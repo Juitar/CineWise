@@ -38,7 +38,7 @@ com.miaoyu.ticket
 
 ## 3. 数据库迁移协作
 
-Flyway 脚本将统一放在 `backend/src/main/resources/db/migration`。当前后端总系分正在执行A/B/C/D字段确认门，确认完成前不生成正式建表迁移，避免把评审附录中的冲突草案写入数据库。
+Flyway 脚本统一放在 `backend/src/main/resources/db/migration`。对应feature OpenSpec建立后，A可以生成用于代码审查的标准格式迁移草案；相关Owner确认且A明确授权前，草案不得在任何数据库执行。没有feature OpenSpec或仍存在字段冲突的表不得提前生成迁移。
 
 运行环境中的`FLYWAY_ENABLED`默认且当前必须为`false`。只有确认门完成、正式迁移通过空MySQL评审后，才可在受控迁移步骤中临时设为`true`；不得在连接云数据库时依靠应用误启动隐式建表。
 
@@ -46,8 +46,8 @@ Flyway 脚本将统一放在 `backend/src/main/resources/db/migration`。当前�
 
 1. 领域Owner先在对应详设和OpenSpec change确认表、索引、生命周期、兼容和回滚方案。
 2. A核对全局雪花ID、`DATETIME(3)`、命名和跨模块逻辑关联规则。
-3. 确认完成后向A申请下一个迁移版本，禁止多人自行占号。
-4. 提交向前迁移；已合并脚本不得改名或改内容。
+3. 向A申请下一个迁移版本，禁止多人自行占号；迁移草案必须在文件头标明未执行状态。
+4. 相关Owner确认后由A授权进入空MySQL验证；已经共享或执行的脚本不得改名或改内容。
 5. 先在空MySQL集成环境验证，再运行重复初始化和旧应用兼容检查。
 
 跨模块使用逻辑关联，不建立物理外键，也不得通过 Mapper 修改其他模块表。
