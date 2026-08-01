@@ -1,0 +1,81 @@
+spring:
+  application:
+    name: cinewise-backend
+  profiles:
+    default: dev
+  jackson:
+    default-property-inclusion: non_null
+    deserialization:
+      fail-on-unknown-properties: true
+  flyway:
+    # 字段确认门通过并生成正式迁移后，部署环境才允许显式开启。
+    enabled: ${FLYWAY_ENABLED:false}
+    locations: classpath:db/migration
+    validate-migration-naming: true
+  threads:
+    virtual:
+      enabled: false
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: false
+  global-config:
+    banner: false
+    db-config:
+      id-type: assign_id
+
+server:
+  port: 8080
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+
+cinewise:
+  api:
+    default-page: 1
+    default-page-size: 20
+    max-page-size: 100
+  security:
+    cors:
+      allowed-origins:
+        - http://localhost:8000
+        - http://localhost:5173
+  scheduling:
+    pool-size: 4
+    thread-name-prefix: cinewise-job-
+    shutdown-await-seconds: 30
+  async:
+    core-pool-size: 2
+    max-pool-size: 8
+    queue-capacity: 100
+    thread-name-prefix: cinewise-async-
+    shutdown-await-seconds: 30
+  http-client:
+    connect-timeout: 2s
+    read-timeout: 5s
+
+logging:
+  pattern:
+    level: "%5p [traceId:%X{traceId:-}]"
+  level:
+    root: INFO
+    com.miaoyu.ticket: INFO
