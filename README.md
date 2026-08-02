@@ -18,8 +18,8 @@ CineWise/
 
 ## 快速开始
 
-1. 复制 `.env.example` 为 `.env`，按本地环境填写密码和密钥；`.env` 不得提交。
-2. 启动 MySQL 与 Redis：`docker compose up -d mysql redis`。
+1. 复制 `.env.example` 为 `.env`，填写云端共享 MySQL 与本地 Redis 的连接信息；`.env` 不得提交。
+2. 启动 Redis：`docker compose up -d redis`。后端通过 `.env` 中的 `MYSQL_HOST` 连接云端 MySQL。
 3. Windows 执行 `backend\mvnw.cmd -f backend\pom.xml spring-boot:run`，macOS/Linux 执行 `bash ./backend/mvnw -f backend/pom.xml spring-boot:run`。
 4. dev 环境访问 `http://localhost:8080/actuator/health` 和 `http://localhost:8080/swagger-ui.html`。
 

@@ -5,7 +5,7 @@
 | 文档版本 | V1.4（2026-07-31） |
 | 适用范围 | 妙语购票后端、Agent 工具适配、数据库迁移、定时任务与接口契约 |
 | 适用成员 | A（票务交易）、B（Agent）、C（认证）、D（数据/推荐/质量） |
-| 技术基线 | Java 21、Spring Boot 3.5.x、Maven、MyBatis-Plus/MyBatis XML、MySQL、Redis、Spring Security、SpringDoc OpenAPI 3；MinIO 为可选 Profile |
+| 技术基线 | Java 21、Spring Boot 3.5.x、Maven、MyBatis-Plus/MyBatis XML、MySQL、Redis、Spring Security、SpringDoc OpenAPI 3；云端 MinIO 为可选对象存储 |
 | 规范级别 | **必须**：合并前满足；**推荐**：无明确理由时遵守；**说明**：统一理解 |
 | 优先级 | 法律与安全要求 > 已冻结 PRD/系统设计/跨模块契约 > 本规范 > 模块实现习惯；发现冲突先停止实现并更新契约，不得用编码规范改写业务规则 |
 
@@ -370,7 +370,7 @@ public record PaymentSucceededEvent(
 
 1. 外部调用必须设置连接超时、读取超时、总预算、有限重试、错误映射和 Mock/降级；非幂等写调用不得自动重试。
 2. 外部 DTO 在 Adapter 边界转换为内部类型，必须标注 `dataSource/dataAt/expiresAt/degraded/fallbackType` 等适用字段；过期或降级数据不能伪装成实时成功结果。
-3. MinIO 在 MVP 中是可选 `storage` Profile，只用于演示静态资源；电子票码由业务数据生成，不以 MinIO 可用作为支付、出票或验票成功条件。
+3. MinIO 在 MVP 中是可选的云端对象存储，只用于演示静态资源；电子票码由业务数据生成，不以 MinIO 可用作为支付、出票或验票成功条件。
 4. 事件、任务和外部 Adapter 日志均携带 `traceId` 与业务关联 ID，不记录敏感原文。
 
 ## 8. 日志、异常与可观测性

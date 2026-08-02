@@ -101,26 +101,62 @@ OpenSpec change：openspec/changes/<change-id>/
 
 SQL 静态审查不能替代真实 MySQL 验证。语法、索引长度、字符集、CHECK、默认值和 MySQL 8 行为，必须由真实 MySQL 8 执行结果确认。
 
-验证环境使用本机 Docker 的 MySQL 8.4 容器即可，但必须满足：
+验证环境使用 A 专用的云端 MySQL 8.4 验证库 `cinewise_migration_check`，必须满足：
 
-- 使用独立、可删除的空数据库和空数据卷；不得使用日常联调的 `cinewise` 数据库。
-- 不使用 Windows 本机 MySQL 服务或任何云数据库作为首次验证环境。
+- 使用独立、可删除的空数据库；不得使用日常联调的 `cinewise` 数据库。
+- 只使用 `cinewise_migrator` 账号连接 `cinewise_migration_check`；不得使用共享 `cinewise_app` 账号执行首次迁移验证。
 - 数据库密码只保存在被 Git 忽略的 `.env` 中；不得写入本文、SQL、OpenSpec、日志或提交记录。
 - `FLYWAY_ENABLED` 默认保持 `false`；只在 A 进行本次受控验证时临时启用，验证后恢复默认值。
 
 ### 环境文件隔离
 
-日常开发阶段只维护现有 `.env`，它只服务于本机 Docker 联调，且 `FLYWAY_ENABLED` 必须保持 `false`。不得为了迁移审查修改其中已有的 MySQL 密码、数据库名或数据卷。
+日常开发阶段使用 `.env` 连接云端共享 `cinewise` 库，且 `FLYWAY_ENABLED` 必须保持 `false`。不得为了迁移审查修改其中已有的数据库名或启用 Flyway。
 
-只有在 A 已完成静态审查并明确授权进行迁移验证时，才创建被 Git 忽略的 `.env.migration-check`。该文件只指向独立、可删除的 Docker 空库；验证完成后可连同该验证库的数据卷删除。
+只有在 A 已完成静态审查并明确授权进行迁移验证时，才使用被 Git 忽略的 `.env.migration-check`。该文件只指向独立、可删除的云端 `cinewise_migration_check` 库。
 
-未来如接入云数据库，云凭据只可放在独立、被 Git 忽略的 `.env.cloud` 中。`.env.cloud` 不得作为 `docker compose up` 的默认环境文件，也不得用于首次迁移验证。
+`.env.cloud` 保留为云端共享库连接信息的参考文件；`.env.migration-check` 是 A 专用迁移验证配置，二者不得混用。
 
 ```text
-.env                     日常本机 Docker 联调；默认不执行迁移
-.env.migration-check     仅在 A 授权的空库迁移验证时创建和使用
-.env.cloud               未来云环境凭据；不参与首次迁移验证
+.env                     云端共享 cinewise 库；默认不执行迁移
+.env.migration-check     仅在 A 授权时连接云端 cinewise_migration_check 验证库
+.env.cloud               云端共享库连接信息的参考文件
 ```
+
+### 从验证库发布到共享 `cinewise` 库
+
+专用 `cinewise_migration_check` 验证通过，不代表迁移已经进入共享 `cinewise` 库。是否需要等待领域代码完成，取决于迁移类型：
+
+- **向后兼容的增量迁移**：只新增独立表、可空字段或索引，不破坏现有应用行为。专用库验证通过并完成共享库发布前检查后，可先迁移空表结构，再由领域 Owner 开发和验证依赖该结构的代码。
+- **破坏性或强耦合迁移**：删除或重命名字段、收紧非空约束、改变现有数据语义，或必须与应用代码同时生效。此类迁移必须等待兼容性验证，并制定应用发布顺序和恢复方案。
+
+V004 只新增 `external_data_snapshot`、`data_sync_log` 两张独立表，不修改 V001 至 V003 的现有表，不包含种子数据，也不建立物理外键，因此属于向后兼容的增量迁移。D 不需要先向 A 提供业务数据；共享库迁移只创建空表结构。
+
+V004 进入共享库前必须同时满足：
+
+```text
+[ ] 专用验证库的首次 migrate、重复 migrate、结构和约束用例全部通过并保存证据
+[ ] A 只读确认共享 cinewise 库当前 Flyway 历史干净、版本和 checksum 与已发布迁移一致
+[ ] 已完成可用备份或时间点恢复确认，并通知受影响成员迁移窗口
+[ ] A 再次确认本次 SQL 对当前应用向后兼容
+```
+
+共享库迁移由 A 使用独立迁移账号在一次性受控步骤中执行。不得使用日常 `cinewise_app` 账号，不得把共享环境的 `FLYWAY_ENABLED` 永久改为 `true`，也不得依靠应用重启自动建表。
+
+推荐顺序：
+
+```text
+验证库通过
+  → A 检查共享库历史与备份
+  → A 单独执行 V004
+  → A 验证 flyway_schema_history 和实际结构
+  → D 使用日常应用账号完成持久层与真实 MySQL 集成测试
+  → 部署依赖 V004 的应用代码
+  → 健康检查与业务冒烟
+```
+
+若迁移不是向后兼容的增量迁移，则不得套用以上顺序，必须先完成领域代码兼容性验证和联合发布方案。
+
+迁移成功后，A 保存共享库的版本、checksum、执行时间、结构检查和冒烟证据；V004 保持冻结。执行失败时不得修改 V004 重试，应停止应用发布并根据失败阶段使用备份恢复或新增向前修复迁移。
 
 每次验证至少记录：
 
@@ -180,7 +216,7 @@ V001至V003首次在云端MySQL 8.4.11执行后已按上述SQL核验：数据库
 
 - 不把 `MYSQL_ROOT_PASSWORD`、业务账号密码、JWT、SSH 私钥或云数据库连接串提交到 Git。
 - 不把 AI 的“通过”当作执行授权。
-- 不在共享库、云库或已有联调数据的数据库上做首次迁移验证。
+- 不在共享 `cinewise` 库、生产库或已有联调数据的数据库上做首次迁移验证；文档明确指定且通过环境守卫的 A 专用 `cinewise_migration_check` 云端验证库除外。
 - 不修改已经共享或执行的 Flyway 历史迁移；需要调整时新增一个向前迁移。
 - 不把 Flyway 结构迁移当作演示种子、账号初始化或业务状态修复工具。
 
@@ -194,7 +230,7 @@ OpenSpec：<change 路径>
 Owner 确认：<人员与日期>
 A 授权：<日期>
 AI 审查结论：通过 / 需修改，问题已处理：<是/否>
-MySQL：8.4.x，本机 Docker 空库
+MySQL：8.4.x，云端 cinewise_migration_check 空库
 migrate：通过 / 失败
 validate：通过 / 失败
 重复执行：通过 / 失败

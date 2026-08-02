@@ -34,7 +34,7 @@ com.miaoyu.ticket
 - 调度使用 4 线程 `ThreadPoolTaskScheduler`；进程锁不是幂等依据，Job 必须使用数据库条件更新、版本 CAS 或唯一约束。
 - 非核心异步任务使用有界 `applicationTaskExecutor`；队列满时明确拒绝，不允许静默丢弃或无界扩张。
 - 外部 Provider 复用 `externalRestClient` 的连接/读取超时基线；业务写操作不得在客户端层自动重试。
-- MinIO 仅在 `storage` profile 启用，不是应用启动或交易主链路依赖。
+- 云端 MinIO 仅用于海报和演示附件，不是应用启动或交易主链路依赖。
 
 ## 3. 数据库迁移协作
 
@@ -70,8 +70,7 @@ Set-Location backend
 .\mvnw.cmd verify # macOS/Linux 使用 cd backend && bash ./mvnw verify
 Set-Location ..
 docker compose config
-docker compose up -d mysql redis
-docker compose --profile storage up -d minio
+docker compose up -d redis
 ```
 
 `verify` 包含编译、单元/上下文测试、ArchUnit、Checkstyle、SpotBugs 和 JaCoCo 报告。本机 H2 测试只用于快速反馈；订单并发、MySQL 条件更新、Flyway 兼容、Redis 降级和容器冒烟必须在后续集成测试中使用真实组件。
