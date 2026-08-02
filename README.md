@@ -44,4 +44,4 @@ CineWise/
 - 写操作不进行网络层自动重试；幂等与恢复必须由业务用例明确实现。
 - 提交前进入 `backend/`，执行 `mvnw.cmd verify`（Windows）或 `bash ./mvnw verify`（macOS/Linux）。
 
-详细边界见 [后端骨架说明](docs/backend-skeleton.md) 和团队系分、编码规范。
+详细边界见 [后端骨架说明](docs/backend-skeleton.md) 和 [后端团队编码规范](docs/backend-coding-standards.md)。
