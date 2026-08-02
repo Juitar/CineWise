@@ -11,8 +11,10 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /** 将异常统一映射为 HTTP 状态与 {@link Result}，不向客户端暴露内部堆栈。 */
@@ -35,7 +37,12 @@ public class GlobalExceptionHandler {
         return badRequest(message);
     }
 
-    @ExceptionHandler({ConstraintViolationException.class, HttpMessageNotReadableException.class})
+    @ExceptionHandler({
+        ConstraintViolationException.class,
+        HttpMessageNotReadableException.class,
+        MissingServletRequestParameterException.class,
+        MethodArgumentTypeMismatchException.class
+    })
     public ResponseEntity<Result<Void>> handleInvalidRequest(Exception exception) {
         LOGGER.debug("请求参数解析或校验失败", exception);
         return badRequest(CommonErrorCode.INVALID_PARAMETER.message());

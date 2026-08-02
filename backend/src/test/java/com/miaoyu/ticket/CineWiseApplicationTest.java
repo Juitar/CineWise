@@ -36,6 +36,6 @@ class CineWiseApplicationTest {
 
     @Test
     void shouldDenyNonPublicEndpointByDefault() throws Exception {
-        mockMvc.perform(get("/api/v1/not-implemented")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/not-implemented")).andExpect(status().isUnauthorized());
     }
 }

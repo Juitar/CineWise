@@ -58,6 +58,9 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      FLYWAY_ENABLED: ${FLYWAY_ENABLED:-false}
+      SEED_ENABLED: ${SEED_ENABLED:-false}
+      SEED_FIXED_VALUE: ${SEED_FIXED_VALUE:-20260802}
     depends_on:
       mysql:
         condition: service_healthy

@@ -75,3 +75,18 @@ docker compose --profile storage up -d minio
 ```
 
 `verify` 包含编译、单元/上下文测试、ArchUnit、Checkstyle、SpotBugs 和 JaCoCo 报告。本机 H2 测试只用于快速反馈；订单并发、MySQL 条件更新、Flyway 兼容、Redis 降级和容器冒烟必须在后续集成测试中使用真实组件。
+
+## 6. 固定演示种子
+
+固定种子与 Flyway 结构迁移分离，默认不执行。受控初始化时临时设置：
+
+```powershell
+$env:SEED_ENABLED = "true"
+$env:SEED_FIXED_VALUE = "20260802"
+Set-Location backend
+.\mvnw.cmd spring-boot:run
+```
+
+初始化完成后停止应用并清除当前终端中的`SEED_ENABLED`。本地 Compose 也会显式传递同名变量，但默认值仍为`false`。
+
+当前种子确保10部Mock影片、4家Mock影院、每家2个影厅、相对运行日期0至6天的早中晚场次和80座完整座位图。重复执行只补缺失业务对象；不会更新已有场次，也不会重置`LOCKED`、`SOLD`或其他非`AVAILABLE`座位。账号、订单、支付、电子票、天气和Agent失败场景由对应模块另行初始化，不属于本种子范围。

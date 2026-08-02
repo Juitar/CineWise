@@ -1,0 +1,90 @@
+package com.miaoyu.ticket.ticketing.infrastructure.persistence;
+
+import com.miaoyu.ticket.ticketing.application.ShowQueryRepository;
+import java.util.List;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+/** 场次和座位快照的显式只读 SQL，查询范围与排序均在数据库侧固定。 */
+@Mapper
+public interface TicketingQueryMapper {
+
+    /** 查询滚动窗口内的可售场次，并在数据库侧汇总实时可用座位数。 */
+    @Select("""
+            <script>
+            SELECT ms.id AS show_id,
+                   ms.movie_id,
+                   ms.cinema_id,
+                   ms.auditorium_id,
+                   a.name AS auditorium_name,
+                   ms.start_time,
+                   ms.end_time,
+                   ms.language_version,
+                   ms.base_price,
+                   SUM(CASE WHEN ss.status = 'AVAILABLE' THEN 1 ELSE 0 END) AS available_seat_count,
+                   ms.status,
+                   ms.data_type,
+                   ms.version,
+                   ms.update_time AS updated_at
+              FROM movie_show ms
+              JOIN auditorium a ON a.id = ms.auditorium_id
+              LEFT JOIN show_seat ss ON ss.show_id = ms.id
+             WHERE ms.movie_id = #{criteria.movieId}
+               AND ms.cinema_id = #{criteria.cinemaId}
+               AND ms.status = 'ON_SALE'
+               AND ms.start_time &gt; #{criteria.startsAfter}
+               AND ms.start_time &lt; #{criteria.startsBefore}
+            <if test="criteria.dateStart != null">
+               AND ms.start_time &gt;= #{criteria.dateStart}
+               AND ms.start_time &lt; #{criteria.dateEnd}
+            </if>
+            <if test="criteria.timeFrom != null">
+               AND CAST(ms.start_time AS TIME) &gt;= #{criteria.timeFrom}
+            </if>
+            <if test="criteria.timeTo != null">
+               AND CAST(ms.start_time AS TIME) &lt; #{criteria.timeTo}
+            </if>
+             GROUP BY ms.id, ms.movie_id, ms.cinema_id, ms.auditorium_id, a.name,
+                      ms.start_time, ms.end_time, ms.language_version, ms.base_price,
+                      ms.status, ms.data_type, ms.version, ms.update_time
+             ORDER BY ms.start_time, ms.id
+            </script>
+            """)
+    List<ShowQueryRow> findSaleableShows(@Param("criteria") ShowQueryRepository.QueryCriteria criteria);
+
+    /** 查询座位图头部，同时取场次与座位中较新的更新时间作为快照时间。 */
+    @Select("""
+            SELECT ms.id AS show_id,
+                   ms.auditorium_id,
+                   a.name AS auditorium_name,
+                   a.row_count,
+                   a.seat_count,
+                   SUM(CASE WHEN ss.status = 'AVAILABLE' THEN 1 ELSE 0 END) AS available_seat_count,
+                   ms.status,
+                   ms.start_time,
+                   ms.version,
+                   GREATEST(ms.update_time, COALESCE(MAX(ss.update_time), ms.update_time)) AS updated_at
+              FROM movie_show ms
+              JOIN auditorium a ON a.id = ms.auditorium_id
+              LEFT JOIN show_seat ss ON ss.show_id = ms.id
+             WHERE ms.id = #{showId}
+             GROUP BY ms.id, ms.auditorium_id, a.name, a.row_count, a.seat_count,
+                      ms.status, ms.start_time, ms.version, ms.update_time
+            """)
+    ShowSeatHeaderRow findShowSeatHeader(@Param("showId") long showId);
+
+    /** 按行号、座号和主键稳定排序，返回场次的完整座位集合。 */
+    @Select("""
+            SELECT id AS seat_id,
+                   row_no,
+                   seat_no,
+                   seat_label,
+                   status,
+                   version
+              FROM show_seat
+             WHERE show_id = #{showId}
+             ORDER BY row_no, seat_no, id
+            """)
+    List<SeatQueryRow> findSeats(@Param("showId") long showId);
+}

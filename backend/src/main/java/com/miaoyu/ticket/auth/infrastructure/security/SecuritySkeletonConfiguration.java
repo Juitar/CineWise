@@ -2,9 +2,12 @@ package com.miaoyu.ticket.auth.infrastructure.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 
 /**
  * 认证功能合并前的默认拒绝安全壳。C 应在本配置上接入 JWT Cookie、CSRF、401/403 处理器和角色规则，
@@ -20,9 +23,15 @@ public class SecuritySkeletonConfiguration {
     @Bean
     public SecurityFilterChain applicationSecurityFilterChain(HttpSecurity http) throws Exception {
         http.cors(Customizer.withDefaults())
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(PUBLIC_ENDPOINTS)
                         .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/shows")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/shows/*/seats")
+                        .authenticated()
                         .anyRequest()
                         .denyAll())
                 .formLogin(form -> form.disable())

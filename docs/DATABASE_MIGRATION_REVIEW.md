@@ -65,7 +65,7 @@ OpenSpec change：openspec/changes/<change-id>/
 - SQL 是否包含 DROP、TRUNCATE、无条件 DELETE、REPLACE 或其他危险语句；
 - 是否修改、删除或重命名历史迁移；
 - 是否错误建立跨模块物理外键，或通过数据库约束越过模块边界；
-- BIGINT 雪花 ID、DATETIME(3)、DECIMAL(10,2)、utf8mb4 等规则是否遵守；
+- BIGINT 雪花 ID、DATETIME(3)、DECIMAL(10,2)、utf8mb4 和`utf8mb4_0900_ai_ci`等规则是否遵守；
 - 必要的唯一约束、索引、CHECK、version 与审计字段是否缺失；
 - SQL 是否与 OpenSpec 中的字段、状态、Owner 边界和生命周期冲突；
 - 是否混入非结构性演示种子、真实账号、密码、JWT 或其他密钥；
@@ -87,7 +87,8 @@ OpenSpec change：openspec/changes/<change-id>/
 [ ] 历史迁移没有被修改、改名或删除
 [ ] SQL 没有 DROP、TRUNCATE、无条件 DELETE、REPLACE 等危险语句
 [ ] 内部主键为 BIGINT 雪花 ID；时间为 DATETIME(3)；金额为 DECIMAL(10,2)
-[ ] 字符集、排序规则、可空性、默认值与 OpenSpec 一致
+[ ] 每张新表显式声明`ENGINE = InnoDB DEFAULT CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci`
+[ ] 数据库、表和字符串列的实际字符集、排序规则、可空性、默认值与OpenSpec一致
 [ ] 必要的 UNIQUE、普通索引、CHECK、version 和审计字段已定义
 [ ] 跨模块只保存业务 ID，不建立物理外键；不通过其他模块 Mapper 写表
 [ ] 迁移不混入真实数据、密码、JWT、账号或不可重复的演示种子
@@ -128,11 +129,52 @@ SQL 静态审查不能替代真实 MySQL 验证。语法、索引长度、字符
 [ ] 执行前 Flyway info 结果
 [ ] migrate 成功结果与 flyway_schema_history 记录
 [ ] 表、列、主键、UNIQUE、普通索引、CHECK 的实际检查结果
+[ ] 数据库、表和字符串列的实际字符集与排序规则检查结果
 [ ] 应用或 Flyway 再执行一次后的结果：不得重复建表或改写历史版本
 [ ] 失败时的错误摘要、处理结论与是否需要回退 SQL 草案
 ```
 
 真实 MySQL 验证通过后，才可以在对应 OpenSpec 的任务中勾选“空 MySQL 执行迁移”。
+
+### 6.1 字符集与排序规则核验
+
+新建表不得只写`DEFAULT CHARSET = utf8mb4`并依赖数据库或服务器默认排序规则。所有后续`CREATE TABLE`必须显式使用：
+
+```sql
+) ENGINE = InnoDB
+  DEFAULT CHARACTER SET = utf8mb4
+  COLLATE = utf8mb4_0900_ai_ci;
+```
+
+发现已执行的历史迁移缺少显式`COLLATE`时，按以下顺序处理：
+
+1. 不修改、改名或重新计算已执行迁移的SQL文件。
+2. 先只读核验目标数据库默认排序规则、全部相关表的`TABLE_COLLATION`，以及字符串列的`COLLATION_NAME`。
+3. 如果数据库、相关表和字符串列实际均为`utf8mb4_0900_ai_ci`，记录验证证据即可，不为了补写DDL而新增无效迁移。
+4. 如果任一实际排序规则不一致，由A评估数据量、索引、锁表时间和回滚方案，再新增向前迁移；不得直接手工修改共享库。
+5. 评审范围必须覆盖同批迁移创建的全部表，不能只检查报告中点名的单表。
+
+推荐使用以下只读SQL保存实际证据：
+
+```sql
+SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME
+  FROM information_schema.SCHEMATA
+ WHERE SCHEMA_NAME = DATABASE();
+
+SELECT TABLE_NAME, TABLE_COLLATION
+  FROM information_schema.TABLES
+ WHERE TABLE_SCHEMA = DATABASE()
+ ORDER BY TABLE_NAME;
+
+SELECT TABLE_NAME, COLUMN_NAME, COLLATION_NAME
+  FROM information_schema.COLUMNS
+ WHERE TABLE_SCHEMA = DATABASE()
+   AND COLLATION_NAME IS NOT NULL
+   AND COLLATION_NAME <> 'utf8mb4_0900_ai_ci'
+ ORDER BY TABLE_NAME, ORDINAL_POSITION;
+```
+
+V001至V003首次在云端MySQL 8.4.11执行后已按上述SQL核验：数据库、10张业务表、Flyway历史表及所有字符串列均符合`utf8mb4_0900_ai_ci`。因此历史文件保持不变，未新增仅用于重复转换排序规则的迁移。
 
 ## 7. 禁止事项
 
@@ -157,6 +199,7 @@ migrate：通过 / 失败
 validate：通过 / 失败
 重复执行：通过 / 失败
 结构检查：通过 / 失败
+字符集与排序规则：通过 / 失败
 未验证项与原因：<内容>
 记录人：A
 ```
