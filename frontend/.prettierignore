@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+pnpm-lock.yaml
+src/.umi/
+src/.umi-production/
+src/.umi-test/
+test-results/

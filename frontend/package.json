@@ -1,0 +1,50 @@
+{
+  "name": "cinewise-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=24.18.0 <25",
+    "pnpm": "10.34.5"
+  },
+  "scripts": {
+    "dev": "umi dev",
+    "build": "umi build",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "e2e": "playwright test",
+    "e2e:install": "playwright install chromium",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "umi lint",
+    "postinstall": "umi setup",
+    "setup": "umi setup",
+    "start": "umi dev",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "antd": "5.29.3",
+    "antd-mobile": "5.42.3",
+    "dayjs": "1.11.21",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "umi": "4.6.84"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/jest-dom": "7.0.0",
+    "@testing-library/react": "16.3.2",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "@umijs/lint": "4.6.84",
+    "@vitest/coverage-v8": "4.1.10",
+    "jsdom": "30.0.1",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
+    "vite": "8.2.0",
+    "vitest": "4.1.10"
+  }
+}

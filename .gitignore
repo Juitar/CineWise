@@ -11,3 +11,12 @@ data/
 coverage/
 .DS_Store
 Thumbs.db
+
+# Frontend dependencies and generated files
+node_modules/
+dist/
+.umi/
+.umi-production/
+*.tsbuildinfo
+playwright-report/
+test-results/

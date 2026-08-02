@@ -77,6 +77,23 @@ services:
     restart: unless-stopped
     networks: [backend]
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:${FRONTEND_PORT:-8000}:80
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ | grep -q '<div id=\"root\"></div>'"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    restart: unless-stopped
+    networks: [backend]
+
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     profiles: [storage]

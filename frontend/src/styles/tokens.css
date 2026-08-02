@@ -1,0 +1,12 @@
+:root {
+  --color-primary: #1677ff;
+  --color-text: #1f2329;
+  --color-text-secondary: #646a73;
+  --color-background: #f5f7fa;
+  --color-surface: #fff;
+  --color-border: #dfe3e8;
+  --spacing-page: 24px;
+  --spacing-page-mobile: 16px;
+  --radius-card: 8px;
+  --content-max-width: 1200px;
+}

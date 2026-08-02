@@ -1,0 +1,46 @@
+name: Frontend Verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up pnpm 10.34.5
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - name: Set up Node 24.18.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check formatting
+        run: pnpm format:check
+      - name: Lint source
+        run: pnpm lint
+      - name: Check TypeScript
+        run: pnpm typecheck
+      - name: Run unit and component tests
+        run: pnpm test
+      - name: Build frontend
+        run: pnpm build
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run browser flow tests
+        run: pnpm e2e
