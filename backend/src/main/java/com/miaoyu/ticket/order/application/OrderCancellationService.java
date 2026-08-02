@@ -56,11 +56,15 @@ public class OrderCancellationService {
                         OrderOperationType.CANCEL,
                         idempotencyKey)
                 .orElseThrow(() -> originalException);
-        if (!Objects.equals(operation.orderNoSnapshot(), orderNo)) {
-            throw new BusinessException(OrderErrorCode.IDEMPOTENCY_PARAMETER_MISMATCH);
-        }
         OrderRepository.OrderSnapshot order = repository.findByOrderNo(userId, orderNo)
                 .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        String expectedParameterHash = OrderOperationParameterHasher.hash(
+                OrderOperationType.CANCEL,
+                order.orderId());
+        if (!Objects.equals(operation.orderNoSnapshot(), orderNo)
+                || !Objects.equals(operation.parameterHash(), expectedParameterHash)) {
+            throw new BusinessException(OrderErrorCode.IDEMPOTENCY_PARAMETER_MISMATCH);
+        }
         return viewFactory.create(order);
     }
 

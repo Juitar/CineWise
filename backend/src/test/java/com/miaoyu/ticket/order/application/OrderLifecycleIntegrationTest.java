@@ -133,6 +133,44 @@ class OrderLifecycleIntegrationTest {
     }
 
     @Test
+    void givenSameCancellationKey_whenTwoRequestsCancelSameOrder_thenReturnOneCommittedResult() throws Exception {
+        ShowSeats fixture = findFutureShowSeats(1);
+        OrderView order = createOrder(
+                fixture.showId(),
+                fixture.seatIds(),
+                "concurrent-cancel-create",
+                "concurrent-cancel-create-key");
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<OrderView> first = executor.submit(() -> cancelAfterSignal(
+                    start,
+                    order.orderNo(),
+                    "concurrent-cancel-key"));
+            Future<OrderView> second = executor.submit(() -> cancelAfterSignal(
+                    start,
+                    order.orderNo(),
+                    "concurrent-cancel-key"));
+            start.countDown();
+
+            OrderView firstResult = first.get(10, TimeUnit.SECONDS);
+            OrderView secondResult = second.get(10, TimeUnit.SECONDS);
+            assertThat(firstResult.status()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(secondResult.status()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(secondResult.orderId()).isEqualTo(firstResult.orderId());
+            assertThat(secondResult.stateVersion()).isEqualTo(firstResult.stateVersion());
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+        }
+
+        assertThat(countOperations()).isEqualTo(1);
+        assertThat(orderStatus(order.orderId())).isEqualTo("CANCELLED");
+        assertThat(seatStatus(fixture.seatIds().getFirst())).isEqualTo("AVAILABLE");
+    }
+
+    @Test
     void givenSeatOwnershipChanged_whenCancel_thenRollbackOrderAndAnyPartialRelease() {
         ShowSeats fixture = findFutureShowSeats(2);
         OrderView order = createOrder(
@@ -269,6 +307,19 @@ class OrderLifecycleIntegrationTest {
             currentUserAccessor.clear();
         }
         return "CANCELLED_OR_CONFLICT";
+    }
+
+    private OrderView cancelAfterSignal(
+            CountDownLatch start,
+            String orderNo,
+            String idempotencyKey) throws InterruptedException {
+        start.await();
+        currentUserAccessor.useUser(USER_A);
+        try {
+            return orderCancellationService.cancelOrder(orderNo, idempotencyKey);
+        } finally {
+            currentUserAccessor.clear();
+        }
     }
 
     private String expireStateAfterSignal(CountDownLatch start, long orderId) throws InterruptedException {
