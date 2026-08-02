@@ -1,8 +1,8 @@
 # Design: ticketing-transaction-flow
 
-## 今日落地范围
+## 实现范围
 
-本阶段只生成交易表结构迁移，不执行迁移、不生成Entity、不实现交易用例。五张表分别承担：
+交易表结构迁移已完成，本阶段在现有Schema上实现建单、查询、取消、过期释放、Mock支付和电子票。五张表分别承担：
 
 | 表 | 权威职责 | 数据库最终约束 |
 | --- | --- | --- |
@@ -17,6 +17,63 @@
 ## 后续状态边界
 
 迁移只提供状态列与约束，不在数据库存储过程或触发器中实现状态机。后续Application Service必须按照冻结状态机和同一本地事务执行条件更新；Mapper不得提供任意`updateStatus`入口。
+
+```text
+Seat:  AVAILABLE -> LOCKED -> SOLD
+       LOCKED -> AVAILABLE (cancel/expiry)
+
+Order: PENDING_PAYMENT -> PAYING -> PAID
+       PENDING_PAYMENT -> CANCELLED | EXPIRED
+```
+
+## 模块与事务边界
+
+- `order/api`只解析字符串业务ID、校验DTO和映射`Result<T>`。
+- `order/application`拥有建单用例与本地事务边界，只从`CurrentUserAccessor`取当前用户。
+- `ticketing/application`提供场次校验和条件锁座能力；`order`不跨模块访问座位Mapper。
+- `order/infrastructure`持久化订单和订单座位快照，不暴露Entity给Controller。
+- 建单事务不包含Redis、HTTP、Agent或其他外部调用。
+
+## 原子建单
+
+`POST /api/v1/orders`接收Header `Idempotency-Key`及Body `showId/seatIds/clientRequestId`，不接收`userId`或金额。一次事务按以下固定顺序执行：
+
+1. 按`userId + clientRequestId`或`userId + idempotencyKey`查询既有订单。
+2. 已有订单时比较两个请求标识、`showId`和排序去重后的`seatIds`；相同返回原订单，不同返回`205005`。
+3. 重新读取场次状态、开场时间和服务端价格，校验场次`ON_SALE`且未开场。
+4. 校验1至6个不重复座位均属于该场次，按`seatId`升序执行带`show_id/status/version`条件的`AVAILABLE -> LOCKED`更新。
+5. 任一条更新影响行数不为1时抛出`204001`，使已锁座位、订单和明细全部回滚。
+6. 用同一`orderNo`写入座位锁、`PENDING_PAYMENT`订单和订单座位快照。单价取`movie_show.base_price`，`totalAmount = unitPrice * ticketCount`。
+
+并发重复请求可能同时通过首次幂等查询。如条件锁座或唯一约束竞争失败，当前事务必须先回滚，再在新的只读事务中按原请求键恢复已提交结果。查到同参订单时返回原结果；查到异参订单时返回`205005`；仍无订单时才返回`204001`。
+
+## 恢复与后续交易
+
+- `GET /api/v1/orders/by-request/{clientRequestId}`必须按当前用户过滤，未找到返回`205001`。
+- 取消和过期只释放`status=LOCKED AND lock_order_no=当前订单号`的座位。
+- Mock支付只接收订单号和Header幂等键，业务请求体为空，后端任何层均不定义六位模拟密码字段。
+- 支付在同一事务内保证唯一支付、`PAYING/PAID`订单、`SOLD`座位和唯一电子票；提交后发布`PaymentSucceededEvent`。
+- HTTP响应未知时只能调用查询接口恢复，不自动生成新幂等键或重放写请求。
+
+## 订单查询、取消与过期
+
+`OrderQueryService`按`CurrentUserAccessor`返回本人列表、详情和恢复结果。列表的`status`只接受`OrderStatus`枚举白名单，日期使用Asia/Shanghai左闭右开区间，`size`不超过公共上限。持久化层先分页查订单，再一次批量查询本页座位快照，不对每个订单生成一次N+1查询。
+
+V005新增A拥有的`ticket_order_operation`表，只保存交易写动作幂等关系和已确定结果，不存储JWT、确认凭证或其他模块数据。取消的`parameter_hash`由`action + orderId`确定性生成；同`userId + action + idempotencyKey`命中后，同参返回原结果，异参返回`205005`。
+
+`OrderCancellationTransaction`首先按`userId + orderNo`锁定订单行，再校验幂等记录和状态。它在同一事务中执行带`PENDING_PAYMENT + version`条件的`CANCELLED`更新、写入操作记录，并通过`SeatReleaseService`只释放当前`orderNo`拥有的`LOCKED`座位。释放数与订单明细数不一致时抛出不可恢复的一致性异常并回滚，不提交半取消状态。
+
+`OrderExpiryService`每批最多扫描100个候选主键，逐个调用独立的`OrderExpiryTransaction`。后者使用`id/status/expire_time/version`条件抢占`EXPIRED`迁移，成功后安全释放座位；条件失败表示另一取消、过期或支付流程已经取得权威结果，当前任务安全跳过。`ExpiredOrderReleaseJob`每30秒只调用该Application Service，不访问Mapper。
+
+## 配置和时间
+
+`TICKET_LOCK_MINUTES`与`ORDER_PAYMENT_MINUTES`默认15，范围5至30。为避免订单在座位锁失效后仍显示可支付，建单的座位锁与订单截止时间统一使用两个配置中的较早时间。所有时间通过注入`Clock`生成并按毫秒持久化。
+
+## 测试策略
+
+- H2用于快速的REST、幂等和回滚回归。
+- 并发条件更新必须在真实MySQL 8环境验证；H2结果不作为防超卖的唯一证据。
+- 必测20请求抢同一座位、同键同参恢复、同键异参、多座位部分冲突全回滚、跨用户恢复不可见。
 
 ## 迁移策略
 
