@@ -54,12 +54,6 @@ cinewise:
     # 演示数据必须显式开启，避免普通启动过程意外写入共享数据库。
     enabled: ${SEED_ENABLED:false}
     fixed-value: ${SEED_FIXED_VALUE:20260802}
-  transaction:
-    ticket-lock-minutes: ${TICKET_LOCK_MINUTES:15}
-    order-payment-minutes: ${ORDER_PAYMENT_MINUTES:15}
-    expiry-job-enabled: ${ORDER_EXPIRY_JOB_ENABLED:true}
-    expiry-job-delay-milliseconds: ${ORDER_EXPIRY_JOB_DELAY_MILLISECONDS:30000}
-    expiry-batch-size: ${ORDER_EXPIRY_BATCH_SIZE:100}
   api:
     default-page: 1
     default-page-size: 20
