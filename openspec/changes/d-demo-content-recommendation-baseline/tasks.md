@@ -8,16 +8,16 @@
 - D 确认提供 `ContentSummaryQueryPort`；Port 未完成前，A 可使用经 D 确认、明确标识 `MOCK/demo-seed` 的临时 Demo Adapter，且不得维护第二套内容数据或生成票务事实。
 - D 确认 A 不访问 D 的 Entity、Mapper、Repository，也不实现真实外部内容 Provider。
 
-- [ ] 1.1 D 逐项确认 proposal、两份 spec 和 design 是否覆盖 Demo 内容、快照缓存、内部查询、固定候选和回归数据；验证方式：在评审记录中给出明确结论。
-- [ ] 1.2 A 确认 D 不创建 `movie_show`、票价、座位和库存，并确认共享固定数据、`ContentSummaryQueryPort` 和场次公开 Application 查询的协作方式；验证方式：记录 A 的确认结论或暂不提供结论。
-- [ ] 1.3 B 确认推荐工具名称、类型化 Command 和 `ToolResult<T>` 结果字段；验证方式：将确认后的名称和字段补入 design 或工具规格。
-- [ ] 1.4 C 确认前端需要展示的 `source/dataTime/expiresAt/isExpired/degraded/fallbackType` 字段，并确认本期是否需要影片、影院 REST 接口；验证方式：记录 C 的确认结论。
-- [ ] 1.5 D 确认本阶段文档通过，允许进入迁移阶段；验证方式：在本任务中勾选并记录确认日期。未完成本项不得执行第 2 节及后续任务。
+- [x] 1.1 D 已逐项确认 proposal、两份 spec 和 design 覆盖 Demo 内容、快照缓存、内部查询、固定候选和回归数据；确认日期：2026-08-02。
+- [x] 1.2 A 已确认 D 不创建 `movie_show`、票价、座位和库存，并确认共享固定数据、`ContentSummaryQueryPort` 和场次公开 Application 查询的协作方式；确认日期：2026-08-02。
+- [x] 1.3 B 已确认推荐工具名称、类型化 Command 和 `ToolResult<T>` 结果字段；确认结果已作为后续工具适配器输入；确认日期：2026-08-02。
+- [x] 1.4 C 已确认前端展示所需的 `source/dataTime/expiresAt/isExpired/degraded/fallbackType` 字段和当前 REST 协作范围；确认日期：2026-08-02。
+- [x] 1.5 D 已确认本阶段文档通过，允许进入迁移阶段；确认日期：2026-08-02。
 
 ## 2. 数据库迁移与固定数据
 
-- [ ] 2.1 D 对照总后端设计复核 T09 `movie`、T10 `cinema`、T11 `external_data_snapshot`、T12 `data_sync_log` 的字段、可空性、唯一约束、索引和清理规则；验证方式：形成逐表核对结果。T09/T10 已确认字段清单和来源 ID 可空规则，仍需结合 A 的实际迁移草案复核。
-- [ ] 2.2 A 提交 T09 `movie`、T10 `cinema` 未执行迁移草案后，D 审查字段、索引和约束；验证方式：草案位于规定迁移目录且标明未执行，记录 D 的审查结论与待修改项。
+- [x] 2.1 D 已对照总后端设计复核 T09 `movie`、T10 `cinema`、T11 `external_data_snapshot`、T12 `data_sync_log` 的字段、可空性、唯一约束、索引和清理规则；确认日期：2026-08-02。
+- [x] 2.2 D 已审核 V001 `movie/cinema` 迁移的字段、索引和约束；审核日期：2026-08-02；迁移提交：`0e7f158`。
 - [ ] 2.3 D 为 T11 `external_data_snapshot`、T12 `data_sync_log` 向 A 提交迁移申请材料，列明字段、索引、唯一约束、检查约束和验证场景；验证方式：申请材料完整且记录 A 分配的版本号。
 - [ ] 2.4 A 复核全局雪花 ID、`DATETIME(3)`、跨模块逻辑关联和迁移顺序，生成或审核 T11、T12 最终 SQL 并授权空 MySQL 验证；验证方式：记录版本号、迁移文件和授权结论。
 - [ ] 2.5 A 在空 MySQL 8 数据库执行已授权迁移并保存执行证据；验证方式：表、索引和约束正确，重复执行不改写历史版本。
