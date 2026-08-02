@@ -95,10 +95,12 @@ agent/tool/         B 的工具协议适配器，仅调用 recommendation Applic
 
 - `movie`：标准化影片快照；`source_movie_id` 非空时，业务唯一键为 `source + source_movie_id`。
 - `cinema`：标准化影院快照；`source_cinema_id` 非空时，业务唯一键为 `source + source_cinema_id`。
-- `external_data_snapshot`：保留最小必要 Provider 载荷，唯一键为 `provider + external_id + data_type`。
-- `data_sync_log`：记录初始化或同步结果，唯一键为 `provider + request_id`。
+- `external_data_snapshot`：保留最小必要 Provider 载荷，唯一键为 `provider + external_id + data_type`；包含 `version`、`create_time`、`update_time`，并限制 `expire_time` 为空或不早于 `data_time`。
+- `data_sync_log`：记录初始化或同步结果，唯一键为 `provider + request_id`；包含 `version`、`create_time`、`update_time`，并有按 `create_time` 查询和清理满 180 天日志的索引。
 
 字段、类型、索引和生命周期以总后端设计的 T09 至 T12 为基线。`external_data_snapshot.expire_time` 在 Java DTO 中映射为 `expiresAt`；不因此增加第二个过期字段。
+
+`data_sync_log` 的状态只允许 `RUNNING`、`SUCCESS`、`FAILED`、`PARTIAL`。`RUNNING` 可以记录已处理数量，但 `finished_at` 必须为空；结束状态的 `finished_at` 必须不早于 `started_at`。结束时，`SUCCESS` 必须全部成功、`FAILED` 必须全部失败、`PARTIAL` 必须同时存在成功和失败记录，且成功数与失败数之和等于总数。三个统计数不得为负，处理中成功数与失败数之和不得超过总数。日志由 D 后续通过 Application Service 每日分批清理 `create_time` 满 180 天的记录，每批最多 500 条。
 
 本变更不创建物理外键。所有主键使用应用生成的 BIGINT 雪花 ID，外部返回时转换为字符串；数据库时间使用 `DATETIME(3)`，应用通过统一时钟处理。
 

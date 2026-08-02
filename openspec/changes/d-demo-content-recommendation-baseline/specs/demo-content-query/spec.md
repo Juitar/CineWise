@@ -109,6 +109,27 @@
 - **THEN** 推荐模块不得将其作为当前可购事实
 - **AND** 调用结果必须保留 `isExpired=true` 和原始来源时间
 
+### Requirement: 内容快照和同步日志必须保留正确的时间与统计关系
+`external_data_snapshot` MUST 包含 `version`、`create_time` 和 `update_time`；`expire_time` 可以为空，但不为空时 MUST 不早于 `data_time`。`data_sync_log` MUST 包含 `version`、`create_time` 和 `update_time`，并建立按 `create_time` 清理满 180 天日志的索引。
+
+同步状态只允许 `RUNNING`、`SUCCESS`、`FAILED`、`PARTIAL`。三个统计数不得为负；处理中成功数与失败数之和不得超过总数。结束状态的 `finished_at` MUST 不早于 `started_at`，且统计数必须与状态一致：`SUCCESS` 全部成功、`FAILED` 全部失败、`PARTIAL` 同时存在成功和失败记录；结束状态的成功数和失败数之和必须等于总数。
+
+#### Scenario: 写入过期时间早于数据时间的快照
+- **GIVEN** 快照的 `expire_time` 不为空且早于 `data_time`
+- **WHEN** 尝试写入快照
+- **THEN** 数据库拒绝该记录
+
+#### Scenario: 写入结束时间早于开始时间的同步日志
+- **GIVEN** 同步状态为 `SUCCESS`、`FAILED` 或 `PARTIAL`
+- **AND** `finished_at` 早于 `started_at`
+- **WHEN** 尝试写入同步日志
+- **THEN** 数据库拒绝该记录
+
+#### Scenario: 写入与状态不一致的同步统计
+- **GIVEN** `SUCCESS` 同步记录存在失败数，或 `FAILED` 同步记录存在成功数，或 `PARTIAL` 未同时存在成功和失败数
+- **WHEN** 尝试写入同步日志
+- **THEN** 数据库拒绝该记录
+
 ### Requirement: D 内容数据不得越过票务边界
 影片和影院内容查询 MUST NOT 创建、修改或推断场次、票价、座位、库存和交易状态；这些信息只能来自 A 提供的公开只读能力或双方确认的固定联调数据。
 

@@ -18,7 +18,7 @@
 
 - [x] 2.1 D 已对照总后端设计复核 T09 `movie`、T10 `cinema`、T11 `external_data_snapshot`、T12 `data_sync_log` 的字段、可空性、唯一约束、索引和清理规则；确认日期：2026-08-02。
 - [x] 2.2 D 已审核 V001 `movie/cinema` 迁移的字段、索引和约束；审核日期：2026-08-02；迁移提交：`0e7f158`。
-- [ ] 2.3 D 为 T11 `external_data_snapshot`、T12 `data_sync_log` 向 A 提交迁移申请材料，列明字段、索引、唯一约束、检查约束和验证场景；验证方式：申请材料完整且记录 A 分配的版本号。
+- [x] 2.3 D 已向 A 提交 T11 `external_data_snapshot`、T12 `data_sync_log` 的迁移申请材料；A 预留版本 `V004`，文件为 `backend/src/main/resources/db/migration/V004__create_content_snapshot_and_sync_log_tables.sql`。2026-08-02 复审要求补充时间顺序和状态统计规则；修正草案待 A 最终静态确认，未授权执行。
 - [ ] 2.4 A 复核全局雪花 ID、`DATETIME(3)`、跨模块逻辑关联和迁移顺序，生成或审核 T11、T12 最终 SQL 并授权空 MySQL 验证；验证方式：记录版本号、迁移文件和授权结论。
 - [ ] 2.5 A 在空 MySQL 8 数据库执行已授权迁移并保存执行证据；验证方式：表、索引和约束正确，重复执行不改写历史版本。
 - [ ] 2.6 A 初始化共享固定影片、影院数据；D 确认字段、来源和时间规则并复用稳定业务 ID；验证方式：保存共享数据清单和 ID 对照表，D 的 `demo-content-v1` 不再插入第二套影片、影院。
