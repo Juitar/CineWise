@@ -18,10 +18,12 @@
 
 - [x] 2.1 D 已对照总后端设计复核 T09 `movie`、T10 `cinema`、T11 `external_data_snapshot`、T12 `data_sync_log` 的字段、可空性、唯一约束、索引和清理规则；确认日期：2026-08-02。
 - [x] 2.2 D 已审核 V001 `movie/cinema` 迁移的字段、索引和约束；审核日期：2026-08-02；迁移提交：`0e7f158`。
-- [x] 2.3 D 已向 A 提交 T11 `external_data_snapshot`、T12 `data_sync_log` 的迁移申请材料；A 预留版本 `V004`，文件为 `backend/src/main/resources/db/migration/V004__create_content_snapshot_and_sync_log_tables.sql`。2026-08-02 复审要求补充时间顺序和状态统计规则；修正草案待 A 最终静态确认，未授权执行。
-- [ ] 2.4 A 复核全局雪花 ID、`DATETIME(3)`、跨模块逻辑关联和迁移顺序，生成或审核 T11、T12 最终 SQL 并授权空 MySQL 验证；验证方式：记录版本号、迁移文件和授权结论。
-- [ ] 2.5 A 在空 MySQL 8 数据库执行已授权迁移并保存执行证据；验证方式：表、索引和约束正确，重复执行不改写历史版本。
+- [x] 2.3 D 已向 A 提交 T11 `external_data_snapshot`、T12 `data_sync_log` 的迁移申请材料；A 分配版本 `V004`，文件为 `backend/src/main/resources/db/migration/V004__create_content_snapshot_and_sync_log_tables.sql`。D 已按两轮复审补齐时间顺序、状态统计、清理索引和生命周期规则。
+- [x] 2.4 A 已于 2026-08-02 复核雪花 ID、`DATETIME(3)`、跨模块逻辑关联和迁移顺序，完成 V004 最终静态审查并授权专用空 MySQL 8.4 验证。
+- [x] 2.5 A 已于 2026-08-02 在 MySQL 8.4.11 专用空库执行 V001 至 V004；首次 migrate、重复 migrate、Flyway 历史、字符集、排序规则、唯一键、索引和 16 个 CHECK 正反用例全部通过。证据见 `docs/V004_MIGRATION_VALIDATION_2026-08-02.md`。
 - [ ] 2.6 A 初始化共享固定影片、影院数据；D 确认字段、来源和时间规则并复用稳定业务 ID；验证方式：保存共享数据清单和 ID 对照表，D 的 `demo-content-v1` 不再插入第二套影片、影院。
+- [x] 2.7 A 已于 2026-08-02 完成共享 `cinewise` 的历史、checksum、备份和兼容性检查，并使用独立 `cinewise_migrator` 执行 V004；首次应用 1 个迁移，重复执行应用 0 个迁移，两张空表、索引、6 个 CHECK 和排序规则检查通过，证据见 `docs/V004_SHARED_MIGRATION_2026-08-02.md`。应用环境的 `FLYWAY_ENABLED` 保持 `false`。
+- [ ] 2.8 D 使用日常应用账号完成依赖 V004 的持久层和真实 MySQL 集成测试；验证方式：覆盖两张表的正常写入、唯一键和 CHECK 拒绝场景，不执行 Flyway，不使用迁移账号。
 
 ## 3. Demo 内容、快照和缓存实现
 

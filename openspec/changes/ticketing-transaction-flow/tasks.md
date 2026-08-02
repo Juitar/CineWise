@@ -2,13 +2,13 @@
 
 ## 数据库基线
 
-- [x] 建立proposal、design、ticketing-database spec和任务清单。
-- [x] 冻结T16-T20字段、唯一约束、索引和CHECK约束。
-- [x] 明确`ticket_order_seat`为追加写快照并补齐`update_time`审计字段。
-- [x] A生成T16-T20标准多行Flyway SQL并完成静态核对。
-- [x] V003已在本地MySQL 8.0.40可丢弃隔离库完成兼容性预演。
-- [ ] A按迁移规范在独立MySQL 8.4空库正式执行Flyway。
-- [ ] 正式执行重复迁移、约束和索引验证并保存结果；预演结果见`content-and-show-selection-flow/tasks.md`。
+- [X] 建立proposal、design、ticketing-database spec和任务清单。
+- [X] 冻结T16-T20字段、唯一约束、索引和CHECK约束。
+- [X] 明确`ticket_order_seat`为追加写快照并补齐`update_time`审计字段。
+- [X] A生成T16-T20标准多行Flyway SQL并完成静态核对。
+- [X] V003已在本地MySQL 8.0.40可丢弃隔离库完成兼容性预演。
+- [X] A按迁移规范在独立MySQL 8.4空库正式执行Flyway。
+- [X] 正式执行重复迁移、约束和索引验证并保存结果；预演结果见`content-and-show-selection-flow/tasks.md`。
 
 ## 后续交易实现
 
