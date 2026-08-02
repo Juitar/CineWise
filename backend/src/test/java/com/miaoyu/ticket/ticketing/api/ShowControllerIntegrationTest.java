@@ -100,7 +100,7 @@ class ShowControllerIntegrationTest {
     }
 
     @Test
-    void givenTicketingEndpoints_whenReadOpenApi_thenExposeBothReadContracts() throws Exception {
+    void givenTicketingEndpoints_whenReadOpenApi_thenExposeReadAndOrderContracts() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paths['/api/v1/shows'].get").exists())
@@ -108,7 +108,13 @@ class ShowControllerIntegrationTest {
                 .andExpect(jsonPath("$.paths['/api/v1/shows/{showId}/seats'].get").exists())
                 .andExpect(jsonPath(
                                 "$.paths['/api/v1/shows/{showId}/seats'].get.security[0].cookieAuth")
-                        .isArray());
+                        .isArray())
+                .andExpect(jsonPath("$.paths['/api/v1/orders'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/orders'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/orders/by-request/{clientRequestId}'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/orders/{orderNo}'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/orders/{orderNo}/cancel'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/orders'].post.security[0].cookieAuth").isArray());
     }
 
     @Test

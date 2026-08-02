@@ -18,6 +18,10 @@ management:
     redis:
       enabled: false
 
+cinewise:
+  transaction:
+    expiry-job-enabled: false
+
 springdoc:
   api-docs:
     enabled: true
