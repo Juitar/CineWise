@@ -60,4 +60,3 @@
 - PR 描述必须列出关联 OpenSpec、改动范围、契约/数据库/权限/配置影响、已确认 Owner、实际验证命令与结果、未验证事项和风险。
 - 提交信息遵守 `docs/GIT_COMMIT_CONVENTION.md`，使用英文 Conventional Commit 协议词和中文主题，例如 `feat(order): 增加订单超时关闭`。
 - 不提交 `.env`、Token、数据库连接串、Cookie、密码、密钥、生产数据、日志、`target`、`node_modules` 或本地容器数据。
-
