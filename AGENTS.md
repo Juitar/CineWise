@@ -109,7 +109,7 @@
 
 ## 6. Git 与代码评审流程
 
-1. 开工前同步主线：`git switch main`、`git pull --ff-only`。不要直接在 `main` 开发。
+1. 开工前同步开发基线：`git switch dev`、`git pull --ff-only origin dev`。不要直接在 `dev` 开发，应从 `dev` 创建本次 OpenSpec change 对应的短生命周期分支。
 2. 每个 OpenSpec change 使用一个短生命周期分支，例如 `feat/agent-runtime-and-workspace`、`fix/auth-cookie-expiry`。
 3. 每次提交只包含一个目的，提交前检查 `git diff --check`、`git status` 和变更文件。提交信息使用 `feat(agent): ...`、`fix(auth): ...`、`test(ticketing): ...`、`docs(openspec): ...` 等格式。
 4. 禁止使用 `git reset --hard`、强推、覆盖他人提交或提交无关格式化；需要整理历史或处理冲突时先确认影响范围。
