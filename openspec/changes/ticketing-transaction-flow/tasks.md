@@ -12,8 +12,28 @@
 
 ## 后续交易实现
 
-- [ ] 实现原子锁座与幂等建单。
-- [ ] 实现本人订单查询、取消和过期释放。
-- [ ] 实现固定成功Mock支付、唯一电子票和结果未知恢复。
+- [x] 扩充proposal、design和spec，冻结原子建单、幂等、恢复和后续交易边界。
+- [x] 实现交易配置、订单领域状态、错误码和持久化端口。
+- [x] 实现按座位ID升序的场次校验与`AVAILABLE -> LOCKED`条件更新。
+- [x] 实现`POST /api/v1/orders`原子建单与同键同参恢复。
+- [x] 实现`GET /api/v1/orders/by-request/{clientRequestId}`本人结果恢复。
+- [x] 完成单请求成功、同键同参、同键异参、部分冲突回滚和跨用户不可见测试。
+- [x] 在真实MySQL 8执行20请求竞争同一座位的并发验收。
+- [x] 冻结本人订单列表/详情、取消幂等记录、安全座位释放和过期Job契约。
+- [x] 生成V005`ticket_order_operation`前向迁移并完成静态审查。
+- [x] 实现本人订单分页列表、详情和批量座位快照查询。
+- [x] 实现取消操作幂等、`PENDING_PAYMENT -> CANCELLED`和按订单归属释放座位。
+- [x] 实现每单独立事务的过期释放服务与`ExpiredOrderReleaseJob`。
+- [x] 完成本人/跨用户查询、重复取消、同键异参、旧订单归属保护、重复/并发过期及取消过期竞争测试。
+- [x] 在独立MySQL 8库验证V005首次/重复迁移和取消/过期条件更新。
+- [ ] 实现固定成功Mock支付、唯一电子票、`PaymentSucceededEvent`和结果未知恢复。
 - [ ] 实现退票确认、幂等退票和替代场次查询。
-- [ ] 完成并发、幂等、状态机、权限和恢复测试。
+- [ ] 完成OpenAPI、B/C联调JSON夹具以及并发、幂等、状态机、权限和恢复回归。
+
+## 实现记录
+
+- 变更编号及模块：`ticketing-transaction-flow`，A的`ticketing/order`模块。
+- 需求/问题与修改范围：基于已执行V003实现原子锁座、幂等建单、丢失响应恢复、本人订单查询、幂等取消和可重复的超时释放；后续继续Mock支付和电子票。
+- 契约影响：新增已冻结的订单REST端点和A拥有的V005操作幂等表；不修改C的认证、安全路由或场次/座位DTO，不修改V001至V004历史迁移。
+- 已执行的验证及结果：2026-08-02执行`openspec validate ticketing-transaction-flow --strict`通过；执行`mvnw.cmd clean verify`通过，共25个测试、0失败、0错误、3个需显式MySQL环境变量的测试跳过，Checkstyle、SpotBugs、ArchUnit和JaCoCo通过。H2覆盖本人/跨用户查询、取消幂等、异参冲突、座位归属不一致回滚、重复/并发过期、取消与过期竞争及`PAYING/PAID`保护。本机MySQL 8.0.40独立库中20个用户竞争同座位结果为1个成功、19个返回`204001`，无超卖；取消和过期条件更新通过。A专用云端MySQL 8.4.11空库`cinewise_migration_check`已完成V001至V005首次迁移、V004到V005升级、重复执行、结构、索引、CHECK、无外键、唯一约束和排序规则验证，V005 checksum为`467504383`，测试数据已清零；证据见`docs/V005_MIGRATION_VALIDATION_2026-08-02.md`。共享`cinewise`已完成迁移前备份及MySQL 8.4.11恢复验证、V004到V005迁移、重复执行和发布后结构检查，证据见`docs/V005_SHARED_MIGRATION_2026-08-02.md`。
+- 未验证事项、剩余风险和后续负责人：C的正式JWT Cookie和订单安全路由尚未合入，A仅通过`CurrentUserAccessor`测试替身验证本人权限；Mock支付、电子票和支付成功事件仍由A按上述任务继续实现。
