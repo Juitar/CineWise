@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: 候选计划和运行计划必须使用固定结构
-系统 SHALL 使用包含 `planId`、`version` 和节点列表的类型化候选计划。候选节点 SHALL 只包含模型可提出的 `nodeId`、`type`、`targetName`（适用时）、`inputRefs`、`dependsOn`、`failurePolicy` 和受保护写操作适用的 `businessParameterHash`；节点类型 MUST 限于 `ASK_USER`、`CALL_TOOL`、`COMPUTE`、`VALIDATE`、`CONFIRM_ACTION` 和 `RENDER_RESULT`。候选计划通过校验后，服务端 SHALL 生成运行计划；运行节点额外包含初始 `status=PENDING`、`requiresConfirmation`、`autoSkipped=false`、可空 `skipReason`、可空 `skipSourceNodeId` 和脱敏 `slotSnapshot`。本 change 只定义这些运行字段和初始值，不实现节点调度或自动跳过。
+系统 SHALL 使用包含 `planId`、`version` 和节点列表的类型化候选计划。候选节点 SHALL 只包含模型可提出的 `nodeId`、`type`、`targetName`（适用时）、`inputRefs`、`dependsOn` 和 `failurePolicy`；节点类型 MUST 限于 `ASK_USER`、`CALL_TOOL`、`COMPUTE`、`VALIDATE`、`CONFIRM_ACTION` 和 `RENDER_RESULT`。候选计划通过校验后，服务端 SHALL 生成运行计划；运行节点额外包含初始 `status=PENDING`、`requiresConfirmation`、`autoSkipped=false`、可空 `skipReason`、可空 `skipSourceNodeId` 和脱敏 `slotSnapshot`。本 change 只定义这些运行字段和初始值，不实现节点调度或自动跳过。
 
 #### Scenario: 校验合法候选计划
 - **WHEN** 候选计划版本不小于 1、节点不超过 12 个且所有节点字段合法
@@ -40,16 +40,18 @@
 - **THEN** `PlanSchemaValidator` 拒绝候选计划
 - **AND** 不调用工具、不尝试按名称查找任意 Bean 或方法
 
-### Requirement: 受保护写操作必须经过确认
-写工具节点的依赖中 MUST 包含且只能包含一个与相同业务参数摘要关联的 `CONFIRM_ACTION` 节点；它仍可以依赖必要的 `VALIDATE` 或其他上游节点，并使用 `FAIL` 失败策略。候选计划 MUST NOT 跳过受保护写操作前的 `VALIDATE` 或 `CONFIRM_ACTION`。
+### Requirement: 当前基础计划不得执行写工具
+本 change 尚未实现服务端生成参数摘要、一次性 `actionId`、用户与计划版本绑定及确认持久化。任何引用非只读 `ToolDefinition` 的 `CALL_TOOL` 候选节点 MUST 被拒绝，且不得生成可执行运行计划。模型候选计划 MUST NOT 携带可用于确认写操作的参数摘要、确认凭据或 `actionId`。
 
-#### Scenario: 校验合法写工具节点
-- **WHEN** 写工具节点的依赖中有且只有一个已声明的确认节点，双方业务参数摘要一致、同时包含必要上游校验且失败策略为 `FAIL`
-- **THEN** `PlanSchemaValidator` 接受该写工具结构
+#### Scenario: 拒绝带确认节点的写工具
+- **WHEN** 候选计划包含写工具，即使它依赖 `VALIDATE` 和 `CONFIRM_ACTION`
+- **THEN** `PlanSchemaValidator` 返回 `WRITE_TOOL_NOT_SUPPORTED`
+- **AND** 系统不得生成可执行运行计划或调用写工具
 
-#### Scenario: 拒绝绕过确认的写工具
-- **WHEN** 写工具缺少确认节点、依赖多个确认节点、参数摘要不一致或配置自动重试策略
-- **THEN** `PlanSchemaValidator` 拒绝整个候选计划
+#### Scenario: 拒绝模型伪造的确认信息
+- **WHEN** 模型在候选计划中尝试提交参数摘要、确认凭据或 `actionId`
+- **THEN** 候选计划类型不接受这些字段
+- **AND** 后续确认动作 change 必须由服务端根据已校验 Command 计算摘要并绑定一次性 `actionId`
 
 ### Requirement: Mock 模型必须返回可复现候选计划
 开发和测试环境 SHALL 通过 `ModelGateway` 接口使用 `MockModelGateway`。相同 `clientRequestId`、相同输入和相同允许工具列表 MUST 返回相同的候选计划和节点顺序，所有 Mock 结果仍 MUST 经过 `PlanSchemaValidator`。

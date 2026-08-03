@@ -44,8 +44,7 @@ public final class MockModelGateway implements ModelGateway {
                         null,
                         List.of(),
                         List.of(),
-                        FailurePolicy.FAIL,
-                        null)));
+                        FailurePolicy.FAIL)));
         return new PlanGenerationResponse(
                 candidatePlan,
                 planSchemaValidator.validate(candidatePlan, validationContext));

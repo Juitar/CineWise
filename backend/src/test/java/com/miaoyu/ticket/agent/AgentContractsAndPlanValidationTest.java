@@ -59,6 +59,9 @@ class AgentContractsAndPlanValidationTest {
         assertFalse(resultFields.contains("dataTime"));
         assertFalse(resultFields.contains("recommendReplan"));
         assertFalse(resultFields.contains("suggestedNextStep"));
+        Set<String> candidateFields = recordFieldNames(CandidatePlanNode.class);
+        assertFalse(candidateFields.contains("businessParameterHash"));
+        assertFalse(candidateFields.contains("actionId"));
     }
 
     @Test
@@ -153,8 +156,7 @@ class AgentContractsAndPlanValidationTest {
                         "readTool",
                         List.of(new InputReference("movieId", InputReferenceSource.SLOT, "movieId")),
                         List.of(),
-                        FailurePolicy.RETRY_ONCE,
-                        null)));
+                        FailurePolicy.RETRY_ONCE)));
         PlanValidationContext context = new PlanValidationContext(
                 Map.of("movieId", String.class),
                 Map.of(),
@@ -183,24 +185,21 @@ class AgentContractsAndPlanValidationTest {
                                 null,
                                 List.of(),
                                 List.of("second"),
-                                FailurePolicy.FAIL,
-                                null),
+                                FailurePolicy.FAIL),
                         new CandidatePlanNode(
                                 "second",
                                 PlanNodeType.COMPUTE,
                                 null,
                                 List.of(),
                                 List.of("first"),
-                                FailurePolicy.FAIL,
-                                null),
+                                FailurePolicy.FAIL),
                         new CandidatePlanNode(
                                 "first",
                                 PlanNodeType.COMPUTE,
                                 null,
                                 List.of(),
                                 List.of(),
-                                FailurePolicy.FAIL,
-                                null)));
+                                FailurePolicy.FAIL)));
 
         var result = validator.validate(candidatePlan, emptyContext());
 
@@ -224,8 +223,7 @@ class AgentContractsAndPlanValidationTest {
                                 null,
                                 List.of(),
                                 List.of(),
-                                FailurePolicy.FAIL,
-                                null),
+                                FailurePolicy.FAIL),
                         new CandidatePlanNode(
                                 "read",
                                 PlanNodeType.CALL_TOOL,
@@ -233,18 +231,16 @@ class AgentContractsAndPlanValidationTest {
                                 List.of(
                                         new InputReference("movieId", InputReferenceSource.SLOT, "wrongType"),
                                         new InputReference("extra", InputReferenceSource.SLOT, "movieId"),
-                                        new InputReference("movieId", InputReferenceSource.NODE_RESULT, "future")),
+                                new InputReference("movieId", InputReferenceSource.NODE_RESULT, "future")),
                                 List.of(),
-                                FailurePolicy.RETRY_ONCE,
-                                null),
+                                FailurePolicy.RETRY_ONCE),
                         new CandidatePlanNode(
                                 "unknown",
                                 PlanNodeType.CALL_TOOL,
                                 "missingTool",
                                 List.of(),
                                 List.of(),
-                                FailurePolicy.FAIL,
-                                null)));
+                                FailurePolicy.FAIL)));
         PlanValidationContext context = new PlanValidationContext(
                 Map.of("wrongType", Integer.class, "movieId", String.class),
                 Map.of("future", String.class),
@@ -260,7 +256,7 @@ class AgentContractsAndPlanValidationTest {
     }
 
     @Test
-    void shouldAcceptWritePlanWithValidateAndSingleMatchingConfirmation() {
+    void shouldRejectWritePlanEvenWhenItContainsValidateAndConfirmationNodes() {
         PlanSchemaValidator validator = new PlanSchemaValidator(new ToolRegistry(List.of(writeTool())));
         CandidatePlan candidatePlan = new CandidatePlan(
                 "plan-4",
@@ -272,35 +268,33 @@ class AgentContractsAndPlanValidationTest {
                                 null,
                                 List.of(),
                                 List.of(),
-                                FailurePolicy.FAIL,
-                                null),
+                                FailurePolicy.FAIL),
                         node(
                                 "confirm",
                                 PlanNodeType.CONFIRM_ACTION,
                                 null,
                                 List.of(),
                                 List.of("validate"),
-                                FailurePolicy.FAIL,
-                                "hash-1"),
+                                FailurePolicy.FAIL),
                         node(
                                 "write",
                                 PlanNodeType.CALL_TOOL,
                                 "writeTool",
                                 List.of(new InputReference("showId", InputReferenceSource.SLOT, "showId")),
                                 List.of("validate", "confirm"),
-                                FailurePolicy.FAIL,
-                                "hash-1")));
+                                FailurePolicy.FAIL)));
 
         var result = validator.validate(
                 candidatePlan,
                 new PlanValidationContext(Map.of("showId", String.class), Map.of(), new SlotSnapshot(1L, Map.of())));
 
-        assertTrue(result.isValid());
-        assertTrue(result.executionPlan().orElseThrow().nodes().get(1).requiresConfirmation());
+        assertFalse(result.isValid());
+        assertTrue(hasIssue(result, PlanValidationIssueCode.WRITE_TOOL_NOT_SUPPORTED));
+        assertTrue(result.executionPlan().isEmpty());
     }
 
     @Test
-    void shouldRejectWritePlanThatBypassesConfirmationOrUsesWrongFailurePolicy() {
+    void shouldRejectWritePlanBeforeAnyModelConfirmationValueCanBeTrusted() {
         PlanSchemaValidator validator = new PlanSchemaValidator(new ToolRegistry(List.of(writeTool())));
         CandidatePlan candidatePlan = new CandidatePlan(
                 "plan-5",
@@ -311,17 +305,15 @@ class AgentContractsAndPlanValidationTest {
                         "writeTool",
                         List.of(new InputReference("showId", InputReferenceSource.SLOT, "showId")),
                         List.of(),
-                        FailurePolicy.RETRY_ONCE,
-                        "hash-1")));
+                        FailurePolicy.RETRY_ONCE)));
 
         var result = validator.validate(
                 candidatePlan,
                 new PlanValidationContext(Map.of("showId", String.class), Map.of(), new SlotSnapshot(1L, Map.of())));
 
         assertFalse(result.isValid());
-        assertTrue(hasIssue(result, PlanValidationIssueCode.WRITE_CONFIRMATION_MISSING));
-        assertTrue(hasIssue(result, PlanValidationIssueCode.WRITE_VALIDATE_MISSING));
-        assertTrue(hasIssue(result, PlanValidationIssueCode.WRITE_FAILURE_POLICY_INVALID));
+        assertTrue(hasIssue(result, PlanValidationIssueCode.WRITE_TOOL_NOT_SUPPORTED));
+        assertTrue(result.executionPlan().isEmpty());
     }
 
     @Test
@@ -349,16 +341,14 @@ class AgentContractsAndPlanValidationTest {
             String targetName,
             List<InputReference> inputReferences,
             List<String> dependsOn,
-            FailurePolicy failurePolicy,
-            String businessParameterHash) {
+            FailurePolicy failurePolicy) {
         return new CandidatePlanNode(
                 nodeId,
                 type,
                 targetName,
                 inputReferences,
                 dependsOn,
-                failurePolicy,
-                businessParameterHash);
+                failurePolicy);
     }
 
     private static ToolDefinition readTool() {

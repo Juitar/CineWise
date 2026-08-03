@@ -9,8 +9,7 @@ public record CandidatePlanNode(
         String targetName,
         List<InputReference> inputRefs,
         List<String> dependsOn,
-        FailurePolicy failurePolicy,
-        String businessParameterHash) {
+        FailurePolicy failurePolicy) {
 
     public CandidatePlanNode {
         inputRefs = inputRefs == null ? List.of() : List.copyOf(inputRefs);

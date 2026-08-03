@@ -13,11 +13,11 @@
 
 ## 3. 计划模型与校验
 
-- [x] 3.1 实现候选计划、候选节点、运行计划、运行节点、固定节点类型、节点状态、失败策略和结构化校验问题类型；验证方式：`AgentContractsAndPlanValidationTest` 验证候选节点不含服务端运行状态，运行节点初始为 `PENDING` 并含确认、跳过和脱敏槽位快照字段。（Owner：B）
+- [x] 3.1 实现候选计划、候选节点、运行计划、运行节点、固定节点类型、节点状态、失败策略和结构化校验问题类型；候选节点不得携带参数摘要、确认凭据或 `actionId`；验证方式：`AgentContractsAndPlanValidationTest` 通过反射确认候选节点不含确认字段，运行节点初始为 `PENDING` 并含确认、跳过和脱敏槽位快照字段。（Owner：B）
 - [x] 3.2 实现计划基础校验：版本不小于 1、节点最多 12 个、节点 ID 唯一、字段完整且节点类型合法；验证方式：`AgentContractsAndPlanValidationTest` 覆盖通过、版本非法、重复节点和循环依赖用例。（Owner：B）
 - [x] 3.3 实现依赖图校验：依赖节点存在、图无环且输入只引用已声明槽位或上游结果；验证方式：`AgentContractsAndPlanValidationTest` 覆盖循环、未知输入和非上游引用。（Owner：B）
 - [x] 3.4 实现工具节点校验：目标存在于 `ToolRegistry`、必填输入齐全且输入类型匹配；验证方式：`AgentContractsAndPlanValidationTest` 覆盖合法只读工具、未知工具、未知输入和类型错误。（Owner：B）
-- [x] 3.5 实现写工具保护校验：依赖中有且只有一个匹配参数摘要的 `CONFIRM_ACTION`，可同时保留必要 `VALIDATE` 和其他上游依赖，不得跳过必要 `VALIDATE`，失败策略必须为 `FAIL`；验证方式：`AgentContractsAndPlanValidationTest` 覆盖合法多依赖结构及绕过确认、校验和自动重试。（Owner：B）
+- [x] 3.5 实现写工具保护校验：当前阶段拒绝所有非只读工具候选节点，不信任模型的参数摘要、确认凭据或 `actionId`；验证方式：`AgentContractsAndPlanValidationTest` 覆盖即使带 `VALIDATE` 和 `CONFIRM_ACTION` 的写工具仍返回 `WRITE_TOOL_NOT_SUPPORTED`，且没有运行计划。（Owner：B）
 - [x] 3.6 实现 `PlanValidationResult`，一次返回稳定问题码、节点 ID 和字段路径；验证方式：`AgentContractsAndPlanValidationTest` 验证非法计划同时返回多个问题且没有运行计划。（Owner：B）
 
 ## 4. Mock 模型边界
@@ -31,4 +31,4 @@
 - [x] 5.1 执行 Agent 相关单元测试并确认无数据库、Redis、SSE、Controller、认证和真实工具依赖；验证方式：`mvnw.cmd -Dtest=AgentContractsAndPlanValidationTest test`，10 通过、0 失败、0 跳过。（Owner：B）
 - [x] 5.2 在 `backend/` 执行 `mvnw.cmd verify`，确保编译、测试、ArchUnit、Checkstyle、SpotBugs 和 JaCoCo 全部通过；验证方式：25 个测试中 24 通过、0 失败、1 个既有 MySQL 集成测试因环境未启用跳过。（Owner：B）
 - [x] 5.3 执行 `openspec validate agent-contracts-and-plan-validation --strict` 并检查实现与 proposal、specs、design、tasks 一致；验证方式：严格校验通过。（Owner：B）
-- [x] 5.4 提交前执行 `git diff --check` 和 `git status`，确认没有无关格式化、构建产物、真实配置或跨模块实现；验证方式：`git diff --check` 无输出，新增文件无尾随空白，工作区只含本 change 文件。（Owner：B）
+- [x] 5.4 提交前执行 `git diff --check` 和 `git status`，确认没有无关格式化、构建产物、真实配置或跨模块实现；验证方式：`git diff --check` 无输出，工作区只含本 PR 评审修正文件。（Owner：B）

@@ -10,7 +10,6 @@ public record ExecutionPlanNode(
         List<InputReference> inputRefs,
         List<String> dependsOn,
         FailurePolicy failurePolicy,
-        String businessParameterHash,
         PlanNodeStatus status,
         boolean requiresConfirmation,
         boolean autoSkipped,

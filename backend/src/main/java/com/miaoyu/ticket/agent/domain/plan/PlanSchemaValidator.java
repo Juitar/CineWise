@@ -5,7 +5,6 @@ import com.miaoyu.ticket.agent.domain.tool.ToolInputDefinition;
 import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -179,7 +178,11 @@ public final class PlanSchemaValidator {
             }
             validateToolInputs(node, definition, nodesById, context, issues);
             if (!definition.readOnly()) {
-                validateWriteTool(node, nodesById, issues);
+                issues.add(issue(
+                        PlanValidationIssueCode.WRITE_TOOL_NOT_SUPPORTED,
+                        node.nodeId(),
+                        "targetName",
+                        "当前基础计划不支持执行写工具"));
             }
         }
     }
@@ -286,51 +289,6 @@ public final class PlanSchemaValidator {
         return resultType;
     }
 
-    private static void validateWriteTool(
-            CandidatePlanNode node,
-            Map<String, CandidatePlanNode> nodesById,
-            List<PlanValidationIssue> issues) {
-        List<CandidatePlanNode> confirmations = node.dependsOn().stream()
-                .map(nodesById::get)
-                .filter(Objects::nonNull)
-                .filter(dependency -> dependency.type() == PlanNodeType.CONFIRM_ACTION)
-                .toList();
-        if (confirmations.isEmpty()) {
-            issues.add(issue(
-                    PlanValidationIssueCode.WRITE_CONFIRMATION_MISSING,
-                    node.nodeId(),
-                    "dependsOn",
-                    "写工具必须依赖一个确认节点"));
-        } else if (confirmations.size() > 1) {
-            issues.add(issue(
-                    PlanValidationIssueCode.WRITE_CONFIRMATION_MULTIPLE,
-                    node.nodeId(),
-                    "dependsOn",
-                    "写工具只能依赖一个确认节点"));
-        } else if (isBlank(node.businessParameterHash())
-                || !node.businessParameterHash().equals(confirmations.getFirst().businessParameterHash())) {
-            issues.add(issue(
-                    PlanValidationIssueCode.WRITE_CONFIRMATION_HASH_MISMATCH,
-                    node.nodeId(),
-                    "businessParameterHash",
-                    "写工具和确认节点的参数摘要必须一致"));
-        }
-        if (!hasUpstreamType(node.nodeId(), PlanNodeType.VALIDATE, nodesById)) {
-            issues.add(issue(
-                    PlanValidationIssueCode.WRITE_VALIDATE_MISSING,
-                    node.nodeId(),
-                    "dependsOn",
-                    "写工具必须依赖上游校验节点"));
-        }
-        if (node.failurePolicy() != FailurePolicy.FAIL) {
-            issues.add(issue(
-                    PlanValidationIssueCode.WRITE_FAILURE_POLICY_INVALID,
-                    node.nodeId(),
-                    "failurePolicy",
-                    "写工具只能使用 FAIL 失败策略"));
-        }
-    }
-
     private static boolean isUpstream(
             String sourceNodeId, String targetNodeId, Map<String, CandidatePlanNode> nodesById) {
         Deque<String> pendingNodeIds = new ArrayDeque<>(nodesById.get(targetNodeId).dependsOn());
@@ -351,13 +309,6 @@ public final class PlanSchemaValidator {
         return false;
     }
 
-    private static boolean hasUpstreamType(
-            String targetNodeId, PlanNodeType type, Map<String, CandidatePlanNode> nodesById) {
-        return nodesById.values().stream()
-                .filter(node -> node.type() == type)
-                .anyMatch(node -> isUpstream(node.nodeId(), targetNodeId, nodesById));
-    }
-
     private static ExecutionPlan toExecutionPlan(CandidatePlan plan, SlotSnapshot slotSnapshot) {
         List<ExecutionPlanNode> nodes = plan.nodes().stream()
                 .map(node -> new ExecutionPlanNode(
@@ -367,7 +318,6 @@ public final class PlanSchemaValidator {
                         node.inputRefs(),
                         node.dependsOn(),
                         node.failurePolicy(),
-                        node.businessParameterHash(),
                         PlanNodeStatus.PENDING,
                         node.type() == PlanNodeType.CONFIRM_ACTION,
                         false,
