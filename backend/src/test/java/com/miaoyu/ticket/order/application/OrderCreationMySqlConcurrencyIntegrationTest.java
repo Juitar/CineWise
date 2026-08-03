@@ -69,7 +69,7 @@ class OrderCreationMySqlConcurrencyIntegrationTest {
     @Test
     void givenMySqlInnoDb_whenTwentyUsersCompeteForOneSeat_thenOnlyOneOrderCommits() throws Exception {
         String mysqlVersion = jdbcTemplate.queryForObject("SELECT VERSION()", String.class);
-        assertThat(mysqlVersion).startsWith("8.0.");
+        assertThat(mysqlVersion).startsWith("8.4.");
         long showId = jdbcTemplate.queryForObject("""
                 SELECT id
                   FROM movie_show

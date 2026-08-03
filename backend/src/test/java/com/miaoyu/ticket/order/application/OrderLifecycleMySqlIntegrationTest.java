@@ -69,12 +69,13 @@ class OrderLifecycleMySqlIntegrationTest {
 
     @Test
     void givenMySqlEight_whenCancelAndExpireOrders_thenPersistOneAuthoritativeResult() {
-        assertThat(jdbcTemplate.queryForObject("SELECT VERSION()", String.class)).startsWith("8.0.");
+        assertThat(jdbcTemplate.queryForObject("SELECT VERSION()", String.class)).startsWith("8.4.");
         assertThat(jdbcTemplate.queryForObject("""
-                SELECT MAX(version)
+                SELECT COUNT(*)
                   FROM flyway_schema_history
-                 WHERE success = 1
-                """, String.class)).isEqualTo("005");
+                 WHERE version = '005'
+                   AND success = 1
+                """, Integer.class)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT table_collation
                   FROM information_schema.tables
@@ -107,9 +108,10 @@ class OrderLifecycleMySqlIntegrationTest {
         LocalDateTime now = LocalDateTime.ofInstant(
                 clock.instant(),
                 ClockConfiguration.BUSINESS_ZONE_ID);
+        // MySQL DATETIME(3) 会截断 Java 纳秒；真实库集成用例使用明确已过期值，等号边界由固定时钟单元测试覆盖。
         jdbcTemplate.update(
                 "UPDATE ticket_order SET expire_time = ? WHERE id = ?",
-                now,
+                now.minusSeconds(1),
                 expiring.orderId());
         assertThat(orderExpiryTransaction.expire(expiring.orderId(), now)).isTrue();
         assertThat(orderExpiryTransaction.expire(expiring.orderId(), now)).isFalse();
