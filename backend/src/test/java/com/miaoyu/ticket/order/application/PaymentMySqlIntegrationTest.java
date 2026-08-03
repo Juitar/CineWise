@@ -64,7 +64,7 @@ class PaymentMySqlIntegrationTest {
 
     @Test
     void givenMySqlEight_whenTwoPaymentsCompete_thenPersistOnePaymentAndTicket() throws Exception {
-        assertThat(jdbcTemplate.queryForObject("SELECT VERSION()", String.class)).startsWith("8.0.");
+        assertThat(jdbcTemplate.queryForObject("SELECT VERSION()", String.class)).startsWith("8.4.");
         ShowSeat fixture = findFutureShowSeat();
         OrderView order = orderApplicationService.createOrder(new CreateOrderCommand(
                 fixture.showId(),
