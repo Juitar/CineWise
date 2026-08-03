@@ -39,7 +39,7 @@ class DemoSeedInitializerTest {
     private DemoContentCatalogProvider catalogProvider;
 
     @Test
-    void givenExistingSeedAndLockedSeat_whenSeedRunsAgain_thenCountsStayStableAndSeatStateIsPreserved() {
+    void givenLegacyDemoSeedAndLockedSeat_whenSeedRunsAgain_thenCountsStayStableAndSeatStateIsPreserved() {
         assertSeedCounts();
         assertContentSourceIdentity();
         assertScheduleWindow();
@@ -99,7 +99,7 @@ class DemoSeedInitializerTest {
 
     private long countBySource(String tableName) {
         return jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM " + tableName + " WHERE source = 'DEMO_CONTENT'",
+                "SELECT COUNT(*) FROM " + tableName + " WHERE source = 'demo-seed'",
                 Long.class);
     }
 
