@@ -1,0 +1,6 @@
+{
+  "version": "fixed-rec-v1",
+  "source": "FIXED_RECOMMENDATION",
+  "sourceType": "MOCK",
+  "validForMinutes": 360
+}
