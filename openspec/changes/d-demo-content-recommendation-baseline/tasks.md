@@ -42,11 +42,11 @@
 
 ## 4. 第一版固定推荐候选
 
-- [ ] 4.1 D 建立 `fixed-rec-v1` 固定候选数据和类型化 Application DTO；验证方式：相同输入和固定时钟返回相同候选与顺序。
-- [ ] 4.2 D 实现固定候选查询，校验候选完整性、过期时间、两位小数价格和来源；验证方式：缺字段或过期候选不生成可购方案。
-- [ ] 4.3 D 在 A 的公开场次查询不可用或无可购结果时返回 `purchaseEligible=false` 和 `missingFactors=[SHOWTIME]`，不生成 `PLAN_CARD`；验证方式：结果中不存在 D 自行生成的 `showId`、价格和库存。
-- [ ] 4.4 A 的公开场次 Application 查询可用后，D 只引用返回的 `showId/movieId/cinemaId/price/startTime/expiresAt`；验证方式：固定候选与 A 的共享 ID 和事实字段一致，不维护第二份场次数据且不调用本应用 Controller。
-- [ ] 4.5 D 按 B 确认的工具名称和 Command 实现工具适配器，返回公共 `ToolResult<T>`；验证方式：工具不追问、不发布 SSE、不调用模型，也不访问 Mapper。
+- [x] 4.1 D 已建立 `fixed-rec-v1` 固定候选目录和类型化 Application DTO；固定时钟与相同输入下候选和顺序一致。验证：`FixedRecommendationQueryServiceTest` 通过，日期：2026-08-03。
+- [x] 4.2 D 已实现可购候选完整性、两位小数价格、来源和过期校验；缺字段、价格格式非法或 `expiresAt <= now` 均不通过，不生成可购方案。验证：`PurchaseCandidateValidatorTest` 通过，日期：2026-08-03。
+- [x] 4.3 D 已在未取得 A 场次事实时返回 `purchaseEligible=false`、`missingFactors=[SHOWTIME]` 的内容候选；结果不含 `showId`、价格、开场时间或库存，且不生成 `PLAN_CARD`。验证：`FixedRecommendationQueryServiceTest` 通过，日期：2026-08-03。
+- [x] 4.4 A 的公开场次 Application 查询已提供 `showId/movieId/cinemaId/basePrice/startTime/expiresAt`；D 仅通过 `ShowQueryService` 调用并将 `basePrice` 映射为两位小数 `price`，不维护第二份场次数据或调用 Controller。验证：`TicketingShowtimeQueryAdapterTest`、`FixedRecommendationQueryServiceTest` 通过，日期：2026-08-03。
+- [x] 4.5 D 已实现 `RankMoviePlanTool` 和 `RankMoviePlanCommand`，`targetName=rankMoviePlan`，返回公共 `ToolResult<T>`；工具只调用推荐 Application Service，不追问、不发布 SSE、不调用模型、不访问 Mapper。验证：`RankMoviePlanToolTest` 通过，日期：2026-08-03。
 
 ## 5. 测试数据与回归用例
 
