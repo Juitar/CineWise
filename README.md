@@ -18,10 +18,10 @@ CineWise/
 
 ## 快速开始
 
-1. 复制 `.env.example` 为 `.env`，填写云端共享 MySQL 与本地 Redis 的连接信息；`.env` 不得提交。
-2. 启动 Redis：`docker compose up -d redis`。后端通过 `.env` 中的 `MYSQL_HOST` 连接云端 MySQL。
-3. Windows 执行 `backend\mvnw.cmd -f backend\pom.xml spring-boot:run`，macOS/Linux 执行 `bash ./backend/mvnw -f backend/pom.xml spring-boot:run`。
-4. dev 环境访问 `http://localhost:8080/actuator/health` 和 `http://localhost:8080/swagger-ui.html`。
+1. 复制 `.env.example` 为 `.env`，填写团队共享 MySQL、Redis 与可选 MinIO 的连接信息；`.env` 不得提交。
+2. 执行 `docker compose config --quiet`，确认共享服务变量完整且 Compose 不会创建重复的 MySQL、Redis 或 MinIO。
+3. 执行 `docker compose up -d --build --wait` 启动后端和前端；后端通过 `.env` 连接共享基础服务。
+4. dev/demo 环境访问 `http://localhost:8080/actuator/health` 和 `http://localhost:8080/swagger-ui.html`。
 
 本机未安装 Docker 时，可以先进入 `backend/` 后执行 `mvnw.cmd verify`（Windows）或 `bash ./mvnw verify`（macOS/Linux），完成编译、测试和静态检查。测试环境使用 H2 的 MySQL 兼容模式，不替代后续 MySQL Testcontainers 与并发验收。
 

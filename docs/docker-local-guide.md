@@ -1,17 +1,17 @@
 # CineWise Docker 本地使用指南
 
-本文用于在 Windows 上启动 CineWise 本地联调所需的 Redis 和后端容器。MySQL 与 MinIO 使用团队已配置的云端服务。
+本文用于在 Windows 上启动 CineWise 本地联调所需的应用容器。MySQL、Redis 与可选 MinIO 使用团队已配置的共享基础服务。
 
 ## 1. Docker 在项目中的作用
 
-Docker 将 Redis 和后端运行在固定版本的容器中。后端通过 `.env` 连接云端共享 MySQL；需要海报或演示附件时，再连接云端 MinIO，不在成员电脑上启动第二套 MySQL 或 MinIO。
+Docker 将后端和前端运行在固定版本的容器中。后端通过 `.env` 连接共享 MySQL、Redis 与可选 MinIO，不在成员电脑或应用服务器上启动第二套基础服务。
 
 项目的容器定义位于根目录的 `compose.yaml`：
 
 | 服务 | 作用 | 本机访问地址 |
 | --- | --- | --- |
-| `redis` | Redis 7.4 缓存、限流和上下文辅助服务 | `127.0.0.1:6379` |
 | `backend` | Spring Boot 后端 | `127.0.0.1:8080` |
+| `frontend` | Umi 前端与同源反向代理 | `127.0.0.1:8000` |
 
 Docker Desktop 运行在 Windows 上。它会通过 WSL 2 在后台运行 Linux 容器；日常开发仍可使用 Windows、IDEA 和 PowerShell，无需安装或操作 Ubuntu。
 
@@ -43,14 +43,16 @@ Copy-Item .env.example .env
 ```dotenv
 MYSQL_HOST=团队提供的云端MySQL主机
 MYSQL_PASSWORD=云端共享数据库账号密码
-REDIS_PASSWORD=自行设置的Redis密码
+REDIS_HOST=团队提供的共享Redis主机
+REDIS_PORT=6379
+REDIS_PASSWORD=共享Redis密码
 JWT_SECRET=由认证模块负责人确认的JWT密钥
 ```
 
 规则：
 
 - `.env` 不得提交到 Git；仓库已通过 `.gitignore` 忽略它。
-- `.env` 中的 `MYSQL_HOST`、`MYSQL_DATABASE`、`MYSQL_USER` 和 `MYSQL_PASSWORD` 必须指向云端共享 `cinewise` 库。
+- `.env` 中的 `MYSQL_*` 必须指向共享 `cinewise` 库，`REDIS_*` 必须指向团队共享 Redis；不得使用 `localhost` 作为隐式回退。
 - A 的迁移验证使用独立的 `.env.migration-check` 和云端 `cinewise_migration_check` 库；不得用共享库做首次迁移验证。
 - `JWT_SECRET` 由认证模块负责人定义算法和密钥要求；部署负责人只负责安全注入，不在源码或镜像中保存。
 - 启用对象存储的模块从 A 获取云端 MinIO 的 `MINIO_ENDPOINT`、最小权限 `MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY` 和 `MINIO_BUCKET=cinewise`；不得使用或保存 MinIO root 管理员凭据。
@@ -64,7 +66,7 @@ JWT_SECRET=由认证模块负责人确认的JWT密钥
 ```powershell
 cd D:\Programming\妙语购票\CineWise
 docker compose config --quiet
-docker compose up -d --build redis backend
+docker compose up -d --build --wait
 ```
 
 说明：
@@ -79,7 +81,7 @@ docker compose up -d --build redis backend
 docker compose ps
 ```
 
-预期 `redis` 和 `backend` 最终都显示为 `healthy` 或正在运行；云端 MySQL 连通性由 backend 日志和健康检查确认。
+预期 `backend` 和 `frontend` 最终都显示为 `healthy` 或正在运行；共享 MySQL 与 Redis 连通性由 backend 日志和整体健康检查确认。
 
 持续查看后端日志：
 
@@ -96,16 +98,15 @@ http://localhost:8080/actuator/health
 http://localhost:8080/swagger-ui.html
 ```
 
-## 5. 仅启动本地缓存
+## 5. 仅验证共享基础服务配置
 
-认证配置尚未就绪，或只需开发缓存相关代码时，可以只启动 Redis：
+应用 Compose 不创建 MySQL、Redis 或 MinIO。只需检查环境变量是否完整时执行：
 
 ```powershell
-docker compose up -d redis
-docker compose ps
+docker compose config --quiet
 ```
 
-注意：`compose.yaml` 会解析所有必填环境变量。若 `JWT_SECRET` 尚未提供，Compose 可能在解析时拒绝执行；此时等待认证模块负责人提供正式配置，或仅在团队约定下使用一次性的本地开发配置。
+若 `MYSQL_HOST`、`REDIS_HOST`、对应账号密码或 `JWT_SECRET` 缺失，Compose 会在连接任何服务前明确失败。共享服务凭据由对应负责人通过安全渠道提供，不得自行使用生产 root 管理员账号。
 
 ## 6. 常用命令
 
@@ -119,7 +120,7 @@ docker compose logs
 # 查看指定服务最近100行日志
 docker compose logs --tail 100 backend
 
-# 停止并删除容器、网络；保留Redis数据卷
+# 停止并删除应用容器、网络
 docker compose down
 
 # 再次后台启动已有服务
@@ -131,13 +132,11 @@ docker compose stop
 # 恢复被 docker compose stop 暂停的服务
 docker compose start
 
-# 完全清空本地容器数据，包括Redis数据卷
-docker compose down -v
 ```
 
 日常“不想继续运行”时，优先使用 `docker compose stop`：它不会删除容器和数据。下次执行 `docker compose start` 或 `docker compose up -d` 即可恢复。
 
-`docker compose down` 会删除容器和网络，但保留 Redis 数据卷；下次 `docker compose up -d` 会重新创建容器并继续使用原数据。`docker compose down -v` 只会删除本地 Redis 数据，不会删除云端 MySQL 或云端 MinIO 对象。
+`docker compose down` 只删除本地应用容器和网络，不会停止或删除共享 MySQL、Redis、MinIO 及其数据。
 
 ## 7. 云端 MinIO
 
@@ -215,25 +214,18 @@ JWT_SECRET
 
 ```powershell
 docker compose ps
-docker compose logs --tail 100 redis
 docker compose logs --tail 100 backend
 ```
 
-优先确认 Redis 已变为 `healthy`，再检查后端的云端 MySQL 连接、Redis 连接和环境变量错误。
+优先检查后端日志中的共享 MySQL、Redis 连接和环境变量错误；应用服务器无法访问基础服务时，核对 VPC/公网地址和固定 `/32` 安全组白名单。
 
 ### 端口被占用
 
-如果 6379 或 8080 被其他程序占用，可以先关闭占用程序，或在 `.env` 中修改 `REDIS_PORT`、`BACKEND_PORT` 后重新启动。云端 MySQL 的 3306 不映射到本机端口。
-
-Windows 上曾安装过 Redis 时，确认没有其他项目需要它后，可在“管理员 PowerShell”中停止：
-
-```powershell
-Stop-Service -Name Redis
-```
+如果 8000 或 8080 被其他程序占用，可以先关闭占用程序，或在 `.env` 中修改 `FRONTEND_PORT`、`BACKEND_PORT` 后重新启动。共享 MySQL、Redis 和 MinIO 端口不会映射到本机。
 
 ## 9. 团队协作约定
 
 - Docker Compose、Dockerfile 和 `.env.example` 属于共享部署契约，修改前应同步团队。
 - `.env`、真实密钥、生产数据和本地数据卷不得提交。
 - 新增迁移脚本、环境变量或服务时，必须同步更新 Compose、`.env.example`、OpenSpec 和本指南。
-- A 负责 Compose、镜像、迁移顺序、健康检查和部署回滚；认证模块负责人负责 JWT 规则与密钥要求；各模块负责人负责自己能力所需的非敏感配置说明。
+- A 负责应用 Compose、镜像、共享基础服务连接、迁移顺序、健康检查和部署回滚；认证模块负责人负责 JWT 规则与密钥要求；各模块负责人负责自己能力所需的非敏感配置说明。

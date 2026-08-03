@@ -45,6 +45,25 @@
 - **WHEN** 服务器 `.env` 将 `FLYWAY_ENABLED` 配置为真
 - **THEN** 系统拒绝部署且不启动新应用版本
 
+### Requirement: 应用复用受控共享基础服务
+
+系统 SHALL 要求演示服务器通过被 Git 忽略的 `.env` 显式配置共享 MySQL 和 Redis 连接，不得在应用 Compose 中重复创建 MySQL、Redis 或 MinIO；可选 MinIO 配置 SHALL 透传给后端且未启用对象存储时不得阻断核心应用启动。
+
+#### Scenario: 部署服务器连接共享 Redis
+
+- **WHEN** 演示服务器使用有效的 `REDIS_HOST`、`REDIS_PORT` 和 `REDIS_PASSWORD` 部署应用
+- **THEN** Compose 不创建本地 Redis 容器，后端连接指定的共享 Redis，并由应用健康检查验证连接结果
+
+#### Scenario: 共享 Redis 配置缺失
+
+- **WHEN** 演示服务器 `.env` 缺少 Redis 主机或密码
+- **THEN** Compose 在构建或启动应用前明确失败，不使用 `localhost` 或容器服务名作为隐式回退
+
+#### Scenario: MinIO 尚未启用
+
+- **WHEN** MinIO 环境变量为空且当前模块未启用对象存储客户端
+- **THEN** 后端核心查询、交易和健康检查仍可启动
+
 ### Requirement: 部署失败恢复上一应用版本
 
 系统 SHALL 记录部署前 Git SHA，使用 Compose 健康检查验证新版本，并在构建或健康检查失败时恢复上一提交。

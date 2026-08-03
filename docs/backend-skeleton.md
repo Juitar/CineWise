@@ -70,7 +70,7 @@ Set-Location backend
 .\mvnw.cmd verify # macOS/Linux 使用 cd backend && bash ./mvnw verify
 Set-Location ..
 docker compose config
-docker compose up -d redis
+docker compose up -d --build --wait
 ```
 
 `verify` 包含编译、单元/上下文测试、ArchUnit、Checkstyle、SpotBugs 和 JaCoCo 报告。本机 H2 测试只用于快速反馈；订单并发、MySQL 条件更新、Flyway 兼容、Redis 降级和容器冒烟必须在后续集成测试中使用真实组件。

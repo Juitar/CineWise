@@ -56,13 +56,20 @@ CD 不使用服务器目录中“当前最新”的不确定代码，而是部�
 2. `DEPLOY_PATH` 已克隆 CineWise 仓库，`origin` 允许部署账号只读获取 `dev`。
 3. SSH 部署账号可以在不使用 root 的情况下运行该项目的 Docker Compose。
 4. 仓库根目录存在被 Git 忽略的 `.env`，真实凭据只保存在服务器。
-5. `.env` 使用演示环境配置，且至少满足：
+5. 应用服务器能通过私网或固定公网 `/32` 白名单访问基础服务 ECS 的 MySQL、Redis 和可选 MinIO API；应用 Compose 不运行重复基础服务。
+6. `.env` 使用演示环境配置，且至少满足：
 
 ```dotenv
 SPRING_PROFILES_ACTIVE=demo
+MYSQL_HOST=基础服务ECS地址
+REDIS_HOST=基础服务ECS地址
+REDIS_PORT=6379
+REDIS_PASSWORD=共享Redis密码
 FLYWAY_ENABLED=false
 SEED_ENABLED=false
 ```
+
+启用对象存储时再填写 `MINIO_ENDPOINT`、最小权限 `MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY` 和 `MINIO_BUCKET`。`MINIO_ENDPOINT` 必须是 API 地址而不是 9001 Console 地址；不得使用 MinIO root 管理员凭据。
 
 首次准备服务器时，由 A 手工执行并确认：
 
@@ -81,6 +88,7 @@ docker compose ps
 
 - 部署目录存在已跟踪文件修改时，CD 拒绝覆盖；先由 A 查明来源。
 - 应用部署不自动执行 Flyway、种子、数据库修数、备份或权限变更。
+- 应用 Compose 不负责共享 MySQL、Redis 或 MinIO 的启动、停止与恢复；基础服务故障应在基础服务 ECS 单独处理。
 - 新版本构建或健康检查失败时，CD 切回部署前 Git SHA 并重新构建旧版本。
 - 自动恢复成功不代表新版本成功；GitHub 工作流仍以失败结束，必须修复后重新部署。
 - 数据库已经发生不兼容变化时，应用回滚可能不足，必须使用对应迁移发布方案和备份恢复流程。
