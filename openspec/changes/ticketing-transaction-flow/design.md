@@ -120,7 +120,7 @@ V003已有`refund_request`及每订单唯一、`user_id + idempotency_key`唯一
 
 ## OpenAPI与联调夹具
 
-联调夹具统一放在`backend/src/test/resources/fixtures/ticketing`，以版本库内静态示例作为A向B/C交付的单一来源。C目录保存完整`Result<T>` REST响应，覆盖场次、座位、订单、支付、电子票、退票和关键错误；B目录保存公共`ToolResult<T>`，覆盖动态场次、建单成功、原订单幂等恢复、座位冲突和订单不存在。
+联调夹具统一放在`backend/src/test/resources/fixtures/ticketing`，以版本库内静态示例作为A向B/C交付的单一来源。A负责`/shows`、选座、订单、支付、电子票、退票页面及其REST夹具；C负责`/movies/**`、`/cinemas/**`、购票入口和公共请求层，并仅通过该请求层接入A的票务REST。`c`目录保存完整`Result<T>`响应，覆盖场次、座位、订单、支付、电子票、退票和关键错误；`b`目录保存公共`ToolResult<T>`，覆盖动态场次、建单成功、原订单幂等恢复、座位冲突和订单不存在。
 
 B夹具严格使用公共`status/data/errorCode/retryable/replanSuggested/suggestedNextAction/degraded/fallbackType/stateVersion/dataAt/expiresAt`字段，业务字段只放入`data`。支付不进入Agent工具夹具。写工具失败不得建议自动重试；原建单结果恢复返回与首次成功相同的业务数据，不增加`replayed`等未冻结字段。
 

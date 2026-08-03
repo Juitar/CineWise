@@ -39,7 +39,7 @@
 - [x] 完成同键同参/异参、跨用户、状态/归属回滚、并发退票和结果未知恢复测试。
 - [x] 冻结OpenAPI与B/C票务联调JSON夹具的字段、错误和恢复语义。
 - [x] 提供B的`ToolResult<T>`成功、座位冲突、幂等恢复和订单不存在JSON夹具。
-- [x] 提供C的场次、座位、订单、支付、电子票、退票及关键错误REST JSON夹具。
+- [x] 提供A的场次、座位、订单、支付、电子票、退票及关键错误REST JSON夹具，供C通过公共请求层接入。
 - [x] 增加夹具解析、敏感字段、OpenAPI、并发、幂等、状态机、权限和恢复本地回归并记录结果。
 - [x] PR #18 的MySQL 8.4、Redis 7.4、Backend Verify和Frontend Verify工作流全部通过；失败时不得合并。
 
@@ -54,7 +54,7 @@
 ## OpenAPI与B/C联调夹具实现记录
 
 - 变更编号及模块：`ticketing-transaction-flow`，A的票务公开契约与测试资源。
-- 需求/问题与修改范围：新增B的5份`ToolResult<T>`夹具和C的13份REST夹具；增加自动解析、时效、幂等恢复、错误语义、敏感字段和实际SpringDoc校验，不修改生产业务代码、数据库或状态机。
+- 需求/问题与修改范围：新增B的5份`ToolResult<T>`夹具和A的13份票务REST夹具；C仅负责通过公共请求层接入。增加自动解析、完整DTO字段、时效、幂等恢复、错误语义、敏感字段和实际SpringDoc校验，不修改生产业务代码、数据库或状态机。
 - 契约影响：无运行时API变更；夹具严格复用现有`basePrice`、字符串ID、金额字符串、ISO 8601时间、稳定错误码和公共ToolResult字段。支付不进入Agent工具，C继续通过公共请求层消费REST。
 - 已执行的验证及结果：同步最新`origin/dev`后，`TicketingContractFixtureTest`共3个测试通过；`mvnw.cmd verify`共91个测试、0失败、0错误、6个外部环境测试跳过，Checkstyle和SpotBugs均为0；`openspec validate ticketing-transaction-flow --strict`与`git diff --check`通过。
 - 未验证事项、剩余风险和后续负责人：PR #18 的Backend MySQL Integration Run 30813882371和Backend Redis Integration Run 30813882372均通过，前后端Verify也通过。B/C仍需在各自模块消费夹具完成联调，A不替其标记消费者验收。

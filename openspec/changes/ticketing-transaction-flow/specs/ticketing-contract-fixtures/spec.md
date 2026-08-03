@@ -2,20 +2,20 @@
 
 ## ADDED Requirements
 
-### Requirement: C的REST夹具必须复用权威响应契约
+### Requirement: A的票务页面REST夹具必须复用权威响应契约
 
 系统 SHALL 提供场次、座位、订单、支付、电子票、退票和关键错误的版本化JSON夹具。每个夹具 SHALL 使用当前`Result<T>`、`PageResult<T>`和对应REST响应DTO，不得增加仅供Mock使用的业务字段。
 
 #### Scenario: C加载票务成功夹具
 
-- GIVEN C需要在公共请求层和页面壳层中联调A的票务页面
+- GIVEN A的票务页面需要联调，且C需要通过公共请求层接入A的票务REST
 - WHEN C加载成功夹具
 - THEN 业务ID均为字符串、金额均为两位小数字符串、时间均为ISO 8601
 - AND 场次、座位、订单、支付、电子票和退票状态与A的REST枚举同名
 
 #### Scenario: C加载票务错误夹具
 
-- GIVEN C需要验证座位冲突、幂等参数不一致、订单不存在或未登录
+- GIVEN A的票务页面需要验证座位冲突、幂等参数不一致、订单不存在或未登录，且C的公共请求层需要正确传递错误
 - WHEN C加载对应错误夹具
 - THEN 返回当前稳定数值错误码、用户可读消息和非空示例`traceId`
 - AND 不返回交易数据或泄露资源是否属于其他用户

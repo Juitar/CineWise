@@ -5,7 +5,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miaoyu.ticket.common.api.PageResult;
+import com.miaoyu.ticket.ticketing.api.SeatMapResponse;
+import com.miaoyu.ticket.ticketing.api.ShowSummaryResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
@@ -107,7 +111,10 @@ class TicketingContractFixtureTest {
             assertNoSensitiveFields(root.toString(), fixture);
         }
 
+        List<ShowSummaryResponse> shows = readSuccessList("c/show-list-success.json", ShowSummaryResponse.class);
+        assertThat(shows).hasSize(1);
         JsonNode show = readFixture("c/show-list-success.json").required("data").get(0);
+        assertExactRecordFields(show, ShowSummaryResponse.class);
         assertTextId(show, "showId");
         assertTextId(show, "movieId");
         assertTextId(show, "cinemaId");
@@ -115,27 +122,60 @@ class TicketingContractFixtureTest {
         assertThat(OffsetDateTime.parse(show.required("expiresAt").asText()))
                 .isEqualTo(OffsetDateTime.parse(show.required("startTime").asText()));
 
+        SeatMapResponse seatMapResponse = readSuccessData("c/seat-map-success.json", SeatMapResponse.class);
+        assertThat(seatMapResponse.seats()).hasSize(2);
         JsonNode seatMap = readFixture("c/seat-map-success.json").required("data");
+        assertExactRecordFields(seatMap, SeatMapResponse.class);
+        assertExactRecordFields(seatMap.required("seats").get(0), SeatMapResponse.SeatItemResponse.class);
         assertThat(seatMap.required("seats").size()).isEqualTo(seatMap.required("seatCount").asInt());
         assertThat(seatMap.required("seats").get(0).required("status").asText()).isEqualTo("AVAILABLE");
 
+        OrderResponse createdOrder = readSuccessData("c/create-order-success.json", OrderResponse.class);
+        assertThat(createdOrder.orderNo()).isNotBlank();
+        PageResult<OrderResponse> orderPage = readSuccessPage("c/order-page-success.json", OrderResponse.class);
+        assertThat(orderPage.records()).hasSize(1);
         JsonNode order = readFixture("c/create-order-success.json").required("data");
+        assertExactRecordFields(order, OrderResponse.class);
+        JsonNode orderPageData = readFixture("c/order-page-success.json").required("data");
+        assertExactRecordFields(orderPageData, PageResult.class);
+        assertExactRecordFields(orderPageData.required("records").get(0), OrderResponse.class);
         assertTextId(order, "orderId");
         assertTextId(order, "showId");
         assertAmount(order, "unitPrice");
         assertAmount(order, "totalAmount");
         assertThat(order.required("status").asText()).isEqualTo("PENDING_PAYMENT");
 
+        PaymentResponse paymentResponse = readSuccessData("c/payment-success.json", PaymentResponse.class);
+        assertThat(paymentResponse.paymentNo()).isNotBlank();
         JsonNode payment = readFixture("c/payment-success.json").required("data");
+        assertExactRecordFields(payment, PaymentResponse.class);
         assertThat(payment.required("orderStatus").asText()).isEqualTo("PAID");
         assertThat(payment.required("paymentStatus").asText()).isEqualTo("SUCCESS");
         assertTextId(payment, "ticketId");
 
+        ElectronicTicketResponse ticketResponse = readSuccessData(
+                "c/electronic-ticket-success.json", ElectronicTicketResponse.class);
+        assertThat(ticketResponse.seatIds()).hasSize(2);
         JsonNode ticket = readFixture("c/electronic-ticket-success.json").required("data");
+        assertExactRecordFields(ticket, ElectronicTicketResponse.class);
         assertThat(ticket.required("status").asText()).isEqualTo("VALID");
         assertThat(ticket.required("qrPayload").asText()).startsWith("cinewise:ticket:");
 
+        RefundImpactResponse refundImpact = readSuccessData(
+                "c/refund-impact-success.json", RefundImpactResponse.class);
+        assertThat(refundImpact.impactText()).isNotBlank();
+        RefundResponse refundResponse = readSuccessData("c/refund-success.json", RefundResponse.class);
+        assertThat(refundResponse.refundNo()).isNotBlank();
+        AlternativeShowsResponse alternatives = readSuccessData(
+                "c/alternative-shows-success.json", AlternativeShowsResponse.class);
+        assertThat(alternatives.shows()).hasSize(1);
+        JsonNode refundImpactData = readFixture("c/refund-impact-success.json").required("data");
+        assertExactRecordFields(refundImpactData, RefundImpactResponse.class);
         JsonNode refund = readFixture("c/refund-success.json").required("data");
+        assertExactRecordFields(refund, RefundResponse.class);
+        JsonNode alternativesData = readFixture("c/alternative-shows-success.json").required("data");
+        assertExactRecordFields(alternativesData, AlternativeShowsResponse.class);
+        assertExactRecordFields(alternativesData.required("shows").get(0), AlternativeShowResponse.class);
         assertAmount(refund, "refundAmount");
         assertThat(refund.required("refundStatus").asText()).isEqualTo("SUCCESS");
         assertThat(refund.required("orderStatus").asText()).isEqualTo("REFUNDED");
@@ -189,6 +229,40 @@ class TicketingContractFixtureTest {
         try (InputStream inputStream = resource.getInputStream()) {
             return objectMapper.readTree(inputStream);
         }
+    }
+
+    /**
+     * 以运行时 ObjectMapper 反序列化成功夹具，防止 DTO 改名、类型变化或夹具出现未声明字段时静默通过。
+     */
+    private <T> T readSuccessData(String relativePath, Class<T> responseType) throws IOException {
+        return objectMapper.treeToValue(readFixture(relativePath).required("data"), responseType);
+    }
+
+    /** 列表夹具同样必须按实际元素 DTO 解析，不能只检查第一条的少量字段。 */
+    private <T> List<T> readSuccessList(String relativePath, Class<T> elementType) throws IOException {
+        JavaType listType = objectMapper.getTypeFactory().constructCollectionType(List.class, elementType);
+        return objectMapper.readerFor(listType)
+                .readValue(readFixture(relativePath).required("data").traverse(objectMapper));
+    }
+
+    /** 分页夹具以实际 PageResult<T> 解析，确保分页包装和记录 DTO 同时受保护。 */
+    private <T> PageResult<T> readSuccessPage(String relativePath, Class<T> elementType) throws IOException {
+        JavaType pageType = objectMapper.getTypeFactory().constructParametricType(PageResult.class, elementType);
+        return objectMapper.readerFor(pageType)
+                .readValue(readFixture(relativePath).required("data").traverse(objectMapper));
+    }
+
+    /**
+     * 反序列化会拒绝改名或多余字段；此断言补充拒绝遗漏新增 DTO 字段，保持每份夹具字段完整。
+     */
+    private void assertExactRecordFields(JsonNode node, Class<?> recordType) {
+        Set<String> actualFields = new HashSet<>();
+        node.fieldNames().forEachRemaining(actualFields::add);
+        Set<String> expectedFields = new HashSet<>();
+        for (java.lang.reflect.RecordComponent component : recordType.getRecordComponents()) {
+            expectedFields.add(component.getName());
+        }
+        assertThat(actualFields).containsExactlyInAnyOrderElementsOf(expectedFields);
     }
 
     private void assertToolEnvelope(JsonNode root) {
