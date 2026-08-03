@@ -29,7 +29,8 @@ class DemoContentProviderTest {
     private final DemoContentCatalogProvider catalogProvider = new ClasspathDemoContentCatalogProvider(
             new com.fasterxml.jackson.databind.ObjectMapper(), new DefaultResourceLoader());
     private final DemoContentProvider provider = new DemoContentProvider(
-            catalogProvider, new ContentProperties(Duration.ofHours(6)), FIXED_CLOCK);
+            catalogProvider, new ContentProperties(Duration.ofHours(6), Duration.ofHours(6), Duration.ofDays(7)),
+            FIXED_CLOCK);
 
     @Test
     void givenSameCatalogQueryAndClock_whenQueryMoviesTwice_thenContentOrderAndSourceEnvelopeStayStable() {

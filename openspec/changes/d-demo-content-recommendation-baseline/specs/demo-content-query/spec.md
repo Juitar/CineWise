@@ -144,8 +144,14 @@
 #### Scenario: A 查询影院摘要
 - **GIVEN** A 持有合法的 `cinemaId`
 - **WHEN** A 通过 `ContentSummaryQueryPort` 查询影院摘要
-- **THEN** 系统返回影院名称、来源、数据时间、过期时间和过期标识，或返回明确的未找到结果
+- **THEN** 系统返回影院名称、区域、来源、数据时间、过期时间和过期标识，或返回明确的未找到结果
 - **AND** A 不访问 D 的持久化和缓存实现
+
+#### Scenario: A 展示影院区域
+- **GIVEN** A 持有合法且未删除的 `cinemaId`
+- **WHEN** A 通过 `ContentSummaryQueryPort` 查询影院摘要
+- **THEN** `CinemaSummary.area` 返回该影院已保存的行政区域
+- **AND** A 不读取 `cinema` 表或 D 的 Mapper
 
 #### Scenario: Port 尚未实现时使用临时 Demo Adapter
 - **GIVEN** `ContentSummaryQueryPort` 尚未实现且 D 已确认共享 Demo 数据

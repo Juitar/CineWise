@@ -62,9 +62,9 @@ agent/tool/         B 的工具协议适配器，仅调用 recommendation Applic
 公开查询建议采用以下边界：
 
 - `MovieQueryService`、`CinemaQueryService`：D 内部按城市、关键字或 ID 查询内容的 Application 用例。
-- `ContentSummaryQueryPort`：D 对 A 公开的只读 Application API，按影片或影院 ID 批量或单个查询摘要。
+- `ContentSummaryQueryPort`：D 对 A 公开的只读 Application API，按影片或影院 ID 批量或单个查询摘要；`CinemaSummary` 固定返回影院名称、区域、来源、数据时间、过期时间和过期标识。
 - `ContentResult<T>`：包装 `data/source/dataTime/expiresAt/isExpired/degraded/fallbackType`。
-- `MovieView`、`CinemaView`：只暴露标准化字段，至少包含影片标题或影院名称、来源、数据时间、过期时间和过期标识；业务 ID 对外按十进制字符串表示。
+- `MovieView`、`CinemaView`：只暴露标准化字段，至少包含影片标题或影院名称、影院区域、来源、数据时间、过期时间和过期标识；业务 ID 对外按十进制字符串表示。
 
 这里的 Service 和 Port 都是同一 Spring Boot 应用内的 Application API，不是 HTTP 服务。需要 REST 时，由 API 层 Controller 调用这些用例；A 只能调用 `ContentSummaryQueryPort` 和其 DTO，不访问 D 的 Entity、Mapper、Repository、缓存实现或内部查询用例。找不到内容时，Port 返回明确的未找到结果；已过期内容保留来源和时间标识，A 可用于只读展示，不得把它当作新的可购事实。
 
