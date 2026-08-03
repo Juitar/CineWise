@@ -15,7 +15,7 @@
 
 - [x] 1.1 D 已逐项确认 proposal、两份 spec 和 design 覆盖 Demo 内容、快照缓存、内部查询、固定候选和回归数据；确认日期：2026-08-02。
 - [x] 1.2 A 已确认 D 不创建 `movie_show`、票价、座位和库存，并确认共享固定数据、`ContentSummaryQueryPort` 和场次公开 Application 查询的协作方式；确认日期：2026-08-02。
-- [x] 1.3 B 已确认推荐工具名称、类型化 Command 和 `ToolResult<T>` 结果字段；确认结果已作为后续工具适配器输入；确认日期：2026-08-02。
+- [x] 1.3 B 已确认工具类 `RankMoviePlanTool`、`ToolRegistry.targetName=rankMoviePlan`、`RankMoviePlanCommand(movieId, cinemaId, date, timeFrom?, timeTo?)` 和 `ToolResult<T>` 公共结果字段；时段成对传入且 `timeFrom < timeTo`，不传用户或票务事实字段；确认日期：2026-08-03。
 - [x] 1.4 C 已确认前端展示所需的 `source/dataTime/expiresAt/isExpired/degraded/fallbackType` 字段和当前 REST 协作范围；确认日期：2026-08-02。
 - [x] 1.5 D 已确认本阶段文档通过，允许进入迁移阶段；确认日期：2026-08-02。
 

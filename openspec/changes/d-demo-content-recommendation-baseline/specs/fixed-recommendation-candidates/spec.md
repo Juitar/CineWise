@@ -16,6 +16,8 @@
 ### Requirement: 推荐工具必须使用公共结果封套
 推荐工具 SHALL 返回公共 `ToolResult<T>` 字段，并在业务数据中返回固定候选列表。动态事实 MUST 携带 `source`、`dataTime`、`expiresAt` 和 `isExpired`。
 
+`ToolRegistry` 中的工具名称 MUST 为 `rankMoviePlan`，适配类为 `RankMoviePlanTool`，并使用 `RankMoviePlanCommand`。Command 必填 `movieId`、`cinemaId`、`date`；`timeFrom`、`timeTo` 必须同时为空或同时传入，且同时传入时 `timeFrom` MUST 早于 `timeTo`。Command MUST NOT 接收 `showId`、价格、座位、库存或 `userId`。公共时效字段只使用 `ToolResult.dataAt` 和 `ToolResult.expiresAt`，不得新增公共 `dataTime` 字段。
+
 #### Scenario: 固定候选查询成功
 - **GIVEN** 工具输入符合已确认的类型化结构
 - **AND** 固定候选数据完整且未过期
