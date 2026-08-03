@@ -11,4 +11,4 @@
 ## 3. 验证与交付
 
 - [x] 3.1 OpenSpec 严格校验、`git diff --check` 和后端完整 `verify` 通过；后端 65 个测试中 60 通过、0 失败、5 个外部环境测试按门控跳过。PR #10 的真实 Redis 测试另在一次性 Redis 7.4.10 上 1/1 通过。
-- [ ] 3.2 推送分支后 GitHub Actions 的 Redis 服务健康、真实 Redis 测试和完整后端验证通过。
+- [x] 3.2 GitHub Actions 的 Redis 服务健康、真实 Redis 测试和完整后端验证通过；PR #11 的 Backend Redis Integration Run 30799769207 共执行 80 个测试，0 失败、0 错误，真实 Redis 用例 1/1 通过。
