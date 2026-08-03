@@ -9,6 +9,7 @@
 - [ ] C合并JWT Cookie、登录接口、测试登录入口和可用认证上下文；A不得自行伪造JWT。
 - [x] D已于2026-08-02确认`movie/cinema`字段、可空外部ID、迁移协作、`ContentSummaryQueryPort`和Demo Adapter边界。
 - [x] A负责种子整体编排；`movie/cinema`写入留在D拥有的content模块边界，ticketing不得访问D的Mapper或Repository。
+- [x] A与D于2026-08-03确认公开场次查询继续使用`basePrice`，并新增`expiresAt=startTime`供D排除已开场可购候选；D不复制场次、价格或库存事实。
 
 ## 数据库与种子
 
@@ -25,6 +26,7 @@
 - [x] A实现MyBatis持久化投影、Mapper、明确字段SQL和Repository适配器，禁止`SELECT *`。
 - [x] A实现ShowQueryService与SeatQueryService。
 - [x] A实现ShowController、参数校验、OpenAPI和统一错误映射。
+- [x] A为`ShowSummaryView`、REST响应和OpenAPI补充`expiresAt`，并保持`expiresAt=startTime`。
 - [ ] C将安全规则接入现有唯一SecurityFilterChain，不新增竞争过滤链。
 
 ## 验证与交付
@@ -32,6 +34,7 @@
 - [x] 增加场次查询H2接口契约测试和真实MySQL 8.4只读集成测试，覆盖筛选、空结果和字段类型。
 - [x] 增加座位查询H2接口契约测试和真实MySQL 8.4只读集成测试，覆盖成功、401、404和不可售场次。
 - [x] 导出`/v3/api-docs`并由A/C核对前端DTO；C于2026-08-02确认权限、ID、金额和时间字段无异议。
+- [x] 增加`expiresAt`接口契约、OpenAPI和真实MySQL可选回归断言，验证其等于`startTime`。
 - [x] 执行`mvnw.cmd clean verify`并记录结果。
 - [ ] 执行本地一键初始化和登录后查询验收，记录命令、响应和未验证事项。
 
@@ -73,3 +76,12 @@
 - OpenAPI：A已从本地H2测试配置实际导出OpenAPI 3.1文档至`backend/target/openapi.json`；两个GET路径、字符串ID、两位小数字符串金额和时间字段类型核对通过，场次接口无安全要求，座位接口已声明`cookieAuth`；C于2026-08-02确认前端DTO无异议。
 - 质量门禁：2026-08-02最后一次执行`mvnw.cmd clean verify`通过，共15个测试、0失败、0错误、1个云端MySQL可选测试跳过；Checkstyle和SpotBugs均通过。
 - 未验证项：C的JWT Cookie和测试登录入口尚未合并，因此云端HTTP仅能验收公开场次；登录座位正向链路由测试认证上下文完成。
+
+## 场次候选失效时间验证记录
+
+- 契约：公开Application DTO和REST响应均新增`expiresAt`，固定等于`startTime`；D继续消费`basePrice`。
+- H2接口测试：实际响应中的`expiresAt`与固定场次`startTime`一致，OpenAPI声明该字段为`date-time`。
+- 真实MySQL测试：2026-08-03使用仓库日常应用配置连接MySQL 8.4，只读执行`ShowQueryMySqlIntegrationTest`；1个测试通过、0失败、0错误，`expiresAt=startTime`、未来场次筛选和80座座位图断言全部通过。Flyway和种子均关闭。
+- Redis连通性：本机Redis服务运行中，使用仓库配置鉴权执行`PING`返回`PONG`；场次查询不依赖Redis，因此未为本字段变更新增Redis业务测试。
+- 质量门禁：2026-08-03同步最新`dev`后执行`mvnw.cmd verify`通过，Checkstyle和SpotBugs均为0问题；随后在一次性MySQL 8.4隔离库执行`ShowQueryMySqlIntegrationTest`，1个测试通过、0失败、0错误、0跳过。
+- OpenSpec：`openspec validate content-and-show-selection-flow --strict`通过。

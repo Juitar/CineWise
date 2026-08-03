@@ -79,6 +79,7 @@ class ShowQueryMySqlIntegrationTest {
                     assertThat(show.movieId()).isEqualTo(movieId);
                     assertThat(show.cinemaId()).isEqualTo(cinemaId);
                     assertThat(show.basePrice().scale()).isEqualTo(2);
+                    assertThat(show.expiresAt()).isEqualTo(show.startTime());
                 });
         assertThat(showQueryService.queryShows(new ShowQuery(
                 movieId,

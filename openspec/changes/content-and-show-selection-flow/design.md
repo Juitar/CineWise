@@ -38,6 +38,8 @@
 
 余座数按查询快照中`show_seat.status=AVAILABLE`聚合。`ShowSummaryResponse.stateVersion`取`movie_show.version`，表示场次元数据版本，不承诺座位仍可锁定。
 
+`expiresAt`表示该场次作为可购候选的最晚有效时刻，当前规则固定为`expiresAt=startTime`。当业务时间`now>=expiresAt`时，消费者不得再生成可购方案。该字段不是缓存TTL，也不承诺此前价格、余座或状态保持不变；`updatedAt`继续表示场次数据更新时间，建单仍须由A重新读取并校验权威状态和金额。
+
 ## 座位图查询
 
 `GET /api/v1/shows/{showId}/seats`要求登录。Application Service重新读取场次并校验存在、`ON_SALE`和未开场，再按排号、座号稳定排序返回座位。
@@ -50,7 +52,7 @@
 ShowSummaryResponse(
   showId, movieId, cinemaId, cinemaName,
   auditoriumId, auditoriumName,
-  startTime, endTime, languageVersion,
+  startTime, endTime, expiresAt, languageVersion,
   basePrice, availableSeatCount,
   status, dataType, stateVersion, updatedAt
 )
@@ -66,7 +68,7 @@ SeatItemResponse(
 )
 ```
 
-HTTP DTO中的ID均为十进制字符串；`basePrice`为两位小数字符串；时间为带偏移ISO 8601；状态值与数据库枚举同名。
+HTTP DTO中的ID均为十进制字符串；`basePrice`为两位小数字符串；时间为带偏移ISO 8601；状态值与数据库枚举同名。公开Application DTO使用`LocalDateTime expiresAt`，REST DTO使用`OffsetDateTime expiresAt`。
 
 ## 错误与权限
 
