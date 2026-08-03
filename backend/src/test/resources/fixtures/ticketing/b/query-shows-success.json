@@ -1,0 +1,25 @@
+{
+  "status": "SUCCESS",
+  "data": {
+    "shows": [
+      {
+        "showId": "2084194401305432066",
+        "movieId": "2084194398004512769",
+        "cinemaId": "2084194399128586242",
+        "startTime": "2026-08-03T11:30:00Z",
+        "languageVersion": "国语2D",
+        "basePrice": "39.00",
+        "status": "ON_SALE"
+      }
+    ]
+  },
+  "errorCode": null,
+  "retryable": false,
+  "replanSuggested": false,
+  "suggestedNextAction": "RENDER_RESULT",
+  "degraded": false,
+  "fallbackType": null,
+  "stateVersion": 3,
+  "dataAt": "2026-08-03T10:00:00Z",
+  "expiresAt": "2026-08-03T11:30:00Z"
+}

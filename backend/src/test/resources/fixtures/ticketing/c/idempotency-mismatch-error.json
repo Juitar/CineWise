@@ -1,0 +1,6 @@
+{
+  "code": 205005,
+  "message": "幂等请求参数不一致",
+  "data": null,
+  "traceId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

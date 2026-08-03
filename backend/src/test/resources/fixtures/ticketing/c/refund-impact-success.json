@@ -1,0 +1,16 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "orderId": "2084194500000000001",
+    "orderNo": "CW2084194500000000001",
+    "refundAmount": "78.00",
+    "orderStatus": "PAID",
+    "ticketStatus": "VALID",
+    "showStartTime": "2026-08-03T19:30:00+08:00",
+    "orderVersion": 2,
+    "ticketVersion": 0,
+    "impactText": "退票成功后电子票失效，原座位将重新开放。"
+  },
+  "traceId": "77777777777777777777777777777777"
+}

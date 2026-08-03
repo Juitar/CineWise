@@ -118,6 +118,16 @@ V003已有`refund_request`及每订单唯一、`user_id + idempotency_key`唯一
 - 必测20请求抢同一座位、同键同参恢复、同键异参、多座位部分冲突全回滚、跨用户恢复不可见。
 - 退票必须覆盖影响查询、同键同参/异参、跨用户、订单/票/座位归属回滚、并发重复退票和响应丢失恢复；真实MySQL验证同一订单最多一条成功退款。
 
+## OpenAPI与联调夹具
+
+联调夹具统一放在`backend/src/test/resources/fixtures/ticketing`，以版本库内静态示例作为A向B/C交付的单一来源。A负责`/shows`、选座、订单、支付、电子票、退票页面及其REST夹具；C负责`/movies/**`、`/cinemas/**`、购票入口和公共请求层，并仅通过该请求层接入A的票务REST。`c`目录保存完整`Result<T>`响应，覆盖场次、座位、订单、支付、电子票、退票和关键错误；`b`目录保存公共`ToolResult<T>`，覆盖动态场次、建单成功、原订单幂等恢复、座位冲突和订单不存在。
+
+B夹具严格使用公共`status/data/errorCode/retryable/replanSuggested/suggestedNextAction/degraded/fallbackType/stateVersion/dataAt/expiresAt`字段，业务字段只放入`data`。支付不进入Agent工具夹具。写工具失败不得建议自动重试；原建单结果恢复返回与首次成功相同的业务数据，不增加`replayed`等未冻结字段。
+
+C夹具严格使用当前Controller DTO，ID为字符串、金额为两位小数字符串、时间带偏移，错误码为JSON数值。夹具不得包含密码、JWT、Cookie、用户ID、确认凭证或真实环境数据。自动契约测试解析全部JSON，核对关键字段、敏感词和恢复语义，并通过实际`/v3/api-docs`核对安全声明、`Idempotency-Key`、请求体和响应Schema；夹具漂移或OpenAPI缺失时构建失败。
+
+未登录夹具是C确认的目标`Result` JSON，依赖C后续认证PR用自定义`AuthenticationEntryPoint`替换当前`HttpStatusEntryPoint`。在该实现合并前，当前运行时可能只返回空HTTP 401，A不得把目标夹具记录成现状验收证据。
+
 ## 迁移策略
 
 - 所有内部主键由应用分配BIGINT雪花ID，不使用`AUTO_INCREMENT`。

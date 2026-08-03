@@ -1,0 +1,18 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "orderNo": "CW2084194500000000001",
+    "shows": [
+      {
+        "showId": "2084194401305432099",
+        "cinemaId": "2084194399128586242",
+        "startTime": "2026-08-04T19:30:00+08:00",
+        "basePrice": "39.00",
+        "status": "ON_SALE",
+        "availableSeatCount": 80
+      }
+    ]
+  },
+  "traceId": "99999999999999999999999999999999"
+}

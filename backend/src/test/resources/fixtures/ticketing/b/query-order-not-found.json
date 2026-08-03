@@ -1,0 +1,13 @@
+{
+  "status": "FAILED",
+  "data": null,
+  "errorCode": 205001,
+  "retryable": false,
+  "replanSuggested": false,
+  "suggestedNextAction": "重新选择本人订单",
+  "degraded": false,
+  "fallbackType": null,
+  "stateVersion": null,
+  "dataAt": null,
+  "expiresAt": null
+}
