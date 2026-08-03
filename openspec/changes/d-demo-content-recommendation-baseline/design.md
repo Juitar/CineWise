@@ -51,7 +51,7 @@ agent/tool/         B 的工具协议适配器，仅调用 recommendation Applic
 
 `demo-content-v1` 是 D 维护的共享数据文件版本、Provider 回退数据和测试夹具；它不得与内容种子维护两套影片、影院。资源文件以 `source + sourceMovieId` 或 `source + sourceCinemaId` 表示跨环境稳定身份，不写入数据库内部 `movieId/cinemaId`。首次初始化由应用生成雪花 ID；重复初始化查询并返回既有 ID，A 的票务种子只使用 `ContentSeedCatalog` 返回的实际 ID。加载时由统一 `Clock` 生成本轮 `dataTime` 和 `expiresAt`；自动测试使用固定 `Clock`，从而同时满足演示数据不过期和回归结果可重复。
 
-调用方按实际 `movieId/cinemaId` 查询且需要 Demo 回退时，Provider 先通过 D 的内容身份查询端口，把数据库 ID 映射为 `DEMO_CONTENT` 的来源 ID，再仅返回该目录条目并把实际 ID 填入结果 DTO。目录不存在、已删除或非 Demo 来源的 ID 不返回内容，不能退化为整份目录。
+调用方按实际 `movieId/cinemaId` 查询且需要 Demo 回退时，Provider 先通过 D 的内容身份查询端口，把数据库 ID 映射为固定种子持久化键 `demo-seed` 下的来源 ID，再仅返回该目录条目并把实际 ID 填入结果 DTO。`DEMO_CONTENT` 只用于 JSON 和返回结果的来源标识，不能作为数据库查询键。目录不存在、已删除或不是 `demo-seed` 的 ID 不返回内容，不能退化为整份目录。
 
 共享初始化按 `source + sourceMovieId` 或 `source + sourceCinemaId` 更新，不按运行次数生成新 ID。相同数据版本重复初始化不得产生重复记录；D 不实现第二个影片、影院初始化器。
 

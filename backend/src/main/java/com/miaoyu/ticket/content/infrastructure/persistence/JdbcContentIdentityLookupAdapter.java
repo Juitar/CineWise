@@ -10,13 +10,14 @@ import org.springframework.stereotype.Repository;
 /**
  * 从 D 负责的内容表把实际数据库主键映射回固定 Demo 来源 ID。
  *
- * <p>查询只读取 movie/cinema 的来源 ID，不向 Provider 暴露完整行，也不访问 A 的票务表。已逻辑删除
- * 或来源不是 DEMO_CONTENT 的内容不能作为固定目录回退，避免同一个数据库 ID 被错误映射。</p>
+ * <p>查询只读取 movie/cinema 的来源 ID，不向 Provider 暴露完整行，也不访问 A 的票务表。固定种子在
+ * 数据库中必须沿用 `demo-seed` 业务键；`DEMO_CONTENT` 只用于 JSON 与返回结果来源。已逻辑删除或不是
+ * `demo-seed` 的内容不能作为固定目录回退，避免把其他 Provider 的数据库 ID 错误映射。</p>
  */
 @Repository
 public class JdbcContentIdentityLookupAdapter implements ContentIdentityLookupPort {
 
-    private static final String DEMO_SOURCE = "DEMO_CONTENT";
+    private static final String DEMO_SEED_SOURCE = "demo-seed";
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -36,7 +37,7 @@ public class JdbcContentIdentityLookupAdapter implements ContentIdentityLookupPo
                    AND source = ?
                    AND deleted_at IS NULL
                 """.formatted(sourceIdColumn, table),
-                (resultSet, rowNumber) -> resultSet.getString(sourceIdColumn), contentId, DEMO_SOURCE);
+                (resultSet, rowNumber) -> resultSet.getString(sourceIdColumn), contentId, DEMO_SEED_SOURCE);
         return sourceIds.stream().findFirst();
     }
 }
