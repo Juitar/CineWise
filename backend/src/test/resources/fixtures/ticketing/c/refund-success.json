@@ -1,0 +1,17 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "refundId": "2084194800000000001",
+    "refundNo": "RFD2084194800000000001",
+    "orderId": "2084194500000000001",
+    "orderNo": "CW2084194500000000001",
+    "refundStatus": "SUCCESS",
+    "refundAmount": "78.00",
+    "orderStatus": "REFUNDED",
+    "ticketStatus": "REFUNDED",
+    "stateVersion": 4,
+    "updatedAt": "2026-08-03T18:10:00+08:00"
+  },
+  "traceId": "88888888888888888888888888888888"
+}

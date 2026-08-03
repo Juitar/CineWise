@@ -1,0 +1,19 @@
+{
+  "status": "SUCCESS",
+  "data": {
+    "orderId": "2084194500000000001",
+    "orderNo": "CW2084194500000000001",
+    "status": "PENDING_PAYMENT",
+    "totalAmount": "78.00",
+    "expireTime": "2026-08-03T10:15:00Z"
+  },
+  "errorCode": null,
+  "retryable": false,
+  "replanSuggested": false,
+  "suggestedNextAction": "RENDER_RESULT",
+  "degraded": false,
+  "fallbackType": null,
+  "stateVersion": 0,
+  "dataAt": null,
+  "expiresAt": null
+}

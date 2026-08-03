@@ -1,0 +1,33 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "showId": "2084194401305432066",
+    "auditoriumId": "2084194400201302017",
+    "auditoriumName": "1号厅",
+    "rowCount": 1,
+    "seatCount": 2,
+    "availableSeatCount": 1,
+    "stateVersion": 3,
+    "updatedAt": "2026-08-03T18:00:00+08:00",
+    "seats": [
+      {
+        "seatId": "2084194402305432067",
+        "rowNo": "A",
+        "seatNo": "01",
+        "seatLabel": "A排01座",
+        "status": "AVAILABLE",
+        "stateVersion": 0
+      },
+      {
+        "seatId": "2084194402305432068",
+        "rowNo": "A",
+        "seatNo": "02",
+        "seatLabel": "A排02座",
+        "status": "LOCKED",
+        "stateVersion": 1
+      }
+    ]
+  },
+  "traceId": "22222222222222222222222222222222"
+}

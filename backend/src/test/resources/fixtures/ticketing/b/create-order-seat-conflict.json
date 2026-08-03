@@ -1,0 +1,13 @@
+{
+  "status": "FAILED",
+  "data": null,
+  "errorCode": 204001,
+  "retryable": false,
+  "replanSuggested": true,
+  "suggestedNextAction": "刷新座位并重新选择",
+  "degraded": false,
+  "fallbackType": null,
+  "stateVersion": null,
+  "dataAt": null,
+  "expiresAt": null
+}

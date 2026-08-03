@@ -1,0 +1,25 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": [
+    {
+      "showId": "2084194401305432066",
+      "movieId": "2084194398004512769",
+      "cinemaId": "2084194399128586242",
+      "cinemaName": "妙语影城中心店",
+      "auditoriumId": "2084194400201302017",
+      "auditoriumName": "1号厅",
+      "startTime": "2026-08-03T19:30:00+08:00",
+      "endTime": "2026-08-03T21:35:00+08:00",
+      "expiresAt": "2026-08-03T19:30:00+08:00",
+      "languageVersion": "国语2D",
+      "basePrice": "39.00",
+      "availableSeatCount": 79,
+      "status": "ON_SALE",
+      "dataType": "MOCK",
+      "stateVersion": 3,
+      "updatedAt": "2026-08-03T18:00:00+08:00"
+    }
+  ],
+  "traceId": "11111111111111111111111111111111"
+}

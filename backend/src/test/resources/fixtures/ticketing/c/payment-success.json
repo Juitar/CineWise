@@ -1,0 +1,15 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "orderId": "2084194500000000001",
+    "orderNo": "CW2084194500000000001",
+    "paymentNo": "PAY2084194600000000001",
+    "orderStatus": "PAID",
+    "paymentStatus": "SUCCESS",
+    "ticketId": "2084194700000000001",
+    "stateVersion": 2,
+    "updatedAt": "2026-08-03T18:05:00+08:00"
+  },
+  "traceId": "55555555555555555555555555555555"
+}
