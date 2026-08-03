@@ -82,6 +82,8 @@ public class ShowQueryService {
         if (cinema == null) {
             throw new BusinessException(TicketingErrorCode.QUERY_UNAVAILABLE);
         }
+        // 场次到达开场时间即不能再作为可购候选；实际价格和库存仍由建单流程重新校验。
+        LocalDateTime candidateExpiresAt = snapshot.startTime();
         return new ShowSummaryView(
                 snapshot.showId(),
                 snapshot.movieId(),
@@ -91,6 +93,7 @@ public class ShowQueryService {
                 snapshot.auditoriumName(),
                 snapshot.startTime(),
                 snapshot.endTime(),
+                candidateExpiresAt,
                 snapshot.languageVersion(),
                 snapshot.basePrice(),
                 snapshot.availableSeatCount(),

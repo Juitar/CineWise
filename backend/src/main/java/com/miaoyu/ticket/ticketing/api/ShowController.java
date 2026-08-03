@@ -88,6 +88,7 @@ public class ShowController {
                 view.auditoriumName(),
                 toOffsetDateTime(view.startTime()),
                 toOffsetDateTime(view.endTime()),
+                toOffsetDateTime(view.expiresAt()),
                 view.languageVersion(),
                 view.basePrice().setScale(2, RoundingMode.UNNECESSARY).toPlainString(),
                 view.availableSeatCount(),
