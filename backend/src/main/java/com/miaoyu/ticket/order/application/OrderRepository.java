@@ -55,6 +55,16 @@ public interface OrderRepository {
             LocalDateTime expiresAtOrBefore,
             LocalDateTime updatedAt);
 
+    /** 只有仍未过期的待支付订单可以进入PAYING。 */
+    boolean markOrderPaying(
+            long orderId,
+            int expectedVersion,
+            LocalDateTime paidBefore,
+            LocalDateTime updatedAt);
+
+    /** 固定成功支付只能从PAYING完成到PAID。 */
+    boolean markOrderPaid(long orderId, int expectedVersion, LocalDateTime paidAt);
+
     record OrderListCriteria(
             long userId,
             String orderNo,

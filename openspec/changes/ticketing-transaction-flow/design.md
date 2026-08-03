@@ -65,6 +65,26 @@ V005新增A拥有的`ticket_order_operation`表，只保存交易写动作幂等
 
 `OrderExpiryService`每批最多扫描100个候选主键，逐个调用独立的`OrderExpiryTransaction`。后者使用`id/status/expire_time/version`条件抢占`EXPIRED`迁移，成功后安全释放座位；条件失败表示另一取消、过期或支付流程已经取得权威结果，当前任务安全跳过。`ExpiredOrderReleaseJob`每30秒只调用该Application Service，不访问Mapper。
 
+## Mock支付与电子票
+
+V003已有`mock_payment`和`electronic_ticket`及每订单唯一约束，本阶段不新增或修改任何Flyway脚本，也不占用C暂定的V006。
+
+`POST /api/v1/orders/{orderNo}/payments`只接收路径订单号和Header幂等键，请求体为空。`PaymentApplicationService`负责身份、输入校验和唯一约束竞争后的只读恢复；`PaymentTransaction`拥有本地事务并按以下顺序执行：
+
+1. 按当前用户和订单号锁定订单行，使支付、取消和过期串行竞争。
+2. 查询订单已有支付和当前幂等键绑定；同订单已有支付时返回原结果，同键绑定其他订单时返回`205005`。
+3. 校验订单为`PENDING_PAYMENT`且`expire_time > now`，以订单金额作为唯一支付金额。
+4. 写唯一`PROCESSING`支付并条件迁移订单到`PAYING`。
+5. 仅将`status=LOCKED AND lock_order_no=当前订单号`的全部座位更新为`SOLD`并清除锁；影响行数必须等于订单票数。
+6. 条件迁移支付到`SUCCESS`、订单到`PAID`，写`paid_time`并生成每订单唯一`VALID`电子票。
+7. 事务提交后才允许发布`PaymentSucceededEvent`；HTTP响应和事件监听结果均不参与事务成功判定。
+
+`GET /api/v1/orders/{orderNo}/payment`和`GET /api/v1/tickets/{ticketId}`只读权威数据并按当前用户过滤。支付POST结果未知时，调用方只能查询原订单支付结果，不能自动重放POST或生成新幂等键。
+
+支付编号、票码和二维码载荷由雪花ID派生；二维码载荷只包含`cinewise:ticket:<ticketCode>`演示引用，不含用户身份、模拟密码或订单明细。
+
+事件使用冻结字段`eventId/orderId/showId/userId/cinemaArea/startAt/orderVersion/occurredAt`。当前D公开内容摘要端口不包含`cinemaArea`，A只定义事件和发布端口，不读取D私有Mapper/表、不伪造区域；待D补齐公开Application API后接通事务后发布适配。
+
 ## 配置和时间
 
 `TICKET_LOCK_MINUTES`与`ORDER_PAYMENT_MINUTES`默认15，范围5至30。为避免订单在座位锁失效后仍显示可支付，建单的座位锁与订单截止时间统一使用两个配置中的较早时间。所有时间通过注入`Clock`生成并按毫秒持久化。
