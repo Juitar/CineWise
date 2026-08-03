@@ -4,7 +4,15 @@
 
 ## 1. 开始任何实现前
 
-除纯文案或格式修正外，开始前必须按顺序完成以下检查：
+以下小型仓库维护不要求创建 OpenSpec change，可以直接在 `dev` 提交：
+
+- 普通文档、注释、命名或格式修改，不改变代码和运行行为。
+- `AGENTS.md`、提交规范及其他协作流程规则修改。
+- 仅调整现有 CI 工作流的分支或路径触发范围，且不修改作业、校验命令、Action 版本、权限、密钥、环境变量、缓存、部署或发布行为。
+
+这类改动仍须阅读受影响文件、执行 `git diff --check` 并核对改动范围。新增或修改 CI 作业、校验步骤、权限、部署、依赖、数据库、接口、业务规则或任何运行行为时，仍必须创建 OpenSpec change。
+
+除上述小型仓库维护外，开始前必须按顺序完成以下检查：
 
 1. 阅读仓库根目录 `README.md`，以及与本次改动对应的 `docs/` 规则文档。后端先读 `docs/backend-skeleton.md`，前端先读 `docs/frontend-coding-standards.md`。
 2. 执行 `openspec list`，确认是否已有覆盖本次工作的 change；有则继续该 change，没有则先创建新的 change。
@@ -109,9 +117,9 @@
 
 ## 6. Git 与代码评审流程
 
-1. 开工前同步开发基线：`git switch dev`、`git pull --ff-only origin dev`。不要直接在 `dev` 开发，应从 `dev` 创建本次 OpenSpec change 对应的短生命周期分支。
+1. 开工前同步开发基线：`git switch dev`、`git pull --ff-only origin dev`。需要 OpenSpec 的改动不得直接在 `dev` 开发，应从 `dev` 创建本次 change 对应的短生命周期分支；第 1 节列出的小型仓库维护可以直接在 `dev` 提交。
 2. 每个 OpenSpec change 使用一个短生命周期分支，例如 `feat/agent-runtime-and-workspace`、`fix/auth-cookie-expiry`。
-3. 每次提交只包含一个目的，提交前检查 `git diff --check`、`git status` 和变更文件。提交信息使用 `feat(agent): ...`、`fix(auth): ...`、`test(ticketing): ...`、`docs(openspec): ...` 等格式。
+3. 每次提交只包含一个目的，提交前检查 `git diff --check`、`git status` 和变更文件。提交前必须阅读 `docs/GIT_COMMIT_CONVENTION.md`：`type` 和 `scope` 使用固定英文，冒号后的 `subject` 与正文必须使用简洁中文。不得照抄本文件的英文格式示例写英文 `subject`；应写 `feat(agent): 新增工具协议与计划校验`，不得写 `feat(agent): add tool contracts and plan validation`。
 4. 禁止使用 `git reset --hard`、强推、覆盖他人提交或提交无关格式化；需要整理历史或处理冲突时先确认影响范围。
 5. PR 必须说明：关联 OpenSpec change、修改范围、契约影响及已确认 Owner、验证命令和结果、未验证事项与风险。跨模块 PR 必须由受影响 Owner 审查。
 6. 数据库迁移是唯一的直提例外：只有 A 可以在 Owner/OpenSpec 确认、版本分配、静态审查和空 MySQL 8.4 验证完成后，将隔离的 Flyway 迁移及直接关联证据提交到 `dev`；其他业务代码、测试和文档仍须通过个人分支 PR。
