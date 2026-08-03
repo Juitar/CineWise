@@ -1,0 +1,49 @@
+name: Backend Redis Integration
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-redis-integration.yml"
+      - "openspec/changes/ci-redis-integration-verification/**"
+  push:
+    branches: [main, dev]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-redis-integration.yml"
+      - "openspec/changes/ci-redis-integration-verification/**"
+
+permissions:
+  contents: read
+
+jobs:
+  redis-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      redis:
+        image: redis:7.4.10-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      REDIS_INTEGRATION_ENABLED: "true"
+      SPRING_DATA_REDIS_HOST: 127.0.0.1
+      SPRING_DATA_REDIS_PORT: "6379"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Verify backend with Redis integration enabled
+        working-directory: backend
+        run: bash ./mvnw --batch-mode --no-transfer-progress verify
