@@ -12,7 +12,7 @@ CineWise/
 ├── frontend/      Umi 前端（由前端负责人初始化）
 ├── docs/          团队共享说明
 ├── openspec/      需求与契约变更
-├── .github/       CI 工作流
+├── .github/       CI/CD 工作流和 Copilot 入口
 └── compose.yaml   本地联调编排
 ```
 
@@ -44,4 +44,4 @@ CineWise/
 - 写操作不进行网络层自动重试；幂等与恢复必须由业务用例明确实现。
 - 提交前进入 `backend/`，执行 `mvnw.cmd verify`（Windows）或 `bash ./mvnw verify`（macOS/Linux）。
 
-详细边界见 [后端骨架说明](docs/backend-skeleton.md) 和 [后端团队编码规范](docs/backend-coding-standards.md)。
+详细边界见 [后端骨架说明](docs/backend-skeleton.md)、[后端团队编码规范](docs/backend-coding-standards.md)、[PR 审查规范](docs/PR_REVIEW_GUIDELINES.md) 和 [演示环境持续部署指南](docs/demo-deployment-guide.md)。数据库执行证据集中保存在 [数据库迁移记录](docs/database-migrations/README.md)。
