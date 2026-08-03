@@ -7,9 +7,16 @@
 - OpenSpec change：`openspec/changes/password-login-and-session/`
 - 领域 Owner：C
 - 涉及表：`sys_user`、`sys_login_log`
-- 申请版本：待 A 分配
-- 迁移文件：待 A 分配版本后审核或生成
+- 申请版本：`V006`，A 已于 2026-08-03 正式分配；`V005` 已由票务迁移占用，不得重复使用
+- 迁移文件：`backend/src/main/resources/db/migration/V006__create_auth_user_and_login_log_tables.sql`
 - 非范围：验证码、注册邀请码、邀请码使用记录、真实账号、密码、JWT 和演示种子
+
+### 1.1 迁移拆分结论
+
+- `V006` 一次创建当前密码登录必需的 `sys_user`、`sys_login_log`，两表同属认证模块且需要一起完成真实登录验收，无需再拆成两个版本。
+- 注册和邮箱验证码不在本次 OpenSpec 范围；后续 `sys_email_verify_code`、`sys_registration_invite`、`sys_registration_invite_use` 随注册变更申请新的 Flyway 版本，不提前放入 `V006`。
+- A 提供最终 SQL 前可以按评审结论调整草案；`V006` 一旦共享或执行，后续修正只能新增向前迁移，不得修改历史文件。
+- `V006` 不包含演示账号、真实邮箱、密码散列或其他种子数据。
 
 ## 2. T01 `sys_user`
 
@@ -108,4 +115,5 @@
 
 - C 已确认：本次只需要 T01、T05，不创建 T02-T04。
 - C 已确认：规范化邮箱存储、`NORMAL/DISABLED/LOCKED`、登录日志只保留 `create_time`、30 天保留期，以及支持假/真邮箱的环境变量认证种子。
-- 待 A 确认：登录日志不含 `update_time` 的只追加表例外、Flyway 版本、最终 SQL、CHECK 兼容性、空 MySQL 验证和执行授权。
+- A 已确认：为本次认证迁移分配 `V006`，文件名为 `V006__create_auth_user_and_login_log_tables.sql`，且只包含 `sys_user`、`sys_login_log`，不包含演示账号或其他种子数据。
+- 待 A 完成：确认登录日志不含 `update_time` 的只追加表例外、最终 SQL、静态审查、AI 只读复核、CHECK 兼容性、空 MySQL 8.4 验证和执行授权。

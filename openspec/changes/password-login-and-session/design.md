@@ -71,6 +71,12 @@ Controller 只校验请求、调用 Application Service、设置或清除 Cookie
 
 本地可以使用 `user@cinewise.test`、`admin@cinewise.test`；正式演示在全新数据库首次初始化前配置真实可收信的测试邮箱。环境变量变化不会静默修改已有账号，避免把已有用户身份和其他模块的 `userId` 关联改乱。
 
+### 10. 注册同意和后续登录分开处理
+
+注册属于后续独立变更，注册页面的隐私同意框必须默认未勾选，服务端只有收到 `privacyAccepted=true` 且版本有效时才写入 `privacy_policy_version/privacy_accepted_at`。本次密码登录只读取并返回已记录版本，不更新同意字段。
+
+登录页可以提供协议链接和说明，但不能把“点击登录”持久化成新同意，也不能在政策升级后自动覆盖旧版本。未来政策版本变化时，需要新增显式重新确认接口和页面状态；该流程不通过修改 V006 或登录 DTO 临时实现。
+
 ## Risks / Trade-offs
 
 - [A/B/D 尚未确认 CSRF 公共接口] → OpenSpec 先固定建议字段，任务清单把 Owner 确认作为编码前置条件；未确认前不修改安全链和公共请求层。
@@ -84,7 +90,7 @@ Controller 只校验请求、调用 Application Service、设置或清除 Cookie
 ## Migration Plan
 
 1. C 在本变更中确认 `sys_user`、`sys_login_log` 字段、索引、保留期和兼容要求，并向 A 提交迁移申请材料。
-2. A 分配 Flyway 版本，审核或生成最终 SQL；AI 仅按迁移规范做只读复核。
+2. A 已分配 `V006__create_auth_user_and_login_log_tables.sql`；A 审核或生成最终 SQL，AI 仅按迁移规范做只读复核。
 3. A 在独立空 MySQL 8.4 中执行迁移、重复执行、索引、约束、字符集与排序规则验证并保存证据。
 4. 合并后端认证实现和前端登录功能，使用测试账号完成用户/管理员登录、刷新恢复、登出、401/403 和 CSRF 冒烟。
 5. 若应用需要回滚，回滚应用版本并保留向前兼容的认证表；已经执行的迁移不改名、不修改、不逆向覆盖。

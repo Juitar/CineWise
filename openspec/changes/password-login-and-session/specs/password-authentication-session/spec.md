@@ -41,6 +41,17 @@
 - **WHEN** Cookie 缺失、JWT 过期、账号状态异常或 JWT 中 `tokenVersion` 与数据库不一致
 - **THEN** 系统返回 HTTP 401 和错误码 `201006`，且不返回旧用户摘要
 
+### Requirement: 登录不自动产生新的隐私同意
+密码登录 SHALL 只校验账号凭据和状态，并返回账号已经记录的 `privacyPolicyVersion`。登录请求不得包含隐私同意字段，也不得修改 `privacy_policy_version` 或 `privacy_accepted_at`。
+
+#### Scenario: 已注册账号再次登录
+- **WHEN** 账号在注册时已经显式同意隐私政策并完成密码登录
+- **THEN** 系统沿用原有同意版本和时间，不把本次登录记录成一次新的同意
+
+#### Scenario: 隐私政策版本更新
+- **WHEN** 当前隐私政策版本高于账号已记录版本
+- **THEN** 系统不得通过登录自动升级账号的同意版本，后续必须由独立隐私确认用例取得用户主动确认
+
 ### Requirement: JWT Cookie 与服务端身份校验
 JWT SHALL 只写入 `HttpOnly` Cookie，最小声明仅包含 `sub`、`role`、`tokenVersion`、`iat`、`exp` 和 `jti`。正式环境 Cookie SHALL 使用 `Secure`、`SameSite=Lax` 和 `Path=/`；本地 HTTP 只能通过环境配置关闭 `Secure`。每个受保护请求 SHALL 重新校验账号状态和数据库 `tokenVersion`。
 
