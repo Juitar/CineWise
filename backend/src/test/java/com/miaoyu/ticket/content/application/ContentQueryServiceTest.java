@@ -49,12 +49,47 @@ class ContentQueryServiceTest {
     }
 
     @Test
+    void givenCacheMissAndValidSnapshot_whenQuery_thenItReturnsSnapshotAndKeepsDegradedMarker() {
+        ContentQueryService service = service(Optional.empty(), Optional.of(result(NOW.plusHours(1), false,
+                ContentFallbackType.SNAPSHOT)), Optional.empty());
+
+        ContentResult<List<? extends ContentItem>> result = service.query(QUERY);
+
+        // 缓存未命中时不能跳过最近有效快照直接展示 Demo，页面仍需知道这是降级结果。
+        assertThat(result.fallbackType()).isEqualTo(ContentFallbackType.SNAPSHOT);
+        assertThat(result.degraded()).isTrue();
+        assertThat(result.expired()).isFalse();
+    }
+
+    @Test
+    void givenSnapshotOlderThanMaximumStale_whenQuery_thenItFallsBackToDemo() {
+        ContentQueryService service = service(Optional.empty(), Optional.of(result(NOW.minusDays(8), false,
+                ContentFallbackType.SNAPSHOT)), Optional.of(result(NOW.plusHours(1), false,
+                ContentFallbackType.MOCK)));
+
+        ContentResult<List<? extends ContentItem>> result = service.query(QUERY);
+
+        // 超过七天陈旧窗口的快照不能继续展示，必须进入唯一的 Demo 回退层。
+        assertThat(result.fallbackType()).isEqualTo(ContentFallbackType.MOCK);
+        assertThat(result.expired()).isFalse();
+    }
+
+    @Test
     void givenNoCacheSnapshotOrDemo_whenQuery_thenItReturnsDataUnavailable303004() {
         ContentQueryService service = service(Optional.empty(), Optional.empty(), Optional.empty());
 
         assertThatThrownBy(() -> service.query(QUERY)).isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
                 .isEqualTo(303004);
+    }
+
+    @Test
+    void givenMissingOrInvalidLocator_whenCreatingQuery_thenItRejectsBeforeAnyProviderAccess() {
+        // 无定位条件和非正业务 ID 都必须在 Application 边界失败，避免生成无意义的缓存或快照键。
+        assertThatThrownBy(() -> new ContentQuery(ContentResourceType.MOVIE, null, " ", ""))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ContentQuery(ContentResourceType.CINEMA, 0L, null, null))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private ContentQueryService service(Optional<ContentResult<List<? extends ContentItem>>> cacheResult,

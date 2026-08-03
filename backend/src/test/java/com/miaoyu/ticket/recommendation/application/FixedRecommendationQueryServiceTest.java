@@ -3,6 +3,8 @@ package com.miaoyu.ticket.recommendation.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.common.error.ErrorCode;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
 import com.miaoyu.ticket.recommendation.domain.PurchaseCandidateValidator.PurchaseCandidate;
 import java.time.Clock;
@@ -11,6 +13,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 
 class FixedRecommendationQueryServiceTest {
 
@@ -92,5 +95,31 @@ class FixedRecommendationQueryServiceTest {
                 "101", "201", LocalDate.of(2026, 8, 3), LocalTime.of(18, 0), null));
         assertThatIllegalArgumentException().isThrownBy(() -> new RecommendationQuery(
                 "101", "201", LocalDate.of(2026, 8, 3), LocalTime.of(20, 0), LocalTime.of(20, 0)));
+    }
+
+    @Test
+    void shouldReturnContentOnlyCandidateWhenTicketingShowtimeQueryIsUnavailable() {
+        FixedRecommendationQueryService service = new FixedRecommendationQueryService(
+                () -> new FixedRecommendationCatalog(
+                        "fixed-rec-v1", "FIXED_RECOMMENDATION", ContentSourceType.MOCK, 360),
+                query -> {
+                    throw new BusinessException(new ErrorCode() {
+                        @Override public int code() { return 201001; }
+                        @Override public String message() { return "场次查询暂不可用"; }
+                        @Override public HttpStatus httpStatus() { return HttpStatus.SERVICE_UNAVAILABLE; }
+                    });
+                },
+                Clock.fixed(NOW, ZoneOffset.UTC));
+
+        FixedRecommendationResult result = service.query(
+                new RecommendationQuery("101", "201", LocalDate.of(2026, 8, 3), null, null));
+
+        // A 的公开查询异常不能被替换成 D 自己编造的场次、价格或可购卡片。
+        assertThat(result.purchaseEligible()).isFalse();
+        assertThat(result.missingFactors()).containsExactly("SHOWTIME");
+        assertThat(result.candidates()).singleElement().satisfies(candidate -> {
+            assertThat(candidate.showId()).isNull();
+            assertThat(candidate.price()).isNull();
+        });
     }
 }
