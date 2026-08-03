@@ -4,7 +4,7 @@
 
 ## What Changes
 
-- 复用 A 的 `content-and-show-selection-flow` 共享固定影片、影院数据和稳定业务 ID；`DemoContentProvider` 仅作为同源回退数据或测试夹具，不再向数据库插入第二套影片、影院。
+- D 接管 A 在 `content-and-show-selection-flow` 演示阶段写入的 10 部影片、4 家影院，作为唯一的 `demo-content-v1`；`DemoContentProvider` 仅作为同源回退数据或测试夹具，不再向数据库插入第二套影片、影院。A 的票务种子继续消费内容模块返回的 `ContentSeedCatalog`，不维护影片、影院清单。
 - 新增影片、影院内容快照和短期缓存行为，所有结果携带来源、数据时间、过期时间和降级信息。
 - 新增 `ContentSummaryQueryPort` 作为内容模块公开只读接口，供 A 查询内容摘要；影片、影院内部查询用例仅供 D 模块实现复用。
 - 新增第一版固定推荐候选结果，保证相同输入和固定时钟下结果可重复。
@@ -42,7 +42,7 @@
 ## Impact
 
 - 代码范围：`backend` 下 `content`、`recommendation` 模块；测试夹具位于对应测试目录。
-- 数据范围：后续涉及 D 负责的 `movie`、`cinema`、`external_data_snapshot`、`data_sync_log`；D 确认字段和约束，A 分配 Flyway 版本、生成或审核最终 SQL 并执行空 MySQL 验证。
+- 数据范围：后续涉及 D 负责的 `movie`、`cinema`、`external_data_snapshot`、`data_sync_log`；D 维护 `demo-content-v1` 及内容种子字段和约束，A 分配 Flyway 版本、生成或审核最终 SQL 并执行空 MySQL 验证。A 的 `DemoSeedInitializer` 只编排内容种子和票务种子。
 - 调用方：B 使用推荐工具结果；C/前端展示来源、更新时间和 Demo 标识；A 通过 `ContentSummaryQueryPort` 获取内容摘要，并提供可购场次、票价和库存的公开只读查询。
 - 负责人：D 负责文档、实现和质量回归；A 负责迁移、共享固定种子和场次查询；B 审查工具输入输出；C 审查展示所需字段。
 

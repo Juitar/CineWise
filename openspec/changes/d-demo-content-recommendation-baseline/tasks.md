@@ -8,6 +8,11 @@
 - D 确认提供 `ContentSummaryQueryPort`；Port 未完成前，A 可使用经 D 确认、明确标识 `MOCK/demo-seed` 的临时 Demo Adapter，且不得维护第二套内容数据或生成票务事实。
 - D 确认 A 不访问 D 的 Entity、Mapper、Repository，也不实现真实外部内容 Provider。
 
+### Demo 数据维护交接（2026-08-03）
+
+- A 已说明此前 10 部影片、4 家影院仅为场次演示临时数据；D 自本变更起接管该清单并维护唯一的 `demo-content-v1`。
+- A 保留 `DemoSeedInitializer` 的编排和票务种子；影片、影院清单及内容种子规则由 D 维护，A 继续只消费 `ContentSeedCatalog` 返回的实际数据库 ID。
+
 - [x] 1.1 D 已逐项确认 proposal、两份 spec 和 design 覆盖 Demo 内容、快照缓存、内部查询、固定候选和回归数据；确认日期：2026-08-02。
 - [x] 1.2 A 已确认 D 不创建 `movie_show`、票价、座位和库存，并确认共享固定数据、`ContentSummaryQueryPort` 和场次公开 Application 查询的协作方式；确认日期：2026-08-02。
 - [x] 1.3 B 已确认推荐工具名称、类型化 Command 和 `ToolResult<T>` 结果字段；确认结果已作为后续工具适配器输入；确认日期：2026-08-02。
@@ -21,9 +26,10 @@
 - [x] 2.3 D 已向 A 提交 T11 `external_data_snapshot`、T12 `data_sync_log` 的迁移申请材料；A 分配版本 `V004`，文件为 `backend/src/main/resources/db/migration/V004__create_content_snapshot_and_sync_log_tables.sql`。D 已按两轮复审补齐时间顺序、状态统计、清理索引和生命周期规则。
 - [x] 2.4 A 已于 2026-08-02 复核雪花 ID、`DATETIME(3)`、跨模块逻辑关联和迁移顺序，完成 V004 最终静态审查并授权专用空 MySQL 8.4 验证。
 - [x] 2.5 A 已于 2026-08-02 在 MySQL 8.4.11 专用空库执行 V001 至 V004；首次 migrate、重复 migrate、Flyway 历史、字符集、排序规则、唯一键、索引和 16 个 CHECK 正反用例全部通过。证据见 `docs/V004_MIGRATION_VALIDATION_2026-08-02.md`。
-- [ ] 2.6 A 初始化共享固定影片、影院数据；D 确认字段、来源和时间规则并复用稳定业务 ID；验证方式：保存共享数据清单和 ID 对照表，D 的 `demo-content-v1` 不再插入第二套影片、影院。
-- [x] 2.7 A 已于 2026-08-02 完成共享 `cinewise` 的历史、checksum、备份和兼容性检查，并使用独立 `cinewise_migrator` 执行 V004；首次应用 1 个迁移，重复执行应用 0 个迁移，两张空表、索引、6 个 CHECK 和排序规则检查通过，证据见 `docs/V004_SHARED_MIGRATION_2026-08-02.md`。应用环境的 `FLYWAY_ENABLED` 保持 `false`。
-- [ ] 2.8 D 使用日常应用账号完成依赖 V004 的持久层和真实 MySQL 集成测试；验证方式：覆盖两张表的正常写入、唯一键和 CHECK 拒绝场景，不执行 Flyway，不使用迁移账号。
+- [x] 2.6 D 与 A 已确认唯一 `demo-content-v1` 的数据维护边界：沿用 A 演示阶段的 10 部影片、4 家影院，来源 ID 清单见 `demo-content-v1-manifest.md`。A 保留 `DemoSeedInitializer` 的初始化编排和票务种子，D 维护影片、影院清单及内容种子规则；确认日期：2026-08-03。
+- [ ] 2.7 D 改造内容种子，使资源文件不写死数据库内部 ID，首次初始化生成雪花 ID、重复初始化查回既有 ID，并通过 `ContentSeedCatalog` 交给 A 的票务种子；验证方式：两次初始化不产生重复影片、影院，且 A 只使用返回的实际 ID。
+- [x] 2.8 A 已于 2026-08-02 完成共享 `cinewise` 的历史、checksum、备份和兼容性检查，并使用独立 `cinewise_migrator` 执行 V004；首次应用 1 个迁移，重复执行应用 0 个迁移，两张空表、索引、6 个 CHECK 和排序规则检查通过，证据见 `docs/V004_SHARED_MIGRATION_2026-08-02.md`。应用环境的 `FLYWAY_ENABLED` 保持 `false`。
+- [ ] 2.9 D 使用日常应用账号完成依赖 V004 的持久层和真实 MySQL 集成测试；验证方式：覆盖两张表的正常写入、唯一键和 CHECK 拒绝场景，不执行 Flyway，不使用迁移账号。
 
 ## 3. Demo 内容、快照和缓存实现
 

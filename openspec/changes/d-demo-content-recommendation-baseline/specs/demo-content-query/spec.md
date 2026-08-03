@@ -19,13 +19,13 @@
 - **THEN** 系统返回相同的影院 ID、内容字段和排列顺序
 - **AND** 每条结果明确标识为 Demo 数据
 
-### Requirement: 影片和影院固定数据必须共享且 ID 稳定
-系统 SHALL 使用 A 维护的共享固定影片、影院数据作为数据库初始化基线。D 的 Demo 内容、测试夹具或回退数据 MUST 使用同一数据版本或同一稳定业务 ID，MUST NOT 向数据库插入第二套影片、影院记录。
+### Requirement: 影片和影院固定数据必须由 D 维护且身份稳定
+系统 SHALL 使用 D 维护的唯一 `demo-content-v1` 影片、影院数据作为数据库初始化基线。该数据沿用 A 演示阶段已有的 10 部影片、4 家影院；A 的票务种子只能消费内容种子返回的 `ContentSeedCatalog`。D 的 Demo 内容、测试夹具或回退数据 MUST 使用同一数据版本和来源 ID，MUST NOT 向数据库插入第二套影片、影院记录。
 
 #### Scenario: 初始化后读取 Demo 内容
-- **GIVEN** A 已使用共享固定数据初始化影片和影院
+- **GIVEN** 内容种子已使用 D 维护的共享固定数据初始化影片和影院
 - **WHEN** D 查询影片或影院，或者读取 Demo 回退数据
-- **THEN** 返回的 `movieId` 和 `cinemaId` 必须与共享数据中的稳定业务 ID 一致
+- **THEN** 返回的 `movieId` 和 `cinemaId` 必须与本次数据库初始化产生或查回的实际 ID 一致
 - **AND** 不得新增同名但 ID 不同的影片或影院记录
 
 #### Scenario: D 的 Demo 数据只用于回退或测试
@@ -44,7 +44,7 @@
 - **AND** 系统在该 Provider 的专用身份识别规则确定前不得将其写入标准内容快照
 
 #### Scenario: 初始化固定 Mock 数据
-- **GIVEN** A 初始化共享固定影片和影院数据
+- **GIVEN** 内容种子初始化 D 维护的共享固定影片和影院数据
 - **WHEN** 写入 Mock 影片或影院
 - **THEN** `source_movie_id` 或 `source_cinema_id` 必须非空
 - **AND** 可以使用 `source + source_*_id` 防止重复初始化
