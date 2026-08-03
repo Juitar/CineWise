@@ -5,9 +5,15 @@ import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import com.miaoyu.ticket.order.domain.OrderStatus;
 import com.miaoyu.ticket.order.domain.PaymentStatus;
+import com.miaoyu.ticket.order.event.PaymentSucceededEvent;
+import com.miaoyu.ticket.order.event.PaymentSucceededEventPublisher;
 import com.miaoyu.ticket.ticketing.application.SeatSaleService;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PaymentTransaction {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(PaymentTransaction.class);
     private static final String PAYMENT_NUMBER_PREFIX = "PAY";
     private static final String TICKET_CODE_PREFIX = "TKT";
     private static final String QR_PAYLOAD_PREFIX = "cinewise:ticket:";
@@ -25,6 +32,7 @@ public class PaymentTransaction {
     private final SeatSaleService seatSaleService;
     private final BusinessIdGenerator idGenerator;
     private final Clock clock;
+    private final PaymentSucceededEventPublisher paymentSucceededEventPublisher;
 
     public PaymentTransaction(
             OrderRepository orderRepository,
@@ -32,18 +40,24 @@ public class PaymentTransaction {
             PaymentViewFactory paymentViewFactory,
             SeatSaleService seatSaleService,
             BusinessIdGenerator idGenerator,
-            Clock clock) {
+            Clock clock,
+            PaymentSucceededEventPublisher paymentSucceededEventPublisher) {
         this.orderRepository = orderRepository;
         this.paymentRepository = paymentRepository;
         this.paymentViewFactory = paymentViewFactory;
         this.seatSaleService = seatSaleService;
         this.idGenerator = idGenerator;
         this.clock = clock;
+        this.paymentSucceededEventPublisher = paymentSucceededEventPublisher;
     }
 
     /** 锁定本人订单行，使支付、取消和过期对同一订单串行决定终态。 */
     @Transactional
-    public PaymentView pay(long userId, String orderNo, String idempotencyKey) {
+    public PaymentView pay(
+            long userId,
+            String orderNo,
+            String idempotencyKey,
+            Optional<PaymentEventContextResolver.PaymentEventContext> eventContext) {
         OrderRepository.OrderSnapshot order = orderRepository.findByOrderNoForUpdate(userId, orderNo)
                 .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
         PaymentRepository.PaymentSnapshot paymentByKey = paymentRepository
@@ -93,7 +107,9 @@ public class PaymentTransaction {
                 userId,
                 QR_PAYLOAD_PREFIX + ticketCode,
                 paidAt));
-        return loadCommittedResult(order.orderId());
+        PaymentView paidResult = loadCommittedResult(order.orderId());
+        eventContext.ifPresent(context -> publishPaymentSucceededSafely(order, paidResult, context, paidAt));
+        return paidResult;
     }
 
     private PaymentView createExistingResult(
@@ -127,6 +143,42 @@ public class PaymentTransaction {
         if (order.totalAmount().compareTo(order.unitPrice().multiply(
                 java.math.BigDecimal.valueOf(order.ticketCount()))) != 0) {
             throw new IllegalStateException("订单金额快照不一致，拒绝支付");
+        }
+    }
+
+    /**
+     * 事件在事务仍活动时登记，D的事务监听器只会在提交成功后执行。
+     * 同步发布器异常被隔离，避免非关键提醒链路把权威支付事务标记为回滚。
+     *
+     * <p>该方法只在首次创建支付和电子票后调用；已有支付从前置幂等分支返回，所以不会为重放请求
+     * 生成新的eventId。若最终数据库提交失败，AFTER_COMMIT消费者也不会执行。</p>
+     */
+    private void publishPaymentSucceededSafely(
+            OrderRepository.OrderSnapshot originalOrder,
+            PaymentView paidResult,
+            PaymentEventContextResolver.PaymentEventContext context,
+            LocalDateTime paidAt) {
+        if (context.showId() != originalOrder.showId()) {
+            LOGGER.warn("支付事件场次上下文不匹配, orderId={}", originalOrder.orderId());
+            return;
+        }
+        PaymentSucceededEvent event = new PaymentSucceededEvent(
+                UUID.randomUUID().toString(),
+                Long.toString(originalOrder.orderId()),
+                Long.toString(originalOrder.showId()),
+                Long.toString(originalOrder.userId()),
+                context.cinemaArea(),
+                context.startAt().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime(),
+                paidResult.stateVersion(),
+                paidAt.atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime());
+        try {
+            paymentSucceededEventPublisher.publish(event);
+        } catch (RuntimeException exception) {
+            LOGGER.warn(
+                    "支付成功事件登记失败, orderId={}, eventId={}, errorType={}",
+                    originalOrder.orderId(),
+                    event.eventId(),
+                    exception.getClass().getSimpleName());
         }
     }
 

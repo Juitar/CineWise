@@ -56,6 +56,15 @@ public class MybatisShowQueryRepository implements ShowQueryRepository {
     }
 
     @Override
+    public Optional<ShowContext> findShowContext(long showId) {
+        ShowContextRow row = mapper.findShowContext(showId);
+        if (row == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new ShowContext(row.showId(), row.cinemaId(), row.startTime()));
+    }
+
+    @Override
     public List<SeatSnapshot> findSeats(long showId) {
         return mapper.findSeats(showId).stream()
                 .map(row -> new SeatSnapshot(

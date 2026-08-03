@@ -82,13 +82,18 @@ V003已有`mock_payment`和`electronic_ticket`及每订单唯一约束，本阶�
 4. 写唯一`PROCESSING`支付并条件迁移订单到`PAYING`。
 5. 仅将`status=LOCKED AND lock_order_no=当前订单号`的全部座位更新为`SOLD`并清除锁；影响行数必须等于订单票数。
 6. 条件迁移支付到`SUCCESS`、订单到`PAID`，写`paid_time`并生成每订单唯一`VALID`电子票。
-7. 事务提交后才允许发布`PaymentSucceededEvent`；HTTP响应和事件监听结果均不参与事务成功判定。
+7. 在全部权威写入完成后、事务仍活动时通过Spring事件发布器登记`PaymentSucceededEvent`；D仅使用
+   `@TransactionalEventListener(phase = AFTER_COMMIT)`消费，因此事务回滚时不触发消费者，成功提交后才执行提醒创建。
 
 `GET /api/v1/orders/{orderNo}/payment`和`GET /api/v1/tickets/{ticketId}`只读权威数据并按当前用户过滤。支付POST结果未知时，调用方只能查询原订单支付结果，不能自动重放POST或生成新幂等键。
 
 支付编号、票码和二维码载荷由雪花ID派生；二维码载荷只包含`cinewise:ticket:<ticketCode>`演示引用，不含用户身份、模拟密码或订单明细。
 
-事件使用冻结字段`eventId/orderId/showId/userId/cinemaArea/startAt/orderVersion/occurredAt`。当前D公开内容摘要端口不包含`cinemaArea`，A只定义事件和发布端口，不读取D私有Mapper/表、不伪造区域；待D补齐公开Application API后接通事务后发布适配。
+事件使用冻结字段`eventId/orderId/showId/userId/cinemaArea/startAt/orderVersion/occurredAt`。A先通过票务公开应用服务读取
+`showId/cinemaId/startAt`，再通过D的`ContentSummaryQueryPort.CinemaSummary.area()`补齐`cinemaArea`，不读取D私有Mapper、
+Repository或Entity。影院摘要不存在、已过期或查询异常时，本次支付仍按MySQL事务完成但不登记事件，并记录不含敏感数据的告警；
+后续最近24小时PAID订单对账负责补偿。首次成功支付登记一次事件，幂等重放直接返回原支付结果且不重复登记。发布器同步登记失败被
+A隔离并交给对账恢复；D的AFTER_COMMIT消费者失败发生在支付提交之后，不能改变`PAID/SUCCESS/SOLD/VALID`权威状态。
 
 ## 配置和时间
 

@@ -10,16 +10,20 @@ import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.order.domain.ElectronicTicketStatus;
 import com.miaoyu.ticket.order.domain.OrderStatus;
 import com.miaoyu.ticket.order.domain.PaymentStatus;
+import com.miaoyu.ticket.order.event.PaymentSucceededEvent;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,8 +32,13 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 @ActiveProfiles("test")
 @SpringBootTest(properties = {
@@ -65,6 +74,9 @@ class PaymentIntegrationTest {
     @Autowired
     private PaymentCurrentUserAccessor currentUserAccessor;
 
+    @Autowired
+    private PaymentEventProbe paymentEventProbe;
+
     @BeforeEach
     void resetTransactionData() {
         jdbcTemplate.update("DELETE FROM ticket_order_operation");
@@ -81,6 +93,7 @@ class PaymentIntegrationTest {
                        version = 0
                 """);
         currentUserAccessor.useUser(USER_A);
+        paymentEventProbe.reset();
     }
 
     @Test
@@ -106,6 +119,16 @@ class PaymentIntegrationTest {
         assertThat(countRows("electronic_ticket")).isEqualTo(1);
         assertThat(order.seatIds()).allSatisfy(seatId -> assertThat(seatStatus(seatId)).isEqualTo("SOLD"));
         assertThat(countOrderSeats(order.orderNo(), "LOCKED")).isZero();
+        assertThat(paymentEventProbe.events()).singleElement().satisfies(event -> {
+            assertThat(event.eventId()).matches("[0-9a-f-]{36}");
+            assertThat(event.orderId()).isEqualTo(Long.toString(order.orderId()));
+            assertThat(event.showId()).isEqualTo(Long.toString(order.showId()));
+            assertThat(event.userId()).isEqualTo(Long.toString(USER_A));
+            assertThat(event.cinemaArea()).isNotBlank();
+            assertThat(event.startAt().getOffset().getTotalSeconds()).isEqualTo(8 * 60 * 60);
+            assertThat(event.orderVersion()).isEqualTo(paid.stateVersion());
+            assertThat(event.occurredAt().toInstant()).isEqualTo(FIXED_INSTANT);
+        });
     }
 
     @Test
@@ -155,6 +178,59 @@ class PaymentIntegrationTest {
         assertThat(seatStatus(order.seatIds().getFirst())).isEqualTo("LOCKED");
         assertThat(seatLockOrder(order.seatIds().getFirst())).isEqualTo(order.orderNo());
         assertThat(seatLockOrder(order.seatIds().get(1))).isEqualTo("OTHER-ORDER");
+        assertThat(paymentEventProbe.events()).isEmpty();
+    }
+
+    @Test
+    void givenExpiredCinemaSummary_whenPay_thenCommitWithoutFabricatingEvent() {
+        OrderView order = createOrder("payment-expired-area", "payment-expired-area-create-key", 1);
+        long cinemaId = findCinemaId(order.showId());
+        Timestamp originalExpiresAt = jdbcTemplate.queryForObject(
+                "SELECT expires_at FROM cinema WHERE id = ?",
+                Timestamp.class,
+                cinemaId);
+        try {
+            jdbcTemplate.update(
+                    "UPDATE cinema SET expires_at = ? WHERE id = ?",
+                    Timestamp.valueOf(FIXED_LOCAL_TIME.minusSeconds(1)),
+                    cinemaId);
+
+            PaymentView paid = paymentApplicationService.pay(order.orderNo(), "payment-expired-area-key");
+
+            assertThat(paid.orderStatus()).isEqualTo(OrderStatus.PAID);
+            assertThat(paymentEventProbe.events()).isEmpty();
+            assertThat(orderStatus(order.orderId())).isEqualTo("PAID");
+        } finally {
+            jdbcTemplate.update("UPDATE cinema SET expires_at = ? WHERE id = ?", originalExpiresAt, cinemaId);
+        }
+    }
+
+    @Test
+    void givenSpringPublisherRejectsRegistration_whenPay_thenPaymentStillCommits() {
+        OrderView order = createOrder("payment-publisher-failure", "payment-publisher-failure-create-key", 1);
+        paymentEventProbe.rejectNextRegistration();
+
+        PaymentView paid = paymentApplicationService.pay(order.orderNo(), "payment-publisher-failure-key");
+
+        assertThat(paid.orderStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(paymentApplicationService.queryPayment(order.orderNo())).isEqualTo(paid);
+        assertThat(paymentEventProbe.events()).isEmpty();
+        assertThat(order.seatIds()).allSatisfy(seatId -> assertThat(seatStatus(seatId)).isEqualTo("SOLD"));
+    }
+
+    @Test
+    void givenAfterCommitConsumerFails_whenPay_thenReturnAndRecoverPaidOrder() {
+        OrderView order = createOrder("payment-consumer-failure", "payment-consumer-failure-create-key", 1);
+        paymentEventProbe.failNextAfterCommit();
+
+        PaymentView paid = paymentApplicationService.pay(order.orderNo(), "payment-consumer-failure-key");
+
+        PaymentView recovered = paymentApplicationService.queryPayment(order.orderNo());
+        assertThat(paid.orderStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(recovered.orderStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(recovered.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(order.seatIds()).allSatisfy(seatId -> assertThat(seatStatus(seatId)).isEqualTo("SOLD"));
+        assertThat(paymentEventProbe.events()).isEmpty();
     }
 
     @Test
@@ -380,6 +456,13 @@ class PaymentIntegrationTest {
                 seatId);
     }
 
+    private long findCinemaId(long showId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT cinema_id FROM movie_show WHERE id = ?",
+                Long.class,
+                showId);
+    }
+
     private record ShowSeats(long showId, List<Long> seatIds) {
     }
 
@@ -396,6 +479,54 @@ class PaymentIntegrationTest {
         @Primary
         PaymentCurrentUserAccessor paymentCurrentUserAccessor() {
             return new PaymentCurrentUserAccessor();
+        }
+
+        @Bean
+        PaymentEventProbe paymentEventProbe() {
+            return new PaymentEventProbe();
+        }
+    }
+
+    /** 同时验证Spring同步登记失败隔离和AFTER_COMMIT成功消费时机。 */
+    static final class PaymentEventProbe {
+
+        private final List<PaymentSucceededEvent> events = new CopyOnWriteArrayList<>();
+        private final AtomicBoolean rejectNextRegistration = new AtomicBoolean();
+        private final AtomicBoolean failNextAfterCommit = new AtomicBoolean();
+
+        @Order(Ordered.HIGHEST_PRECEDENCE)
+        @EventListener
+        public void rejectRegistrationWhenRequested(PaymentSucceededEvent event) {
+            if (rejectNextRegistration.compareAndSet(true, false)) {
+                throw new IllegalStateException("测试发布器登记失败");
+            }
+        }
+
+        /** 只有支付事务成功提交后才把事件加入测试探针。 */
+        @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+        public void captureAfterCommit(PaymentSucceededEvent event) {
+            if (failNextAfterCommit.compareAndSet(true, false)) {
+                throw new IllegalStateException("测试AFTER_COMMIT消费者失败");
+            }
+            events.add(event);
+        }
+
+        List<PaymentSucceededEvent> events() {
+            return List.copyOf(events);
+        }
+
+        void rejectNextRegistration() {
+            rejectNextRegistration.set(true);
+        }
+
+        void failNextAfterCommit() {
+            failNextAfterCommit.set(true);
+        }
+
+        void reset() {
+            events.clear();
+            rejectNextRegistration.set(false);
+            failNextAfterCommit.set(false);
         }
     }
 

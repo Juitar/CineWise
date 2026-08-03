@@ -31,7 +31,7 @@
 - [x] 实现支付查询、本人电子票详情REST接口及OpenAPI契约。
 - [x] 完成重复/并发支付、支付与取消/过期竞争、归属回滚、跨用户和密码隔离测试。
 - [x] 定义`PaymentSucceededEvent`及发布端口，待D公开`cinemaArea`摘要端口后接通AFTER_COMMIT发布。
-- [ ] 待D通过公开Application API提供`cinemaArea`后，接通`PaymentSucceededEvent`的AFTER_COMMIT发布。
+- [x] 使用D公开`ContentSummaryQueryPort.CinemaSummary.area()`接通`PaymentSucceededEvent`的AFTER_COMMIT发布，覆盖幂等、回滚和摘要降级测试。
 - [x] 冻结退票影响、传统页面确认、原子退票、结果恢复和替代场次契约，确认复用V003且不新增SQL。
 - [x] 实现退票影响查询和传统页面二次确认后的REST退票入口，Agent `actionId`保留在Tool Adapter边界。
 - [x] 实现退款幂等快照、`PAID -> REFUNDING -> REFUNDED`、票失效和按订单明细安全释放`SOLD`座位。
@@ -49,7 +49,7 @@
 - 需求/问题与修改范围：基于已执行V003和V005实现原子锁座建单、本人订单生命周期、固定成功Mock支付、唯一电子票，以及退票影响、原子幂等退票、结果恢复和同影片替代场次；退票截止采用原场次严格未开场边界，本阶段未新增或修改SQL。
 - 契约影响：新增已冻结的支付、电子票、退票影响、退票写入/恢复和替代场次REST端点，以及`PaymentSucceededEvent`类型和发布端口；不修改C的认证、安全路由，不实现B的确认存储，不读取D私有持久层，不修改任何历史迁移，也不占用预留版本。传统页面REST拒绝非空Agent `actionId`，未来Tool Adapter须在调用A应用服务前由B校验确认。
 - 已执行的验证及结果：2026-08-03同步最新`origin/dev`后执行`openspec validate ticketing-transaction-flow --strict --no-interactive`和`git diff --check`通过；执行`mvnw.cmd clean verify`通过，共65个测试、0失败、0错误、5个需显式MySQL环境变量的测试跳过，Checkstyle为0错误、SpotBugs为0缺陷，ArchUnit和JaCoCo通过。新增7个H2退票集成测试覆盖影响查询、成功与原键/新键重放、异参和跨订单幂等冲突、开场截止、Agent确认隔离、票/座位不一致回滚、跨用户、并发唯一退款、结果恢复和替代场次过滤；OpenAPI已包含四个退票端点。本机MySQL 8.0.40隔离库`cinewise_ticketing_concurrency_check`此前已验证两个并发退票最终仅1条退款，订单`REFUNDED`、电子票`REFUNDED`、座位`AVAILABLE`，清理后退款、支付、电子票、订单、订单座位和非可用座位均为0。按V1.6口径，本次新增生产代码有效注释率约30.67%，A的`order/ticketing`模块由基线约5.58%提升到13.35%。此前支付、20请求竞争同座位及V005迁移证据继续有效。
-- 未验证事项、剩余风险和后续负责人：本次同步后当前`.env`不指向退票专用隔离库，因此未重跑会清理交易夹具的MySQL退票测试；C正式JWT Cookie和订单安全路由仍需联调；B确认端口未接入，当前传统REST拒绝非空`actionId`；D公开内容摘要仍缺`cinemaArea`，支付事件实际发布继续等待D。全后端历史生产代码粗测有效注释率约10.3%，虽然本次新增达到30%且未降低A模块比例，但最终全仓30%门槛仍需A/B/C/D按各自Owner边界共同补齐，不能在本退票PR跨模块批量改写。
+- 未验证事项、剩余风险和后续负责人：本次同步后当前`.env`不指向退票专用隔离库，因此未重跑会清理交易夹具的MySQL退票测试；C正式JWT Cookie和订单安全路由仍需联调；B确认端口未接入，当前传统REST拒绝非空`actionId`；D公开内容摘要现已提供`cinemaArea`，支付事件发布由本任务接通。全后端历史生产代码粗测有效注释率约10.3%，虽然本次新增达到30%且未降低A模块比例，但最终全仓30%门槛仍需A/B/C/D按各自Owner边界共同补齐，不能在本退票PR跨模块批量改写。
 
 ## OpenAPI与B/C联调夹具实现记录
 
@@ -59,3 +59,11 @@
 - C复审修正：`unauthenticated-error.json`明确为C确认的目标格式，依赖后续认证PR实现自定义`AuthenticationEntryPoint`；当前安全骨架可能仅返回空HTTP 401，不作为现状验收证据。
 - 已执行的验证及结果：同步最新`origin/dev`后，`TicketingContractFixtureTest`共3个测试通过；`mvnw.cmd verify`共91个测试、0失败、0错误、6个外部环境测试跳过，Checkstyle和SpotBugs均为0；`openspec validate ticketing-transaction-flow --strict`与`git diff --check`通过。
 - 未验证事项、剩余风险和后续负责人：PR #18 的Backend MySQL Integration Run 30813882371和Backend Redis Integration Run 30813882372均通过，前后端Verify也通过。B/C仍需在各自模块消费夹具完成联调，A不替其标记消费者验收。
+
+## 支付成功事件实现记录
+
+- 变更编号及模块：`ticketing-transaction-flow`，A的`order/ticketing`支付成功事件生产链路。
+- 需求/问题与修改范围：通过A公开场次上下文和D公开`ContentSummaryQueryPort.CinemaSummary.area()`补齐冻结事件字段；在支付事务完成`PAID/SUCCESS/SOLD/VALID`写入后登记Spring事件，由D的`AFTER_COMMIT`监听器在提交成功后消费。重复支付不重复登记，事务回滚不触发消费者，影院摘要缺失、过期、空区域或查询异常时支付继续并等待对账补偿。
+- 契约与数据影响：没有新增或修改REST、OpenAPI、数据库表、Flyway、认证或Agent契约；未访问D的Mapper、Repository、Entity或私有表。事件仍只包含`eventId/orderId/showId/userId/cinemaArea/startAt/orderVersion/occurredAt`，不含密码、JWT、Cookie、二维码载荷或完整订单明细。
+- 已执行的验证及结果：`PaymentIntegrationTest`共11个测试通过，新增覆盖首次完整事件、原键和新键支付重放不重复、事务回滚不发布、影院摘要过期降级、同步登记失败隔离及AFTER_COMMIT消费者失败不回滚。同步最新`origin/dev`后执行`mvnw.cmd verify`通过，共99个测试、0失败、0错误、6个需显式MySQL/Redis环境变量的测试跳过；Checkstyle、SpotBugs、ArchUnit和JaCoCo通过。新增及修改的生产代码按V1.6有效口径统计约34.97%，高于30%门槛。
+- 未验证事项、剩余风险和后续负责人：本次没有连接共享库或执行Flyway；需显式MySQL 8.4环境变量的支付集成测试本轮未运行。D仍需在自己的change中实现并验证`AFTER_COMMIT`消费者按`orderId`幂等创建`travel_task`；A/D的最近24小时PAID订单对账补偿仍是后续独立任务。PR #18已合入，当前功能分支已纯快进同步最新`origin/dev`。
