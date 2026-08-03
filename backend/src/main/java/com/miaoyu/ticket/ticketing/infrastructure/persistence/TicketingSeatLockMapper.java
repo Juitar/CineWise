@@ -71,4 +71,18 @@ public interface TicketingSeatLockMapper {
     int releaseLockedSeats(
             @Param("orderNo") String orderNo,
             @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Update("""
+            UPDATE show_seat
+               SET status = 'SOLD',
+                   lock_order_no = NULL,
+                   lock_expire_time = NULL,
+                   version = version + 1,
+                   update_time = #{soldAt}
+             WHERE status = 'LOCKED'
+               AND lock_order_no = #{orderNo}
+            """)
+    int sellLockedSeats(
+            @Param("orderNo") String orderNo,
+            @Param("soldAt") LocalDateTime soldAt);
 }
