@@ -11,9 +11,10 @@
 - 增加 PC Web 与移动 H5 共用业务逻辑的登录页面、安全 `returnUrl`、提交防重复和登录结果未知恢复。
 - 保留现有原生 `fetch` 公共 REST 客户端，不引入 Umi request 插件或第二套请求封装。
 - 认证 REST `CurrentUser` 使用字符串 `id`、脱敏邮箱和认证设计中的字段，不返回完整邮箱；内部安全上下文继续使用 `userId/role/tokenVersion`。
+- `sys_login_log` 作为只追加登录审计日志默认保留 30 天，到期后由认证清理任务按 `create_time` 物理删除；这是“审计记录不得物理删除”通用规范的有限保留期例外，不适用于订单、支付、退款等交易审计记录。
 - 本变更不实现邮箱验证码登录、验证码发送、注册、密码重置和相关页面；登录页不把隐私同意作为密码登录字段。
 - 注册时的隐私同意由后续注册变更以默认未勾选的显式确认完成；已有账号后续登录沿用已记录版本，不把登录操作自动写成一次新的隐私同意。
-- 本变更只提出 `sys_user`、`sys_login_log` 迁移需求和审查材料，不自行分配 Flyway 版本、生成最终迁移 SQL 或执行数据库迁移。
+- 本变更只创建 `sys_user`、`sys_login_log` 迁移草案；版本仍由 A 分配，C 编写本地 SQL 草案，A 固化最终 SQL、完成空 MySQL 8.4 验证并直提 `dev`。A 接管前，C 不提交、不推送、不执行数据库迁移。
 
 ## Capabilities
 
@@ -31,6 +32,6 @@
 - 后端：`auth/api`、`auth/application`、`auth/domain`、`auth/infrastructure/security`、`auth/infrastructure/persistence`，以及现有默认拒绝安全链。
 - 前端：`modules/auth`、`shared/auth`、`shared/api`、登录页路由和响应式登录视图；现有 `apiRequest` 对外调用方式保持不变。
 - 公共接口：新增密码登录、管理员登录、当前用户、登出和 CSRF Token 获取接口；A/B/D 已完成对 CSRF 接口、Header 和浏览器写请求处理规则的审查。
-- 数据库：需要 `sys_user`、`sys_login_log`；C 确认字段，A 分配版本、审核或生成最终 SQL、授权并在空 MySQL 验证。
+- 数据库：需要 `sys_user`、`sys_login_log`；A 已分配版本，C 编写本地 SQL 草案，A 负责最终审查、执行授权和空 MySQL 8.4 验证。
 - 部署：正式环境必须使用 HTTPS 和 `Secure` Cookie；本地 HTTP 仅允许通过环境配置关闭 `Secure`，不得成为生产默认值。
 - 文档：认证设计、前端应用设计中残留的 Umi `request` 描述，以及后端总系分中 `CurrentUser` 的 `userId/email` 描述需要后续按已确认接口修正。

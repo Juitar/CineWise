@@ -111,3 +111,20 @@ JWT SHALL 只写入 `HttpOnly` Cookie，最小声明仅包含 `sub`、`role`、`
 #### Scenario: 登录失败审计
 - **WHEN** 密码登录明确成功或失败
 - **THEN** 登录结果可通过 traceId 排查，且响应、普通日志和登录日志中没有密码、完整邮箱、Cookie 或 JWT
+
+### Requirement: 登录日志结果一致且按有限保留期清理
+`sys_login_log` SHALL 通过数据库 CHECK 保证结果一致：成功日志必须包含 `user_id` 且 `failure_code` 为空，失败日志必须包含 `failure_code`，失败时 `user_id` 可以为空。系统 SHALL 默认保留登录日志 30 天，并通过 `idx_login_cleanup_create_time(create_time)` 支持认证清理任务按到期时间物理删除。
+
+30 天物理删除 SHALL 是“审计记录不得物理删除”通用规范仅针对 `sys_login_log` 的有限保留期例外，不得扩展到订单、支付、电子票、退款等交易审计记录。清理 SHALL 只删除超过正整数配置保留期的记录，不提供按用户或单条日志随意删除的业务入口。
+
+#### Scenario: 成功日志字段不一致
+- **WHEN** 系统尝试写入 `success=1` 但 `user_id` 为空或 `failure_code` 不为空的登录日志
+- **THEN** 数据库拒绝该记录
+
+#### Scenario: 失败日志缺少失败码
+- **WHEN** 系统尝试写入 `success=0` 且 `failure_code` 为空的登录日志
+- **THEN** 数据库拒绝该记录
+
+#### Scenario: 清理超过保留期的登录日志
+- **WHEN** 认证清理任务扫描超过配置保留期的 `sys_login_log` 记录
+- **THEN** 系统使用 `create_time` 清理索引物理删除到期记录，且不删除保留期内记录或其他审计表数据
