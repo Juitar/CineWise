@@ -1,23 +1,6 @@
 name: cinewise
 
 services:
-  redis:
-    image: redis:7.4.10-alpine
-    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
-    ports:
-      - 127.0.0.1:${REDIS_PORT:-6379}:6379
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
-    restart: unless-stopped
-    networks: [backend]
-
   backend:
     build:
       context: ./backend
@@ -30,20 +13,21 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE is required}
       MYSQL_USER: ${MYSQL_USER:?MYSQL_USER is required}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_HOST: ${REDIS_HOST:?REDIS_HOST is required}
+      REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-}
+      MINIO_BUCKET: ${MINIO_BUCKET:-cinewise}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       FLYWAY_ENABLED: ${FLYWAY_ENABLED:-false}
       SEED_ENABLED: ${SEED_ENABLED:-false}
       SEED_FIXED_VALUE: ${SEED_FIXED_VALUE:-20260802}
-    depends_on:
-      redis:
-        condition: service_healthy
     ports:
       - 127.0.0.1:${BACKEND_PORT:-8080}:8080
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health/readiness | grep UP"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health | grep UP"]
       interval: 10s
       timeout: 3s
       retries: 12
@@ -71,6 +55,3 @@ services:
 networks:
   backend:
     driver: bridge
-
-volumes:
-  redis_data:
