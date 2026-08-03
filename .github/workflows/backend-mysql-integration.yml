@@ -43,6 +43,8 @@ jobs:
       MYSQL_DATABASE: cinewise_ticketing_concurrency_check
       MYSQL_USER: cinewise_ci
       MYSQL_PASSWORD: cinewise-ci-only
+      JWT_SECRET: cinewise-ci-jwt-secret-at-least-32-bytes-long
+      AUTH_AUDIT_HASH_SECRET: cinewise-ci-audit-secret-at-least-32-bytes-long
       CINEWISE_MYSQL_IT: "true"
       CINEWISE_MYSQL_CONCURRENCY_IT: "true"
       CINEWISE_MYSQL_LIFECYCLE_IT: "true"
