@@ -19,6 +19,11 @@ management:
       enabled: false
 
 cinewise:
+  auth:
+    jwt-secret: test-jwt-secret-at-least-32-bytes-long
+    audit-hash-secret: test-audit-secret-at-least-32-bytes-long
+    cookie-secure: false
+    login-log-cleanup-delay-milliseconds: 86400000
   transaction:
     expiry-job-enabled: false
 

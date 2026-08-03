@@ -11,24 +11,24 @@
 
 ## 2. 后端认证实现
 
-- [ ] 2.1 查阅当前 Spring Security 官方文档，确认 Spring Boot 3.5 对 JWT 编解码、Cookie CSRF Token 和无状态安全链的 API 用法。
-- [ ] 2.2 增加认证安全依赖和 `cinewise.auth` 配置，校验 JWT 密钥、有效期、Cookie 属性和本地开发例外。
-- [ ] 2.3 实现账号领域状态、认证错误码、邮箱规范化、邮箱脱敏和 BCrypt 密码校验边界。
-- [ ] 2.4 实现 `sys_user`、`sys_login_log` 的认证 Repository 接口和 MyBatis 适配，不创建或修改 Flyway SQL。
-- [ ] 2.5 实现用户密码登录、管理员密码登录、当前用户查询和登出 Application Service，保证账号状态、角色和 `tokenVersion` 校验。
-- [ ] 2.6 实现 JWT 签发、Cookie 写入/清除、JWT Cookie 过滤器和真实 `CurrentUserAccessor`，替换默认拒绝回退实现。
-- [ ] 2.7 在现有单一安全链中接入公开登录、CSRF、认证、ADMIN、401/403、`201009` 和 CORS 规则。
-- [ ] 2.8 实现登录、管理员登录、`/auth/me`、登出和 CSRF Controller/DTO，并同步 SpringDoc 契约。
-- [ ] 2.9 实现不影响登录结果的脱敏登录审计和 30 天到期清理，确保日志不记录完整邮箱、密码、Cookie 或 JWT，且清理只删除超过配置保留期的 `sys_login_log`。
-- [ ] 2.10 实现显式开启的认证演示种子，支持本地 `.test` 邮箱和正式演示真邮箱，环境变量变化不得覆盖已有账号。
+- [x] 2.1 查阅当前 Spring Security 官方文档，确认 Spring Boot 3.5 对 JWT 编解码、Cookie CSRF Token 和无状态安全链的 API 用法。
+- [x] 2.2 增加认证安全依赖和 `cinewise.auth` 配置，校验 JWT 密钥、有效期、Cookie 属性和本地开发例外。
+- [x] 2.3 实现账号领域状态、认证错误码、邮箱规范化、邮箱脱敏和 BCrypt 密码校验边界。
+- [x] 2.4 实现 `sys_user`、`sys_login_log` 的认证 Repository 接口和 MyBatis 适配，不创建或修改 Flyway SQL。
+- [x] 2.5 实现用户密码登录、管理员密码登录、当前用户查询和登出 Application Service，保证账号状态、角色和 `tokenVersion` 校验。
+- [x] 2.6 实现 JWT 签发、Cookie 写入/清除、JWT Cookie 过滤器和真实 `CurrentUserAccessor`，替换默认拒绝回退实现。
+- [x] 2.7 在现有单一安全链中接入公开登录、CSRF、认证、ADMIN、401/403、`201009` 和 CORS 规则。
+- [x] 2.8 实现登录、管理员登录、`/auth/me`、登出和 CSRF Controller/DTO，并同步 SpringDoc 契约。
+- [x] 2.9 实现不影响登录结果的脱敏登录审计和 30 天到期清理，确保日志不记录完整邮箱、密码、Cookie 或 JWT，且清理只删除超过配置保留期的 `sys_login_log`。
+- [x] 2.10 实现显式开启的认证演示种子，支持本地 `.test` 邮箱和正式演示真邮箱，环境变量变化不得覆盖已有账号。
 
 ## 3. 后端测试
 
-- [ ] 3.1 为邮箱规范化、脱敏、密码校验、JWT 声明和 Cookie 属性增加单元测试。
-- [ ] 3.2 使用测试 Repository 覆盖 USER/ADMIN 登录成功、错误凭据统一响应、账号禁用和普通用户不能从管理入口升级。
-- [ ] 3.3 覆盖 `/auth/me` 的有效、缺失、过期、账号禁用和 `tokenVersion` 不一致场景。
-- [ ] 3.4 覆盖 CSRF 缺失/有效、登出清 Cookie、重复登出和旧 JWT 失效场景。
-- [ ] 3.5 覆盖登录日志失败不改变认证结果、成功/失败字段一致性、30 天清理边界、清理索引使用和敏感字段扫描。
+- [x] 3.1 为邮箱规范化、脱敏、密码校验、JWT 声明和 Cookie 属性增加单元测试。
+- [x] 3.2 使用测试 Repository 覆盖 USER/ADMIN 登录成功、错误凭据统一响应、账号禁用和普通用户不能从管理入口升级。
+- [x] 3.3 覆盖 `/auth/me` 的有效、缺失、过期、账号禁用和 `tokenVersion` 不一致场景。
+- [x] 3.4 覆盖 CSRF 缺失/有效、登出清 Cookie、重复登出和旧 JWT 失效场景。
+- [x] 3.5 覆盖登录日志失败不改变认证结果、成功/失败字段一致性、30 天清理边界、清理索引使用和敏感字段扫描。
 
 ## 4. 前端认证实现
 
@@ -52,8 +52,8 @@
 
 - [ ] 6.1 修正认证设计和前端应用设计中残留的 Umi `request` 描述，统一为现有原生 `fetch` 公共客户端。
 - [ ] 6.2 修正后端总系分中认证 REST `CurrentUser.userId/email` 和登录详细接口缺少 `clientRequestId` 的旧描述。
-- [ ] 6.3 C 按静态审查意见完成 `V006` 修订草案并私下交给 A；A 固化最终 SQL、完成 AI 只读复核并将验证通过的文件直提 `dev`。C 不提交、不推送、不执行迁移。
-- [ ] 6.4 A 在独立空 MySQL 8.4 验证迁移、重复执行、字段、索引、约束、字符集和排序规则，并记录证据。
-- [ ] 6.5 使用受控测试账号完成用户/管理员真实 MySQL 登录、刷新恢复、登出、401/403、CSRF 和 Cookie 冒烟。
+- [x] 6.3 C 按静态审查意见完成 `V006` 修订草案并私下交给 A；A 固化最终 SQL、完成 AI 只读复核并将验证通过的文件直提 `dev`。C 不提交、不推送、不执行迁移。
+- [x] 6.4 A 在独立空 MySQL 8.4 验证迁移、重复执行、字段、索引、约束、字符集和排序规则，并记录证据。
+- [x] 6.5 使用受控测试账号完成用户/管理员真实 MySQL 登录、刷新恢复、登出、401/403、CSRF 和 Cookie 冒烟。
 - [ ] 6.6 执行 `openspec validate password-login-and-session --strict`、后端 `mvnw.cmd verify`、前端 `pnpm check` 和相关 E2E，并记录实际结果。
 - [ ] 6.7 导出 `/v3/api-docs`，由 A/B/C/D 复核认证响应、Cookie 安全方案、CSRF Header 和公共错误码。
