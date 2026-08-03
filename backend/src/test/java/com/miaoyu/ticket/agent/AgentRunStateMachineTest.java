@@ -11,6 +11,7 @@ import com.miaoyu.ticket.agent.domain.plan.FailurePolicy;
 import com.miaoyu.ticket.agent.domain.plan.PlanNodeStatus;
 import com.miaoyu.ticket.agent.domain.plan.PlanNodeType;
 import com.miaoyu.ticket.agent.domain.plan.SlotSnapshot;
+import com.miaoyu.ticket.agent.domain.run.ExecutionNodeState;
 import com.miaoyu.ticket.agent.domain.run.ExecutionPlanStateMachine;
 import com.miaoyu.ticket.agent.domain.run.ExecutionRunState;
 import com.miaoyu.ticket.agent.domain.run.ReplanRequestResult;
@@ -19,6 +20,9 @@ import com.miaoyu.ticket.agent.domain.tool.ToolDefinition;
 import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Modifier;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -157,6 +161,20 @@ class AgentRunStateMachineTest {
     }
 
     @Test
+    void shouldRejectDirectToolNodeCompletionOutsideToolResultHandler() {
+        ExecutionPlanStateMachine stateMachine = stateMachine();
+        ExecutionRunState runningState = stateMachine.startNode(
+                stateMachine.initialize(
+                        plan(node("read", PlanNodeType.CALL_TOOL, "readTool", List.of(), FailurePolicy.RETRY_ONCE))),
+                "read");
+
+        assertThrows(IllegalStateException.class, () -> stateMachine.succeedNode(runningState, "read"));
+        assertThrows(IllegalStateException.class, () -> stateMachine.failNode(runningState, "read"));
+        assertEquals(PlanNodeStatus.RUNNING, runningState.nodeState("read").status());
+        assertEquals(0, runningState.nodeState("read").retryCount());
+    }
+
+    @Test
     void shouldApproveAtMostTwoReplansWithoutChangingPlan() {
         ExecutionPlanStateMachine stateMachine = stateMachine();
         ExecutionRunState state = stateMachine.initialize(
@@ -177,13 +195,38 @@ class AgentRunStateMachineTest {
 
     @Test
     void shouldKeepRunStateImmutable() {
-        ExecutionRunState state = ExecutionRunState.initial(
+        ExecutionPlanStateMachine stateMachine = stateMachine();
+        ExecutionRunState state = stateMachine.initialize(
                 plan(node("compute", PlanNodeType.COMPUTE, null, List.of(), FailurePolicy.FAIL)));
 
         assertThrows(UnsupportedOperationException.class, () -> state.nodeStates().clear());
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> state.withNextReplanCount().withNextReplanCount().withNextReplanCount());
+        assertTrue(Modifier.isPrivate(ExecutionRunState.class.getDeclaredConstructors()[0].getModifiers()));
+        assertTrue(Modifier.isPrivate(ExecutionNodeState.class.getDeclaredConstructors()[0].getModifiers()));
+    }
+
+    @Test
+    void shouldRejectForgedNodeStateCounters() throws ReflectiveOperationException {
+        Constructor<ExecutionNodeState> constructor = ExecutionNodeState.class.getDeclaredConstructor(
+                String.class,
+                PlanNodeStatus.class,
+                int.class,
+                int.class,
+                ToolStatus.class,
+                Integer.class,
+                boolean.class,
+                String.class,
+                String.class);
+        constructor.setAccessible(true);
+
+        InvocationTargetException noAttemptForSuccess = assertThrows(
+                InvocationTargetException.class,
+                () -> constructor.newInstance("node", PlanNodeStatus.SUCCESS, 0, 0, null, null, false, null, null));
+        InvocationTargetException excessiveRetry = assertThrows(
+                InvocationTargetException.class,
+                () -> constructor.newInstance("node", PlanNodeStatus.PENDING, 1, 2, null, null, false, null, null));
+
+        assertTrue(noAttemptForSuccess.getCause() instanceof IllegalArgumentException);
+        assertTrue(excessiveRetry.getCause() instanceof IllegalArgumentException);
     }
 
     private static ExecutionPlanStateMachine stateMachine() {

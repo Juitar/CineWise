@@ -8,7 +8,6 @@ import com.miaoyu.ticket.agent.domain.plan.PlanNodeType;
 import com.miaoyu.ticket.agent.domain.tool.ToolDefinition;
 import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
-import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
@@ -51,12 +50,14 @@ public final class ExecutionPlanStateMachine {
     /** 将执行中的非工具节点标记为成功。 */
     public ExecutionRunState succeedNode(ExecutionRunState state, String nodeId) {
         ExecutionRunState currentState = Objects.requireNonNull(state, "运行状态不能为空");
-        return currentState.withNodeState(currentState.nodeState(nodeId).succeed(successResult()));
+        requireNonToolNode(currentState, nodeId);
+        return currentState.withNodeState(currentState.nodeState(nodeId).succeed());
     }
 
     /** 将执行中的节点标记为失败，并跳过尚未开始的下游节点。 */
     public ExecutionRunState failNode(ExecutionRunState state, String nodeId) {
         ExecutionRunState currentState = Objects.requireNonNull(state, "运行状态不能为空");
+        requireNonToolNode(currentState, nodeId);
         ExecutionRunState failedState = currentState.withNodeState(currentState.nodeState(nodeId).fail());
         return skipPendingDownstreamNodes(failedState, nodeId, nodeId);
     }
@@ -173,7 +174,9 @@ public final class ExecutionPlanStateMachine {
                 .orElseThrow(() -> new IllegalArgumentException("计划中不存在节点: " + nodeId));
     }
 
-    private static ToolResult<Void> successResult() {
-        return new ToolResult<>(ToolStatus.SUCCESS, null, null, false, false, null, false, null, null, null, null);
+    private static void requireNonToolNode(ExecutionRunState state, String nodeId) {
+        if (findNode(state, nodeId).type() == PlanNodeType.CALL_TOOL) {
+            throw new IllegalStateException("工具节点只能通过 recordToolResult 推进: " + nodeId);
+        }
     }
 }

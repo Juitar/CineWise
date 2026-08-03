@@ -9,26 +9,35 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /** 一次计划运行的不可变快照，计划定义和运行过程分别保存。 */
-public record ExecutionRunState(ExecutionPlan plan, Map<String, ExecutionNodeState> nodeStates, int replanCount) {
-
+public final class ExecutionRunState {
     private static final int MAX_REPLAN_COUNT = 2;
 
-    public ExecutionRunState {
-        plan = Objects.requireNonNull(plan, "运行计划不能为空");
-        nodeStates = copyAndValidateNodeStates(plan, nodeStates);
+    private final ExecutionPlan plan;
+    private final Map<String, ExecutionNodeState> nodeStates;
+    private final int replanCount;
+
+    private ExecutionRunState(ExecutionPlan plan, Map<String, ExecutionNodeState> nodeStates, int replanCount) {
+        this.plan = Objects.requireNonNull(plan, "运行计划不能为空");
+        this.nodeStates = copyAndValidateNodeStates(plan, nodeStates);
         if (replanCount < 0 || replanCount > MAX_REPLAN_COUNT) {
             throw new IllegalArgumentException("重规划次数必须在 0 到 " + MAX_REPLAN_COUNT + " 之间");
         }
+        this.replanCount = replanCount;
     }
 
-    /** 从已校验运行计划创建初始运行快照。 */
-    public static ExecutionRunState initial(ExecutionPlan plan) {
-        Objects.requireNonNull(plan, "运行计划不能为空");
-        Map<String, ExecutionNodeState> initialStates = new LinkedHashMap<>();
-        for (ExecutionPlanNode node : plan.nodes()) {
-            initialStates.put(node.nodeId(), ExecutionNodeState.initial(node));
-        }
-        return new ExecutionRunState(plan, initialStates, 0);
+    /** 返回已校验的计划定义。 */
+    public ExecutionPlan plan() {
+        return plan;
+    }
+
+    /** 返回不可修改的节点状态快照。 */
+    public Map<String, ExecutionNodeState> nodeStates() {
+        return nodeStates;
+    }
+
+    /** 返回已批准的重规划次数。 */
+    public int replanCount() {
+        return replanCount;
     }
 
     /** 读取指定节点的运行状态。 */
@@ -40,8 +49,16 @@ public record ExecutionRunState(ExecutionPlan plan, Map<String, ExecutionNodeSta
         return state;
     }
 
-    /** 返回替换一个节点状态后的新快照。 */
-    public ExecutionRunState withNodeState(ExecutionNodeState nextNodeState) {
+    static ExecutionRunState initial(ExecutionPlan plan) {
+        Objects.requireNonNull(plan, "运行计划不能为空");
+        Map<String, ExecutionNodeState> initialStates = new LinkedHashMap<>();
+        for (ExecutionPlanNode node : plan.nodes()) {
+            initialStates.put(node.nodeId(), ExecutionNodeState.initial(node));
+        }
+        return new ExecutionRunState(plan, initialStates, 0);
+    }
+
+    ExecutionRunState withNodeState(ExecutionNodeState nextNodeState) {
         Objects.requireNonNull(nextNodeState, "节点状态不能为空");
         if (!nodeStates.containsKey(nextNodeState.nodeId())) {
             throw new IllegalArgumentException("计划中不存在节点: " + nextNodeState.nodeId());
@@ -51,8 +68,7 @@ public record ExecutionRunState(ExecutionPlan plan, Map<String, ExecutionNodeSta
         return new ExecutionRunState(plan, copiedStates, replanCount);
     }
 
-    /** 返回重规划次数增加后的新快照。 */
-    public ExecutionRunState withNextReplanCount() {
+    ExecutionRunState withNextReplanCount() {
         return new ExecutionRunState(plan, nodeStates, replanCount + 1);
     }
 

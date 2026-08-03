@@ -19,3 +19,8 @@
 - [x] 4.1 补齐 Agent 状态机测试夹具，确保测试不依赖 MySQL、Redis、SSE、Controller、认证或真实 A/D 工具。（Owner：B；验证：`mvnw.cmd -Dtest=AgentRunStateMachineTest test` 通过）
 - [x] 4.2 在 `backend/` 执行完整质量检查，并记录通过、失败和跳过数。（Owner：B；验证：`mvnw.cmd verify` 通过）
 - [x] 4.3 严格校验 OpenSpec，检查任务仅在完成并验证后勾选，并核对 Git 改动范围。（Owner：B；验证：`openspec validate agent-run-state-machine --strict`、`git diff --check` 和 `git status --short --branch` 无异常）
+
+## 5. PR 评审修正
+
+- [x] 5.1 限制通用成功和失败入口仅处理非工具节点，工具节点只能由 `recordToolResult()` 推进。（Owner：B；验证：`AgentRunStateMachineTest` 覆盖工具节点直接成功、直接失败均被拒绝）
+- [x] 5.2 收紧运行与节点状态的构造和替换入口，拒绝伪造终态及非法计数。（Owner：B；验证：`AgentRunStateMachineTest` 覆盖私有构造、成功节点零尝试和 `retryCount > attemptCount`）
