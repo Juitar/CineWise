@@ -13,4 +13,4 @@
 
 - [x] 3.1 OpenSpec 严格校验、`git diff --check` 和后端完整 `verify` 通过；后端 65 个测试中 60 通过、0 失败、5 个外部环境测试按门控跳过。
 - [x] 3.2 一次性 MySQL 8.4.11 上五个集成测试全部通过：5 通过、0 失败、0 错误、0 跳过。
-- [ ] 3.3 推送分支后 GitHub Actions 的 MySQL 服务健康和集成质量门通过。
+- [x] 3.3 GitHub Actions 的 MySQL 服务健康和集成质量门通过；PR #12 的 Backend MySQL Integration Run 30799775111 共执行 5 个真实 MySQL 测试，0 失败、0 错误、0 跳过。
