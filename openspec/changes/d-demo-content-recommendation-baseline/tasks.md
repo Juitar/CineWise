@@ -35,7 +35,7 @@
 
 - [x] 3.1 D 已在 `content` 模块定义标准化影片、影院、来源封套、查询条件以及 Provider、快照、缓存端口；Application 和 Domain 不依赖 Web、MyBatis 或 Redis 类型。验证：`backend\mvnw.cmd -Dtest=ModuleArchitectureTest test` 通过，日期：2026-08-03。
 - [x] 3.2 D 已实现版本化 Demo 内容资源读取和 `DemoContentProvider`，统一通过业务 `Clock` 生成时间；验证：固定时钟、相同版本和条件下重复查询保持内容、JSON 顺序、`DEMO_CONTENT/MOCK` 来源与时间封套一致，日期：2026-08-03。
-- [ ] 3.3 D 实现 `movie`、`cinema`、`external_data_snapshot`、`data_sync_log` 的持久化适配，不访问其他模块 Mapper；验证方式：持久化集成测试覆盖唯一键和重复初始化。
+- [x] 3.3 D 已实现 `movie`、`cinema`、`external_data_snapshot`、`data_sync_log` 的 JDBC 持久化适配，不访问其他模块 Mapper；验证：H2 集成测试覆盖重复内容初始化、快照/同步日志唯一键及 V004 的时间、统计 CHECK 拒绝，日期：2026-08-03。真实 MySQL 日常账号验证仍由 2.9 单独完成。
 - [ ] 3.4 D 实现 Redis 内容缓存，使用 `ext:content:{city}:{resource}:{idOrHash}` 键和配置化 TTL；验证方式：缓存只保存标准 DTO，Redis 失败可继续回退。
 - [ ] 3.5 D 实现影片和影院内部只读 Application 用例及公开 `ContentSummaryQueryPort`，按“有效缓存、有效快照、允许的过期快照、Demo、`303004`”处理；验证方式：每种结果均返回正确来源、时间和降级字段，A 只能通过 Port 查询内容摘要。
 - [ ] 3.6 D 确保过期内容仅用于只读展示且不进入新的可购推荐；验证方式：过期内容用例返回 `isExpired=true` 并被推荐资格校验排除。
