@@ -11,7 +11,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class JdbcContentSeedRepository implements ContentSeedRepository {
 
-    private static final String SEED_SOURCE = "demo-seed";
+    private static final String SEED_SOURCE = "DEMO_CONTENT";
     private static final String SOURCE_TYPE = "MOCK";
 
     private final JdbcTemplate jdbcTemplate;

@@ -27,7 +27,7 @@
 - [x] 2.4 A 已于 2026-08-02 复核雪花 ID、`DATETIME(3)`、跨模块逻辑关联和迁移顺序，完成 V004 最终静态审查并授权专用空 MySQL 8.4 验证。
 - [x] 2.5 A 已于 2026-08-02 在 MySQL 8.4.11 专用空库执行 V001 至 V004；首次 migrate、重复 migrate、Flyway 历史、字符集、排序规则、唯一键、索引和 16 个 CHECK 正反用例全部通过。证据见 `docs/V004_MIGRATION_VALIDATION_2026-08-02.md`。
 - [x] 2.6 D 与 A 已确认唯一 `demo-content-v1` 的数据维护边界：沿用 A 演示阶段的 10 部影片、4 家影院，来源 ID 清单见 `demo-content-v1-manifest.md`。A 保留 `DemoSeedInitializer` 的初始化编排和票务种子，D 维护影片、影院清单及内容种子规则；确认日期：2026-08-03。
-- [ ] 2.7 D 改造内容种子，使资源文件不写死数据库内部 ID，首次初始化生成雪花 ID、重复初始化查回既有 ID，并通过 `ContentSeedCatalog` 交给 A 的票务种子；验证方式：两次初始化不产生重复影片、影院，且 A 只使用返回的实际 ID。
+- [x] 2.7 D 已将唯一的 `demo-content-v1` 落为 classpath JSON，目录只保存来源 ID 和内容字段；`ContentSeedApplicationService` 首次写入使用雪花 ID，重复初始化按来源 ID 查回既有记录并经 `ContentSeedCatalog` 交给 A 的票务种子。验证：`backend\mvnw.cmd verify` 通过；固定时钟下两次初始化保持 10 部影片、4 家影院、8 个影厅、168 个场次、13440 个座位，已锁座位状态不变，日期：2026-08-03。
 - [x] 2.8 A 已于 2026-08-02 完成共享 `cinewise` 的历史、checksum、备份和兼容性检查，并使用独立 `cinewise_migrator` 执行 V004；首次应用 1 个迁移，重复执行应用 0 个迁移，两张空表、索引、6 个 CHECK 和排序规则检查通过，证据见 `docs/V004_SHARED_MIGRATION_2026-08-02.md`。应用环境的 `FLYWAY_ENABLED` 保持 `false`。
 - [ ] 2.9 D 使用日常应用账号完成依赖 V004 的持久层和真实 MySQL 集成测试；验证方式：覆盖两张表的正常写入、唯一键和 CHECK 拒绝场景，不执行 Flyway，不使用迁移账号。
 
