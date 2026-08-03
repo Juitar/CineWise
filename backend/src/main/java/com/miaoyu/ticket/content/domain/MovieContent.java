@@ -12,16 +12,25 @@ import java.util.Objects;
  * <p>类型、时长和评分属于内容事实；可购时间、价格和余座属于 A 的票务事实，禁止加入本模型。</p>
  */
 public record MovieContent(
+        Long movieId,
         String sourceMovieId,
         String title,
         String genresJson,
         int durationMinutes,
         BigDecimal rating) implements ContentItem {
 
+    /** 资源目录不保存数据库主键；按实际主键查询并回退时才由 Provider 填入。 */
+    public MovieContent(String sourceMovieId, String title, String genresJson, int durationMinutes, BigDecimal rating) {
+        this(null, sourceMovieId, title, genresJson, durationMinutes, rating);
+    }
+
     /**
      * 固定 Demo 数据必须完整，提前拒绝空来源 ID 和无效时长，避免无法幂等的内容进入种子。
      */
     public MovieContent {
+        if (movieId != null && movieId <= 0L) {
+            throw new IllegalArgumentException("movieId must be positive");
+        }
         sourceMovieId = requireText(sourceMovieId, "sourceMovieId");
         title = requireText(title, "title");
         genresJson = requireText(genresJson, "genresJson");

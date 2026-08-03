@@ -2,6 +2,7 @@ package com.miaoyu.ticket.content.infrastructure.provider;
 
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.content.application.ContentProperties;
+import com.miaoyu.ticket.content.application.ContentIdentityLookupPort;
 import com.miaoyu.ticket.content.application.ContentProvider;
 import com.miaoyu.ticket.content.application.ContentQuery;
 import com.miaoyu.ticket.content.application.ContentResult;
@@ -31,6 +32,7 @@ public class DemoContentProvider implements ContentProvider {
 
     private final DemoContentCatalogProvider catalogProvider;
     private final ContentProperties properties;
+    private final ContentIdentityLookupPort identityLookupPort;
     private final Clock clock;
 
     /**
@@ -41,17 +43,19 @@ public class DemoContentProvider implements ContentProvider {
     public DemoContentProvider(
             DemoContentCatalogProvider catalogProvider,
             ContentProperties properties,
+            ContentIdentityLookupPort identityLookupPort,
             Clock clock) {
         this.catalogProvider = catalogProvider;
         this.properties = properties;
+        this.identityLookupPort = identityLookupPort;
         this.clock = clock;
     }
 
     /**
      * 按资源类型和基础查询条件筛选固定目录，并为本轮查询生成统一时间封套。
      *
-     * <p>目录自身没有数据库主键，所以这里不处理 contentId；该条件需要后续 3.5 从标准化快照或内容表
-     * 查询。不能把资源数组下标或来源 ID 强行转换为本环境的 BIGINT 主键。</p>
+     * <p>目录自身没有数据库主键。收到 contentId 时先由端口从内容表查回对应来源 ID，再精确筛选目录并
+     * 将实际主键写入返回 DTO；未知 ID 直接返回空，不能退化为整份目录。</p>
      *
      * <p>返回的内容顺序完全沿用 JSON 文件顺序。这样页面演示和固定推荐夹具能复现同一候选，不依赖
      * 数据库查询计划、区域设置或流式并发顺序。</p>
@@ -60,9 +64,13 @@ public class DemoContentProvider implements ContentProvider {
     public Optional<ContentResult<List<? extends ContentItem>>> query(ContentQuery query) {
         // 目录加载失败需要由上层继续尝试快照或返回不可用，不能把半截数据伪装成完整 Demo。
         DemoContentCatalog catalog = catalogProvider.load();
+        Optional<String> requestedSourceId = findRequestedSourceId(query);
+        if (query.contentId() != null && requestedSourceId.isEmpty()) {
+            return Optional.empty();
+        }
         List<? extends ContentItem> content = query.resourceType() == ContentResourceType.MOVIE
-                ? findMovies(catalog.movies(), query)
-                : findCinemas(catalog.cinemas(), query);
+                ? findMovies(catalog.movies(), query, requestedSourceId.orElse(null))
+                : findCinemas(catalog.cinemas(), query, requestedSourceId.orElse(null));
         if (content.isEmpty()) {
             return Optional.empty();
         }
@@ -83,8 +91,14 @@ public class DemoContentProvider implements ContentProvider {
      *
      * <p>不因用户城市过滤影片，避免把“没有本地场次”错写成“影片内容不存在”；场次可购性由 A 负责。</p>
      */
-    private List<MovieContent> findMovies(List<MovieContent> movies, ContentQuery query) {
-        return movies.stream().filter(movie -> matches(query.keyword(), movie.title(), movie.sourceMovieId())).toList();
+    private List<MovieContent> findMovies(List<MovieContent> movies, ContentQuery query, String requestedSourceId) {
+        return movies.stream()
+                .filter(movie -> requestedSourceId == null || requestedSourceId.equals(movie.sourceMovieId()))
+                .filter(movie -> matches(query.keyword(), movie.title(), movie.sourceMovieId()))
+                .map(movie -> query.contentId() == null ? movie : new MovieContent(query.contentId(),
+                        movie.sourceMovieId(), movie.title(), movie.genresJson(), movie.durationMinutes(),
+                        movie.rating()))
+                .toList();
     }
 
     /**
@@ -92,11 +106,22 @@ public class DemoContentProvider implements ContentProvider {
      *
      * <p>先按精确 cityCode 限定范围，再按关键词过滤，避免地址或行政区的模糊匹配泄露到其他城市列表。</p>
      */
-    private List<CinemaContent> findCinemas(List<CinemaContent> cinemas, ContentQuery query) {
+    private List<CinemaContent> findCinemas(List<CinemaContent> cinemas, ContentQuery query, String requestedSourceId) {
         return cinemas.stream()
+                .filter(cinema -> requestedSourceId == null || requestedSourceId.equals(cinema.sourceCinemaId()))
                 .filter(cinema -> query.cityCode() == null || query.cityCode().equals(cinema.cityCode()))
                 .filter(cinema -> matches(query.keyword(), cinema.name(), cinema.sourceCinemaId()))
+                .map(cinema -> query.contentId() == null ? cinema : new CinemaContent(query.contentId(),
+                        cinema.sourceCinemaId(), cinema.name(), cinema.cityCode(), cinema.area(), cinema.address(),
+                        cinema.longitude(), cinema.latitude()))
                 .toList();
+    }
+
+    /** 精确 ID 只能映射到目录中已确认的来源身份，避免未知 ID 获得任意 Demo 列表。 */
+    private Optional<String> findRequestedSourceId(ContentQuery query) {
+        return query.contentId() == null
+                ? Optional.empty()
+                : identityLookupPort.findSourceId(query.resourceType(), query.contentId());
     }
 
     /**

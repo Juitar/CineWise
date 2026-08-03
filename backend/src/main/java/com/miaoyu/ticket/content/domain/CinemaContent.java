@@ -14,6 +14,7 @@ import java.util.Objects;
  * <p>影厅名称和场次时间由票务模块维护，内容变化不能覆盖这些票务数据。</p>
  */
 public record CinemaContent(
+        Long cinemaId,
         String sourceCinemaId,
         String name,
         String cityCode,
@@ -22,10 +23,19 @@ public record CinemaContent(
         BigDecimal longitude,
         BigDecimal latitude) implements ContentItem {
 
+    /** 资源目录不保存数据库主键；按实际主键查询并回退时才由 Provider 填入。 */
+    public CinemaContent(String sourceCinemaId, String name, String cityCode, String area, String address,
+                         BigDecimal longitude, BigDecimal latitude) {
+        this(null, sourceCinemaId, name, cityCode, area, address, longitude, latitude);
+    }
+
     /**
      * 固定 Demo 影院必须有可复用的来源 ID 和完整地址字段，否则不能作为初始化或回退数据。
      */
     public CinemaContent {
+        if (cinemaId != null && cinemaId <= 0L) {
+            throw new IllegalArgumentException("cinemaId must be positive");
+        }
         sourceCinemaId = requireText(sourceCinemaId, "sourceCinemaId");
         name = requireText(name, "name");
         cityCode = requireText(cityCode, "cityCode");

@@ -3,6 +3,7 @@ package com.miaoyu.ticket.content.infrastructure.provider;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.miaoyu.ticket.content.application.ContentProperties;
+import com.miaoyu.ticket.content.application.ContentIdentityLookupPort;
 import com.miaoyu.ticket.content.application.ContentQuery;
 import com.miaoyu.ticket.content.application.ContentResult;
 import com.miaoyu.ticket.content.application.DemoContentCatalog;
@@ -28,9 +29,15 @@ class DemoContentProviderTest {
 
     private final DemoContentCatalogProvider catalogProvider = new ClasspathDemoContentCatalogProvider(
             new com.fasterxml.jackson.databind.ObjectMapper(), new DefaultResourceLoader());
+    private final ContentIdentityLookupPort identityLookupPort = (resourceType, contentId) -> {
+        if (resourceType == ContentResourceType.MOVIE && contentId == 8_100_001L) {
+            return java.util.Optional.of("mock-movie-01");
+        }
+        return java.util.Optional.empty();
+    };
     private final DemoContentProvider provider = new DemoContentProvider(
             catalogProvider, new ContentProperties(Duration.ofHours(6), Duration.ofHours(6), Duration.ofDays(7)),
-            FIXED_CLOCK);
+            identityLookupPort, FIXED_CLOCK);
 
     @Test
     void givenSameCatalogQueryAndClock_whenQueryMoviesTwice_thenContentOrderAndSourceEnvelopeStayStable() {
@@ -67,6 +74,26 @@ class DemoContentProviderTest {
         ContentQuery query = new ContentQuery(ContentResourceType.MOVIE, null, null, "不存在的影片");
 
         // 空结果交给后续 3.5 的回退顺序处理，Provider 不补造影片、场次或价格。
+        assertThat(provider.query(query)).isEmpty();
+    }
+
+    @Test
+    void givenKnownDatabaseMovieId_whenQueryDemoContent_thenOnlyItsMappedEntryCarriesThatId() {
+        ContentQuery query = new ContentQuery(ContentResourceType.MOVIE, 8_100_001L, null, null);
+
+        ContentResult<List<? extends ContentItem>> result = provider.query(query).orElseThrow();
+
+        // 缓存、快照未命中后的 Demo 回退也必须保持调用方指定的实际数据库主键。
+        assertThat(result.data()).hasSize(1);
+        MovieContent movie = (MovieContent) result.data().getFirst();
+        assertThat(movie.movieId()).isEqualTo(8_100_001L);
+        assertThat(movie.sourceMovieId()).isEqualTo("mock-movie-01");
+    }
+
+    @Test
+    void givenUnknownDatabaseMovieId_whenQueryDemoContent_thenItDoesNotReturnTheCatalogList() {
+        ContentQuery query = new ContentQuery(ContentResourceType.MOVIE, 8_199_999L, null, null);
+
         assertThat(provider.query(query)).isEmpty();
     }
 }

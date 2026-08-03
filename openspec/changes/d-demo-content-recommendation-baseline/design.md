@@ -51,6 +51,8 @@ agent/tool/         B 的工具协议适配器，仅调用 recommendation Applic
 
 `demo-content-v1` 是 D 维护的共享数据文件版本、Provider 回退数据和测试夹具；它不得与内容种子维护两套影片、影院。资源文件以 `source + sourceMovieId` 或 `source + sourceCinemaId` 表示跨环境稳定身份，不写入数据库内部 `movieId/cinemaId`。首次初始化由应用生成雪花 ID；重复初始化查询并返回既有 ID，A 的票务种子只使用 `ContentSeedCatalog` 返回的实际 ID。加载时由统一 `Clock` 生成本轮 `dataTime` 和 `expiresAt`；自动测试使用固定 `Clock`，从而同时满足演示数据不过期和回归结果可重复。
 
+调用方按实际 `movieId/cinemaId` 查询且需要 Demo 回退时，Provider 先通过 D 的内容身份查询端口，把数据库 ID 映射为 `DEMO_CONTENT` 的来源 ID，再仅返回该目录条目并把实际 ID 填入结果 DTO。目录不存在、已删除或非 Demo 来源的 ID 不返回内容，不能退化为整份目录。
+
 共享初始化按 `source + sourceMovieId` 或 `source + sourceCinemaId` 更新，不按运行次数生成新 ID。相同数据版本重复初始化不得产生重复记录；D 不实现第二个影片、影院初始化器。
 
 `source_movie_id`、`source_cinema_id` 在表结构中允许为空，以兼容未来上游未提供来源 ID 的内容；但固定 Mock 数据必须非空。MySQL 联合唯一键允许多条包含 `NULL` 的记录，因此来源 ID 为空时不得以 `source + source_*_id` 作为幂等更新、去重或同一对象判定依据。第一版 `DemoContentProvider` 不生成来源 ID 为空的数据；真实 Provider 接入前必须在对应变更中定义替代身份识别规则。
@@ -110,6 +112,8 @@ T09、T10 的迁移草案由 A 提供，D 只审查字段、索引、约束和�
 
 第一版候选版本使用 `fixed-rec-v1`。推荐 Application API 接收类型化条件，返回固定顺序的 `RecommendationCandidate` 列表和 `algorithmVersion`；工具适配器再包装为 B 定义的 `ToolResult<T>`。
 
+B 已于 2026-08-03 确认工具类名为 `RankMoviePlanTool`，`ToolRegistry` 中的 `targetName` 为 `rankMoviePlan`。它使用 `RankMoviePlanCommand`：`movieId`、`cinemaId` 和 `date` 必填，`timeFrom`、`timeTo` 同时为空或同时传入且前者早于后者。Command 不携带 `showId`、价格、座位、库存或 `userId`；这些业务事实只能来自 A 的公开场次 Application 查询。工具为只读工具，公共时效字段只使用 `ToolResult.dataAt`、`ToolResult.expiresAt`，不新增公共 `dataTime` 字段。
+
 固定候选分两种：
 
 1. 只有 D 影片和影院数据时，返回 `purchaseEligible=false` 的内容候选和 `missingFactors=[SHOWTIME]`，不得生成 `PLAN_CARD` 可购方案。
@@ -160,5 +164,5 @@ T09、T10 的迁移草案由 A 提供，D 只审查字段、索引、约束和�
 
 - A 与 D 确认 `ContentSummaryQueryPort` 和场次公开 Application 查询的方法名、包位置及 DTO 字段；在实现前补入双方变更。
 - `demo-content-v1` 的资源文件落位、Provider 读取和固定时钟夹具由 D 在 3.1、3.2、5.1 实现；本阶段仅以来源 ID 清单作为交接证据。
-- B 最终采用的推荐工具名称和类型化 Command 名称是什么？不影响 D 的 Application API 和固定候选规则。
+- B 已确认 `RankMoviePlanTool`、`rankMoviePlan` 和 `RankMoviePlanCommand` 的字段；A 还需保证公开场次 Application DTO 返回本变更所需的 `expiresAt`，D 才能完成可购候选的时效校验。
 - C 首版页面是否需要直接调用影片/影院 REST 接口？若需要，在实现阶段补 API 层和 OpenAPI，不改变内部查询规格。
