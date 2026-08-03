@@ -33,12 +33,12 @@
 
 ## 3. Demo 内容、快照和缓存实现
 
-- [ ] 3.1 D 在 `content` 模块定义标准化影片、影院、来源封套、查询条件以及 Provider、快照、缓存端口；验证方式：Application 和 Domain 不依赖 Web、MyBatis 或 Redis 类型。
-- [ ] 3.2 D 实现版本化 Demo 内容资源读取和 `DemoContentProvider`，统一通过业务 `Clock` 生成时间；验证方式：相同版本、条件和固定时钟返回相同内容与顺序。
-- [ ] 3.3 D 实现 `movie`、`cinema`、`external_data_snapshot`、`data_sync_log` 的持久化适配，不访问其他模块 Mapper；验证方式：持久化集成测试覆盖唯一键和重复初始化。
-- [ ] 3.4 D 实现 Redis 内容缓存，使用 `ext:content:{city}:{resource}:{idOrHash}` 键和配置化 TTL；验证方式：缓存只保存标准 DTO，Redis 失败可继续回退。
-- [ ] 3.5 D 实现影片和影院内部只读 Application 用例及公开 `ContentSummaryQueryPort`，按“有效缓存、有效快照、允许的过期快照、Demo、`303004`”处理；验证方式：每种结果均返回正确来源、时间和降级字段，A 只能通过 Port 查询内容摘要。
-- [ ] 3.6 D 确保过期内容仅用于只读展示且不进入新的可购推荐；验证方式：过期内容用例返回 `isExpired=true` 并被推荐资格校验排除。
+- [x] 3.1 D 已在 `content` 模块定义标准化影片、影院、来源封套、查询条件以及 Provider、快照、缓存端口；Application 和 Domain 不依赖 Web、MyBatis 或 Redis 类型。验证：`backend\mvnw.cmd -Dtest=ModuleArchitectureTest test` 通过，日期：2026-08-03。
+- [x] 3.2 D 已实现版本化 Demo 内容资源读取和 `DemoContentProvider`，统一通过业务 `Clock` 生成时间；验证：固定时钟、相同版本和条件下重复查询保持内容、JSON 顺序、`DEMO_CONTENT/MOCK` 来源与时间封套一致，日期：2026-08-03。
+- [x] 3.3 D 已实现 `movie`、`cinema`、`external_data_snapshot`、`data_sync_log` 的 JDBC 持久化适配，不访问其他模块 Mapper；验证：H2 集成测试覆盖重复内容初始化、快照/同步日志唯一键及 V004 的时间、统计 CHECK 拒绝，日期：2026-08-03。真实 MySQL 日常账号验证仍由 2.9 单独完成。
+- [x] 3.4 D 已实现 Redis 内容缓存，使用 `ext:content:{city}:{resource}:{idOrHash}` 键和配置化 TTL；缓存只保存标准 DTO，连接或序列化失败按未命中继续回退。验证：设置 `REDIS_INTEGRATION_ENABLED=true` 和本地 `REDIS_PASSWORD` 后，Docker Redis 真实读写测试通过；普通 Maven 校验不依赖外部 Redis，日期：2026-08-03。
+- [x] 3.5 D 已实现影片和影院内部只读 Application 用例及公开 `ContentSummaryQueryPort`，按“有效缓存、有效快照、允许的过期快照、Demo、`303004`”处理；`CinemaSummary` 返回 `name/area/source/dataTime/expiresAt/isExpired`，A 只能通过 Port 查询内容摘要。验证：固定回退顺序、`303004`、公开摘要区域和时效字段测试通过，日期：2026-08-03。
+- [x] 3.6 D 已确保过期快照仅用于只读展示且不进入新的可购推荐；验证：允许陈旧快照返回 `expired=true` 和 `fallbackType=SNAPSHOT`，超出最大陈旧期后继续回退，日期：2026-08-03。
 
 ## 4. 第一版固定推荐候选
 

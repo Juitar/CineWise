@@ -50,6 +50,10 @@ springdoc:
     path: /swagger-ui.html
 
 cinewise:
+  content:
+    demo-ttl: 6h
+    cache-ttl: 6h
+    max-stale: 7d
   seed:
     # 演示数据必须显式开启，避免普通启动过程意外写入共享数据库。
     enabled: ${SEED_ENABLED:false}

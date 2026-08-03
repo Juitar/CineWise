@@ -28,6 +28,12 @@
 - **THEN** 返回的 `movieId` 和 `cinemaId` 必须与本次数据库初始化产生或查回的实际 ID 一致
 - **AND** 不得新增同名但 ID 不同的影片或影院记录
 
+#### Scenario: 按实际数据库 ID 回退 Demo 内容
+- **GIVEN** 缓存和快照均未命中，且内容种子已将某个 Demo 来源 ID 以数据库持久化键 `demo-seed` 映射为实际 `movieId` 或 `cinemaId`
+- **WHEN** 调用方使用该实际 ID 查询 Demo 回退内容
+- **THEN** 系统只返回该来源 ID 对应的一条内容，并在结果中保留该实际 ID
+- **AND** 未知、已删除或非 `demo-seed` 的 ID 返回无内容，不得返回整份 Demo 目录
+
 #### Scenario: D 的 Demo 数据只用于回退或测试
 - **GIVEN** 数据库中已经存在共享固定影片和影院
 - **WHEN** D 加载 `demo-content-v1` 数据
@@ -144,8 +150,14 @@
 #### Scenario: A 查询影院摘要
 - **GIVEN** A 持有合法的 `cinemaId`
 - **WHEN** A 通过 `ContentSummaryQueryPort` 查询影院摘要
-- **THEN** 系统返回影院名称、来源、数据时间、过期时间和过期标识，或返回明确的未找到结果
+- **THEN** 系统返回影院名称、区域、来源、数据时间、过期时间和过期标识，或返回明确的未找到结果
 - **AND** A 不访问 D 的持久化和缓存实现
+
+#### Scenario: A 展示影院区域
+- **GIVEN** A 持有合法且未删除的 `cinemaId`
+- **WHEN** A 通过 `ContentSummaryQueryPort` 查询影院摘要
+- **THEN** `CinemaSummary.area` 返回该影院已保存的行政区域
+- **AND** A 不读取 `cinema` 表或 D 的 Mapper
 
 #### Scenario: Port 尚未实现时使用临时 Demo Adapter
 - **GIVEN** `ContentSummaryQueryPort` 尚未实现且 D 已确认共享 Demo 数据
