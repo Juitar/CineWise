@@ -222,7 +222,7 @@ V001至V003首次在云端MySQL 8.4.11执行后已按上述SQL核验：数据库
 
 ## 8. 验证记录模板
 
-将下列模板放入对应 OpenSpec 的 `tasks.md`、PR 描述或团队约定的验证记录中：
+正式迁移验证与共享库发布记录统一保存在 `docs/database-migrations/`，并从对应 OpenSpec 的 `tasks.md` 或后续业务 PR 链接到记录。使用以下模板：
 
 ```text
 迁移：V<版本>__<描述>.sql
