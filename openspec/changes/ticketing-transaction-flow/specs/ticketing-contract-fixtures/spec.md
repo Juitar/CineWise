@@ -20,6 +20,13 @@
 - THEN 返回当前稳定数值错误码、用户可读消息和非空示例`traceId`
 - AND 不返回交易数据或泄露资源是否属于其他用户
 
+#### Scenario: C加载未登录目标夹具
+
+- GIVEN C已确认未登录最终使用完整`Result` JSON，但当前安全骨架仍可能返回空HTTP 401
+- WHEN C加载`unauthenticated-error.json`
+- THEN 该夹具被标记为依赖后续自定义`AuthenticationEntryPoint`的目标格式
+- AND 在C的认证实现合并前不得宣称当前运行时已支持该响应体
+
 ### Requirement: B的票务工具夹具必须遵守公共ToolResult
 
 系统 SHALL 提供`queryShows/createOrder/queryOrder`联调夹具。公共包装 SHALL 仅使用冻结的`ToolResult<T>`字段，业务字段 SHALL 仅位于`data`，支付 SHALL NOT 被表示为Agent工具。

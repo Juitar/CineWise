@@ -126,6 +126,8 @@ B夹具严格使用公共`status/data/errorCode/retryable/replanSuggested/sugges
 
 C夹具严格使用当前Controller DTO，ID为字符串、金额为两位小数字符串、时间带偏移，错误码为JSON数值。夹具不得包含密码、JWT、Cookie、用户ID、确认凭证或真实环境数据。自动契约测试解析全部JSON，核对关键字段、敏感词和恢复语义，并通过实际`/v3/api-docs`核对安全声明、`Idempotency-Key`、请求体和响应Schema；夹具漂移或OpenAPI缺失时构建失败。
 
+未登录夹具是C确认的目标`Result` JSON，依赖C后续认证PR用自定义`AuthenticationEntryPoint`替换当前`HttpStatusEntryPoint`。在该实现合并前，当前运行时可能只返回空HTTP 401，A不得把目标夹具记录成现状验收证据。
+
 ## 迁移策略
 
 - 所有内部主键由应用分配BIGINT雪花ID，不使用`AUTO_INCREMENT`。
