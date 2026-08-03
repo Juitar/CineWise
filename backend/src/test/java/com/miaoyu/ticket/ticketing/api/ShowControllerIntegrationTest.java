@@ -122,6 +122,17 @@ class ShowControllerIntegrationTest {
                         .doesNotExist())
                 .andExpect(jsonPath("$.paths['/api/v1/orders/{orderNo}/payment'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/tickets/{ticketId}'].get").exists())
+                .andExpect(jsonPath(
+                                "$.paths['/api/v1/orders/{orderNo}/refund-confirmation'].post")
+                        .exists())
+                .andExpect(jsonPath("$.paths['/api/v1/orders/{orderNo}/refunds'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/orders/{orderNo}/refund'].get").exists())
+                .andExpect(jsonPath(
+                                "$.paths['/api/v1/orders/{orderNo}/alternative-shows'].get")
+                        .exists())
+                .andExpect(jsonPath(
+                                "$.paths['/api/v1/orders/{orderNo}/refunds'].post.security[0].cookieAuth")
+                        .isArray())
                 .andExpect(content().string(not(containsString("paymentPassword"))))
                 .andExpect(jsonPath("$.paths['/api/v1/orders'].post.security[0].cookieAuth").isArray());
     }
