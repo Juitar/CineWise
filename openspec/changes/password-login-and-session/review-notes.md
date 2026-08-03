@@ -31,7 +31,13 @@ D 根据《前端应用系统设计》和旧认证设计提出普通 REST 使用
 
 A 正式为本次认证迁移分配 Flyway `V006`，预计文件为 `V006__create_auth_user_and_login_log_tables.sql`。该迁移只包含 `sys_user`、`sys_login_log`，不包含演示账号或其他种子数据；`V005` 已由票务迁移占用，不得重复使用。
 
-最终 SQL、静态审查、AI 只读复核和空 MySQL 8.4 验证由 A 负责，C 不自行生成、修改或执行最终迁移。C 补充确认：A 的其他确认项按默认同意处理，因此 `sys_login_log` 作为只追加日志不增加 `update_time`。
+最终 SQL 审查、AI 只读复核和空 MySQL 8.4 验证由 A 负责。C 在本地编写 SQL 草案并私下交给 A，A 审查通过前不提交、不推送、不执行。C 补充确认：A 的其他确认项按默认同意处理，因此 `sys_login_log` 作为只追加日志不增加 `update_time`。
+
+## 2026-08-03 A 首轮静态审查
+
+A 的结论为“需修改，暂不允许提交、推送或执行”。C 需要为 `sys_login_log` 增加 `idx_login_cleanup_create_time(create_time)` 和登录结果一致性 CHECK：成功日志必须有 `user_id` 且 `failure_code` 为空，失败日志必须有 `failure_code`；同时明确 30 天物理删除是相对于“审计记录不得物理删除”规范的有限保留期例外。
+
+C 修订后只重新私下提交草案。A 负责固化最终 SQL、完成 AI 只读复核和空 MySQL 8.4 验证，并由 A 将验证通过的最终文件直提 `dev`。
 
 ## 2026-08-03 C 确认隐私政策处理
 

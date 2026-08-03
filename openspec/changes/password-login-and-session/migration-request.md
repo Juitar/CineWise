@@ -15,7 +15,7 @@
 
 - `V006` 一次创建当前密码登录必需的 `sys_user`、`sys_login_log`，两表同属认证模块且需要一起完成真实登录验收，无需再拆成两个版本。
 - 注册和邮箱验证码不在本次 OpenSpec 范围；后续 `sys_email_verify_code`、`sys_registration_invite`、`sys_registration_invite_use` 随注册变更申请新的 Flyway 版本，不提前放入 `V006`。
-- A 提供最终 SQL 前可以按评审结论调整草案；`V006` 一旦共享或执行，后续修正只能新增向前迁移，不得修改历史文件。
+- C 在本地编写 SQL 草案并按 A 的评审结论调整；A 审查通过前不得提交、推送或执行。`V006` 一旦共享或执行，后续修正只能新增向前迁移，不得修改历史文件。
 - `V006` 不包含演示账号、真实邮箱、密码散列或其他种子数据。
 
 ## 2. T01 `sys_user`
@@ -78,17 +78,19 @@
 - 普通索引：`idx_login_user_time (user_id, create_time)`。
 - 普通索引：`idx_login_result_time (success, create_time)`。
 - 普通索引：`idx_login_trace (trace_id)`。
+- 清理索引：`idx_login_cleanup_create_time (create_time)`。
 - 建议 CHECK：`login_type IN ('PASSWORD','ADMIN_PASSWORD')`。
 - 建议 CHECK：`success IN (0,1)`。
+- 登录结果一致性 CHECK：成功日志必须满足 `user_id IS NOT NULL AND failure_code IS NULL`；失败日志必须满足 `failure_code IS NOT NULL`，失败时 `user_id` 可以为空或保留已识别账号 ID。
 - `user_id` 只做逻辑关联，不建立外键。
 - 表显式使用 `InnoDB`、`utf8mb4`、`utf8mb4_0900_ai_ci`。
 
 ### 3.3 生命周期
 
-- 默认保留 30 天，通过配置管理。
-- 清理任务由认证 Application Service 执行条件删除；不在迁移 SQL 中加入定时清理逻辑。
+- 默认保留 30 天，通过正整数配置管理；到期记录由认证 Application Service 按 `create_time` 条件物理删除，不在迁移 SQL 中加入定时清理逻辑。
 - 登录日志只用于安全审计和排查，不作为用户会话是否有效的依据。
 - 本表是只追加、不可修改的审计日志，因此只保留 `create_time`，不增加没有业务含义的 `update_time`；A 已确认该只追加表例外。
+- 30 天到期物理删除是“订单、支付、电子票、退款和审计记录不得物理删除”通用规范的有限保留期例外。该例外仅适用于 `sys_login_log`，因为它不承载交易事实；30 天内不得随意物理删除，也不提供按用户或单条日志删除的业务入口，不影响交易审计记录的长期保留要求。
 
 ## 4. 非迁移演示账号初始化
 
@@ -104,16 +106,17 @@
 
 1. 空 MySQL 8.4 执行迁移成功，Flyway 历史版本正确。
 2. 重复执行不重复建表、不修改历史迁移。
-3. 两张表的字段类型、可空性、默认值、主键、索引和 CHECK 与确认后的本文件一致。
+3. 两张表的字段类型、可空性、默认值、主键、索引和 CHECK 与确认后的本文件一致，包含 `idx_login_cleanup_create_time`。
 4. 表及所有字符串列实际使用 `utf8mb4_0900_ai_ci`。
 5. 两个并发请求插入同一规范化邮箱时，唯一索引只允许一个成功。
 6. `token_version` 和 `version` 不允许负数；非法角色、账号状态、登录类型和布尔值被 CHECK 拒绝。
-7. 登录失败日志允许 `user_id=NULL`，成功日志能够按用户和时间查询。
+7. 成功日志缺少 `user_id` 或包含 `failure_code` 时被拒绝；失败日志缺少 `failure_code` 时被拒绝；失败日志允许 `user_id=NULL`。
 8. 不存在外键、真实账号、密码、JWT、邀请码或其他演示业务数据。
 
 ## 6. 当前确认状态
 
 - C 已确认：本次只需要 T01、T05，不创建 T02-T04。
-- C 已确认：规范化邮箱存储、`NORMAL/DISABLED/LOCKED`、登录日志只保留 `create_time`、30 天保留期，以及支持假/真邮箱的环境变量认证种子。
+- C 已确认：规范化邮箱存储、`NORMAL/DISABLED/LOCKED`、登录日志只保留 `create_time`、30 天有限保留期物理删除例外，以及支持假/真邮箱的环境变量认证种子。
 - A 已确认：为本次认证迁移分配 `V006`，文件名为 `V006__create_auth_user_and_login_log_tables.sql`，且只包含 `sys_user`、`sys_login_log`，不包含演示账号或其他种子数据；`sys_login_log` 作为只追加日志不增加 `update_time`。
-- 待 A 完成：最终 SQL、静态审查、AI 只读复核、CHECK 兼容性、空 MySQL 8.4 验证和执行授权。
+- C 负责：按 A 的静态审查意见修订本地 SQL 草案，保持未提交、未推送、未执行，并重新私下交给 A。
+- 待 A 完成：固化最终 SQL、AI 只读复核、CHECK 兼容性、空 MySQL 8.4 验证，并由 A 将验证通过的最终文件直提 `dev`。

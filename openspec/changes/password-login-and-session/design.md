@@ -1,6 +1,6 @@
 ## Context
 
-当前后端只有默认拒绝的 `SecuritySkeletonConfiguration`、`CurrentUserAccessor` 公共端口和认证包占位；前端已有唯一原生 `fetch` REST 客户端、双组件库和响应式布局基础。认证表尚无 Flyway 迁移，且 `DATABASE_MIGRATION_REVIEW.md` 要求 C 先确认字段、A 分配版本并负责最终 SQL 与空 MySQL 验证。
+当前后端只有默认拒绝的 `SecuritySkeletonConfiguration`、`CurrentUserAccessor` 公共端口和认证包占位；前端已有唯一原生 `fetch` REST 客户端、双组件库和响应式布局基础。认证表尚无 Flyway 迁移，且 `DATABASE_MIGRATION_REVIEW.md` 要求 C 先确认字段、A 分配版本并负责最终审查、执行授权与空 MySQL 验证。
 
 前端文档存在两类需要在本变更中明确的旧描述：部分文档仍要求 Umi `request`，但前端主设计已记录撤回 request 插件并使用原生 `fetch`；后端总系分仍使用 `CurrentUser.userId/email`，而较新的认证设计要求 REST 返回 `id/emailMasked`。
 
@@ -16,7 +16,7 @@
 **Non-Goals:**
 
 - 不实现邮箱验证码、注册、邀请码、重置密码、邮件 Provider、账号注销和个人资料编辑。
-- 不创建 Flyway 版本、不生成或执行最终迁移 SQL、不向共享数据库写入演示账号。
+- 不自行分配 Flyway 版本；A 审查通过前不提交、推送或执行迁移 SQL，不向共享数据库写入演示账号。
 - 不修改 A/B/D 业务 DTO，不为 REST 再建立 Umi request 或其他请求封装。
 
 ## Decisions
@@ -77,9 +77,15 @@ Controller 只校验请求、调用 Application Service、设置或清除 Cookie
 
 登录页可以提供协议链接和说明，但不能把“点击登录”持久化成新同意，也不能在政策升级后自动覆盖旧版本。未来政策版本变化时，需要新增显式重新确认接口和页面状态；该流程不通过修改 V006 或登录 DTO 临时实现。
 
+### 11. 登录审计日志采用 30 天有限保留期
+
+`sys_login_log` 是只追加、不可修改的登录安全审计日志，但不是订单、支付、电子票或退款等必须长期保留的交易审计记录。本变更明确将它列为“审计记录不得物理删除”通用规范的有限保留期例外：记录创建后默认保留 30 天，到期后由认证 Application Service 按 `create_time` 条件物理删除。
+
+清理只能删除超过配置保留期的记录，不能提供按用户或单条记录随意删除的业务入口；保留期配置必须为正数，默认值为 30 天。清理查询使用 `idx_login_cleanup_create_time(create_time)`，不在 Flyway SQL 中创建事件、存储过程或定时任务。该例外不改变交易审计记录不得物理删除的要求。
+
 ## Risks / Trade-offs
 
-- [认证表迁移未完成，真实数据库无法登录] → C 只提交字段与场景材料；A 分配版本、生成或审核 SQL 并完成空 MySQL 验证后再做真实联调。
+- [认证表迁移未完成，真实数据库无法登录] → A 已分配版本，C 编写和修订本地 SQL 草案；A 固化最终 SQL、完成空 MySQL 验证并直提 `dev` 后再进行真实联调。
 - [登出导致同账号所有设备退出] → 当前优先保证 Redis 故障时旧 JWT 也失效，并在用户提示和测试中明确；需要单设备登出时另建变更。
 - [每次受保护请求读取用户表增加延迟] → 首版先保证禁用和 tokenVersion 立即生效；达到性能瓶颈后再引入不降低安全性的短期缓存。
 - [本地 HTTP 与 Secure Cookie 冲突] → 生产默认始终 Secure，本地通过独立环境配置关闭并在部署测试中验证 HTTPS Cookie。
@@ -89,7 +95,7 @@ Controller 只校验请求、调用 Application Service、设置或清除 Cookie
 ## Migration Plan
 
 1. C 在本变更中确认 `sys_user`、`sys_login_log` 字段、索引、保留期和兼容要求，并向 A 提交迁移申请材料。
-2. A 已分配 `V006__create_auth_user_and_login_log_tables.sql`；A 审核或生成最终 SQL，AI 仅按迁移规范做只读复核。
-3. A 在独立空 MySQL 8.4 中执行迁移、重复执行、索引、约束、字符集与排序规则验证并保存证据。
+2. A 已分配 `V006__create_auth_user_and_login_log_tables.sql`；C 编写和修订本地 SQL 草案并私下交给 A，C 不提交、不推送、不执行。
+3. A 固化最终 SQL并完成 AI 只读复核后，在独立空 MySQL 8.4 中执行迁移、重复执行、索引、约束、字符集与排序规则验证并保存证据，由 A 将验证通过的最终文件直提 `dev`。
 4. 合并后端认证实现和前端登录功能，使用测试账号完成用户/管理员登录、刷新恢复、登出、401/403 和 CSRF 冒烟。
 5. 若应用需要回滚，回滚应用版本并保留向前兼容的认证表；已经执行的迁移不改名、不修改、不逆向覆盖。
