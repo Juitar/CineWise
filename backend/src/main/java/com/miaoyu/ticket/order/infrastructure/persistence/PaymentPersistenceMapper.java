@@ -118,4 +118,20 @@ public interface PaymentPersistenceMapper {
             )
             """)
     int insertTicket(@Param("row") TicketInsertRow row);
+
+    /** 票状态和版本共同保证重复退款不会再次修改电子票。 */
+    @Update("""
+            UPDATE electronic_ticket
+               SET status = 'REFUNDED',
+                   invalidated_time = #{invalidatedAt},
+                   version = version + 1,
+                   update_time = #{invalidatedAt}
+             WHERE id = #{ticketId}
+               AND status = 'VALID'
+               AND version = #{expectedVersion}
+            """)
+    int refundTicket(
+            @Param("ticketId") long ticketId,
+            @Param("expectedVersion") int expectedVersion,
+            @Param("invalidatedAt") LocalDateTime invalidatedAt);
 }

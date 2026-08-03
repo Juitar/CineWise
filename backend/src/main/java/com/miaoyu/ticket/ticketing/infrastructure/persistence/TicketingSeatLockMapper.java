@@ -85,4 +85,39 @@ public interface TicketingSeatLockMapper {
     int sellLockedSeats(
             @Param("orderNo") String orderNo,
             @Param("soldAt") LocalDateTime soldAt);
+
+    /** 影响查询只统计订单快照引用且仍为SOLD的座位。 */
+    @Select("""
+            SELECT COUNT(*)
+              FROM show_seat ss
+             WHERE ss.status = 'SOLD'
+               AND ss.id IN (
+                   SELECT tos.show_seat_id
+                     FROM ticket_order_seat tos
+                    WHERE tos.order_id = #{orderId}
+               )
+            """)
+    int countSoldSeats(@Param("orderId") long orderId);
+
+    /**
+     * 订单座位快照限定资源范围，SOLD条件保证重复调用不会释放其他状态。
+     * 影响行数由退款事务与订单票数比较，部分更新会触发整笔事务回滚。
+     */
+    @Update("""
+            UPDATE show_seat
+               SET status = 'AVAILABLE',
+                   lock_order_no = NULL,
+                   lock_expire_time = NULL,
+                   version = version + 1,
+                   update_time = #{refundedAt}
+             WHERE status = 'SOLD'
+               AND id IN (
+                   SELECT tos.show_seat_id
+                     FROM ticket_order_seat tos
+                    WHERE tos.order_id = #{orderId}
+               )
+            """)
+    int releaseSoldSeats(
+            @Param("orderId") long orderId,
+            @Param("refundedAt") LocalDateTime refundedAt);
 }
