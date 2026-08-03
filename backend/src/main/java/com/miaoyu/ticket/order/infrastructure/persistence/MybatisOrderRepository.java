@@ -170,6 +170,20 @@ public class MybatisOrderRepository implements OrderRepository {
         return mapper.expireOrder(orderId, expectedVersion, expiresAtOrBefore, updatedAt) == 1;
     }
 
+    @Override
+    public boolean markOrderPaying(
+            long orderId,
+            int expectedVersion,
+            LocalDateTime paidBefore,
+            LocalDateTime updatedAt) {
+        return mapper.markOrderPaying(orderId, expectedVersion, paidBefore, updatedAt) == 1;
+    }
+
+    @Override
+    public boolean markOrderPaid(long orderId, int expectedVersion, LocalDateTime paidAt) {
+        return mapper.markOrderPaid(orderId, expectedVersion, paidAt) == 1;
+    }
+
     private OrderSnapshot toSnapshot(OrderSnapshotRow row) {
         return new OrderSnapshot(
                 row.orderId(),

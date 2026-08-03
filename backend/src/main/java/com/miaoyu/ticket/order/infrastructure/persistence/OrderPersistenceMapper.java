@@ -306,4 +306,35 @@ public interface OrderPersistenceMapper {
             @Param("expectedVersion") int expectedVersion,
             @Param("expiresAtOrBefore") LocalDateTime expiresAtOrBefore,
             @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Update("""
+            UPDATE ticket_order
+               SET status = 'PAYING',
+                   version = version + 1,
+                   update_time = #{updatedAt}
+             WHERE id = #{orderId}
+               AND status = 'PENDING_PAYMENT'
+               AND expire_time > #{paidBefore}
+               AND version = #{expectedVersion}
+            """)
+    int markOrderPaying(
+            @Param("orderId") long orderId,
+            @Param("expectedVersion") int expectedVersion,
+            @Param("paidBefore") LocalDateTime paidBefore,
+            @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Update("""
+            UPDATE ticket_order
+               SET status = 'PAID',
+                   paid_time = #{paidAt},
+                   version = version + 1,
+                   update_time = #{paidAt}
+             WHERE id = #{orderId}
+               AND status = 'PAYING'
+               AND version = #{expectedVersion}
+            """)
+    int markOrderPaid(
+            @Param("orderId") long orderId,
+            @Param("expectedVersion") int expectedVersion,
+            @Param("paidAt") LocalDateTime paidAt);
 }
