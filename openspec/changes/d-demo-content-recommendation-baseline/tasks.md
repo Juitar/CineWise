@@ -15,7 +15,7 @@
 
 - [x] 1.1 D 已逐项确认 proposal、两份 spec 和 design 覆盖 Demo 内容、快照缓存、内部查询、固定候选和回归数据；确认日期：2026-08-02。
 - [x] 1.2 A 已确认 D 不创建 `movie_show`、票价、座位和库存，并确认共享固定数据、`ContentSummaryQueryPort` 和场次公开 Application 查询的协作方式；确认日期：2026-08-02。
-- [x] 1.3 B 已确认推荐工具名称、类型化 Command 和 `ToolResult<T>` 结果字段；确认结果已作为后续工具适配器输入；确认日期：2026-08-02。
+- [x] 1.3 B 已确认工具类 `RankMoviePlanTool`、`ToolRegistry.targetName=rankMoviePlan`、`RankMoviePlanCommand(movieId, cinemaId, date, timeFrom?, timeTo?)` 和 `ToolResult<T>` 公共结果字段；时段成对传入且 `timeFrom < timeTo`，不传用户或票务事实字段；确认日期：2026-08-03。
 - [x] 1.4 C 已确认前端展示所需的 `source/dataTime/expiresAt/isExpired/degraded/fallbackType` 字段和当前 REST 协作范围；确认日期：2026-08-02。
 - [x] 1.5 D 已确认本阶段文档通过，允许进入迁移阶段；确认日期：2026-08-02。
 
@@ -42,19 +42,19 @@
 
 ## 4. 第一版固定推荐候选
 
-- [ ] 4.1 D 建立 `fixed-rec-v1` 固定候选数据和类型化 Application DTO；验证方式：相同输入和固定时钟返回相同候选与顺序。
-- [ ] 4.2 D 实现固定候选查询，校验候选完整性、过期时间、两位小数价格和来源；验证方式：缺字段或过期候选不生成可购方案。
-- [ ] 4.3 D 在 A 的公开场次查询不可用或无可购结果时返回 `purchaseEligible=false` 和 `missingFactors=[SHOWTIME]`，不生成 `PLAN_CARD`；验证方式：结果中不存在 D 自行生成的 `showId`、价格和库存。
-- [ ] 4.4 A 的公开场次 Application 查询可用后，D 只引用返回的 `showId/movieId/cinemaId/price/startTime/expiresAt`；验证方式：固定候选与 A 的共享 ID 和事实字段一致，不维护第二份场次数据且不调用本应用 Controller。
-- [ ] 4.5 D 按 B 确认的工具名称和 Command 实现工具适配器，返回公共 `ToolResult<T>`；验证方式：工具不追问、不发布 SSE、不调用模型，也不访问 Mapper。
+- [x] 4.1 D 已建立 `fixed-rec-v1` 固定候选目录和类型化 Application DTO；固定时钟与相同输入下候选和顺序一致。验证：`FixedRecommendationQueryServiceTest` 通过，日期：2026-08-03。
+- [x] 4.2 D 已实现可购候选完整性、两位小数价格、来源和过期校验；缺字段、价格格式非法或 `expiresAt <= now` 均不通过，不生成可购方案。验证：`PurchaseCandidateValidatorTest` 通过，日期：2026-08-03。
+- [x] 4.3 D 已在未取得 A 场次事实时返回 `purchaseEligible=false`、`missingFactors=[SHOWTIME]` 的内容候选；结果不含 `showId`、价格、开场时间或库存，且不生成 `PLAN_CARD`。验证：`FixedRecommendationQueryServiceTest` 通过，日期：2026-08-03。
+- [x] 4.4 A 的公开场次 Application 查询已提供 `showId/movieId/cinemaId/basePrice/startTime/expiresAt`；D 仅通过 `ShowQueryService` 调用并将 `basePrice` 映射为两位小数 `price`，不维护第二份场次数据或调用 Controller。验证：`TicketingShowtimeQueryAdapterTest`、`FixedRecommendationQueryServiceTest` 通过，日期：2026-08-03。
+- [x] 4.5 D 已实现 `RankMoviePlanTool` 和 `RankMoviePlanCommand`，`targetName=rankMoviePlan`，返回公共 `ToolResult<T>`；工具只调用推荐 Application Service，不追问、不发布 SSE、不调用模型、不访问 Mapper。验证：`RankMoviePlanToolTest` 通过，日期：2026-08-03。
 
 ## 5. 测试数据与回归用例
 
-- [ ] 5.1 D 建立固定时钟、`demo-content-v1`、`fixed-rec-v1` 和期望结果夹具；验证方式：业务初始化和测试引用同一数据版本。
-- [ ] 5.2 D 编写内容单元测试，覆盖固定影片、固定影院、输入校验、来源封套和稳定排序；验证方式：相关测试全部通过。
-- [ ] 5.3 D 编写缓存和快照测试，覆盖缓存命中、缓存不可用、有效快照、允许的过期快照和全部不可用；验证方式：回退顺序、`303004` 和降级标识符合规格。
-- [ ] 5.4 D 编写固定推荐测试，覆盖可复现顺序、不完整候选、过期候选、A 场次查询不可用和引用 A 公开查询结果；验证方式：不存在虚构可购事实。
-- [ ] 5.5 D 建立第一版回归用例清单，包含 `caseId/module/priority/preconditions/input/mockProfile/expectedTool/expectedBusinessRefs/expectedResult/forbiddenResult/dataSourceExpectation/timeoutMs/owner`；验证方式：字段完整且不保存敏感输入。
+- [x] 5.1 D 已使用唯一 classpath `demo-content-v1`、`fixed-rec-v1` 和固定业务时钟建立测试夹具；内容种子、Demo Provider 与测试均读取同一目录版本。验证：相关定向测试通过，日期：2026-08-03。
+- [x] 5.2 D 已补齐内容单元测试，覆盖固定影片、固定影院、输入校验、来源封套和稳定排序。验证：`ContentQueryServiceTest`、`DemoContentProviderTest` 通过，日期：2026-08-03。
+- [x] 5.3 D 已补齐缓存和快照测试，覆盖缓存命中、Redis 读取失败按未命中回退、有效快照、允许的过期快照、超过陈旧期回退 Demo 和全部不可用。验证：回退顺序、`303004` 和降级标识测试通过，日期：2026-08-03。
+- [x] 5.4 D 已补齐固定推荐测试，覆盖可复现顺序、不完整候选、过期候选、A 场次查询不可用和引用 A 公开查询结果。验证：没有可购场次事实时不返回 `showId`、价格或可购卡片，日期：2026-08-03。
+- [x] 5.5 D 已建立第一版回归用例清单 `regression-cases.md`，字段完整且未包含敏感输入。验证：覆盖内容来源、缓存/快照、过期、`303004`、固定推荐及 A 场次不可用，日期：2026-08-03。
 - [ ] 5.6 D 在 A 已完成迁移验证的 MySQL 8 和 Redis 环境执行内容查询、缓存降级与推荐集成测试；验证方式：记录环境、命令、通过数、失败数和缺陷编号，不在此任务中执行 Flyway 结构迁移。
 
 ## 6. 验收与归档
