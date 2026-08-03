@@ -4,8 +4,11 @@ import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.miaoyu.ticket.auth.application.CurrentUser;
@@ -114,6 +117,12 @@ class ShowControllerIntegrationTest {
                 .andExpect(jsonPath("$.paths['/api/v1/orders/by-request/{clientRequestId}'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/orders/{orderNo}'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/orders/{orderNo}/cancel'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/orders/{orderNo}/payments'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/orders/{orderNo}/payments'].post.requestBody")
+                        .doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/v1/orders/{orderNo}/payment'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/tickets/{ticketId}'].get").exists())
+                .andExpect(content().string(not(containsString("paymentPassword"))))
                 .andExpect(jsonPath("$.paths['/api/v1/orders'].post.security[0].cookieAuth").isArray());
     }
 
