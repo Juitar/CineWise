@@ -65,6 +65,12 @@ public interface OrderRepository {
     /** 固定成功支付只能从PAYING完成到PAID。 */
     boolean markOrderPaid(long orderId, int expectedVersion, LocalDateTime paidAt);
 
+    /** 只有已支付订单可以进入退款处理中。 */
+    boolean markOrderRefunding(long orderId, int expectedVersion, LocalDateTime updatedAt);
+
+    /** 只有退款处理中订单可以完成退票并记录完成时间。 */
+    boolean markOrderRefunded(long orderId, int expectedVersion, LocalDateTime refundedAt);
+
     record OrderListCriteria(
             long userId,
             String orderNo,

@@ -32,13 +32,17 @@
 - [x] 完成重复/并发支付、支付与取消/过期竞争、归属回滚、跨用户和密码隔离测试。
 - [x] 定义`PaymentSucceededEvent`及发布端口，待D公开`cinemaArea`摘要端口后接通AFTER_COMMIT发布。
 - [ ] 待D通过公开Application API提供`cinemaArea`后，接通`PaymentSucceededEvent`的AFTER_COMMIT发布。
-- [ ] 实现退票确认、幂等退票和替代场次查询。
+- [x] 冻结退票影响、传统页面确认、原子退票、结果恢复和替代场次契约，确认复用V003且不新增SQL。
+- [x] 实现退票影响查询和传统页面二次确认后的REST退票入口，Agent `actionId`保留在Tool Adapter边界。
+- [x] 实现退款幂等快照、`PAID -> REFUNDING -> REFUNDED`、票失效和按订单明细安全释放`SOLD`座位。
+- [x] 实现退票结果恢复和同影片未来可售替代场次查询。
+- [x] 完成同键同参/异参、跨用户、状态/归属回滚、并发退票和结果未知恢复测试。
 - [ ] 完成OpenAPI、B/C联调JSON夹具以及并发、幂等、状态机、权限和恢复回归。
 
 ## 实现记录
 
 - 变更编号及模块：`ticketing-transaction-flow`，A的`ticketing/order`模块。
-- 需求/问题与修改范围：基于已执行V003和V005实现原子锁座建单、结果恢复、本人订单查询、幂等取消、可重复超时释放，以及固定成功Mock支付、支付结果恢复和唯一电子票；本阶段未新增或修改SQL。
-- 契约影响：新增已冻结的支付与电子票REST端点、`PaymentSucceededEvent`类型和发布端口；不修改C的认证、安全路由或场次/座位DTO，不修改任何历史迁移，也不占用C暂定的V006。事件实际发布仍等待D通过公开Application API提供`cinemaArea`。
-- 已执行的验证及结果：2026-08-03执行`openspec validate ticketing-transaction-flow --strict`和`git diff --check`通过；基于最新`origin/dev`执行`mvnw.cmd clean verify`通过，共45个测试、0失败、0错误、4个需显式MySQL环境变量的测试跳过，Checkstyle为0错误、SpotBugs为0缺陷，ArchUnit和JaCoCo通过。新增8个H2支付集成测试覆盖成功支付、原键和新键重放、跨订单幂等键冲突、到期拒绝、座位归属回滚、跨用户隔离、并发支付以及支付与取消/过期竞争；OpenAPI测试确认支付POST没有请求体且不含`paymentPassword`。本机MySQL 8.0.40独立库的支付并发测试结果为1条成功支付、1张电子票、订单`PAID`、座位`SOLD`，清理后支付、电子票、订单、订单座位和锁定座位均为0。此前20个用户竞争同座位结果仍为1个成功、19个返回`204001`，无超卖；V005云端验证及共享库迁移证据见`docs/V005_MIGRATION_VALIDATION_2026-08-02.md`和`docs/V005_SHARED_MIGRATION_2026-08-02.md`。
-- 未验证事项、剩余风险和后续负责人：C的正式JWT Cookie和订单安全路由尚未合入，A仅通过`CurrentUserAccessor`测试替身验证本人权限；D的公开内容摘要端口尚不包含`cinemaArea`，因此A只完成冻结事件类型和发布端口，未跨模块读取D私表或伪造区域，待D补齐公开字段后再接通事务提交后的事件发布。
+- 需求/问题与修改范围：基于已执行V003和V005实现原子锁座建单、本人订单生命周期、固定成功Mock支付、唯一电子票，以及退票影响、原子幂等退票、结果恢复和同影片替代场次；退票截止采用原场次严格未开场边界，本阶段未新增或修改SQL。
+- 契约影响：新增已冻结的支付、电子票、退票影响、退票写入/恢复和替代场次REST端点，以及`PaymentSucceededEvent`类型和发布端口；不修改C的认证、安全路由，不实现B的确认存储，不读取D私有持久层，不修改任何历史迁移，也不占用预留版本。传统页面REST拒绝非空Agent `actionId`，未来Tool Adapter须在调用A应用服务前由B校验确认。
+- 已执行的验证及结果：2026-08-03同步最新`origin/dev`后执行`openspec validate ticketing-transaction-flow --strict --no-interactive`和`git diff --check`通过；执行`mvnw.cmd clean verify`通过，共65个测试、0失败、0错误、5个需显式MySQL环境变量的测试跳过，Checkstyle为0错误、SpotBugs为0缺陷，ArchUnit和JaCoCo通过。新增7个H2退票集成测试覆盖影响查询、成功与原键/新键重放、异参和跨订单幂等冲突、开场截止、Agent确认隔离、票/座位不一致回滚、跨用户、并发唯一退款、结果恢复和替代场次过滤；OpenAPI已包含四个退票端点。本机MySQL 8.0.40隔离库`cinewise_ticketing_concurrency_check`此前已验证两个并发退票最终仅1条退款，订单`REFUNDED`、电子票`REFUNDED`、座位`AVAILABLE`，清理后退款、支付、电子票、订单、订单座位和非可用座位均为0。按V1.6口径，本次新增生产代码有效注释率约30.67%，A的`order/ticketing`模块由基线约5.58%提升到13.35%。此前支付、20请求竞争同座位及V005迁移证据继续有效。
+- 未验证事项、剩余风险和后续负责人：本次同步后当前`.env`不指向退票专用隔离库，因此未重跑会清理交易夹具的MySQL退票测试；C正式JWT Cookie和订单安全路由仍需联调；B确认端口未接入，当前传统REST拒绝非空`actionId`；D公开内容摘要仍缺`cinemaArea`，支付事件实际发布继续等待D。全后端历史生产代码粗测有效注释率约10.3%，虽然本次新增达到30%且未降低A模块比例，但最终全仓30%门槛仍需A/B/C/D按各自Owner边界共同补齐，不能在本退票PR跨模块批量改写。

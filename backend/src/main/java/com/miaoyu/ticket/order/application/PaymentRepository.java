@@ -24,6 +24,9 @@ public interface PaymentRepository {
 
     void insertTicket(NewTicket ticket);
 
+    /** 退款事务只能将当前仍有效的电子票失效为REFUNDED。 */
+    boolean refundTicket(long ticketId, int expectedVersion, LocalDateTime invalidatedAt);
+
     record PaymentSnapshot(
             long paymentId,
             String paymentNo,

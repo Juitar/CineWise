@@ -337,4 +337,35 @@ public interface OrderPersistenceMapper {
             @Param("orderId") long orderId,
             @Param("expectedVersion") int expectedVersion,
             @Param("paidAt") LocalDateTime paidAt);
+
+    /** 订单状态和版本共同防止重复退票或其他流程覆盖已支付终态。 */
+    @Update("""
+            UPDATE ticket_order
+               SET status = 'REFUNDING',
+                   version = version + 1,
+                   update_time = #{updatedAt}
+             WHERE id = #{orderId}
+               AND status = 'PAID'
+               AND version = #{expectedVersion}
+            """)
+    int markOrderRefunding(
+            @Param("orderId") long orderId,
+            @Param("expectedVersion") int expectedVersion,
+            @Param("updatedAt") LocalDateTime updatedAt);
+
+    /** 只有同一事务已经进入REFUNDING的订单才能形成退款终态。 */
+    @Update("""
+            UPDATE ticket_order
+               SET status = 'REFUNDED',
+                   refunded_time = #{refundedAt},
+                   version = version + 1,
+                   update_time = #{refundedAt}
+             WHERE id = #{orderId}
+               AND status = 'REFUNDING'
+               AND version = #{expectedVersion}
+            """)
+    int markOrderRefunded(
+            @Param("orderId") long orderId,
+            @Param("expectedVersion") int expectedVersion,
+            @Param("refundedAt") LocalDateTime refundedAt);
 }

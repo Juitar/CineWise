@@ -184,6 +184,16 @@ public class MybatisOrderRepository implements OrderRepository {
         return mapper.markOrderPaid(orderId, expectedVersion, paidAt) == 1;
     }
 
+    @Override
+    public boolean markOrderRefunding(long orderId, int expectedVersion, LocalDateTime updatedAt) {
+        return mapper.markOrderRefunding(orderId, expectedVersion, updatedAt) == 1;
+    }
+
+    @Override
+    public boolean markOrderRefunded(long orderId, int expectedVersion, LocalDateTime refundedAt) {
+        return mapper.markOrderRefunded(orderId, expectedVersion, refundedAt) == 1;
+    }
+
     private OrderSnapshot toSnapshot(OrderSnapshotRow row) {
         return new OrderSnapshot(
                 row.orderId(),

@@ -2,6 +2,7 @@ package com.miaoyu.ticket.ticketing.infrastructure.persistence;
 
 import com.miaoyu.ticket.ticketing.application.SeatLockRepository;
 import com.miaoyu.ticket.ticketing.application.SeatReleaseRepository;
+import com.miaoyu.ticket.ticketing.application.SeatRefundRepository;
 import com.miaoyu.ticket.ticketing.application.SeatSaleRepository;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -10,7 +11,8 @@ import org.springframework.stereotype.Repository;
 
 /** 将座位锁定持久化投影显式映射为应用层类型。 */
 @Repository
-public class MybatisSeatLockRepository implements SeatLockRepository, SeatReleaseRepository, SeatSaleRepository {
+public class MybatisSeatLockRepository
+        implements SeatLockRepository, SeatReleaseRepository, SeatSaleRepository, SeatRefundRepository {
 
     private final TicketingSeatLockMapper mapper;
 
@@ -56,5 +58,15 @@ public class MybatisSeatLockRepository implements SeatLockRepository, SeatReleas
     @Override
     public int sellLockedSeats(String orderNo, LocalDateTime soldAt) {
         return mapper.sellLockedSeats(orderNo, soldAt);
+    }
+
+    @Override
+    public int countSoldSeats(long orderId) {
+        return mapper.countSoldSeats(orderId);
+    }
+
+    @Override
+    public int releaseSoldSeats(long orderId, LocalDateTime refundedAt) {
+        return mapper.releaseSoldSeats(orderId, refundedAt);
     }
 }

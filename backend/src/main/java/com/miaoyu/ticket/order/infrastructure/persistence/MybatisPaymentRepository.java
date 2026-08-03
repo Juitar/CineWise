@@ -72,6 +72,11 @@ public class MybatisPaymentRepository implements PaymentRepository {
         }
     }
 
+    @Override
+    public boolean refundTicket(long ticketId, int expectedVersion, LocalDateTime invalidatedAt) {
+        return mapper.refundTicket(ticketId, expectedVersion, invalidatedAt) == 1;
+    }
+
     private PaymentSnapshot toPaymentSnapshot(PaymentSnapshotRow row) {
         return new PaymentSnapshot(
                 row.paymentId(),
