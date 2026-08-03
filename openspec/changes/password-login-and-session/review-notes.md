@@ -31,7 +31,7 @@ D 根据《前端应用系统设计》和旧认证设计提出普通 REST 使用
 
 A 正式为本次认证迁移分配 Flyway `V006`，预计文件为 `V006__create_auth_user_and_login_log_tables.sql`。该迁移只包含 `sys_user`、`sys_login_log`，不包含演示账号或其他种子数据；`V005` 已由票务迁移占用，不得重复使用。
 
-最终 SQL、静态审查、AI 只读复核和空 MySQL 8.4 验证由 A 负责，C 不自行生成、修改或执行最终迁移。A 仍需确认 `sys_login_log` 作为只追加日志不增加 `update_time` 的例外。
+最终 SQL、静态审查、AI 只读复核和空 MySQL 8.4 验证由 A 负责，C 不自行生成、修改或执行最终迁移。C 补充确认：A 的其他确认项按默认同意处理，因此 `sys_login_log` 作为只追加日志不增加 `update_time`。
 
 ## 2026-08-03 C 确认隐私政策处理
 

@@ -4,8 +4,8 @@
 - [x] 1.2 C 对照当前代码和前端主设计确认普通 REST 保留唯一原生 `fetch` 客户端，不引入 Umi request 插件。
 - [x] 1.3 D 确认 `GET /api/v1/auth/csrf`、`X-XSRF-TOKEN`、内存保存、公共请求层统一加 Header、写请求不自动重放和业务 DTO 不变。
 - [x] 1.4 C/D 确认 REST `CurrentUser` 使用 `id/emailMasked`，内部安全上下文继续使用 `userId/role/tokenVersion`，不得直接返回内部 record。
-- [ ] 1.5 A/B 审查 CSRF 公共接口、服务端校验、登录/登出换新、`201009` 处理和浏览器写请求接入方式。
-- [x] 1.6 C 确认 `sys_user`、`sys_login_log` 的字段、索引、可空性、状态、30 天登录日志保留期和兼容要求；`sys_login_log` 不增加 `update_time`，待 A 批准只追加表例外。
+- [x] 1.5 A/B 已审查 CSRF 公共接口、服务端校验、登录/登出换新、`201009` 处理和浏览器写请求接入方式。
+- [x] 1.6 C 已确认 `sys_user`、`sys_login_log` 的字段、索引、可空性、状态、30 天登录日志保留期和兼容要求；A 已确认 `sys_login_log` 作为只追加日志不增加 `update_time`。
 - [x] 1.7 A 已为 `sys_user`、`sys_login_log` 正式分配 `V006__create_auth_user_and_login_log_tables.sql`；`V005` 已被票务占用，C 不自行生成、修改或执行最终 SQL。
 - [x] 1.8 C 确认注册时隐私政策默认未勾选并显式记录版本；后续登录只沿用已有记录，不自动产生或升级隐私同意。
 
@@ -52,7 +52,7 @@
 
 - [ ] 6.1 修正认证设计和前端应用设计中残留的 Umi `request` 描述，统一为现有原生 `fetch` 公共客户端。
 - [ ] 6.2 修正后端总系分中认证 REST `CurrentUser.userId/email` 和登录详细接口缺少 `clientRequestId` 的旧描述。
-- [ ] 6.3 A 完成 `V006` 最终 SQL、只追加日志例外确认、静态审查和 AI 只读复核；C 不自行修改或执行迁移。
+- [ ] 6.3 A 完成 `V006` 最终 SQL、静态审查和 AI 只读复核；C 不自行修改或执行迁移。
 - [ ] 6.4 A 在独立空 MySQL 8.4 验证迁移、重复执行、字段、索引、约束、字符集和排序规则，并记录证据。
 - [ ] 6.5 使用受控测试账号完成用户/管理员真实 MySQL 登录、刷新恢复、登出、401/403、CSRF 和 Cookie 冒烟。
 - [ ] 6.6 执行 `openspec validate password-login-and-session --strict`、后端 `mvnw.cmd verify`、前端 `pnpm check` 和相关 E2E，并记录实际结果。

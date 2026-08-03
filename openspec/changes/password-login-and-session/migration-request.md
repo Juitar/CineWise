@@ -88,7 +88,7 @@
 - 默认保留 30 天，通过配置管理。
 - 清理任务由认证 Application Service 执行条件删除；不在迁移 SQL 中加入定时清理逻辑。
 - 登录日志只用于安全审计和排查，不作为用户会话是否有效的依据。
-- 本表是只追加、不可修改的审计日志，因此只保留 `create_time`，不增加没有业务含义的 `update_time`；该例外需 A 在迁移评审中确认。
+- 本表是只追加、不可修改的审计日志，因此只保留 `create_time`，不增加没有业务含义的 `update_time`；A 已确认该只追加表例外。
 
 ## 4. 非迁移演示账号初始化
 
@@ -115,5 +115,5 @@
 
 - C 已确认：本次只需要 T01、T05，不创建 T02-T04。
 - C 已确认：规范化邮箱存储、`NORMAL/DISABLED/LOCKED`、登录日志只保留 `create_time`、30 天保留期，以及支持假/真邮箱的环境变量认证种子。
-- A 已确认：为本次认证迁移分配 `V006`，文件名为 `V006__create_auth_user_and_login_log_tables.sql`，且只包含 `sys_user`、`sys_login_log`，不包含演示账号或其他种子数据。
-- 待 A 完成：确认登录日志不含 `update_time` 的只追加表例外、最终 SQL、静态审查、AI 只读复核、CHECK 兼容性、空 MySQL 8.4 验证和执行授权。
+- A 已确认：为本次认证迁移分配 `V006`，文件名为 `V006__create_auth_user_and_login_log_tables.sql`，且只包含 `sys_user`、`sys_login_log`，不包含演示账号或其他种子数据；`sys_login_log` 作为只追加日志不增加 `update_time`。
+- 待 A 完成：最终 SQL、静态审查、AI 只读复核、CHECK 兼容性、空 MySQL 8.4 验证和执行授权。
