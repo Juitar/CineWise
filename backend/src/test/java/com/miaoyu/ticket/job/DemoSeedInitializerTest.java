@@ -2,6 +2,8 @@ package com.miaoyu.ticket.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.miaoyu.ticket.content.application.DemoContentCatalog;
+import com.miaoyu.ticket.content.application.DemoContentCatalogProvider;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
@@ -33,9 +35,13 @@ class DemoSeedInitializerTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private DemoContentCatalogProvider catalogProvider;
+
     @Test
-    void givenExistingSeedAndLockedSeat_whenSeedRunsAgain_thenCountsStayStableAndSeatStateIsPreserved() {
+    void givenLegacyDemoSeedAndLockedSeat_whenSeedRunsAgain_thenCountsStayStableAndSeatStateIsPreserved() {
         assertSeedCounts();
+        assertContentSourceIdentity();
         assertScheduleWindow();
 
         Long seatId = jdbcTemplate.queryForObject("SELECT MIN(id) FROM show_seat", Long.class);
@@ -49,9 +55,11 @@ class DemoSeedInitializerTest {
                 """, Timestamp.from(FIXED_INSTANT.plusSeconds(900)), seatId);
         assertThat(updated).isOne();
 
+        // 第二次执行必须只查回既有内容和票务引用，不能覆盖已经锁定的座位交易状态。
         initializer.initialize();
 
         assertSeedCounts();
+        assertContentSourceIdentity();
         Map<String, Object> seat = jdbcTemplate.queryForMap("""
                 SELECT status, lock_order_no, version
                   FROM show_seat
@@ -62,12 +70,37 @@ class DemoSeedInitializerTest {
         assertThat(((Number) seat.get("VERSION")).intValue()).isEqualTo(7);
     }
 
+    @Test
+    void givenDemoCatalog_whenLoaded_thenItContainsOnlyStableSourceIdsAndNoDatabaseIds() {
+        DemoContentCatalog catalog = catalogProvider.load();
+
+        assertThat(catalog.version()).isEqualTo("demo-content-v1");
+        assertThat(catalog.source()).isEqualTo("DEMO_CONTENT");
+        assertThat(catalog.movies()).hasSize(10)
+                .extracting(movie -> movie.sourceMovieId())
+                .doesNotHaveDuplicates();
+        assertThat(catalog.cinemas()).hasSize(4)
+                .extracting(cinema -> cinema.sourceCinemaId())
+                .doesNotHaveDuplicates();
+    }
+
     private void assertSeedCounts() {
         assertThat(count("movie")).isEqualTo(10);
         assertThat(count("cinema")).isEqualTo(4);
         assertThat(count("auditorium")).isEqualTo(8);
         assertThat(count("movie_show")).isEqualTo(168);
         assertThat(count("show_seat")).isEqualTo(13_440);
+    }
+
+    private void assertContentSourceIdentity() {
+        assertThat(countBySource("movie")).isEqualTo(10);
+        assertThat(countBySource("cinema")).isEqualTo(4);
+    }
+
+    private long countBySource(String tableName) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM " + tableName + " WHERE source = 'demo-seed'",
+                Long.class);
     }
 
     private void assertScheduleWindow() {

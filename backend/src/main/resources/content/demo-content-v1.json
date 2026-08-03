@@ -1,0 +1,23 @@
+{
+  "version": "demo-content-v1",
+  "source": "DEMO_CONTENT",
+  "sourceType": "MOCK",
+  "movies": [
+    {"sourceMovieId": "mock-movie-01", "title": "星河远征", "genresJson": "[\"科幻\",\"冒险\"]", "durationMinutes": 128, "rating": 8.6},
+    {"sourceMovieId": "mock-movie-02", "title": "夏日回声", "genresJson": "[\"剧情\",\"青春\"]", "durationMinutes": 112, "rating": 8.1},
+    {"sourceMovieId": "mock-movie-03", "title": "云端来信", "genresJson": "[\"爱情\",\"剧情\"]", "durationMinutes": 105, "rating": 7.9},
+    {"sourceMovieId": "mock-movie-04", "title": "午夜追光", "genresJson": "[\"悬疑\",\"犯罪\"]", "durationMinutes": 118, "rating": 8.3},
+    {"sourceMovieId": "mock-movie-05", "title": "小城奇遇", "genresJson": "[\"喜剧\",\"家庭\"]", "durationMinutes": 101, "rating": 7.8},
+    {"sourceMovieId": "mock-movie-06", "title": "深海之歌", "genresJson": "[\"动画\",\"奇幻\"]", "durationMinutes": 96, "rating": 8.5},
+    {"sourceMovieId": "mock-movie-07", "title": "长风万里", "genresJson": "[\"动作\",\"历史\"]", "durationMinutes": 132, "rating": 8.0},
+    {"sourceMovieId": "mock-movie-08", "title": "时间拼图", "genresJson": "[\"科幻\",\"悬疑\"]", "durationMinutes": 121, "rating": 8.4},
+    {"sourceMovieId": "mock-movie-09", "title": "山野星光", "genresJson": "[\"纪录\",\"自然\"]", "durationMinutes": 89, "rating": 8.7},
+    {"sourceMovieId": "mock-movie-10", "title": "周末乐队", "genresJson": "[\"音乐\",\"喜剧\"]", "durationMinutes": 108, "rating": 7.7}
+  ],
+  "cinemas": [
+    {"sourceCinemaId": "mock-cinema-01", "name": "妙语影城·滨江店", "cityCode": "330100", "area": "滨江区", "address": "江南大道88号", "longitude": 120.2120100, "latitude": 30.2084000},
+    {"sourceCinemaId": "mock-cinema-02", "name": "妙语影城·西湖店", "cityCode": "330100", "area": "西湖区", "address": "文三路168号", "longitude": 120.1302600, "latitude": 30.2741500},
+    {"sourceCinemaId": "mock-cinema-03", "name": "妙语影城·拱墅店", "cityCode": "330100", "area": "拱墅区", "address": "湖墅南路258号", "longitude": 120.1509500, "latitude": 30.3182200},
+    {"sourceCinemaId": "mock-cinema-04", "name": "妙语影城·上城店", "cityCode": "330100", "area": "上城区", "address": "钱江路66号", "longitude": 120.2057100, "latitude": 30.2573900}
+  ]
+}

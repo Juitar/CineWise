@@ -1,81 +1,79 @@
 package com.miaoyu.ticket.content.application;
 
 import com.miaoyu.ticket.common.config.ClockConfiguration;
-import com.miaoyu.ticket.common.config.SeedProperties;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
-import java.math.BigDecimal;
+import com.miaoyu.ticket.content.domain.CinemaContent;
+import com.miaoyu.ticket.content.domain.MovieContent;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 初始化内容模块拥有的固定演示数据，只向票务模块返回稳定标识，不暴露持久化对象。 */
+/**
+ * 初始化内容模块拥有的固定演示数据。
+ *
+ * <p>这里是 D 维护内容清单与 A 维护票务种子的唯一交接点。服务只返回已经落库的实际 ID，
+ * 使 A 无需读取内容表或了解 Provider、缓存等实现细节。</p>
+ *
+ * <p>来源 ID 才是跨环境稳定身份；数据库雪花 ID 只能在首次写入时生成，不能写进
+ * `demo-content-v1` 资源，否则不同空库会产生错误关联。</p>
+ *
+ * <p>本服务不生成影厅、场次、票价、座位或库存；这些票务事实仍由 A 在内容目录返回后创建。
+ * 内容种子失败时也不得绕过该边界直接写入票务表。</p>
+ */
 @Service
 public class ContentSeedApplicationService {
 
-    private static final List<MovieTemplate> MOVIES = List.of(
-            new MovieTemplate("mock-movie-01", "星河远征", "[\"科幻\",\"冒险\"]", 128, "8.6"),
-            new MovieTemplate("mock-movie-02", "夏日回声", "[\"剧情\",\"青春\"]", 112, "8.1"),
-            new MovieTemplate("mock-movie-03", "云端来信", "[\"爱情\",\"剧情\"]", 105, "7.9"),
-            new MovieTemplate("mock-movie-04", "午夜追光", "[\"悬疑\",\"犯罪\"]", 118, "8.3"),
-            new MovieTemplate("mock-movie-05", "小城奇遇", "[\"喜剧\",\"家庭\"]", 101, "7.8"),
-            new MovieTemplate("mock-movie-06", "深海之歌", "[\"动画\",\"奇幻\"]", 96, "8.5"),
-            new MovieTemplate("mock-movie-07", "长风万里", "[\"动作\",\"历史\"]", 132, "8.0"),
-            new MovieTemplate("mock-movie-08", "时间拼图", "[\"科幻\",\"悬疑\"]", 121, "8.4"),
-            new MovieTemplate("mock-movie-09", "山野星光", "[\"纪录\",\"自然\"]", 89, "8.7"),
-            new MovieTemplate("mock-movie-10", "周末乐队", "[\"音乐\",\"喜剧\"]", 108, "7.7"));
-
-    private static final List<CinemaTemplate> CINEMAS = List.of(
-            new CinemaTemplate("mock-cinema-01", "妙语影城·滨江店", "滨江区", "江南大道88号", "120.2120100", "30.2084000"),
-            new CinemaTemplate("mock-cinema-02", "妙语影城·西湖店", "西湖区", "文三路168号", "120.1302600", "30.2741500"),
-            new CinemaTemplate("mock-cinema-03", "妙语影城·拱墅店", "拱墅区", "湖墅南路258号", "120.1509500", "30.3182200"),
-            new CinemaTemplate("mock-cinema-04", "妙语影城·上城店", "上城区", "钱江路66号", "120.2057100", "30.2573900"));
-
+    /** 内容表写入端口，种子服务不得直接拼接 SQL。 */
     private final ContentSeedRepository repository;
+
+    /** D 的版本化清单读取端口；具体资源文件读取属于后续基础设施实现。 */
+    private final DemoContentCatalogProvider catalogProvider;
+
+    /** 首次缺少记录时生成内部主键，重复执行时该值不会覆盖已有主键。 */
     private final BusinessIdGenerator idGenerator;
-    private final SeedProperties properties;
+
+    /** 统一业务时钟，保证演示时间与自动化测试可以稳定复现。 */
     private final Clock clock;
 
     public ContentSeedApplicationService(
             ContentSeedRepository repository,
+            DemoContentCatalogProvider catalogProvider,
             BusinessIdGenerator idGenerator,
-            SeedProperties properties,
             Clock clock) {
         this.repository = repository;
+        this.catalogProvider = catalogProvider;
         this.idGenerator = idGenerator;
-        this.properties = properties;
         this.clock = clock;
     }
 
     /**
-     * 幂等补齐固定影片和影院；相同随机种子只影响数据排列，不改变业务唯一键。
+     * 幂等补齐固定影片和影院。
      *
-     * @return 供票务种子引用的影片、影院稳定标识
+     * <p>资源清单顺序可以作为 Demo 查询和测试夹具的稳定顺序，但不能把该顺序当作数据库
+     * 主键。Repository 按来源 ID 查回已经存在的记录，避免初始化第二次时改变 A 已引用的 ID。</p>
+     *
+     * @return 供票务种子引用的影片、影院实际数据库标识
      */
     @Transactional
     public ContentSeedCatalog ensureFixedSeed() {
         LocalDateTime generatedAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
-
-        List<MovieTemplate> movieOrder = new ArrayList<>(MOVIES);
-        List<CinemaTemplate> cinemaOrder = new ArrayList<>(CINEMAS);
-        Collections.shuffle(movieOrder, new Random(properties.fixedValue()));
-        Collections.shuffle(cinemaOrder, new Random(properties.fixedValue() ^ 0x5DEECE66DL));
-
-        List<ContentSeedCatalog.MovieRef> movies = movieOrder.stream()
+        DemoContentCatalog catalog = catalogProvider.load();
+        List<ContentSeedCatalog.MovieRef> movies = catalog.movies().stream()
                 .map(template -> ensureMovie(template, generatedAt))
                 .toList();
-        List<ContentSeedCatalog.CinemaRef> cinemas = cinemaOrder.stream()
+        List<ContentSeedCatalog.CinemaRef> cinemas = catalog.cinemas().stream()
                 .map(template -> ensureCinema(template, generatedAt))
                 .toList();
         return new ContentSeedCatalog(movies, cinemas);
     }
 
+    /**
+     * 写入或查回影片后再返回主键；票务侧只得到必要引用，不能获得内容持久化对象。
+     */
     private ContentSeedCatalog.MovieRef ensureMovie(
-            MovieTemplate template,
+            MovieContent template,
             LocalDateTime generatedAt) {
         long movieId = repository.ensureMovie(new ContentSeedRepository.MovieSeed(
                 idGenerator.nextId(),
@@ -83,43 +81,29 @@ public class ContentSeedApplicationService {
                 template.title(),
                 template.genresJson(),
                 template.durationMinutes(),
-                new BigDecimal(template.rating()),
+                template.rating(),
                 generatedAt,
                 null));
         return new ContentSeedCatalog.MovieRef(movieId, template.sourceMovieId(), template.durationMinutes());
     }
 
+    /**
+     * 影院与影片使用相同的幂等原则，保证同一来源 ID 不会对应两条内容记录。
+     */
     private ContentSeedCatalog.CinemaRef ensureCinema(
-            CinemaTemplate template,
+            CinemaContent template,
             LocalDateTime generatedAt) {
         long cinemaId = repository.ensureCinema(new ContentSeedRepository.CinemaSeed(
                 idGenerator.nextId(),
                 template.sourceCinemaId(),
                 template.name(),
-                "330100",
+                template.cityCode(),
                 template.area(),
                 template.address(),
-                new BigDecimal(template.longitude()),
-                new BigDecimal(template.latitude()),
+                template.longitude(),
+                template.latitude(),
                 generatedAt,
                 null));
         return new ContentSeedCatalog.CinemaRef(cinemaId, template.sourceCinemaId());
-    }
-
-    private record MovieTemplate(
-            String sourceMovieId,
-            String title,
-            String genresJson,
-            int durationMinutes,
-            String rating) {
-    }
-
-    private record CinemaTemplate(
-            String sourceCinemaId,
-            String name,
-            String area,
-            String address,
-            String longitude,
-            String latitude) {
     }
 }

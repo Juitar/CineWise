@@ -11,6 +11,10 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class JdbcContentSeedRepository implements ContentSeedRepository {
 
+    /**
+     * 数据库中的种子业务键必须保持历史值，已运行过旧种子的库依赖它查回既有影片和影院。
+     * `DEMO_CONTENT` 仅用于资源目录及后续查询结果的来源标识，不能替换这里的持久化键。
+     */
     private static final String SEED_SOURCE = "demo-seed";
     private static final String SOURCE_TYPE = "MOCK";
 
