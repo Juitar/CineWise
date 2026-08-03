@@ -28,7 +28,9 @@
 
 系统 SHALL 提供`GET /api/v1/shows`。REST场次页的`movieId`和`cinemaId` SHALL 必填，`date/timeFrom/timeTo` MAY 提供。接口 SHALL 返回`Result<List<ShowSummaryResponse>>`。
 
-`ShowSummaryResponse` SHALL 仅包含并完整包含：`showId/movieId/cinemaId/cinemaName/auditoriumId/auditoriumName/startTime/endTime/languageVersion/basePrice/availableSeatCount/status/dataType/stateVersion/updatedAt`。
+`ShowSummaryResponse` SHALL 仅包含并完整包含：`showId/movieId/cinemaId/cinemaName/auditoriumId/auditoriumName/startTime/endTime/expiresAt/languageVersion/basePrice/availableSeatCount/status/dataType/stateVersion/updatedAt`。公开Application查询中的`ShowSummaryView` SHALL 同步返回`expiresAt`。
+
+`expiresAt` SHALL 等于`startTime`，表示场次作为可购候选的最晚有效时刻。当业务时间`now>=expiresAt`时，消费者 MUST NOT 再生成可购方案。该字段 SHALL NOT 被解释为价格、余座或状态在此之前保持不变的承诺。
 
 #### Scenario: 查询未来可售场次
 
@@ -37,6 +39,14 @@
 - THEN 只返回匹配影片和影院、`ON_SALE`、未开场且处于未来7天窗口的场次
 - AND `availableSeatCount`等于查询快照中`AVAILABLE`座位数量
 - AND ID为字符串、`basePrice`为两位小数字符串、时间为带偏移ISO 8601
+- AND `expiresAt`等于`startTime`
+
+#### Scenario: 消费者判断场次候选已经失效
+
+- GIVEN 调用方持有A公开Application查询返回的场次候选
+- WHEN 当前业务时间大于或等于候选的`expiresAt`
+- THEN 调用方不得再将该场次作为可购方案
+- AND 调用方不得把`expiresAt`当作价格或余座有效期
 
 #### Scenario: 缺少必填条件
 

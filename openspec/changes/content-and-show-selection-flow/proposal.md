@@ -12,6 +12,7 @@ A 今日需要交付票务只读垂直切片：落地影片、影院、影厅、
 - 使用固定随机种子和业务唯一键生成可重复的Mock影片、影院、影厅、未来7天场次和完整座位图。
 - 实现`GET /api/v1/shows`和`GET /api/v1/shows/{showId}/seats`。
 - 冻结REST DTO的ID、金额、时间、状态和版本语义，并与前端契约保持一致。
+- 为公开场次Application查询和REST响应补充可购候选失效时间，供推荐消费者排除已开场场次。
 - 通过真实MySQL集成测试验证迁移、种子、场次查询和座位查询。
 
 ## 非目标
@@ -28,6 +29,7 @@ A 今日需要交付票务只读垂直切片：落地影片、影院、影厅、
 - C：确认`/shows`公开、`/shows/{showId}/seats`登录访问的安全规则，并提供可用认证上下文。
 - D：确认`movie/cinema`字段及`ContentSummaryQueryPort`边界；A不得直接访问D的Repository。
 - B：消费票务Application Service时使用独立的Agent Tool DTO，不复用Controller。
+- D：消费公开场次Application查询的`basePrice`和`expiresAt`，不复制场次、价格或库存事实。
 
 ## 验收
 
