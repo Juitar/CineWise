@@ -24,6 +24,11 @@ Seat:  AVAILABLE -> LOCKED -> SOLD
 
 Order: PENDING_PAYMENT -> PAYING -> PAID
        PENDING_PAYMENT -> CANCELLED | EXPIRED
+       PAID -> REFUNDING -> REFUNDED
+
+Ticket: VALID -> REFUNDED
+
+Refund: REQUESTED -> PROCESSING -> SUCCESS
 ```
 
 ## 模块与事务边界
@@ -89,11 +94,29 @@ V003已有`mock_payment`和`electronic_ticket`及每订单唯一约束，本阶�
 
 `TICKET_LOCK_MINUTES`与`ORDER_PAYMENT_MINUTES`默认15，范围5至30。为避免订单在座位锁失效后仍显示可支付，建单的座位锁与订单截止时间统一使用两个配置中的较早时间。所有时间通过注入`Clock`生成并按毫秒持久化。
 
+## 模拟退票与替代场次
+
+V003已有`refund_request`及每订单唯一、`user_id + idempotency_key`唯一约束，本阶段不新增或修改Flyway脚本。`impact_snapshot`保存退款金额、订单与票版本以及`clientRequestId/refundReason/actionId`的确定性请求快照，用于同键参数一致性校验和结果恢复，不存储JWT或B的确认内容。
+
+`POST /api/v1/orders/{orderNo}/refund-confirmation`是固定页面的只读影响查询。它按当前用户聚合订单、电子票和原场次，只有`PAID + VALID + startTime > now`返回可退影响；退款金额始终取订单`totalAmount`。传统页面在本地展示二次确认后调用退票接口。非空`actionId`属于未来Agent Tool路径，当前REST直接拒绝，A不实现B的确认存储或校验。
+
+`RefundTransaction`在同一本地事务中按固定顺序执行：
+
+1. 按当前用户和订单号锁定订单行，使重复退票和其他订单状态写入串行竞争。
+2. 查询当前幂等键及订单已有退款；原键异参或同键绑定其他订单返回`205005`，同订单已退款返回权威原结果。
+3. 重新校验订单`PAID`、电子票`VALID`、原场次未开场，并以订单金额生成影响快照。
+4. 写唯一`REQUESTED`退款，条件迁移订单到`REFUNDING`、退款到`PROCESSING`。
+5. 条件迁移电子票`VALID -> REFUNDED`，仅释放订单明细引用且仍为`SOLD`的全部座位；影响行数必须等于订单票数。
+6. 条件迁移退款到`SUCCESS`、订单到`REFUNDED`并写`refunded_time`。任一影响行数异常时抛出一致性异常，使整笔事务回滚。
+
+`GET /api/v1/orders/{orderNo}/refund`只读恢复原退款结果。`GET /api/v1/orders/{orderNo}/alternative-shows`先校验本人订单，再通过`ticketing/application`查询同影片、排除原场次、未来且`ON_SALE`的场次；日期范围最多七天，空结果返回空数组。替代场次查询不属于退款事务，失败或空结果不得回滚已成功退票。
+
 ## 测试策略
 
 - H2用于快速的REST、幂等和回滚回归。
 - 并发条件更新必须在真实MySQL 8环境验证；H2结果不作为防超卖的唯一证据。
 - 必测20请求抢同一座位、同键同参恢复、同键异参、多座位部分冲突全回滚、跨用户恢复不可见。
+- 退票必须覆盖影响查询、同键同参/异参、跨用户、订单/票/座位归属回滚、并发重复退票和响应丢失恢复；真实MySQL验证同一订单最多一条成功退款。
 
 ## 迁移策略
 
