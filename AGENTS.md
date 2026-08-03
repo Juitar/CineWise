@@ -110,7 +110,7 @@
 - 后端统一使用 Java 21、Spring Boot 3.5、Maven Wrapper。提交前在 `backend/` 执行 `./mvnw.cmd verify`；必须通过编译、测试、ArchUnit、Checkstyle、SpotBugs 和 JaCoCo。
 - 前端提交前按 `frontend/package.json` 中已有脚本执行安装、类型检查、Lint、单元测试和构建；如果前端工程尚未初始化，先由 C 按 OpenSpec 完成工程骨架和脚本，不得自行引入第二套构建入口。
 - 前端改动必须覆盖对应的加载、空数据、失败、无权限、重复提交、刷新恢复和响应式场景；Agent/SSE 改动还要覆盖重复事件、断线恢复、旧计划事件和未知事件降级。
-- 改动数据库、Redis、Docker、迁移、并发、SSE 或外部适配器时，除单元测试外，还要按 OpenSpec 在真实云端 MySQL、云端 MinIO（启用对象存储时）和 Docker Redis 环境验证。先执行 `docker compose config --quiet`，再按需运行 `docker compose up -d redis`；迁移首次验证只可连接独立的 `cinewise_migration_check` 库。
+- 改动数据库、Redis、Docker、迁移、并发、SSE 或外部适配器时，除单元测试外，还要按 OpenSpec 在真实共享 MySQL、共享 Redis、云端 MinIO（启用对象存储时）或 CI 一次性 Docker Redis 环境验证。应用 Compose 不创建基础服务；先执行 `docker compose config --quiet`，再通过后端整体健康检查确认必需连接。迁移首次验证只可连接独立的 `cinewise_migration_check` 库。
 - 不提交 `.env`、真实密钥、容器数据、构建产物、日志、调试代码或无归属 TODO。
 - 业务 ID 对外为十进制字符串；金额在 Java 内使用 `BigDecimal`，对外为两位小数字符串；业务时间通过注入的 `Clock` 获取。
 - API、错误码、OpenAPI、Mock、消费者夹具和测试必须随契约变更一起更新。
