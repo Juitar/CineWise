@@ -6,17 +6,23 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
+  workers: 2,
+  timeout: 60_000,
+  expect: {
+    timeout: 15_000,
+  },
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://127.0.0.1:8000',
+    baseURL: 'http://127.0.0.1:8123',
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'pnpm dev',
+    command: 'pnpm exec umi dev',
+    env: { ...process.env, PORT: '8123' },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
-    url: 'http://127.0.0.1:8000',
+    url: 'http://127.0.0.1:8123',
   },
   projects: [
     {

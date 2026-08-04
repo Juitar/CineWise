@@ -1,0 +1,11 @@
+.auth-guard-state {
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.auth-guard-alert {
+  width: min(100%, 480px);
+}

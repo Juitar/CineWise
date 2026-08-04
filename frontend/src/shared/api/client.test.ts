@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { apiRequest } from './client';
+import { apiRequest, clearCsrfToken, setUnauthorizedHandler } from './client';
 
 function createApiResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -15,6 +15,8 @@ describe('apiRequest', () => {
   const fetchMock = vi.fn<typeof fetch>();
 
   beforeEach(() => {
+    fetchMock.mockReset();
+    clearCsrfToken();
     vi.stubGlobal('fetch', fetchMock);
   });
 
@@ -74,7 +76,15 @@ describe('apiRequest', () => {
 
   it('写请求超时后标记结果未知，避免调用方重复提交', async () => {
     vi.useFakeTimers();
-    fetchMock.mockImplementation(
+    fetchMock.mockResolvedValueOnce(
+      createApiResponse({
+        code: 0,
+        message: 'success',
+        data: { token: 'csrf-timeout', headerName: 'X-XSRF-TOKEN' },
+        traceId: 'trace-csrf-timeout',
+      }),
+    );
+    fetchMock.mockImplementationOnce(
       (_input, requestInit) =>
         new Promise((_resolve, reject) => {
           requestInit?.signal?.addEventListener('abort', () => {
@@ -96,7 +106,110 @@ describe('apiRequest', () => {
       isResultUnknown: true,
     });
 
+    await Promise.resolve();
+    await Promise.resolve();
     await vi.advanceTimersByTimeAsync(50);
     await expectation;
+  });
+
+  it('并发写请求只获取一次 CSRF Token，并统一添加服务端指定的 Header', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        createApiResponse({
+          code: 0,
+          message: 'success',
+          data: { token: 'csrf-1', headerName: 'X-XSRF-TOKEN' },
+          traceId: 'trace-csrf',
+        }),
+      )
+      .mockImplementation(async () =>
+        createApiResponse({
+          code: 0,
+          message: 'success',
+          data: { accepted: true },
+          traceId: 'trace-write',
+        }),
+      );
+
+    await Promise.all([
+      apiRequest('/api/v1/orders/1/cancel', { method: 'POST' }),
+      apiRequest('/api/v1/orders/2/cancel', { method: 'POST' }),
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/v1/auth/csrf')).toHaveLength(1);
+    fetchMock.mock.calls.slice(1).forEach(([, requestInit]) => {
+      expect(new Headers(requestInit?.headers).get('X-XSRF-TOKEN')).toBe('csrf-1');
+    });
+  });
+
+  it('收到 201009 后换新 CSRF Token，但不自动重放原写请求', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        createApiResponse({
+          code: 0,
+          message: 'success',
+          data: { token: 'csrf-old', headerName: 'X-XSRF-TOKEN' },
+          traceId: 'trace-csrf-old',
+        }),
+      )
+      .mockResolvedValueOnce(
+        createApiResponse(
+          {
+            code: 201009,
+            message: 'csrf invalid',
+            data: null,
+            traceId: 'trace-csrf-invalid',
+          },
+          403,
+        ),
+      )
+      .mockResolvedValueOnce(
+        createApiResponse({
+          code: 0,
+          message: 'success',
+          data: { token: 'csrf-new', headerName: 'X-XSRF-TOKEN' },
+          traceId: 'trace-csrf-new',
+        }),
+      );
+
+    await expect(apiRequest('/api/v1/auth/logout', { method: 'POST' })).rejects.toMatchObject({
+      kind: 'HTTP',
+      code: 201009,
+      status: 403,
+    });
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/v1/auth/csrf',
+      '/api/v1/auth/logout',
+      '/api/v1/auth/csrf',
+    ]);
+  });
+
+  it('并发 401 只执行一次全局会话清理', async () => {
+    const handleUnauthorized = vi.fn(async () => {
+      await Promise.resolve();
+    });
+    const removeHandler = setUnauthorizedHandler(handleUnauthorized);
+    fetchMock.mockResolvedValue(
+      createApiResponse(
+        {
+          code: 201006,
+          message: 'session invalid',
+          data: null,
+          traceId: 'trace-401',
+        },
+        401,
+      ),
+    );
+
+    const results = await Promise.allSettled([
+      apiRequest('/api/v1/auth/me'),
+      apiRequest('/api/v1/orders'),
+    ]);
+
+    expect(results.every((result) => result.status === 'rejected')).toBe(true);
+    expect(handleUnauthorized).toHaveBeenCalledTimes(1);
+    removeHandler();
   });
 });

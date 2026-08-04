@@ -350,15 +350,20 @@
   }
 }
 
-.register-link-row {
+.login-policy-row {
   margin-top: 24px;
   color: #646a73;
   font-size: 14px;
   text-align: center;
 }
 
-.register-link-row a {
+.login-policy-row a {
   color: #635bff;
   font-weight: 500;
   text-decoration: none;
+}
+
+.login-recovery-btn {
+  min-height: 44px;
+  border-radius: var(--radius-btn);
 }

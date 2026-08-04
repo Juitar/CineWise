@@ -1,11 +1,15 @@
 import { Avatar, Dropdown, Input } from 'antd';
 import type { MenuProps } from 'antd';
-import React from 'react';
-import { Link } from 'umi';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'umi';
 
+import { useAuth } from '../../shared/auth/AuthProvider';
 import { MapPinIcon, SearchIcon, UserIcon } from '../../shared/components/icons/layout-icons';
 
 export const DesktopTopBar: React.FC = () => {
+  const navigate = useNavigate();
+  const { currentUser, logout, status } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const userMenu: MenuProps['items'] = [
     {
       key: 'profile',
@@ -16,9 +20,21 @@ export const DesktopTopBar: React.FC = () => {
     },
     {
       key: 'logout',
-      label: <span className="logout-menu-label">退出登录</span>,
+      disabled: isLoggingOut,
+      label: <span className="logout-menu-label">{isLoggingOut ? '正在退出' : '退出登录'}</span>,
     },
   ];
+
+  const handleUserMenuClick: MenuProps['onClick'] = ({ key }) => {
+    if (key !== 'logout' || isLoggingOut) {
+      return;
+    }
+    setIsLoggingOut(true);
+    void logout().finally(() => {
+      navigate('/login', { replace: true });
+      setIsLoggingOut(false);
+    });
+  };
 
   const cityMenu: MenuProps['items'] = [
     { key: 'hz', label: '杭州' },
@@ -48,12 +64,22 @@ export const DesktopTopBar: React.FC = () => {
       </div>
 
       <div className="desktop-top-bar-right">
-        {/* 用户头像下拉 */}
-        <Dropdown menu={{ items: userMenu }} placement="bottomRight" arrow>
-          <div className="desktop-user-profile">
-            <Avatar className="user-avatar" icon={<UserIcon size={18} />} />
-          </div>
-        </Dropdown>
+        {status === 'authenticated' && currentUser ? (
+          <Dropdown
+            menu={{ items: userMenu, onClick: handleUserMenuClick }}
+            placement="bottomRight"
+            arrow
+          >
+            <div className="desktop-user-profile">
+              <Avatar className="user-avatar" icon={<UserIcon size={18} />} />
+              <span className="desktop-user-name">{currentUser.nickname}</span>
+            </div>
+          </Dropdown>
+        ) : (
+          <Link className="desktop-login-link" to="/login">
+            登录
+          </Link>
+        )}
       </div>
     </header>
   );

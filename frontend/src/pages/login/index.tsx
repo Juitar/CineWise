@@ -1,7 +1,10 @@
-import { Button, Input } from 'antd';
-import React, { useState } from 'react';
-import { Link, useLocation } from 'umi';
+import { Alert, Button, Input } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'umi';
 
+import { usePasswordLogin } from '../../modules/auth/usePasswordLogin';
+import { useAuth } from '../../shared/auth/AuthProvider';
+import { resolveSafeReturnUrl } from '../../shared/auth/safeReturnUrl';
 import {
   BrandLogoIcon,
   CinemaIllustrationSVG,
@@ -15,8 +18,10 @@ import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 
 export default function LoginPage() {
-  const location = useLocation();
-  const isAdminLogin = location.pathname === '/admin/login';
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { currentUser, status: sessionStatus } = useAuth();
+  const { errorMessage, isSubmitDisabled, retryRecovery, status, submit } = usePasswordLogin();
 
   // 响应式屏幕状态判断 (< 1024px 为移动端 / H5 视图)
   const isMobile = useMediaQuery('(max-width: 1023px)');
@@ -25,10 +30,54 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
 
-  // 提交登录表单
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (sessionStatus !== 'authenticated' || !currentUser) {
+      return;
+    }
+    navigate(resolveSafeReturnUrl(searchParams.get('returnUrl'), currentUser.role), {
+      replace: true,
+    });
+  }, [currentUser, navigate, searchParams, sessionStatus]);
+
+  const navigateAfterLogin = (role: 'ADMIN' | 'USER') => {
+    navigate(resolveSafeReturnUrl(searchParams.get('returnUrl'), role), {
+      replace: true,
+    });
+  };
+
+  // 表单只负责收集输入，网络调用和结果未知恢复由认证 Hook 统一处理。
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      setValidationMessage('请输入有效邮箱');
+      return;
+    }
+    if (password.length < 8 || password.length > 128) {
+      setValidationMessage('密码长度必须为 8 到 128 位');
+      return;
+    }
+
+    setValidationMessage(null);
+    const result = await submit(normalizedEmail, password);
+    if (result.clearPassword) {
+      setPassword('');
+    }
+    if (result.user) {
+      navigateAfterLogin(result.user.role);
+    }
+  };
+
+  const handleRecovery = async () => {
+    const result = await retryRecovery();
+    if (result.clearPassword) {
+      setPassword('');
+    }
+    if (result.user) {
+      navigateAfterLogin(result.user.role);
+    }
   };
 
   return (
@@ -65,12 +114,8 @@ export default function LoginPage() {
           </section>
 
           <section className="login-form-section">
-            <h1 className="login-form-title">{isAdminLogin ? '管理登录' : '登录'}</h1>
-            <p className="login-form-subtitle">
-              {isAdminLogin
-                ? '欢迎使用妙语购票管理后台'
-                : '登录后继续购票、查看订单与个性化观影服务'}
-            </p>
+            <h1 className="login-form-title">登录</h1>
+            <p className="login-form-subtitle">登录后继续购票、查看订单与个性化观影服务</p>
 
             <form className="login-form" onSubmit={handleSubmit}>
               <div className="login-input-group">
@@ -84,9 +129,15 @@ export default function LoginPage() {
                   prefix={<MailIcon size={18} className="login-input-icon-antd" />}
                   placeholder="请输入邮箱"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setValidationMessage(null);
+                  }}
                   aria-label="邮箱"
+                  autoComplete="email"
                   className="login-input-antd"
+                  disabled={isSubmitDisabled}
+                  maxLength={255}
                 />
               </div>
 
@@ -101,9 +152,15 @@ export default function LoginPage() {
                   prefix={<LockIcon size={18} className="login-input-icon-antd" />}
                   placeholder="请输入密码"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setValidationMessage(null);
+                  }}
                   aria-label="密码"
+                  autoComplete="current-password"
                   className="login-input-antd"
+                  disabled={isSubmitDisabled}
+                  maxLength={128}
                   suffix={
                     <button
                       type="button"
@@ -118,21 +175,36 @@ export default function LoginPage() {
                 />
               </div>
 
+              {(validationMessage || errorMessage) && (
+                <Alert
+                  type="error"
+                  showIcon
+                  message={validationMessage ?? errorMessage}
+                  role="alert"
+                />
+              )}
+
               <Button
                 type="primary"
                 htmlType="submit"
                 className="login-submit-btn-antd"
                 block
                 size="large"
+                disabled={isSubmitDisabled}
+                loading={status === 'submitting' || status === 'recovering'}
               >
-                登录
+                {status === 'recovering' ? '正在确认登录结果' : '登录'}
               </Button>
 
-              {!isAdminLogin && (
-                <div className="register-link-row">
-                  没有账号？ <Link to="/register">立即注册</Link>
-                </div>
+              {status === 'result-unknown' && (
+                <Button className="login-recovery-btn" onClick={() => void handleRecovery()}>
+                  重新查询登录结果
+                </Button>
               )}
+
+              <div className="login-policy-row">
+                登录不会更新隐私同意记录 · <Link to="/privacy">查看隐私政策</Link>
+              </div>
             </form>
           </section>
         </div>

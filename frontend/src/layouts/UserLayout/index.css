@@ -199,7 +199,27 @@
 }
 
 .desktop-user-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
+}
+
+.desktop-user-name {
+  max-width: 160px;
+  overflow: hidden;
+  color: #1f2329;
+  font-size: 14px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-login-link {
+  color: #635bff;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .desktop-location-arrow {
