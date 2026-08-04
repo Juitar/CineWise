@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class ContentQueryServiceTest {
@@ -72,6 +73,40 @@ class ContentQueryServiceTest {
         // 超过七天陈旧窗口的快照不能继续展示，必须进入唯一的 Demo 回退层。
         assertThat(result.fallbackType()).isEqualTo(ContentFallbackType.MOCK);
         assertThat(result.expired()).isFalse();
+    }
+
+    @Test
+    void givenDemoFallback_whenQuery_thenItMustNotBeSavedAsCache() {
+        AtomicInteger cacheSaveCount = new AtomicInteger();
+        ContentCachePort cache = new ContentCachePort() {
+            @Override
+            public Optional<ContentResult<List<? extends ContentItem>>> find(ContentQuery query) {
+                return Optional.empty();
+            }
+
+            @Override
+            public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) {
+                cacheSaveCount.incrementAndGet();
+            }
+        };
+        ContentSnapshotPort snapshot = new ContentSnapshotPort() {
+            @Override
+            public Optional<ContentResult<List<? extends ContentItem>>> findLatest(ContentQuery query) {
+                return Optional.empty();
+            }
+
+            @Override
+            public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) { }
+        };
+        ContentProvider demo = query -> Optional.of(result(NOW.plusHours(1), false, ContentFallbackType.MOCK));
+        ContentQueryService service = new ContentQueryService(cache, snapshot, demo,
+                new ContentProperties(Duration.ofHours(6), Duration.ofHours(6), Duration.ofDays(7)), CLOCK);
+
+        ContentResult<List<? extends ContentItem>> result = service.query(QUERY);
+
+        // Demo 是离线回退，不得因缓存而在后续响应中被错误标记为 CACHE。
+        assertThat(result.fallbackType()).isEqualTo(ContentFallbackType.MOCK);
+        assertThat(cacheSaveCount).hasValue(0);
     }
 
     @Test

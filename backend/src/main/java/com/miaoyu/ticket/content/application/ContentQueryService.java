@@ -55,10 +55,9 @@ public class ContentQueryService {
      */
     public ContentResult<List<? extends ContentItem>> query(ContentQuery query) {
         return cachePort.find(query).orElseGet(() -> findFromSnapshot(query)
-                .orElseGet(() -> demoProvider.query(query).map(result -> {
-                    cachePort.save(query, result);
-                    return result;
-                }).orElseThrow(() -> new BusinessException(ContentErrorCode.DATA_UNAVAILABLE))));
+                // Demo 是离线最后回退层，绝不能写回 Redis 后被下一次查询伪装成真实缓存。
+                .orElseGet(() -> demoProvider.query(query)
+                        .orElseThrow(() -> new BusinessException(ContentErrorCode.DATA_UNAVAILABLE))));
     }
 
     private java.util.Optional<ContentResult<List<? extends ContentItem>>> findFromSnapshot(ContentQuery query) {
