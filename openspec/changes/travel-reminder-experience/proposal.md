@@ -24,6 +24,6 @@
 ## Impact
 
 - 代码范围：`backend` 下新增 `travel` 模块的 api、application、domain、infrastructure 和对应测试；D 的 Provider、缓存、定时任务、Demo 资源和回归清单。
-- 数据范围：新增 D 负责的 `travel_task`、`travel_advice_snapshot`、`travel_notification_log`；`travel_task.id` 为内部主键，`travel_task.task_id` 为对外任务号，子表以 `travel_task_id` 逻辑关联内部主键。迁移版本号由 A 在完整申请和全局版本复核后分配，D 不修改已发布迁移。
+- 数据范围：新增 D 负责的 `travel_task`、`travel_advice_snapshot`、`travel_notification_log`；`travel_task.id` 为内部主键，`travel_task.task_id` 为对外任务号，子表以 `travel_task_id` 逻辑关联内部主键。A 已正式分配 V007；D 编写前向迁移文件并提交 A 静态复核，D 不修改已发布迁移，也不自行执行迁移。
 - 跨模块：A 的 `PaymentSucceededEvent`、`OrderInvalidated` 和补偿调用；C 的 `EmailDeliveryPort`、当前用户和路线展示；B 的 `ToolContext`、`ToolResult<T>` 与只读工具注册。
 - 外部依赖：天气、餐饮 POI、高德路线服务未确认时使用版本化 Demo Provider；路线的精确起点与几何不写 MySQL、Redis、日志、画像、快照、URL 或 Agent 轨迹。
