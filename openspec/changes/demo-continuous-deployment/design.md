@@ -48,7 +48,7 @@ MinIO 仍是可选能力。Compose 将四个 MinIO 变量透传给后端，为�
 
 `index.html` 始终使用 `Cache-Control: no-store`。当前 Umi 尚未开启文件名 hash，因此本次不为静态资源增加长期缓存；由 C 开启并确认 `hash: true` 产物后，再为带内容哈希的资源增加 `immutable` 长缓存，避免非哈希文件被客户端长期保留。
 
-前端质量门额外构建并运行真实生产镜像，通过同网络的后端 stub 验证 `/api/**` 代理标记，并使用 Playwright 检查嵌套路由、缺失资源 404、入口资源 MIME 和浏览器启动。该测试与现有 `pnpm dev` E2E 并存，专门覆盖开发服务器无法暴露的生产 Nginx 行为。
+PR 的 `Frontend Verify` 与合入 `dev` 后的部署质量门都额外构建并运行真实生产镜像，通过同网络的后端 stub 验证 `/api/**` 代理标记，并使用 Playwright 检查嵌套路由、缺失资源 404、入口资源 MIME 和浏览器启动。该测试与现有 `pnpm dev` E2E 并存，专门覆盖开发服务器无法暴露的生产 Nginx 行为。
 
 ## Risks / Trade-offs
 

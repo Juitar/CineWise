@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     defaults:
       run:
         working-directory: frontend
@@ -44,3 +44,5 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: Run browser flow tests
         run: pnpm e2e
+      - name: Run production Nginx smoke
+        run: pnpm e2e:production-nginx
