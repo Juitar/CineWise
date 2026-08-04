@@ -39,4 +39,3 @@
 - H2/Spring 集成测试覆盖首次退款、原键/新键重放、并发唯一事件、事务回滚、同步登记异常、提交后消费异常和上下文降级。
 - 字段测试固定 `Clock`，断言十进制 ID、`+08:00`、固定原因和退款后版本。
 - 执行 `openspec validate order-invalidated-event --strict`、定向 Maven 测试、`mvnw.cmd verify`、注释率检查和 `git diff --check`。
-

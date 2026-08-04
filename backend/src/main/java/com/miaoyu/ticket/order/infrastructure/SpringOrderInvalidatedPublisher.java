@@ -26,4 +26,3 @@ public class SpringOrderInvalidatedPublisher implements OrderInvalidatedPublishe
         applicationEventPublisher.publishEvent(event);
     }
 }
-

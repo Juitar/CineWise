@@ -18,4 +18,3 @@ public record OrderInvalidated(
         OffsetDateTime occurredAt,
         String invalidReason) {
 }
-

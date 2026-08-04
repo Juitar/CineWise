@@ -6,4 +6,3 @@ public interface OrderInvalidatedPublisher {
 
     void publish(OrderInvalidated event);
 }
-

@@ -70,4 +70,3 @@ public class TravelEventContextResolver {
     public record TravelEventContext(long showId, String cinemaArea, LocalDateTime startAt) {
     }
 }
-
