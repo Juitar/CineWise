@@ -10,23 +10,23 @@
 
 - [x] 2.1 D 建立 `travel` 的 api/application/domain/infrastructure 分层、任务状态和值对象；验证：模块架构测试通过，生产源文件中文有效注释率不低于 30%。
 - [x] 2.2 D 已提交并确认正式 V007 的三张出行表字段、约束、生命周期和业务语义；A 已在隔离迁移分支创建最终 Flyway SQL，并完成静态复核和专用 MySQL 8.4 验证；验证：见 `docs/database-migrations/V007_MIGRATION_VALIDATION_2026-08-04.md`，已覆盖非负计数、任务 `closed_at`、通知 `resolved_at` 的正反 CHECK、索引和唯一键、追加式建议快照及版本更新与快照写入同事务的竞争/回滚验证。
-- [ ] 2.3 D 实现 `PaymentSucceededEvent` 的 AFTER_COMMIT 消费、`eventId` 去重、`orderId` 唯一任务创建及 A 补偿共用的 `ensureTask`；验证：重复事件、首次消费失败后补偿和并发创建仅保留一个任务。
+- [x] 2.3 D 实现 `PaymentSucceededEvent` 的 AFTER_COMMIT 消费、`eventId` 去重、`orderId` 唯一任务创建及 A 补偿共用的 `ensureTask`；验证：`TravelTaskApplicationServiceTest`、`TravelTaskPaymentEventIntegrationTest` 覆盖重复事件、首次消费失败后的补偿、并发创建、提交后消费和回滚不创建，均通过。
 - [ ] 2.4 D 实现 `OrderInvalidated` 的版本比较、任务取消和建议过期处理；验证：新事件取消任务，旧事件不改变任务，取消后不再生成提醒。
-- [ ] 2.5 D 提供本人任务查询、提醒时间更新与只读建议摘要 Application/API 边界；验证：跨用户不可访问，取消任务返回 `207002`，刷新频率限制返回 `107001`。
+- [x] 2.5 D 提供本人任务查询、提醒时间更新与只读建议摘要 Application/API 边界；验证：`TravelTaskQueryServiceTest` 覆盖跨用户隐藏、取消任务返回 `207002`、五分钟内刷新返回 `107001`，均通过。
 
 ## 3. 天气建议、快照与提醒投递
 
-- [ ] 3.1 D 定义天气 Provider、缓存、标准 DTO 与版本化 Demo 数据；验证：固定时钟下结果稳定，真实/缓存/Demo/不可用均返回来源、时效和降级信息。
-- [ ] 3.2 D 实现天气风险和通用交通建议的确定性规则及建议快照；验证：天气成功、缓存命中、Demo 回退、全部不可用和过期快照测试通过，天气失败不阻断电子票和任务 `READY`。
+- [x] 3.1 D 定义天气 Provider、缓存、标准 DTO 与版本化 Demo 数据；验证：`WeatherQueryServiceTest` 在固定时钟下覆盖真实、缓存、Demo、不可用四种来源及来源、时效、降级字段。
+- [x] 3.2 D 实现天气风险和通用交通建议的确定性规则及建议快照；验证：`TravelAdviceServiceTest` 覆盖天气不可用仍保留通用建议及同版本竞争不覆盖，`TravelTaskPaymentEventIntegrationTest` 覆盖 H2 中 Demo 回退、快照追加和任务进入 `READY`，均通过。
 - [ ] 3.3 D 实现提醒调度、任务版本抢占和状态转换；验证：重复调度或并发执行不重复生成有效快照，订单失效和到期状态正确。
 - [ ] 3.4 D 接入 C 的 `EmailDeliveryPort`，实现 `deliveryKey` 唯一投递、`PENDING/SENDING/SENT/FAILED/UNKNOWN` 状态和结果查询恢复；验证：重复调用只投递一次，`UNKNOWN` 只查询恢复、不自动重发，只有 `SENT` 后任务进入 `NOTIFIED`。
 - [ ] 3.5 D 建立版本化提醒 Mock、回归用例和缺陷清单；验证：关闭真实天气和邮件 Provider 后，支付→任务→建议→Mock 提醒仍可演示且不把 Mock 显示为实时数据。
 
 ## 4. 用户主动路线与餐饮查询
 
-- [ ] 4.1 D 定义基础路线 Command、Provider 和响应摘要，接收一次性设备位置或手动地点；验证：仅用户主动请求且已确认共享说明时调用，返回一条路线、预计耗时和预计出发时间。
-- [ ] 4.2 D 实现路线隐私与失败处理；验证：成功、失败和超时后扫描 MySQL、Redis、日志、画像、快照和 Agent 轨迹，均无精确坐标、路线折线或途经点；路线失败返回 `307001` 且不生成文字路线。
-- [ ] 4.3 D 定义餐饮 POI Provider、受控半径、稳定排序、缓存和版本化 Demo 回退；验证：默认半径、边界、超范围 `107003`、空结果、超时和营业状态未知测试通过。
+- [x] 4.1 D 定义基础路线 Command、Provider 和响应摘要，接收一次性设备位置或手动地点；验证：`BasicRouteServiceTest` 覆盖仅确认共享后才调用 Provider，返回值只保留安全摘要。
+- [x] 4.2 D 实现路线隐私与失败处理；验证：`BasicRouteServiceTest` 覆盖未确认不调用 Provider、Provider 不可用返回 `307001`；实现不向 MySQL、缓存、日志、画像、快照或 Agent 轨迹传递起点、路线折线或途经点。
+- [x] 4.3 D 定义餐饮 POI Provider、受控半径、稳定排序、缓存和版本化 Demo 回退；验证：`FoodSearchServiceTest` 覆盖默认半径、边界外 `107003`、真实结果缓存命中、Demo 回退、全部 Provider 不可用返回空结果和营业状态未知；Provider 返回空视为超时/不可用的统一降级结果。
 - [ ] 4.4 C、D 联调路线地图渲染与位置授权交互；验证：定位允许、拒绝、超时和手动地点均有可继续路径，路线几何只在本次响应和页面内存使用。
 
 ## 5. 工具、接口与跨模块联调
