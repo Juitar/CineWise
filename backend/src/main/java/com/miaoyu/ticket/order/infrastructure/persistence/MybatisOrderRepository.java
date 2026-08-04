@@ -104,6 +104,29 @@ public class MybatisOrderRepository implements OrderRepository {
     }
 
     @Override
+    public List<PaidTravelReconciliationCandidate> findPaidTravelReconciliationCandidates(
+            LocalDateTime paidAtOrAfter,
+            LocalDateTime paidAtOrBefore,
+            LocalDateTime afterPaidAt,
+            long afterOrderId,
+            int limit) {
+        return mapper.findPaidTravelReconciliationCandidates(
+                        paidAtOrAfter,
+                        paidAtOrBefore,
+                        afterPaidAt,
+                        afterOrderId,
+                        limit)
+                .stream()
+                .map(row -> new PaidTravelReconciliationCandidate(
+                        row.orderId(),
+                        row.userId(),
+                        row.showId(),
+                        row.orderVersion(),
+                        row.paidAt()))
+                .toList();
+    }
+
+    @Override
     public void insertOrder(NewOrder order) {
         int inserted = mapper.insertOrder(new OrderInsertRow(
                 order.orderId(),

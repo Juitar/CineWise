@@ -124,6 +124,33 @@ public interface OrderPersistenceMapper {
             """)
     OrderSnapshotRow findById(@Param("orderId") long orderId);
 
+    /**
+     * paid_time与id共同组成游标，避免相同毫秒支付的订单在分页边界重复或遗漏。
+     * status在数据库查询层先过滤，应用层仍会在调用D前重读状态和版本。
+     */
+    @Select("""
+            SELECT id AS order_id,
+                   user_id,
+                   show_id,
+                   version AS order_version,
+                   paid_time AS paid_at
+              FROM ticket_order
+             WHERE status = 'PAID'
+               AND paid_time IS NOT NULL
+               AND paid_time >= #{paidAtOrAfter}
+               AND paid_time <= #{paidAtOrBefore}
+               AND (paid_time > #{afterPaidAt}
+                    OR (paid_time = #{afterPaidAt} AND id > #{afterOrderId}))
+             ORDER BY paid_time, id
+             LIMIT #{limit}
+            """)
+    List<PaidTravelReconciliationCandidateRow> findPaidTravelReconciliationCandidates(
+            @Param("paidAtOrAfter") LocalDateTime paidAtOrAfter,
+            @Param("paidAtOrBefore") LocalDateTime paidAtOrBefore,
+            @Param("afterPaidAt") LocalDateTime afterPaidAt,
+            @Param("afterOrderId") long afterOrderId,
+            @Param("limit") int limit);
+
     @Select("""
             <script>
             SELECT COUNT(*)

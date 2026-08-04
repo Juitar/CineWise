@@ -5,6 +5,7 @@ import com.miaoyu.ticket.order.domain.OrderOperationType;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /** 订单权威持久化端口；请求键查询始终限定当前用户。 */
@@ -40,6 +41,17 @@ public interface OrderRepository {
             String idempotencyKey);
 
     List<Long> findExpiredCandidateIds(LocalDateTime expiresAtOrBefore, int limit);
+
+    /**
+     * 按原始支付时间和订单ID做稳定键集分页，只返回冻结窗口内仍为PAID的候选。
+     * 候选只用于缩小扫描范围，跨模块调用前必须再次读取订单权威状态。
+     */
+    List<PaidTravelReconciliationCandidate> findPaidTravelReconciliationCandidates(
+            LocalDateTime paidAtOrAfter,
+            LocalDateTime paidAtOrBefore,
+            LocalDateTime afterPaidAt,
+            long afterOrderId,
+            int limit);
 
     void insertOrder(NewOrder order);
 
@@ -82,6 +94,22 @@ public interface OrderRepository {
     }
 
     record OrderSeatReference(long orderId, long seatId) {
+    }
+
+    /** PAID补偿所需的最小数据库投影，不携带金额、座位、电子票或用户隐私字段。 */
+    record PaidTravelReconciliationCandidate(
+            long orderId,
+            long userId,
+            long showId,
+            int orderVersion,
+            LocalDateTime paidAt) {
+
+        public PaidTravelReconciliationCandidate {
+            if (orderId <= 0 || userId <= 0 || showId <= 0 || orderVersion < 0) {
+                throw new IllegalArgumentException("PAID出行补偿候选包含非法业务标识或版本");
+            }
+            Objects.requireNonNull(paidAt, "PAID出行补偿候选的paidAt不能为空");
+        }
     }
 
     record OrderOperationSnapshot(
