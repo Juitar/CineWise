@@ -130,6 +130,21 @@ describe('MoviesPage', () => {
     expect(screen.getByText('没有找到符合条件的影片')).toBeInTheDocument();
   });
 
+  it('当前页为空但仍有总记录时保留分页并可返回第一页', () => {
+    pageMocks.search = 'page=999';
+    pageMocks.useMovieList.mockReturnValue(
+      movieListState({ data: { ...response, records: [], total: 10, page: 999 } }),
+    );
+    render(<MoviesPage />);
+
+    expect(screen.getByText('没有找到符合条件的影片')).toBeInTheDocument();
+    expect(screen.getByText('共 10 部影片')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '返回第一页' }));
+    const nextParams = pageMocks.setSearchParams.mock.calls[0][0] as URLSearchParams;
+    expect(nextParams.get('page')).toBeNull();
+  });
+
   it('失败时展示 traceId 并允许手动重试', () => {
     const retry = vi.fn();
     pageMocks.useMovieList.mockReturnValue(

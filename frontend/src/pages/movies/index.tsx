@@ -218,34 +218,39 @@ export default function MoviesPage() {
           ) : null}
 
           {!isLoading && !error && data?.records.length === 0 ? (
-            <Empty description="没有找到符合条件的影片" />
+            <Empty description="没有找到符合条件的影片">
+              {data.total > 0 && query.page > 1 ? (
+                <Button onClick={() => updateQuery({ page: 1 })}>返回第一页</Button>
+              ) : null}
+            </Empty>
           ) : null}
 
           {data && data.records.length > 0 ? (
-            <>
-              <div className="movies-grid-view" aria-live="polite">
-                {data.records.map((movie) => (
-                  <MovieCard key={movie.movieId} movie={movie} />
-                ))}
-              </div>
-              <div className="movies-pagination">
-                <span>共 {data.total} 部影片</span>
-                <Pagination
-                  current={data.page}
-                  onChange={(page, size) =>
-                    updateQuery({
-                      // 改变每页数量后原页码可能越界，因此回到第一页；单纯翻页则保留目标页码。
-                      page: size === query.size ? page : 1,
-                      size,
-                    })
-                  }
-                  pageSize={data.size}
-                  pageSizeOptions={['10', '20', '50']}
-                  showSizeChanger
-                  total={data.total}
-                />
-              </div>
-            </>
+            <div className="movies-grid-view" aria-live="polite">
+              {data.records.map((movie) => (
+                <MovieCard key={movie.movieId} movie={movie} />
+              ))}
+            </div>
+          ) : null}
+
+          {data && data.total > 0 ? (
+            <div className="movies-pagination">
+              <span>共 {data.total} 部影片</span>
+              <Pagination
+                current={data.page}
+                onChange={(page, size) =>
+                  updateQuery({
+                    // 改变每页数量后原页码可能越界，因此回到第一页；单纯翻页则保留目标页码。
+                    page: size === query.size ? page : 1,
+                    size,
+                  })
+                }
+                pageSize={data.size}
+                pageSizeOptions={['10', '20', '50']}
+                showSizeChanger
+                total={data.total}
+              />
+            </div>
           ) : null}
         </section>
       </div>
