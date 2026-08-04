@@ -1,0 +1,539 @@
+.plan-recommendation-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+  background: #f5f7fa;
+  min-height: 100vh;
+}
+
+.plan-header-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.plan-main-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1f2329;
+  margin: 0;
+}
+
+.plan-subtitle {
+  font-size: 14px;
+  color: #8f959e;
+  flex: 1;
+}
+
+.refresh-plan-btn {
+  background: white;
+  border: 1px solid rgba(226, 228, 235, 60%);
+  color: #1f2329;
+  padding: 6px 16px;
+  border-radius: 16px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.refresh-plan-btn:hover {
+  background: #f0f2f5;
+}
+
+.plan-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.plan-card-full {
+  display: flex;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid rgba(226, 228, 235, 60%);
+  padding: 20px;
+  gap: 24px;
+  position: relative;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.plan-card-full:hover {
+  border-color: rgba(99, 91, 255, 30%);
+}
+
+.plan-card-full.active-plan {
+  border-color: #635bff;
+  box-shadow: 0 4px 16px rgba(99, 91, 255, 10%);
+}
+
+.plan-badge-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 80px;
+  flex-shrink: 0;
+  border-right: 1px dashed rgba(226, 228, 235, 60%);
+  padding-right: 20px;
+}
+
+.plan-badge-title {
+  background: rgba(99, 91, 255, 10%);
+  color: #635bff;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.plan-badge-desc {
+  font-size: 12px;
+  color: #635bff;
+  font-weight: 500;
+  margin-bottom: 24px;
+}
+
+.plan-radio-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #dcdcdc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+}
+
+.plan-radio-circle.checked {
+  background: #635bff;
+  border-color: #635bff;
+}
+
+.plan-movie-col {
+  display: flex;
+  gap: 16px;
+  flex: 2;
+  border-right: 1px dashed rgba(226, 228, 235, 60%);
+  padding-right: 24px;
+}
+
+.plan-movie-poster {
+  width: 80px;
+  height: 112px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.plan-movie-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plan-movie-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2329;
+}
+
+.plan-movie-name .score {
+  color: #ff9800;
+  font-size: 14px;
+  margin-left: 8px;
+}
+
+.plan-movie-tags {
+  font-size: 12px;
+  color: #646a73;
+}
+
+.plan-cinema-name {
+  font-size: 14px;
+  color: #1f2329;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.plan-cinema-tags {
+  display: flex;
+  gap: 6px;
+}
+
+.ctag {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f0f2f5;
+  color: #635bff;
+}
+
+.plan-showtime {
+  font-size: 13px;
+  color: #1f2329;
+  font-weight: 500;
+}
+
+.plan-seat-info {
+  font-size: 12px;
+  color: #8f959e;
+}
+
+.plan-travel-col {
+  flex: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-right: 1px dashed rgba(226, 228, 235, 60%);
+  padding-right: 24px;
+}
+
+.travel-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.travel-label {
+  font-size: 12px;
+  color: #8f959e;
+}
+
+.travel-val {
+  font-size: 14px;
+  color: #1f2329;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.travel-val.bold {
+  font-weight: 600;
+}
+
+.status-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.status-badge.green {
+  background: rgba(16, 185, 129, 10%);
+  color: #10b981;
+}
+
+.status-badge.orange {
+  background: rgba(245, 158, 11, 10%);
+  color: #f59e0b;
+}
+
+.travel-sub {
+  font-size: 12px;
+  color: #8f959e;
+}
+
+.plan-food-col {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.food-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2329;
+  margin-bottom: 4px;
+}
+
+.food-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f9f9f9;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.food-img {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+}
+
+.food-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.food-name {
+  font-size: 13px;
+  color: #1f2329;
+  font-weight: 500;
+}
+
+.food-desc {
+  font-size: 11px;
+  color: #8f959e;
+}
+
+.food-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.ftag {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(226, 228, 235, 60%);
+  color: #646a73;
+}
+
+.ftag.highlight {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 5%);
+  border-color: rgba(239, 68, 68, 20%);
+}
+
+.plan-bottom-grid {
+  display: flex;
+  gap: 24px;
+}
+
+.plan-map-section {
+  flex: 1;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid rgba(226, 228, 235, 60%);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-food-section {
+  flex: 1;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid rgba(226, 228, 235, 60%);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2329;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.more-link {
+  font-size: 13px;
+  color: #635bff;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.map-placeholder {
+  flex: 1;
+  background: #e8f0fe;
+  border-radius: 8px;
+  position: relative;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-route-line {
+  position: relative;
+  width: 80%;
+  height: 4px;
+  background: #635bff;
+  border-radius: 2px;
+}
+
+.map-point {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: white;
+  border: 3px solid #635bff;
+  border-radius: 50%;
+  top: -4px;
+}
+
+.map-point.start {
+  left: 0;
+  border-color: #10b981;
+}
+
+.map-point.end {
+  right: 0;
+}
+
+.point-label {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 10%);
+  text-align: center;
+}
+
+.route-info-badge {
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 10%);
+  text-align: center;
+}
+
+.route-info-badge .time {
+  font-size: 12px;
+  font-weight: 600;
+  color: #635bff;
+}
+
+.route-info-badge .desc {
+  font-size: 11px;
+  color: #8f959e;
+}
+
+.food-scroll-list {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.food-scroll-item {
+  width: 120px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.food-scroll-item .img {
+  width: 100%;
+  height: 80px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+
+.food-scroll-item .name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2329;
+}
+
+.food-scroll-item .desc {
+  font-size: 11px;
+  color: #8f959e;
+}
+
+.food-scroll-item .price {
+  font-size: 12px;
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.plan-preferences-bar {
+  display: flex;
+  align-items: center;
+  background: white;
+  border-radius: 12px;
+  padding: 16px 24px;
+  border: 1px solid rgba(226, 228, 235, 60%);
+  gap: 24px;
+}
+
+.pref-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2329;
+}
+
+.pref-items {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.pref-item {
+  font-size: 13px;
+  color: #646a73;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.edit-pref-btn {
+  background: rgba(99, 91, 255, 10%);
+  color: #635bff;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.edit-pref-btn:hover {
+  background: rgba(99, 91, 255, 15%);
+}
+
+.back-to-home-btn {
+  align-self: flex-start;
+  padding: 8px 14px;
+  border: 1px solid #e2e4eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #646a73;
+  cursor: pointer;
+}
+
+.plan-movie-poster--blue-gray {
+  background: #4a5b6c;
+}
+
+.plan-movie-poster--sky {
+  background: #87ceeb;
+}
+
+.food-img--gray {
+  background: #dcdcdc;
+}
+
+.food-img--cream {
+  background: #f5deb3;
+}
+
+.food-img--tan {
+  background: #deb887;
+}
+
+.food-img--pink {
+  background: #ffe4e1;
+}
