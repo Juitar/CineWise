@@ -11,7 +11,7 @@
 - [x] 2.1 D 建立 `travel` 的 api/application/domain/infrastructure 分层、任务状态和值对象；验证：模块架构测试通过，生产源文件中文有效注释率不低于 30%。
 - [x] 2.2 D 已提交并确认正式 V007 的三张出行表字段、约束、生命周期和业务语义；A 已在隔离迁移分支创建最终 Flyway SQL，并完成静态复核和专用 MySQL 8.4 验证；验证：见 `docs/database-migrations/V007_MIGRATION_VALIDATION_2026-08-04.md`，已覆盖非负计数、任务 `closed_at`、通知 `resolved_at` 的正反 CHECK、索引和唯一键、追加式建议快照及版本更新与快照写入同事务的竞争/回滚验证。
 - [x] 2.3 D 实现 `PaymentSucceededEvent` 的 AFTER_COMMIT 消费、`eventId` 去重、`orderId` 唯一任务创建及 A 补偿共用的 `ensureTask`；验证：`TravelTaskApplicationServiceTest`、`TravelTaskPaymentEventIntegrationTest` 覆盖重复事件、首次消费失败后的补偿、并发创建、提交后消费和回滚不创建，均通过。
-- [ ] 2.4 D 实现 `OrderInvalidated` 的版本比较、任务取消和建议过期处理；验证：新事件取消任务，旧事件不改变任务，取消后不再生成提醒。
+- [x] 2.4 D 实现 `OrderInvalidated` 的版本比较、任务取消和建议过期处理；验证：`TravelTaskApplicationServiceTest`、`TravelTaskPaymentEventIntegrationTest` 覆盖退款提交后取消、退款先到的 CANCELLED 墓碑、支付事件随后到达不重开任务、低版本退款后较高版本退款推进墓碑审计字段及两版本并发到达时保留较高版本，均通过。
 - [x] 2.5 D 提供本人任务查询、提醒时间更新与只读建议摘要 Application/API 边界；验证：`TravelTaskQueryServiceTest` 覆盖跨用户隐藏、取消任务返回 `207002`、五分钟内刷新返回 `107001`，均通过。
 
 ## 3. 天气建议、快照与提醒投递

@@ -3,6 +3,7 @@ package com.miaoyu.ticket.travel.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
+import com.miaoyu.ticket.order.event.OrderInvalidated;
 import com.miaoyu.ticket.order.event.PaymentSucceededEvent;
 import com.miaoyu.ticket.travel.domain.TravelTaskStatus;
 import java.time.Clock;
@@ -68,6 +69,30 @@ class TravelTaskApplicationServiceTest {
         assertThat(stored.triggerAt()).isEqualTo(stored.startAt().minusHours(2));
     }
 
+    @Test
+    void givenRefundArrivesBeforePayment_whenEnsuringThenPaying_thenKeepCancelledTombstone() {
+        InMemoryTravelTaskRepository repository = new InMemoryTravelTaskRepository();
+        TravelTaskApplicationService service = service(repository);
+
+        TravelTaskSummary cancelled = service.ensureTaskCancelled(invalidatedEvent("refund-first", "90003", 4L));
+        TravelTaskSummary paidLater = service.ensureTask(paymentEvent("payment-late", "90003"));
+
+        assertThat(cancelled.status()).isEqualTo(TravelTaskStatus.CANCELLED);
+        assertThat(paidLater).isEqualTo(cancelled);
+    }
+
+    @Test
+    void givenLowerRefundThenHigherRefund_whenCancelling_thenPromoteCancelledTombstoneVersion() {
+        InMemoryTravelTaskRepository repository = new InMemoryTravelTaskRepository();
+        TravelTaskApplicationService service = service(repository);
+
+        service.ensureTaskCancelled(invalidatedEvent("refund-old", "90004", 5L));
+        TravelTaskSummary newer = service.ensureTaskCancelled(invalidatedEvent("refund-new", "90004", 6L));
+
+        assertThat(newer.status()).isEqualTo(TravelTaskStatus.CANCELLED);
+        assertThat(newer.orderVersion()).isEqualTo(6L);
+    }
+
     private TravelTaskApplicationService service(InMemoryTravelTaskRepository repository) {
         AtomicLong ids = new AtomicLong(9_000_000L);
         BusinessIdGenerator idGenerator = ids::incrementAndGet;
@@ -95,15 +120,31 @@ class TravelTaskApplicationServiceTest {
                 OffsetDateTime.parse("2026-08-04T08:00:00+08:00"));
     }
 
+    private OrderInvalidated invalidatedEvent(String eventId, String orderId, long orderVersion) {
+        return new OrderInvalidated(
+                eventId, orderId, "80001", "70001", "西湖区",
+                OffsetDateTime.parse("2026-08-05T19:00:00+08:00"), orderVersion,
+                OffsetDateTime.parse("2026-08-04T08:10:00+08:00"), "REFUNDED");
+    }
+
     /** 用并发 Map 模拟两个唯一索引，让应用层重复恢复逻辑不依赖数据库实现细节。 */
     private static final class InMemoryTravelTaskRepository implements TravelTaskRepository {
 
         private final ConcurrentHashMap<String, TravelTaskSnapshot> tasksByEventId = new ConcurrentHashMap<>();
         private final ConcurrentHashMap<Long, TravelTaskSnapshot> tasksByOrderId = new ConcurrentHashMap<>();
+        private final ConcurrentHashMap<Long, String> invalidationEventIds = new ConcurrentHashMap<>();
 
         @Override
         public Optional<TravelTaskSnapshot> findByPaymentEventId(String paymentEventId) {
             return Optional.ofNullable(tasksByEventId.get(paymentEventId));
+        }
+
+        @Override
+        public Optional<TravelTaskSnapshot> findByInvalidationEventId(String invalidationEventId) {
+            return invalidationEventIds.entrySet().stream()
+                    .filter(entry -> invalidationEventId.equals(entry.getValue()))
+                    .map(entry -> tasksByOrderId.get(entry.getKey()))
+                    .findFirst();
         }
 
         @Override
@@ -127,6 +168,26 @@ class TravelTaskApplicationServiceTest {
         public boolean updateTriggerAt(
                 long id, long expectedVersion, LocalDateTime triggerAt, LocalDateTime updatedAt) {
             return false;
+        }
+
+        @Override
+        public boolean cancel(long id, long orderVersion, String invalidationEventId, LocalDateTime closedAt) {
+            TravelTaskSnapshot task = findById(id).orElse(null);
+            if (task == null
+                    || task.orderVersion() > orderVersion
+                    || task.status() == TravelTaskStatus.COMPLETED
+                    || task.status() == TravelTaskStatus.FAILED
+                    || (task.status() == TravelTaskStatus.CANCELLED && task.orderVersion() == orderVersion)) {
+                return false;
+            }
+            TravelTaskSnapshot cancelled = new TravelTaskSnapshot(
+                    task.id(), task.taskId(), task.userId(), task.orderId(), task.showId(), task.cinemaArea(),
+                    task.startAt(), task.triggerAt(), orderVersion, task.version() + 1, TravelTaskStatus.CANCELLED,
+                    closedAt, closedAt);
+            tasksByOrderId.put(task.orderId(), cancelled);
+            tasksByEventId.replaceAll((eventId, existing) -> existing.id() == task.id() ? cancelled : existing);
+            invalidationEventIds.put(task.orderId(), invalidationEventId);
+            return true;
         }
 
         @Override
@@ -154,6 +215,18 @@ class TravelTaskApplicationServiceTest {
                 tasksByOrderId.remove(task.orderId(), snapshot);
                 throw new DuplicateKeyException("eventId 已存在");
             }
+        }
+
+        @Override
+        public void insertCancelled(NewCancelledTravelTask task) {
+            TravelTaskSnapshot snapshot = new TravelTaskSnapshot(
+                    task.id(), task.taskId(), task.userId(), task.orderId(), task.showId(), task.cinemaArea(),
+                    task.startAt(), task.triggerAt(), task.orderVersion(), 0L, TravelTaskStatus.CANCELLED,
+                    task.closedAt(), task.closedAt());
+            if (tasksByOrderId.putIfAbsent(task.orderId(), snapshot) != null) {
+                throw new DuplicateKeyException("orderId 已存在");
+            }
+            invalidationEventIds.put(task.orderId(), task.invalidationEventId());
         }
 
         int count() {
