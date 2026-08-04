@@ -62,6 +62,27 @@
 - **THEN** 系统返回原任务的最小摘要
 - **AND** 不将任务变为 `PENDING`、不生成建议或通知
 
+### Requirement: 出行迁移必须约束计数与终态清理时间
+
+A 分配 Flyway 版本后，迁移 MUST 为 `travel_task.order_version`、`travel_task.version`、`travel_task.retry_count`、`travel_notification_log.task_version` 和 `travel_notification_log.attempt_count` 设置非负 CHECK。迁移 MUST 保证 `travel_task` 的 `COMPLETED`、`CANCELLED`、`FAILED` 状态有 `closed_at`，其他状态没有 `closed_at`；`travel_notification_log` 的 `SENT`、`FAILED` 状态有 `resolved_at`，`PENDING`、`SENDING`、`UNKNOWN` 状态没有 `resolved_at`。
+
+#### Scenario: 负计数或版本写入
+- **WHEN** MySQL 插入或更新任一负数订单版本、任务版本、重试次数或投递次数
+- **THEN** 对应 CHECK 拒绝写入
+- **AND** 不产生可供调度或清理的异常记录
+
+#### Scenario: 任务终态与关闭时间不一致
+- **WHEN** MySQL 写入 `COMPLETED`、`CANCELLED`、`FAILED` 但 `closed_at` 为空的任务
+- **THEN** 对应 CHECK 拒绝写入
+- **WHEN** MySQL 写入非终态但 `closed_at` 非空的任务
+- **THEN** 对应 CHECK 拒绝写入
+
+#### Scenario: 通知终态与解决时间不一致
+- **WHEN** MySQL 写入 `SENT`、`FAILED` 但 `resolved_at` 为空的通知
+- **THEN** 对应 CHECK 拒绝写入
+- **WHEN** MySQL 写入 `PENDING`、`SENDING`、`UNKNOWN` 且 `resolved_at` 非空的通知
+- **THEN** 对应 CHECK 拒绝写入
+
 ### Requirement: 提醒任务必须生成可降级的建议快照
 
 系统 SHALL 在到达提醒时间或用户合法刷新时，以任务的影院区域和开场时间生成天气与确定性通用交通建议，并保存带 `source`、`dataTime`、`expiresAt`、`isExpired`、`degraded`、`fallbackType` 的建议快照。天气不可用时 MUST 保留通用建议并明确天气不可用，不得编造天气事实。
