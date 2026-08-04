@@ -66,6 +66,9 @@ export default function RegisterPage() {
           <section className="login-form-section">
             <h1 className="login-form-title">注册</h1>
             <p className="login-form-subtitle">注册后即可购票、查看订单与个性化观影服务</p>
+            <p className="register-preview-notice" role="status">
+              静态页面预览，验证码和注册接口暂未接入
+            </p>
 
             <div className="register-tabs">
               <div className="register-tab active">邮箱注册</div>
@@ -94,8 +97,8 @@ export default function RegisterPage() {
                   onChange={(e) => setCode(e.target.value)}
                   className="login-input-antd"
                   suffix={
-                    <button type="button" className="send-code-btn">
-                      发送验证码
+                    <button type="button" className="send-code-btn" disabled>
+                      暂未开放
                     </button>
                   }
                 />
@@ -158,8 +161,9 @@ export default function RegisterPage() {
                 className="login-submit-btn-antd"
                 block
                 size="large"
+                disabled
               >
-                注册
+                注册暂未开放
               </Button>
 
               <div className="login-link-row">

@@ -48,7 +48,7 @@
   line-height: 1;
 }
 
-.send-code-btn:hover {
+.send-code-btn:not(:disabled):hover {
   background: rgba(99, 91, 255, 10%);
 }
 
@@ -77,4 +77,16 @@
   color: #635bff;
   font-weight: 500;
   text-decoration: none;
+}
+
+.register-preview-notice {
+  margin: -8px 0 16px;
+  color: #8f5a00;
+  font-size: 13px;
+  text-align: center;
+}
+
+.send-code-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }

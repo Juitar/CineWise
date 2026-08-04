@@ -9,19 +9,8 @@ export default defineConfig({
   },
   routes: [
     { path: '/login', component: '@/pages/login' },
-    { path: '/admin/login', component: '@/pages/login' },
     { path: '/register', component: '@/pages/register' },
     { path: '/privacy', component: '@/pages/privacy' },
-    {
-      path: '/admin',
-      component: '@/layouts/AdminLayout',
-      routes: [
-        { path: '/admin/content', component: '@/pages/admin/dashboard' },
-        { path: '/admin/orders', component: '@/pages/admin/orders' },
-        { path: '/admin/agent-runs', component: '@/pages/admin/agent-logs' },
-        { path: '*', component: '@/pages/not-found' },
-      ],
-    },
     {
       path: '/',
       component: '@/layouts/UserLayout',
