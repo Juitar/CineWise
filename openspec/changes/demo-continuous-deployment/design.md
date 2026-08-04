@@ -46,7 +46,7 @@ MinIO 仍是可选能力。Compose 将四个 MinIO 变量透传给后端，为�
 
 `/api/` 使用 `^~` 前缀位置并保留现有代理头、SSE 和超时配置，确保 API 请求优先交给后端。脚本、样式、图片和字体扩展名使用独立正则位置，文件不存在时直接返回 404；其余非静态路径才允许通过 `/index.html` 完成 SPA 路由回退。
 
-`index.html` 始终使用 `Cache-Control: no-store`。当前 Umi 尚未开启文件名 hash，因此本次不为静态资源增加长期缓存；由 C 开启并确认 `hash: true` 产物后，再为带内容哈希的资源增加 `immutable` 长缓存，避免非哈希文件被客户端长期保留。
+`index.html` 始终使用 `Cache-Control: no-store`。C 已开启并验证 `hash: true`，因此仅对文件名包含至少 8 位十六进制内容哈希的静态资源增加一年 `immutable` 缓存；非哈希资源、`/api/**` 和缺失资源不获得长期缓存。缓存响应头不使用 `always`，避免暂时缺失的哈希资源 404 被浏览器长期保留。
 
 PR 的 `Frontend Verify` 与合入 `dev` 后的部署质量门都额外构建并运行真实生产镜像，通过同网络的后端 stub 验证 `/api/**` 代理标记，并使用 Playwright 检查嵌套路由、缺失资源 404、入口资源 MIME 和浏览器启动。该测试与现有 `pnpm dev` E2E 并存，专门覆盖开发服务器无法暴露的生产 Nginx 行为。
 

@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 
 const JAVASCRIPT_CONTENT_TYPE = /(?:application|text)\/javascript/i;
+const CONTENT_HASHED_ASSET =
+  /\.[a-f0-9]{8,}(?:\.async)?\.(?:js|mjs|css|map|png|jpe?g|gif|svg|ico|webp|avif|woff2?|ttf|otf|eot|wasm)(?:[?#]|$)/i;
 
 function extractLocalAssetPaths(indexHtml: string, baseURL: string): string[] {
   const assetReferences = [
@@ -65,14 +67,20 @@ test('production Nginx preserves SPA fallback and rejects missing assets', async
 
   const missingStylesheet = await request.get('/definitely-missing.css');
   expect(missingStylesheet.status()).toBe(404);
+
+  const missingHashedAsset = await request.get('/definitely-missing.12345678.js');
+  expect(missingHashedAsset.status()).toBe(404);
+  expect(missingHashedAsset.headers()['cache-control'] ?? '').not.toContain('immutable');
 });
 
 test('API paths are proxied instead of handled by the SPA fallback', async ({ request }) => {
-  const apiResponse = await request.get('/api/production-nginx-smoke');
+  const apiResponse = await request.get('/api/production-nginx-smoke.12345678.js');
 
   expect(apiResponse.status()).toBe(200);
   expect(apiResponse.headers()['content-type']).toContain('application/json');
   expect(apiResponse.headers()['x-cinewise-api-stub']).toBe('true');
+  expect(apiResponse.headers()['x-content-type-options']).toBe('nosniff');
+  expect(apiResponse.headers()['cache-control'] ?? '').not.toContain('immutable');
 });
 
 test('index assets exist with browser-compatible MIME types', async ({ request }, testInfo) => {
@@ -83,6 +91,7 @@ test('index assets exist with browser-compatible MIME types', async ({ request }
   expect(indexResponse.status()).toBe(200);
   expect(indexResponse.headers()['content-type']).toContain('text/html');
   expect(indexResponse.headers()['cache-control']).toContain('no-store');
+  expect(indexResponse.headers()['x-content-type-options']).toBe('nosniff');
 
   const assetPaths = extractLocalAssetPaths(await indexResponse.text(), baseURL!);
   expect(assetPaths.length).toBeGreaterThan(0);
@@ -95,6 +104,14 @@ test('index assets exist with browser-compatible MIME types', async ({ request }
     expect(contentType, `${assetPath} returned ${contentType}`).toMatch(
       expectedContentType(assetPath),
     );
+    expect(assetResponse.headers()['x-content-type-options']).toBe('nosniff');
+
+    if (CONTENT_HASHED_ASSET.test(assetPath)) {
+      const cacheControl = assetResponse.headers()['cache-control'] ?? '';
+      expect(cacheControl, `${assetPath} should be cached immutably`).toContain('public');
+      expect(cacheControl, `${assetPath} should be cached immutably`).toContain('max-age=31536000');
+      expect(cacheControl, `${assetPath} should be cached immutably`).toContain('immutable');
+    }
   }
 });
 
