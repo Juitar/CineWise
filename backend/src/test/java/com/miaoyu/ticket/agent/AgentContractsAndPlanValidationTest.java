@@ -8,6 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.miaoyu.ticket.agent.application.model.PlanGenerationRequest;
 import com.miaoyu.ticket.agent.application.model.ReplyGenerationRequest;
+import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
+import com.miaoyu.ticket.agent.application.reply.ErrorReplyFacts;
+import com.miaoyu.ticket.agent.application.tool.AgentToolDefinitions;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlan;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlanNode;
 import com.miaoyu.ticket.agent.domain.plan.FailurePolicy;
@@ -318,21 +321,30 @@ class AgentContractsAndPlanValidationTest {
 
     @Test
     void shouldKeepMockPlanAndReplyDeterministicAndAlwaysValidatePlan() {
-        PlanSchemaValidator validator = new PlanSchemaValidator(new ToolRegistry(List.of()));
-        MockModelGateway gateway = new MockModelGateway(validator, emptyContext());
-        PlanGenerationRequest request = new PlanGenerationRequest("request-1", "帮我找电影", Set.of("readTool"));
+        ToolRegistry registry = new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan()));
+        PlanSchemaValidator validator = new PlanSchemaValidator(registry);
+        MockModelGateway gateway = new MockModelGateway(validator, registry);
+        Map<String, String> slots = Map.of(
+                "movieId", "101", "cinemaId", "201", "date", "2026-08-04");
+        PlanGenerationRequest request = new PlanGenerationRequest(
+                "request-1", "帮我找电影", slots, Set.of("rankMoviePlan"));
 
         var first = gateway.generatePlan(request);
         var second = gateway.generatePlan(request);
         var changedAllowList = gateway.generatePlan(
-                new PlanGenerationRequest("request-1", "帮我找电影", Set.of("otherTool")));
+                new PlanGenerationRequest("request-1", "帮我找电影", slots, Set.of("otherTool")));
 
         assertEquals(first.candidatePlan(), second.candidatePlan());
         assertTrue(first.validationResult().isValid());
         assertNotEquals(first.candidatePlan().planId(), changedAllowList.candidatePlan().planId());
+        ReplyGenerationRequest replyRequest = new ReplyGenerationRequest(
+                "request-1",
+                "帮我找电影",
+                AgentReplyMessageType.ERROR,
+                new ErrorReplyFacts(100001, List.of()));
         assertEquals(
-                gateway.generateReply(new ReplyGenerationRequest("request-1", "帮我找电影")),
-                gateway.generateReply(new ReplyGenerationRequest("request-1", "帮我找电影")));
+                gateway.generateReply(replyRequest),
+                gateway.generateReply(replyRequest));
     }
 
     private static CandidatePlanNode node(
