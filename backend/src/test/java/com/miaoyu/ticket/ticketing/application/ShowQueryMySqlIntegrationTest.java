@@ -41,6 +41,9 @@ class ShowQueryMySqlIntegrationTest {
     private ShowQueryService showQueryService;
 
     @Autowired
+    private AvailableDateQueryService availableDateQueryService;
+
+    @Autowired
     private SeatQueryService seatQueryService;
 
     @Autowired
@@ -81,6 +84,9 @@ class ShowQueryMySqlIntegrationTest {
                     assertThat(show.basePrice().scale()).isEqualTo(2);
                     assertThat(show.expiresAt()).isEqualTo(show.startTime());
                 });
+        assertThat(availableDateQueryService.queryAvailableDates(movieId, cinemaId))
+                .isNotEmpty()
+                .allSatisfy(date -> assertThat(date.showCount()).isPositive());
         assertThat(showQueryService.queryShows(new ShowQuery(
                 movieId,
                 cinemaId,

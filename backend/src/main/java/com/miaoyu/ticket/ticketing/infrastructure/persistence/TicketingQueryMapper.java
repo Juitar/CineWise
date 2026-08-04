@@ -1,5 +1,6 @@
 package com.miaoyu.ticket.ticketing.infrastructure.persistence;
 
+import com.miaoyu.ticket.ticketing.application.AvailableDateQueryRepository;
 import com.miaoyu.ticket.ticketing.application.ShowQueryRepository;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
@@ -9,6 +10,25 @@ import org.apache.ibatis.annotations.Select;
 /** 场次和座位快照的显式只读 SQL，查询范围与排序均在数据库侧固定。 */
 @Mapper
 public interface TicketingQueryMapper {
+
+    /**
+     * 日期数量只按场次事实聚合，不连接座位表；售罄展示语义继续由具体场次查询负责。
+     * CAST写法同时兼容项目的MySQL 8生产基线与H2 MySQL模式契约测试。
+     */
+    @Select("""
+            SELECT CAST(ms.start_time AS DATE) AS show_date,
+                   COUNT(*) AS show_count
+              FROM movie_show ms
+             WHERE ms.movie_id = #{criteria.movieId}
+               AND ms.cinema_id = #{criteria.cinemaId}
+               AND ms.status = 'ON_SALE'
+               AND ms.start_time > #{criteria.startsAfter}
+               AND ms.start_time < #{criteria.startsBefore}
+             GROUP BY CAST(ms.start_time AS DATE)
+             ORDER BY show_date
+            """)
+    List<AvailableDateQueryRow> findAvailableDates(
+            @Param("criteria") AvailableDateQueryRepository.QueryCriteria criteria);
 
     /** 查询滚动窗口内的可售场次，并在数据库侧汇总实时可用座位数。 */
     @Select("""

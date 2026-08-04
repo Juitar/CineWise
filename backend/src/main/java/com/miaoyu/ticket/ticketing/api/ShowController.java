@@ -4,6 +4,7 @@ import com.miaoyu.ticket.common.api.Result;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
+import com.miaoyu.ticket.ticketing.application.AvailableDateQueryService;
 import com.miaoyu.ticket.ticketing.application.SeatMapView;
 import com.miaoyu.ticket.ticketing.application.SeatQueryService;
 import com.miaoyu.ticket.ticketing.application.ShowQuery;
@@ -29,12 +30,36 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/shows")
 public class ShowController {
 
+    private final AvailableDateQueryService availableDateQueryService;
     private final ShowQueryService showQueryService;
     private final SeatQueryService seatQueryService;
 
-    public ShowController(ShowQueryService showQueryService, SeatQueryService seatQueryService) {
+    public ShowController(
+            AvailableDateQueryService availableDateQueryService,
+            ShowQueryService showQueryService,
+            SeatQueryService seatQueryService) {
+        this.availableDateQueryService = availableDateQueryService;
         this.showQueryService = showQueryService;
         this.seatQueryService = seatQueryService;
+    }
+
+    /**
+     * 日期摘要只用于驱动场次页筛选；调用方仍需按选中日期重新读取具体场次。
+     * 两个路由ID均在边界解析，避免非法字符串进入聚合SQL或形成无界查询。
+     */
+    @GetMapping("/available-dates")
+    @Operation(summary = "查询固定影片和影院未来七天的可售日期")
+    public Result<AvailableDatesResponse> queryAvailableDates(
+            @RequestParam String movieId,
+            @RequestParam String cinemaId) {
+        List<AvailableDatesResponse.AvailableDateItemResponse> dates = availableDateQueryService
+                .queryAvailableDates(parseBusinessId(movieId), parseBusinessId(cinemaId))
+                .stream()
+                .map(view -> new AvailableDatesResponse.AvailableDateItemResponse(
+                        view.date(),
+                        view.showCount()))
+                .toList();
+        return Result.success(new AvailableDatesResponse(dates));
     }
 
     /** 接收字符串业务 ID 和可选时间筛选，响应金额始终序列化为两位小数字符串。 */

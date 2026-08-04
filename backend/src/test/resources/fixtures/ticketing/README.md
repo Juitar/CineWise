@@ -20,6 +20,7 @@
 
 | 夹具 | HTTP 方法与路径 | 必要请求头 | 结果未知时的恢复方式 |
 | --- | --- | --- | --- |
+| `c/available-dates-success.json` | `GET /api/v1/shows/available-dates?movieId={movieId}&cinemaId={cinemaId}` | 无 | 只读查询，可直接重新查询。 |
 | `c/show-list-success.json` | `GET /api/v1/shows?movieId={movieId}&cinemaId={cinemaId}` | 无 | 只读查询，可直接重新查询。 |
 | `c/seat-map-success.json` | `GET /api/v1/shows/{showId}/seats` | Cookie 认证 | 只读查询，可重新读取权威座位图。 |
 | `c/create-order-success.json` | `POST /api/v1/orders` | Cookie 认证、`Idempotency-Key`、`Content-Type: application/json` | 使用原 `clientRequestId` 调用 `GET /api/v1/orders/by-request/{clientRequestId}`；不得生成新键重发建单。 |
