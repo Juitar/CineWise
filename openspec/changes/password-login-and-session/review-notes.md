@@ -42,3 +42,37 @@ C 修订后只重新私下提交草案。A 负责固化最终 SQL、完成 AI �
 ## 2026-08-03 C 确认隐私政策处理
 
 注册时隐私政策同意框默认未勾选，用户主动同意后才记录版本和时间。已有账号后续密码登录沿用已记录同意，不把登录自动写成新同意；政策版本更新时必须通过后续独立用例重新主动确认。
+
+## 2026-08-04 C 完成认证文档修正
+
+C 已在 `CineWise-Docs/main` 以提交 `f26a05a` 完成以下修正：
+
+- 《用户认证设计》和《前端应用系统设计》的当前方案统一使用公共原生 `fetch` 客户端 `apiRequest<T>()`，普通 REST 始终携带 `credentials: 'include'`；
+- 后端总系分中的认证 REST `CurrentUser` 统一为 `id/role/nickname/emailMasked/emailVerified/status/privacyPolicyVersion`，不返回完整邮箱和 `tokenVersion`；
+- 注册、密码登录、验证码登录和管理员登录的详细请求补齐 `clientRequestId`，并修正认证响应示例；
+- 本仓库 `AGENTS.md` 同步修正公共请求层说明，避免后续实现重新引入 Umi request 插件。
+
+文档差异检查、Markdown 围栏检查和冲突标记检查均通过，因此任务 6.1、6.2 标记完成。
+
+## 2026-08-04 C 完成 OpenAPI 预检查
+
+C 从当前收尾分支使用测试密钥和内存 H2 启动后端，未读取 `.env`，未连接共享 MySQL/Redis，导出实际 `/v3/api-docs`。候选文件位于本地构建目录 `backend/target/cinewise-auth-openapi.json`，不提交仓库；SHA-256 为 `F9C535924AA2EDCB9CFCCFB56573663142FDEA03A159EC3E7F9B34C74FD9C779`。
+
+导出前首次检查发现认证接口只有 `200` 响应，响应 DTO 字段也未标记必填。C 已补充认证 OpenAPI 响应和 Schema 注解，并增加自动化契约测试；修正后的导出结果为：
+
+- `POST /api/v1/auth/login/password`：`200/400/401/403`，请求必填 `clientRequestId/email/password`；
+- `POST /api/v1/admin/auth/login`：`200/400/401/403`，请求必填 `clientRequestId/email/password`；
+- `GET /api/v1/auth/me`：`200/401`，使用 `cookieAuth`；
+- `POST /api/v1/auth/logout`：`200/403`，同时声明 `cookieAuth` 和 `csrfToken`；
+- `GET /api/v1/auth/csrf`：`200`，公开获取 CSRF Token；
+- `CurrentUserResponse` 必填字段为 `id/role/nickname/emailMasked/emailVerified/status/privacyPolicyVersion`，不存在 `userId/email/tokenVersion`；
+- `cookieAuth` 使用 Cookie `cinewise_access_token`，`csrfToken` 使用 Header `X-XSRF-TOKEN`；
+- `201001/201005/201006/201009` 已进入对应 HTTP 错误响应说明。
+
+C 预检查结论为通过。任务 6.7 仍需以下负责人基于同一提交和导出摘要明确回复“确认”或指出问题：
+
+- A：确认订单、支付、退款和管理接口继续使用 `cookieAuth`，浏览器写请求使用 `X-XSRF-TOKEN`，不需要修改 A 的业务 DTO；
+- B：确认 Agent POST SSE 和确认写请求继续复用 Cookie/CSRF 规则，会话失效与断流恢复不重发写操作；
+- D：确认普通 REST 客户端、`CurrentUserResponse`、401/403 处理以及 D 的业务 DTO 不需要修改。
+
+Cookie 的 `Secure/HttpOnly/SameSite=Lax/Path=/` 属性由 `AuthSecurityAdaptersTest` 和 `AuthControllerIntegrationTest` 验证；OpenAPI 只声明 Cookie 名称与用途，不能替代运行时 `Set-Cookie` 验证。A/B/D 均确认后，C 才可勾选任务 6.7。

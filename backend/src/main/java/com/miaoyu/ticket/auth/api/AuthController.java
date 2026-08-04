@@ -9,10 +9,14 @@ import com.miaoyu.ticket.auth.infrastructure.config.AuthProperties;
 import com.miaoyu.ticket.auth.infrastructure.security.AuthCookieManager;
 import com.miaoyu.ticket.common.api.Result;
 import com.miaoyu.ticket.common.observability.TraceIdHolder;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,6 +51,17 @@ public class AuthController {
 
     @PostMapping("/auth/login/password")
     @SecurityRequirement(name = "csrfToken")
+    @ApiResponses({
+        @ApiResponse(
+                responseCode = "200",
+                description = "登录成功并写入 JWT HttpOnly Cookie",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(ref = "#/components/schemas/ResultCurrentUserResponse"))),
+        @ApiResponse(responseCode = "400", description = "101001 请求参数不合法"),
+        @ApiResponse(responseCode = "401", description = "201001 邮箱或密码错误"),
+        @ApiResponse(responseCode = "403", description = "201005 账号不可用；201009 CSRF Token 缺失或无效")
+    })
     public Result<CurrentUserResponse> loginUser(
             @Valid @RequestBody PasswordLoginRequest request,
             HttpServletRequest servletRequest,
@@ -56,6 +71,17 @@ public class AuthController {
 
     @PostMapping("/admin/auth/login")
     @SecurityRequirement(name = "csrfToken")
+    @ApiResponses({
+        @ApiResponse(
+                responseCode = "200",
+                description = "管理员登录成功并写入 JWT HttpOnly Cookie",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(ref = "#/components/schemas/ResultCurrentUserResponse"))),
+        @ApiResponse(responseCode = "400", description = "101001 请求参数不合法"),
+        @ApiResponse(responseCode = "401", description = "201001 邮箱、密码或管理员角色校验失败"),
+        @ApiResponse(responseCode = "403", description = "201005 账号不可用；201009 CSRF Token 缺失或无效")
+    })
     public Result<CurrentUserResponse> loginAdmin(
             @Valid @RequestBody PasswordLoginRequest request,
             HttpServletRequest servletRequest,
@@ -65,6 +91,15 @@ public class AuthController {
 
     @GetMapping("/auth/me")
     @SecurityRequirement(name = "cookieAuth")
+    @ApiResponses({
+        @ApiResponse(
+                responseCode = "200",
+                description = "返回服务端确认的当前用户",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(ref = "#/components/schemas/ResultCurrentUserResponse"))),
+        @ApiResponse(responseCode = "401", description = "201006 Cookie 会话缺失或已经失效")
+    })
     public Result<CurrentUserResponse> currentUser() {
         long userId = currentUserAccessor.requireCurrentUserId();
         return Result.success(CurrentUserResponse.from(authService.getCurrentUser(userId)));
@@ -73,6 +108,15 @@ public class AuthController {
     @PostMapping("/auth/logout")
     @SecurityRequirement(name = "cookieAuth")
     @SecurityRequirement(name = "csrfToken")
+    @ApiResponses({
+        @ApiResponse(
+                responseCode = "200",
+                description = "幂等登出完成并清除认证 Cookie",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(ref = "#/components/schemas/ResultLogoutResponse"))),
+        @ApiResponse(responseCode = "403", description = "201009 CSRF Token 缺失或无效")
+    })
     public Result<LogoutResponse> logout(HttpServletRequest request, HttpServletResponse response) {
         currentUserAccessor.findCurrentUser().ifPresent(authService::logout);
         cookieManager.clearAccessToken(response);
