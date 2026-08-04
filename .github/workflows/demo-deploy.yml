@@ -17,7 +17,7 @@ permissions:
 
 concurrency:
   group: cinewise-demo-deployment
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   backend-verify:
@@ -69,7 +69,7 @@ jobs:
     if: github.ref == 'refs/heads/dev'
     needs: [backend-verify, frontend-verify]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment: demo
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -116,6 +116,9 @@ jobs:
             "$DEPLOY_USER@$DEPLOY_HOST" \
             "DEPLOY_PATH_BASE64='$deploy_path_base64' DEPLOY_SHA='$DEPLOY_SHA' bash -se" <<'REMOTE'
           set -Eeuo pipefail
+
+          # Compose 构建发生在演示服务器；显式使用 BuildKit 才能复用 Dockerfile 的 Maven cache mount。
+          export DOCKER_BUILDKIT=1
 
           deploy_path="$(printf '%s' "$DEPLOY_PATH_BASE64" | base64 --decode)"
           cd "$deploy_path"

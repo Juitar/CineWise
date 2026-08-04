@@ -12,6 +12,7 @@
 - [x] 2.4 部署失败时恢复上一 Git SHA，保持失败结果供 A 处理。
 - [x] 2.5 拒绝 `FLYWAY_ENABLED=true` 或 `SEED_ENABLED=true` 的自动部署。
 - [x] 2.6 移除应用 Compose 的 Redis 服务，显式注入共享 Redis 和可选 MinIO 环境变量。
+- [x] 2.7 后端 Dockerfile 使用服务器 BuildKit Maven cache mount，部署构建输出 plain progress；GitHub Runner 的 Maven 缓存继续只服务质量门，新提交取消同组旧工作流。
 
 ## 3. 文档与验证
 

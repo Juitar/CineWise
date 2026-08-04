@@ -34,6 +34,14 @@ MinIO 仍是可选能力。Compose 将四个 MinIO 变量透传给后端，为�
 
 部署前检查服务器 `.env`，发现 `FLYWAY_ENABLED` 或 `SEED_ENABLED` 开启即拒绝部署。Flyway SQL 版本分配、空库验证和共享库发布继续由 A 的独立受控流程完成。
 
+### 8. 复用演示服务器的 BuildKit 依赖缓存
+
+后端 Docker 镜像仍在演示服务器通过 Compose 构建。GitHub Runner 的 Maven 缓存只加速 `backend-verify`，不能直接加速 SSH 远端的 Docker build；在没有镜像仓库和镜像发布流程前，不配置无法被远端构建消费的 GitHub Actions Buildx cache。
+
+后端 Dockerfile 使用 BuildKit cache mount 持久复用 Maven repository，并让 `dependency:go-offline` 与正式 `package` 共享同一缓存。Compose 构建显式启用 BuildKit 和 plain progress，既减少 `pom.xml` 或构建层失效后的重复下载，也持续输出依赖下载日志。首次构建仍需下载依赖，服务器清理 BuildKit cache 后也会重新预热。
+
+同一 `dev` 部署组启用 `cancel-in-progress`，新提交可以取消已过时的工作流，避免旧质量门或旧构建长期占用队列。取消发生在远端切换过程中时不保证旧工作流执行回滚；后续精确 SHA 部署必须重新执行完整 Compose 收敛和健康检查，因此不得把工作流取消视为一次成功发布。
+
 ## Risks / Trade-offs
 
 - 服务器构建依赖网络和 Docker 缓存：首次部署较慢；通过 Compose 构建缓存降低后续耗时。

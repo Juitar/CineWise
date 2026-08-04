@@ -1,10 +1,12 @@
 FROM maven:3.9.11-eclipse-temurin-21-alpine AS builder
 WORKDIR /workspace
 COPY pom.xml ./
-RUN mvn --batch-mode --no-transfer-progress dependency:go-offline
+RUN --mount=type=cache,id=cinewise-backend-m2,target=/root/.m2/repository,sharing=locked \
+    mvn --batch-mode --no-transfer-progress dependency:go-offline
 COPY src ./src
 COPY config ./config
-RUN mvn --batch-mode --no-transfer-progress clean package -DskipTests
+RUN --mount=type=cache,id=cinewise-backend-m2,target=/root/.m2/repository,sharing=locked \
+    mvn --batch-mode --no-transfer-progress clean package -DskipTests
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
