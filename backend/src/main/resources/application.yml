@@ -64,6 +64,11 @@ cinewise:
       requests-per-minute: 10
       retry-count: 1
       retry-backoff: 200ms
+  travel:
+    food:
+      radius-default-meters: ${TRAVEL_FOOD_RADIUS_DEFAULT_METERS:1000}
+      radius-min-meters: ${TRAVEL_FOOD_RADIUS_MIN_METERS:300}
+      radius-max-meters: ${TRAVEL_FOOD_RADIUS_MAX_METERS:3000}
   seed:
     # 演示数据必须显式开启，避免普通启动过程意外写入共享数据库。
     enabled: ${SEED_ENABLED:false}
