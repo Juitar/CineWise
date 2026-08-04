@@ -8,7 +8,7 @@
 - 提供天气、确定性通用交通建议、建议快照和 EMAIL 提醒调度；外部数据失败时明确使用缓存、版本化 Demo 或省略天气事实，不影响电子票展示。
 - 提供用户主动发起的单条基础路线和简单周边餐饮查询；路线仅使用一次性位置或手动地点，不保存精确位置和路线几何。
 - 建立 `travel_task`、`travel_advice_snapshot`、`travel_notification_log` 的迁移、任务状态、通知恢复、Mock 与回归测试方案。
-- 明确 A、C、B 的协作边界：A 提供事件和迁移版本号，C 提供公共邮件端口和路线展示，B 只能读取任务或建议摘要，不通过对话创建、刷新或发送提醒。
+- 明确 A、C、B 的协作边界：A 在交易事务内登记事件、由 D 在提交后消费，并每 5 分钟分别扫描最近 24 小时的 `PAID`、`REFUNDED` 订单进行补偿；C 提供公共邮件端口和路线展示，B 只能读取任务或建议摘要，不通过对话创建、刷新或发送提醒。
 
 ## Capabilities
 
@@ -24,6 +24,6 @@
 ## Impact
 
 - 代码范围：`backend` 下新增 `travel` 模块的 api、application、domain、infrastructure 和对应测试；D 的 Provider、缓存、定时任务、Demo 资源和回归清单。
-- 数据范围：新增 D 负责的 `travel_task`、`travel_advice_snapshot`、`travel_notification_log`；迁移版本号由 A 分配，D 不修改已发布迁移。
+- 数据范围：新增 D 负责的 `travel_task`、`travel_advice_snapshot`、`travel_notification_log`；`travel_task.id` 为内部主键，`travel_task.task_id` 为对外任务号，子表以 `travel_task_id` 逻辑关联内部主键。迁移版本号由 A 在完整申请和全局版本复核后分配，D 不修改已发布迁移。
 - 跨模块：A 的 `PaymentSucceededEvent`、`OrderInvalidated` 和补偿调用；C 的 `EmailDeliveryPort`、当前用户和路线展示；B 的 `ToolContext`、`ToolResult<T>` 与只读工具注册。
 - 外部依赖：天气、餐饮 POI、高德路线服务未确认时使用版本化 Demo Provider；路线的精确起点与几何不写 MySQL、Redis、日志、画像、快照、URL 或 Agent 轨迹。

@@ -1,10 +1,10 @@
 ## 1. 跨模块前置确认
 
-- [ ] 1.1 A 确认 `PaymentSucceededEvent`、`OrderInvalidated` 的字段、事务提交后发布方式和 A→D 补偿调用；验证：A、D 在本 change 记录确认，且事件不含邮箱、支付密码、座位明细、精确位置或路线几何。
-- [ ] 1.2 D 通过公开 Application API 提供 A 发布事件所需的 `cinemaArea` 摘要；验证：A 不访问 D 的 Entity、Mapper、Repository 或表即可组装事件。
-- [ ] 1.3 C 确认 `EmailDeliveryPort` 的 `deliveryKey` 发送/查询语义、Mock Provider 和已验证邮箱解析边界；验证：D 仅传 `recipientUserId`，重复键可查回原结果。
-- [ ] 1.4 A 分配 Flyway 版本号并确认 `travel_task`、`travel_advice_snapshot`、`travel_notification_log` 的字段、索引、保留期和兼容方案；验证：记录 Owner 确认，未修改已发布迁移。
-- [ ] 1.5 B、C、D 确认只读出行工具和卡片边界；验证：B 对话读取不创建任务、刷新快照、发送邮件或请求位置，C 只在用户主动操作时发起路线和餐饮请求。
+- [x] 1.1 A 确认 `PaymentSucceededEvent`、`OrderInvalidated` 的字段、事务提交后发布方式和 A→D 的 `ensureTask`、`ensureTaskCancelled` 补偿调用；验证：A、D 在本 change 记录确认，且事件不含邮箱、支付密码、座位明细、精确位置或路线几何。
+- [x] 1.2 D 通过公开 Application API 提供 A 发布事件所需的 `cinemaArea` 摘要；验证：A 不访问 D 的 Entity、Mapper、Repository 或表即可组装事件。
+- [x] 1.3 C 确认 `EmailDeliveryPort` 的 `deliveryKey` 发送/查询语义、Mock Provider 和已验证邮箱解析边界；验证：D 仅传 `recipientUserId`，重复键可查回原结果。
+- [ ] 1.4 A 在 D 提交完整迁移申请后分配 Flyway 版本号并确认 `travel_task`、`travel_advice_snapshot`、`travel_notification_log` 的字段、索引、保留期和兼容方案；验证：记录 Owner 确认，未修改已发布迁移。
+- [x] 1.5 B、C、D 确认只读出行工具和卡片边界；验证：B 对话读取不创建任务、刷新快照、发送邮件或请求位置，C 只在用户主动操作时发起路线和餐饮请求。
 
 ## 2. 任务、事件与数据基础
 

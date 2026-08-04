@@ -21,7 +21,7 @@
 
 ### Requirement: 订单失效必须按版本取消任务
 
-系统 SHALL 消费 A 发布的 `OrderInvalidated`；仅当事件的 `orderVersion` 不小于任务的订单版本时取消未结束任务，并将既有建议标记为只读过期。较旧事件 MUST 被忽略。
+系统 SHALL 消费 A 在退款完成后登记的 `OrderInvalidated`；该事件包含 `PaymentSucceededEvent` 的全部字段，另含 `invalidReason`，MVP 固定为 `REFUNDED`。D 仅当事件的 `orderVersion` 不小于任务的订单版本时取消未结束任务，并将既有建议标记为只读过期。较旧事件 MUST 被忽略。
 
 #### Scenario: 新版本订单失效事件
 - **GIVEN** 存在未结束的出行任务
@@ -33,6 +33,34 @@
 - **GIVEN** 任务已记录更高的订单版本
 - **WHEN** 系统收到较旧的订单失效事件
 - **THEN** 系统不改变任务状态和建议
+
+### Requirement: 支付与订单失效的补偿必须分别按最终订单状态执行
+
+系统 SHALL 公开 `ensureTask(PaymentSucceededEvent)` 和 `ensureTaskCancelled(OrderInvalidated)` 两个 D Application API，供 A 的对账调用；二者均返回仅含 `taskId`、`status`、`orderVersion` 的任务摘要。A 每五分钟分别扫描最近 24 小时的 `PAID`、`REFUNDED` 订单，每批最多 100 条并逐条调用：仍为 `PAID` 的订单调用前者，退款已完成且 `invalidReason=REFUNDED` 的订单调用后者。单条失败不得回滚整批。两个调用都不得访问 D 的 Entity、Mapper、Repository 或表，且重复调用不得创建重复任务、通知或状态回退。
+
+#### Scenario: 支付成功事件消费失败后的补偿
+- **GIVEN** 支付已提交，但 D 未能完成事件消费
+- **WHEN** A 扫描仍为 `PAID` 的订单并调用 `ensureTask`
+- **THEN** D 按原 `orderId` 创建或返回唯一任务
+- **AND** 不因补偿调用创建第二条任务或通知
+
+#### Scenario: 退款失效事件消费失败后的补偿
+- **GIVEN** 退款已完成，但 D 未能完成 `OrderInvalidated` 消费
+- **WHEN** A 扫描退款完成订单并调用 `ensureTaskCancelled`
+- **THEN** D 按退款完成后的 `orderVersion` 取消对应未结束任务并使已有建议只读过期
+- **AND** 系统不将该订单当作 `PAID` 再调用 `ensureTask`
+
+#### Scenario: 退款事件先于支付成功事件到达
+- **GIVEN** D 尚未为该 `orderId` 创建出行任务
+- **WHEN** D 先收到或由 A 对账调用 `ensureTaskCancelled` 的退款完成事件
+- **THEN** D 创建或保留 `CANCELLED` 墓碑任务，并记录不低于该事件的 `orderVersion`
+- **AND** 随后到达的支付成功事件不得创建或重新打开该任务
+
+#### Scenario: 终态任务收到迟到的支付成功事件
+- **GIVEN** 任务状态为 `CANCELLED` 或 `COMPLETED`
+- **WHEN** A 重放事件或调用 `ensureTask`
+- **THEN** 系统返回原任务的最小摘要
+- **AND** 不将任务变为 `PENDING`、不生成建议或通知
 
 ### Requirement: 提醒任务必须生成可降级的建议快照
 
