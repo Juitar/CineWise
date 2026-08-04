@@ -14,7 +14,7 @@ A 已在支付事务内登记 `PaymentSucceededEvent`，D 使用 `AFTER_COMMIT` 
 
 ### 2. 候选不是最终事实，调用 D 前必须重读
 
-`PaidTravelTaskReconciliationService` 对每个候选使用 `findById` 重读订单。只有状态仍为 `PAID` 且版本等于候选版本时才解析上下文，降低扫描后发生退款或状态变化时创建迟到任务的概率。跨模块调用不放入 A 数据库事务；支付与退款事件最终由 D 的订单版本和后续取消能力收敛极短竞争窗口。
+`PaidTravelTaskReconciliationService` 对每个候选使用 `findById` 重读订单。只有状态仍为 `PAID` 且版本等于候选版本时才解析上下文，降低扫描后发生退款或状态变化时创建迟到任务的概率。跨模块调用不放入 A 数据库事务；支付与退款事件最终由 D 的订单版本和后续取消能力收敛极短竞争窗口。当前 D 尚未交付取消入口，因此不能把这次重读当作退款竞态的最终保护。
 
 `TravelEventContextResolver` 继续组合 A 的场次事实与 D 的公开影院摘要。空、过期或异常上下文均按本轮跳过处理，不读取 D 私有数据，也不猜测区域。
 
@@ -30,7 +30,7 @@ A 已在支付事务内登记 `PaymentSucceededEvent`，D 使用 `AFTER_COMMIT` 
 
 ### 5. Job 只负责调度和 trace
 
-新增 `PaidTravelTaskReconciliationJob`，默认启用，每五分钟固定延迟执行，启动后同样等待五分钟，避免应用启动阶段与迁移、种子和其他恢复任务争抢资源。Job 只创建 traceId、调用应用服务并记录汇总，不访问 Repository 或 D 服务。
+新增 `PaidTravelTaskReconciliationJob`，默认关闭；只有部署显式设置 `PAID_TRAVEL_RECONCILIATION_ENABLED=true` 才会注册。D 的 `ensureTaskCancelled(OrderInvalidated)` 合入、退款事件消费与“重读后退款再 ensure”竞态联调通过前，运维不得开启该开关。启用后每五分钟固定延迟执行，启动后同样等待五分钟，避免应用启动阶段与迁移、种子和其他恢复任务争抢资源。Job 只创建 traceId、调用应用服务并记录汇总，不访问 Repository 或 D 服务。
 
 配置位于 `cinewise.transaction`：启用开关、延迟、窗口小时数和批次大小。窗口默认二十四小时、批次默认一百，校验范围防止无界扫描。
 
@@ -39,12 +39,12 @@ A 已在支付事务内登记 `PaymentSucceededEvent`，D 使用 `AFTER_COMMIT` 
 - 不新增或修改数据库表、索引和 Flyway 文件。
 - 不修改 REST、OpenAPI、权限、前端或事件字段。
 - 新查询只读取 `ticket_order`，新跨模块调用只依赖 D 的公开 Application Service。
-- `REFUNDED` 取消补偿不在本 change；D 完成 `ensureTaskCancelled` 后独立实现。
+- `REFUNDED` 取消补偿不在本 change；D 完成 `ensureTaskCancelled` 后独立实现。在该前置条件满足前，PAID 补偿 Job 保持默认关闭。
 
 ## Verification
 
 - 单元测试覆盖多页键集扫描、空窗口、状态/版本变化、上下文缺失、D 调用失败隔离和事件字段。
 - Spring 集成测试覆盖真实订单查询、支付后删除测试任务再补建、重复补偿仍唯一以及窗口过滤。
 - MySQL 8.4 集成测试覆盖相同毫秒支付、批次大小为一的键集分页和任务唯一约束联调。
-- Job 测试覆盖服务调用和 MDC 清理。
+- Job 测试覆盖服务调用、MDC 清理和缺少显式开关时不注册 Job。
 - 执行 `openspec validate paid-travel-task-reconciliation --strict`、定向测试、`mvnw.cmd verify`、有效注释审查和 `git diff --check`。

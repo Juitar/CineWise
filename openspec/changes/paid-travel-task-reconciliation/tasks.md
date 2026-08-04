@@ -9,9 +9,10 @@
 
 - [x] 2.1 A 实现按 `paid_time/id` 的 PAID 候选键集分页查询；验证：状态、窗口、边界和同时间排序测试通过。
 - [x] 2.2 A 实现权威重读、上下文解析、事件重建和逐条 `ensureTask`；验证：重复、状态变化、上下文缺失和异常隔离测试通过。
-- [x] 2.3 A 实现有界配置、五分钟 Job、traceId 和批处理报告；验证：Job 不访问 Mapper/D Repository，空窗口和失败汇总正确。
+- [x] 2.3 A 实现有界配置、默认关闭的五分钟 Job、traceId 和批处理报告；验证：Job 不访问 Mapper/D Repository，缺少显式开启配置时不注册，空窗口和失败汇总正确。
 
 ## 3. 验证与交付
 
 - [x] 3.1 A 完成与 D 公开服务的 H2 和 MySQL 8.4 集成测试；验证：遗漏任务可补建、同毫秒键集分页、重复补偿任务唯一、交易终态不改变。
 - [x] 3.2 A 执行完整质量门；验证：`mvnw.cmd verify`、关键生产代码有效注释、`git diff --check` 和范围检查通过。
+- [ ] 3.3 A/D 在 D 交付 `ensureTaskCancelled(OrderInvalidated)` 后补充“重读后退款、再执行 ensureTask”竞态联调；通过前生产保持 `PAID_TRAVEL_RECONCILIATION_ENABLED=false`。

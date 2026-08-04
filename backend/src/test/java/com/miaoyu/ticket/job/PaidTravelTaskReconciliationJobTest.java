@@ -11,6 +11,7 @@ import com.miaoyu.ticket.order.application.PaidTravelTaskReconciliationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 class PaidTravelTaskReconciliationJobTest {
 
@@ -42,5 +43,17 @@ class PaidTravelTaskReconciliationJobTest {
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(MDC.get(TraceIdHolder.MDC_KEY)).isNull();
+    }
+
+    @Test
+    void givenMissingEnablementProperty_whenEvaluatingJobCondition_thenDoNotRegisterJob() {
+        ConditionalOnProperty condition = PaidTravelTaskReconciliationJob.class
+                .getAnnotation(ConditionalOnProperty.class);
+
+        assertThat(condition).isNotNull();
+        assertThat(condition.prefix()).isEqualTo("cinewise.transaction.paid-travel-reconciliation");
+        assertThat(condition.name()).containsExactly("enabled");
+        assertThat(condition.havingValue()).isEqualTo("true");
+        assertThat(condition.matchIfMissing()).isFalse();
     }
 }

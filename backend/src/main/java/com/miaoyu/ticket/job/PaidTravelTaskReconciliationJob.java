@@ -12,7 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * 每五分钟触发A的PAID订单出行任务补偿应用服务。
+ * 显式启用后每五分钟触发A的PAID订单出行任务补偿应用服务。
  *
  * <p>Job只负责调度、trace和汇总日志，不直接读取订单Mapper或D的任务持久层。</p>
  */
@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
         prefix = "cinewise.transaction.paid-travel-reconciliation",
         name = "enabled",
         havingValue = "true",
-        matchIfMissing = true)
+        matchIfMissing = false)
 public class PaidTravelTaskReconciliationJob {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PaidTravelTaskReconciliationJob.class);
