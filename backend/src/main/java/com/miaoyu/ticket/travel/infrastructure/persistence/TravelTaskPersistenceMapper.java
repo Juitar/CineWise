@@ -90,14 +90,18 @@ public interface TravelTaskPersistenceMapper {
 
     /**
      * 用订单版本作为退款事件的顺序裁决，不能因旧事件或重复对账取消较新的任务状态。
+     *
+     * <p>已取消任务仅在收到更高版本退款时更新审计字段；状态与原关闭时间不变，避免被迟到的支付事件重新打开。</p>
      */
     @org.apache.ibatis.annotations.Update("""
             UPDATE travel_task
                SET invalidation_event_id = #{invalidationEventId}, order_version = #{orderVersion},
-                   version = version + 1, status = 'CANCELLED', closed_at = #{closedAt},
+                   version = version + 1, status = 'CANCELLED',
+                   closed_at = CASE WHEN status = 'CANCELLED' THEN closed_at ELSE #{closedAt} END,
                    update_time = #{closedAt}
-             WHERE id = #{id} AND order_version <= #{orderVersion}
-               AND status NOT IN ('COMPLETED', 'CANCELLED', 'FAILED')
+             WHERE id = #{id} AND status NOT IN ('COMPLETED', 'FAILED')
+               AND (order_version < #{orderVersion}
+                    OR (status <> 'CANCELLED' AND order_version = #{orderVersion}))
             """)
     int cancel(
             @Param("id") long id,

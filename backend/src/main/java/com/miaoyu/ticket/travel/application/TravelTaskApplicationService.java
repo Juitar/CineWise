@@ -108,7 +108,10 @@ public class TravelTaskApplicationService {
 
     private TravelTaskSummary cancelExistingTask(
             TravelTaskRepository.TravelTaskSnapshot task, InvalidationTaskInput input) {
-        if (task.orderVersion() > input.orderVersion() || task.status().isTerminal()) {
+        if (task.orderVersion() > input.orderVersion()
+                || task.status() == TravelTaskStatus.COMPLETED
+                || task.status() == TravelTaskStatus.FAILED
+                || (task.status() == TravelTaskStatus.CANCELLED && task.orderVersion() == input.orderVersion())) {
             return toSummary(task);
         }
         if (travelTaskRepository.cancel(task.id(), input.orderVersion(), input.eventId(), currentBusinessTime())) {

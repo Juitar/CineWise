@@ -6,6 +6,10 @@ import com.miaoyu.ticket.order.event.OrderInvalidated;
 import com.miaoyu.ticket.order.event.PaymentSucceededEvent;
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -113,6 +117,46 @@ class TravelTaskPaymentEventIntegrationTest {
     }
 
     @Test
+    void givenLowerRefundThenHigherRefund_whenPublished_thenPromoteCancelledTombstoneAuditVersion() {
+        transactionTemplate.executeWithoutResult(status -> eventPublisher.publishEvent(
+                invalidatedEvent("refund-v5", "88007", 5L)));
+        transactionTemplate.executeWithoutResult(status -> eventPublisher.publishEvent(
+                invalidatedEvent("refund-v6", "88007", 6L)));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM travel_task WHERE order_id = ?", String.class, 88007L))
+                .isEqualTo("CANCELLED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT order_version FROM travel_task WHERE order_id = ?", Long.class, 88007L))
+                .isEqualTo(6L);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT invalidation_event_id FROM travel_task WHERE order_id = ?", String.class, 88007L))
+                .isEqualTo("refund-v6");
+    }
+
+    @Test
+    void givenConcurrentRefunds_whenCancelling_thenKeepHigherCancelledTombstoneVersion() throws Exception {
+        CountDownLatch start = new CountDownLatch(1);
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            Future<TravelTaskSummary> lower = executor.submit(() -> cancelAfterSignal(
+                    start, invalidatedEvent("refund-concurrent-v5", "88008", 5L)));
+            Future<TravelTaskSummary> higher = executor.submit(() -> cancelAfterSignal(
+                    start, invalidatedEvent("refund-concurrent-v6", "88008", 6L)));
+            start.countDown();
+
+            lower.get();
+            higher.get();
+        }
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM travel_task WHERE order_id = ?", String.class, 88008L))
+                .isEqualTo("CANCELLED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT order_version FROM travel_task WHERE order_id = ?", Long.class, 88008L))
+                .isEqualTo(6L);
+    }
+
+    @Test
     void givenPendingTask_whenGeneratingAdvice_thenAppendDemoSnapshotAndMarkTaskReady() {
         TravelTaskSummary task = travelTaskApplicationService.ensureTask(paymentEvent("event-advice", "88003"));
         long internalTaskId = jdbcTemplate.queryForObject(
@@ -171,6 +215,12 @@ class TravelTaskPaymentEventIntegrationTest {
                 orderVersion,
                 OffsetDateTime.parse("2026-08-04T08:10:00+08:00"),
                 "REFUNDED");
+    }
+
+    private TravelTaskSummary cancelAfterSignal(CountDownLatch start, OrderInvalidated event)
+            throws InterruptedException {
+        start.await();
+        return travelTaskApplicationService.ensureTaskCancelled(event);
     }
 
     private long countTasks() {

@@ -82,16 +82,15 @@ class TravelTaskApplicationServiceTest {
     }
 
     @Test
-    void givenNewerRefundThenOlderRefund_whenCancelling_thenKeepNewerOrderVersion() {
+    void givenLowerRefundThenHigherRefund_whenCancelling_thenPromoteCancelledTombstoneVersion() {
         InMemoryTravelTaskRepository repository = new InMemoryTravelTaskRepository();
         TravelTaskApplicationService service = service(repository);
-        service.ensureTask(paymentEvent("payment-before-refund", "90004"));
 
-        service.ensureTaskCancelled(invalidatedEvent("refund-new", "90004", 6L));
-        TravelTaskSummary older = service.ensureTaskCancelled(invalidatedEvent("refund-old", "90004", 5L));
+        service.ensureTaskCancelled(invalidatedEvent("refund-old", "90004", 5L));
+        TravelTaskSummary newer = service.ensureTaskCancelled(invalidatedEvent("refund-new", "90004", 6L));
 
-        assertThat(older.status()).isEqualTo(TravelTaskStatus.CANCELLED);
-        assertThat(older.orderVersion()).isEqualTo(6L);
+        assertThat(newer.status()).isEqualTo(TravelTaskStatus.CANCELLED);
+        assertThat(newer.orderVersion()).isEqualTo(6L);
     }
 
     private TravelTaskApplicationService service(InMemoryTravelTaskRepository repository) {
@@ -174,7 +173,11 @@ class TravelTaskApplicationServiceTest {
         @Override
         public boolean cancel(long id, long orderVersion, String invalidationEventId, LocalDateTime closedAt) {
             TravelTaskSnapshot task = findById(id).orElse(null);
-            if (task == null || task.orderVersion() > orderVersion || task.status().isTerminal()) {
+            if (task == null
+                    || task.orderVersion() > orderVersion
+                    || task.status() == TravelTaskStatus.COMPLETED
+                    || task.status() == TravelTaskStatus.FAILED
+                    || (task.status() == TravelTaskStatus.CANCELLED && task.orderVersion() == orderVersion)) {
                 return false;
             }
             TravelTaskSnapshot cancelled = new TravelTaskSnapshot(
