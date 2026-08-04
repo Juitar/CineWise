@@ -57,7 +57,7 @@ public class PaymentTransaction {
             long userId,
             String orderNo,
             String idempotencyKey,
-            Optional<PaymentEventContextResolver.PaymentEventContext> eventContext) {
+            Optional<TravelEventContextResolver.TravelEventContext> eventContext) {
         OrderRepository.OrderSnapshot order = orderRepository.findByOrderNoForUpdate(userId, orderNo)
                 .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
         PaymentRepository.PaymentSnapshot paymentByKey = paymentRepository
@@ -156,7 +156,7 @@ public class PaymentTransaction {
     private void publishPaymentSucceededSafely(
             OrderRepository.OrderSnapshot originalOrder,
             PaymentView paidResult,
-            PaymentEventContextResolver.PaymentEventContext context,
+            TravelEventContextResolver.TravelEventContext context,
             LocalDateTime paidAt) {
         if (context.showId() != originalOrder.showId()) {
             LOGGER.warn("支付事件场次上下文不匹配, orderId={}", originalOrder.orderId());

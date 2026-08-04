@@ -4,6 +4,7 @@ import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
+import com.miaoyu.ticket.order.domain.OrderStatus;
 import com.miaoyu.ticket.ticketing.application.RefundShowRepository;
 import com.miaoyu.ticket.ticketing.application.RefundShowService;
 import com.miaoyu.ticket.ticketing.application.SeatRefundService;
@@ -11,6 +12,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -48,6 +50,7 @@ public class RefundApplicationService {
     private final RefundEligibilityPolicy eligibilityPolicy;
     private final RefundShowService refundShowService;
     private final SeatRefundService seatRefundService;
+    private final TravelEventContextResolver travelEventContextResolver;
     private final Clock clock;
 
     public RefundApplicationService(
@@ -60,6 +63,7 @@ public class RefundApplicationService {
             RefundEligibilityPolicy eligibilityPolicy,
             RefundShowService refundShowService,
             SeatRefundService seatRefundService,
+            TravelEventContextResolver travelEventContextResolver,
             Clock clock) {
         this.currentUserAccessor = currentUserAccessor;
         this.orderRepository = orderRepository;
@@ -70,6 +74,7 @@ public class RefundApplicationService {
         this.eligibilityPolicy = eligibilityPolicy;
         this.refundShowService = refundShowService;
         this.seatRefundService = seatRefundService;
+        this.travelEventContextResolver = travelEventContextResolver;
         this.clock = clock;
     }
 
@@ -108,10 +113,12 @@ public class RefundApplicationService {
     public RefundView requestRefund(RefundCommand rawCommand) {
         RefundCommand command = normalizeAndValidate(rawCommand);
         long userId = currentUserAccessor.requireCurrentUserId();
+        Optional<TravelEventContextResolver.TravelEventContext> eventContext =
+                resolveEventContext(userId, command.orderNo());
         // 外层服务捕获唯一约束竞争，确保原事务已经回滚后才查询竞争者提交的结果。
         // 这里不循环重试，避免对退款和座位释放形成隐式网络重放语义。
         try {
-            RefundView result = refundTransaction.refund(userId, command);
+            RefundView result = refundTransaction.refund(userId, command, eventContext);
             LOGGER.info(
                     "模拟退票处理完成, orderId={}, refundStatus={}, orderStatus={}",
                     result.orderId(),
@@ -120,6 +127,28 @@ public class RefundApplicationService {
             return result;
         } catch (DuplicateKeyException exception) {
             return recoverCompetingRefund(userId, command, exception);
+        }
+    }
+
+    /**
+     * D的影院摘要查询位于退款事务之外；暂时不可用时退款主链继续，由REFUNDED订单对账补偿。
+     * 已退款重放不再查询D，避免恢复权威结果时产生无意义的跨模块依赖。
+     */
+    private Optional<TravelEventContextResolver.TravelEventContext> resolveEventContext(
+            long userId,
+            String orderNo) {
+        OrderRepository.OrderSnapshot order = orderRepository.findByOrderNo(userId, orderNo).orElse(null);
+        if (order == null || order.status() != OrderStatus.PAID) {
+            return Optional.empty();
+        }
+        try {
+            return travelEventContextResolver.resolve(order);
+        } catch (RuntimeException exception) {
+            LOGGER.warn(
+                    "退款失效事件上下文暂不可用, orderId={}, errorType={}",
+                    order.orderId(),
+                    exception.getClass().getSimpleName());
+            return Optional.empty();
         }
     }
 

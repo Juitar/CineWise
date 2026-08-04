@@ -23,7 +23,7 @@ public class PaymentApplicationService {
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
     private final PaymentViewFactory paymentViewFactory;
-    private final PaymentEventContextResolver paymentEventContextResolver;
+    private final TravelEventContextResolver travelEventContextResolver;
 
     public PaymentApplicationService(
             CurrentUserAccessor currentUserAccessor,
@@ -31,20 +31,20 @@ public class PaymentApplicationService {
             OrderRepository orderRepository,
             PaymentRepository paymentRepository,
             PaymentViewFactory paymentViewFactory,
-            PaymentEventContextResolver paymentEventContextResolver) {
+            TravelEventContextResolver travelEventContextResolver) {
         this.currentUserAccessor = currentUserAccessor;
         this.paymentTransaction = paymentTransaction;
         this.orderRepository = orderRepository;
         this.paymentRepository = paymentRepository;
         this.paymentViewFactory = paymentViewFactory;
-        this.paymentEventContextResolver = paymentEventContextResolver;
+        this.travelEventContextResolver = travelEventContextResolver;
     }
 
     /** 唯一约束竞争失败后只查询已提交结果，不在异常事务中继续写入。 */
     public PaymentView pay(String orderNo, String idempotencyKey) {
         validatePaymentInput(orderNo, idempotencyKey);
         long currentUserId = currentUserAccessor.requireCurrentUserId();
-        Optional<PaymentEventContextResolver.PaymentEventContext> eventContext =
+        Optional<TravelEventContextResolver.TravelEventContext> eventContext =
                 resolveEventContext(currentUserId, orderNo);
         try {
             PaymentView result = paymentTransaction.pay(currentUserId, orderNo, idempotencyKey, eventContext);
@@ -63,7 +63,7 @@ public class PaymentApplicationService {
      * D的影院摘要查询位于支付事务之外；暂时不可用时支付主链继续，最近24小时对账负责补建提醒。
      * 日志只记录订单ID和异常类型，不记录区域、用户身份或任何支付凭据。
      */
-    private Optional<PaymentEventContextResolver.PaymentEventContext> resolveEventContext(
+    private Optional<TravelEventContextResolver.TravelEventContext> resolveEventContext(
             long userId,
             String orderNo) {
         OrderRepository.OrderSnapshot order = orderRepository.findByOrderNo(userId, orderNo).orElse(null);
@@ -71,7 +71,7 @@ public class PaymentApplicationService {
             return Optional.empty();
         }
         try {
-            return paymentEventContextResolver.resolve(order);
+            return travelEventContextResolver.resolve(order);
         } catch (RuntimeException exception) {
             LOGGER.warn(
                     "支付事件上下文暂不可用, orderId={}, errorType={}",
