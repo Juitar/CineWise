@@ -14,9 +14,7 @@ spring:
     validate-migration-naming: true
   threads:
     virtual:
-      enabled: ${CINEWISE_CONTENT_NETSTART_ENABLED:false}
-      # 受控验证时显式开启；应用就绪后只调用一次同步，不提供公网刷新接口。
-      sync-on-startup: ${CINEWISE_CONTENT_NETSTART_SYNC_ON_STARTUP:false}
+      enabled: false
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
@@ -58,7 +56,9 @@ cinewise:
     max-stale: 7d
     netstart:
       # 仅学习/演示环境可显式打开；本地保护阈值并非第三方公布配额。
-      enabled: false
+      enabled: ${CINEWISE_CONTENT_NETSTART_ENABLED:false}
+      # 受控验证时显式开启；应用就绪后只调用一次同步，不提供公网刷新接口。
+      sync-on-startup: ${CINEWISE_CONTENT_NETSTART_SYNC_ON_STARTUP:false}
       base-url: https://apis.netstart.cn/maoyan
       daily-sync-cron: "${CINEWISE_CONTENT_NETSTART_DAILY_SYNC_CRON:0 0 3 * * *}"
       connect-timeout: 500ms
