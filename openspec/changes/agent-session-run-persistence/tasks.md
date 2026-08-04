@@ -2,7 +2,7 @@
 
 - [x] 1.1 Owner B：补齐 `active_run_id` 的 `BIGINT NULL`、逻辑关联 `agent_run.id`、正数 CHECK、索引，以及“插入运行与条件占用同事务、终态按当前 run 条件释放”的完整规则；同步总体设计。
 - [x] 1.2 Owner B：补齐四表完整字段、状态 CHECK、唯一键、查询索引、`expire_at` 索引和 `agent_run_step → agent_message → agent_run → agent_session` 的 30 天清理顺序；核对本 Change 不包含 `agent_event`、`agent_action`、`agent_feedback`、`agent_tool_call`。
-- [x] 1.3 Owner B：将完整 Change 推送到可审查分支并执行严格校验，向 A 提供复核材料；V008 在此之前仅为候选版本。已推送 `8bfe01f`，`openspec validate agent-session-run-persistence --strict` 已通过。
+- [x] 1.3 Owner B：将完整 Change 推送到可审查分支并执行严格校验，向 A 提供复核材料；V008 在此之前仅为候选版本。最新已推送提交为 `8e14726`，`openspec validate agent-session-run-persistence --strict` 已通过。
 - [ ] 1.4 Owner A：复核已推送 Change 与总体设计后，正式分配 V008；版本分配不等于 SQL 执行或共享库发布授权。
 - [ ] 1.5 Owner C：确认 `CurrentUserAccessor` 的未认证异常可由 B 的 Application 用例直接复用；本次不新增 HTTP 或 SSE 协议。
 
@@ -10,8 +10,9 @@
 
 - [x] 1.6 Owner B：把 Agent 详细设计第 5.2.1 节设为本 Change 的唯一四表字段来源，逐字段列出类型、长度、可空性、默认值、CHECK、唯一键和索引，并标明未来完整模型不适用于本次迁移。
 - [x] 1.7 Owner B：冻结 session/run/message/step 的状态、角色、消息类型、终态时间和组合关系；定义步骤 `version` CAS、RUNNING/PROCESSING、崩溃超时恢复、到期清理和 `request_hash v1`。
-- [ ] 1.8 Owner A：V007 已由 D 的 `travel-reminder-experience` 使用；根据二次复核材料正式分配本 Change 的 V008。
-- [ ] 1.9 Owner B：提交并推送本轮 Change、总体设计和 Agent 详细设计更新，附上 `openspec validate agent-session-run-persistence --strict` 结果，请 A 再次复核。
+- [ ] 1.8 Owner A：根据本轮小修后的复核材料正式分配本 Change 的 V008；版本分配仅允许形成迁移草案，不代表执行、提交或推送授权。
+- [ ] 1.9 Owner B：本轮小修仅保留本地、未提交未推送；按 A 的后续授权记录提交号和 `openspec validate agent-session-run-persistence --strict` 结果，再发起最终复核。
+- [ ] 1.10 Owner B：补充陈旧运行恢复测试，覆盖启动/新消息提交、30 秒阈值边界、CAS 冲突、失败落库、条件释放 `active_run_id`，以及运行/消息/步骤统一到期时间和会话删除前置条件。
 
 ## 2. Agent 持久化模型与迁移
 
