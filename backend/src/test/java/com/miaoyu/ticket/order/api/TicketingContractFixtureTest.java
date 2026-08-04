@@ -97,7 +97,7 @@ class TicketingContractFixtureTest {
             "updatedAt");
     private static final Set<String> ALTERNATIVE_SHOWS_FIELDS = Set.of("orderNo", "shows");
     private static final Set<String> ALTERNATIVE_SHOW_FIELDS = Set.of(
-            "showId", "cinemaId", "startTime", "basePrice", "status", "availableSeatCount");
+            "showId", "movieId", "cinemaId", "startTime", "basePrice", "status", "availableSeatCount");
     private static final List<String> REST_FIXTURES = List.of(
             "c/show-list-success.json",
             "c/seat-map-success.json",
@@ -232,6 +232,7 @@ class TicketingContractFixtureTest {
             assertExactFields(alternativeShow, "C alternative-show record", ALTERNATIVE_SHOW_FIELDS);
             assertExactRecordFields(alternativeShow, AlternativeShowResponse.class);
             assertTextId(alternativeShow, "showId");
+            assertTextId(alternativeShow, "movieId");
             assertTextId(alternativeShow, "cinemaId");
             assertAmount(alternativeShow, "basePrice");
             OffsetDateTime.parse(alternativeShow.required("startTime").asText());
@@ -311,6 +312,7 @@ class TicketingContractFixtureTest {
         assertSchemaProperty(openApi, "PaymentResponse", "ticketId", "string");
         assertSchemaProperty(openApi, "ElectronicTicketResponse", "ticketId", "string");
         assertSchemaProperty(openApi, "RefundResponse", "refundAmount", "string");
+        assertSchemaProperty(openApi, "AlternativeShowResponse", "movieId", "string");
 
         String normalizedOpenApi = openApiJson.toLowerCase();
         assertThat(normalizedOpenApi)

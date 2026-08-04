@@ -158,6 +158,7 @@ public class RefundController {
         // availableSeatCount只是查询快照，页面仍需在选座时刷新权威座位图。
         return new AlternativeShowResponse(
                 Long.toString(show.showId()),
+                Long.toString(show.movieId()),
                 Long.toString(show.cinemaId()),
                 toOffsetDateTime(show.startTime()),
                 money(show.basePrice()),
