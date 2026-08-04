@@ -27,6 +27,8 @@
 
 本 Change 只引入 `agent_session`、`agent_run`、`agent_message` 和 `agent_run_step`。
 
+V007 已由 D 的出行迁移使用，V008 是本 Change 的候选版本；A 复核后才正式分配，候选不等于 SQL 执行或共享库发布授权。版本选择不改变本 Change 的字段表。相邻《Agent 智能决策中心系统分析设计》第 5.2.1 节“最小四表字段表”是本 Change 唯一字段来源，后续完整模型章节不能用于本次迁移。
+
 - `agent_session`：内部 `id BIGINT`、对外唯一 `session_id VARCHAR(36)`、`user_id BIGINT`、最小摘要、`status`、`active_run_id BIGINT NULL`、`create_time`、`update_time`、`expire_at`。`active_run_id` 逻辑关联 `agent_run.id`，允许空值；使用 `CHECK (active_run_id IS NULL OR active_run_id > 0)`，并建唯一索引，防止同一运行被多个会话占用。
 - `agent_run`：内部 `id BIGINT`、对外唯一 `run_id VARCHAR(36)`、`session_id BIGINT`、`user_id BIGINT`、`client_request_id VARCHAR(36)`、请求摘要哈希、计划 ID/版本、`status`、开始/结束时间、`trace_id`、`create_time`、`update_time`、`expire_at`。对 `(user_id, session_id, client_request_id)` 建唯一键，确保同一请求返回原 runId。
 - `agent_message`：内部 `id BIGINT`、对外唯一 `message_id VARCHAR(36)`、`session_id BIGINT`、`run_id BIGINT`、`user_id BIGINT`、角色、内部消息类型、展示文本、受控 payload JSON、消息状态、`create_time`、`expire_at`。
@@ -37,6 +39,22 @@
 表不建立物理外键，跨表完整性由 Application Service、逻辑关联和必要唯一索引保证。清理任务按 `agent_run_step → agent_message → agent_run → agent_session` 删除已到期数据。`agent_event`、`agent_action`、`agent_feedback`、`agent_tool_call` 留给 SSE、确认、反馈和轨迹 Change，避免提前引入没有消费者的字段。
 
 备选方案是一次性创建详设全部 Agent 表。未采用，因为事件、写工具确认和工具审计的状态与保留规则尚未实现，提前建表会把未验证的字段和索引锁进迁移。
+
+### 1.1 状态、终态时间和步骤并发更新
+
+- 会话状态只允许 `ACTIVE`、`CLEARED`。`CLEARED` 必须没有 `active_run_id`；`ACTIVE` 可有或没有活动运行。
+- 运行状态只允许 `RUNNING`、`COMPLETED`、`FAILED`、`CANCELLED`。`RUNNING` 时 `finished_at` 必须为空；其他终态时 `finished_at` 必须非空。
+- V007/V008 的消息为一次写入的最终可展示消息：角色只允许 `USER`、`ASSISTANT`，状态固定 `COMPLETED`；`USER` 只能使用 `TEXT`，`ASSISTANT` 只能使用 `TEXT`、`QUESTION`、`MOVIE_CARD`、`PLAN_CARD`、`PROGRESS`、`ERROR`。`STREAMING`、`SYSTEM`、路线/订单卡片和事件关联字段留给后续迁移。
+- 步骤状态只允许 `PENDING`、`RUNNING`、`SUCCESS`、`FAILED`、`SKIPPED`。`PENDING` 没有开始/结束时间；`RUNNING` 有开始时间而无结束时间；`SUCCESS`、`FAILED` 有开始和结束时间；`SKIPPED` 没有开始时间但有结束时间。`auto_skipped=true` 时状态必须为 `SKIPPED`，并且 `skip_reason=UPSTREAM_FAILED`、`skip_source_node_id` 非空；其他状态必须没有跳过字段。
+- `agent_run_step` 使用 `version` CAS 加状态前置条件更新，不只依赖状态字符串。所有推进以 `WHERE id=:id AND version=:expectedVersion AND status=:expectedStatus` 更新并使 `version=version+1`；影响行数为零时重新读取，不覆盖其他调度器已保存的结果。
+
+### 1.2 RUNNING、PROCESSING、崩溃和清理
+
+`ToolResult.PROCESSING` 保存为 `agent_run.status=RUNNING`、对应步骤 `status=RUNNING`、`recovery_pending=true`。V007/V008 不自动再次调用工具：在运行超过 30 秒，或应用启动扫描到遗留 `RUNNING` 记录时，恢复器只把未完成的只读步骤和运行条件更新为 `FAILED`，写入安全错误消息，并使用当前内部 run ID 条件清空会话占用；它不重放任何工具。只有终态记录才可在 `expire_at` 到期后清理；清理前若发现 `active_run_id` 指向该运行，必须先按同一条件完成终态转换或跳过删除，绝不留下悬空引用。
+
+### 1.3 request_hash V1
+
+`request_hash_version` 固定为 `v1`。服务端用 UTF-8 对以下规范化 JSON 计算小写十六进制 SHA-256：`{"v":"v1","content":"...","slotSnapshotVersion":n,"slots":{...}}`。字段顺序固定为 `v`、`content`、`slotSnapshotVersion`、`slots`；`slots` 的键按 Unicode 码点升序，字符串先做 Unicode NFC 和 `CRLF/CR` 到 `LF` 统一，但不 trim、不折叠空白。内容、槽位版本和槽位值均参与哈希；`runId`、`traceId`、超时预算和服务端白名单不参与。重复请求必须同时比较版本和哈希，任一不一致即拒绝。
 
 ### 2. 当前用户只能来自 C 的认证上下文
 
@@ -67,15 +85,15 @@ Application Service 依赖 `CurrentUserAccessor`，使用其返回的用户 ID �
 ## Risks / Trade-offs
 
 - [A 未正式分配 V008] → 只能完成规划和不依赖表的纯 Java 类型；表、Mapper、Repository 和集成测试暂停，直到 Change 可审查、总体设计同步并经 A 复核。
-- [运行在工具调用后进程崩溃] → 初始 `RUNNING` 事实仍保留，不会错误重发；恢复器和写工具查询不在本 Change，后续 Change 以该记录为输入。
-- [只读工具返回 PROCESSING] → 运行保持活动且阻止新消息；本 Change 不实现恢复入口，调用方只能查询快照，后续 SSE/恢复 Change 解决继续执行。
+- [运行在工具调用后进程崩溃] → 初始 `RUNNING` 事实仍保留；30 秒超时或启动扫描仅将它条件更新为失败并释放活动运行位，不自动重发工具。
+- [只读工具返回 PROCESSING] → 运行保持活动；恢复器在超时或启动扫描后只结束失败，不调用工具。
 - [MySQL 不支持部分唯一索引] → 以会话活动 run 条件更新保证单会话活动约束，而非依赖 `RUNNING` 状态的部分唯一索引。
 - [JSON 快照包含敏感原文] → 只保存白名单的槽位名、业务 ID、节点和安全回复字段；模型原始消息和工具原始响应不进入 JSON。
 
 ## Migration Plan
 
 1. B 完成数据字段、索引、30 天保留和测试方案的 OpenSpec 规划。
-2. B 推送完整 Change 并同步总体设计；A 复核无物理外键、ID、时间字段、状态 CHECK、索引、30 天清理顺序和执行窗口后，正式分配 V008。
+2. B 推送完整 Change 并同步总体和 Agent 详细设计；V007 已由 D 使用。A 复核无物理外键、逐字段定义、状态 CHECK、索引、30 天清理顺序、CAS、恢复规则和请求哈希后，正式分配本 Change 的 V008。
 3. B 创建迁移脚本及 Entity/Mapper/Repository；A 授权后在空 MySQL 验证，再做重复初始化和旧应用兼容检查。
 4. 发布时先部署兼容表结构，再部署 B 应用代码；本 Change 不读取或修改其他模块表。
 5. 回退应用时保留新增表，不回滚已执行迁移；后续结构修复只通过新的向前迁移完成。

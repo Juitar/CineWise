@@ -69,3 +69,24 @@
 - **WHEN** A 已确认表字段、索引、生命周期并分配迁移版本
 - **THEN** B 使用该版本创建仅包含 Agent 表的迁移脚本和空 MySQL 验证
 - **AND** 迁移不修改 A、C 或 D 拥有的表
+
+### Requirement: 最小四表字段表必须是唯一迁移依据
+系统 SHALL 以 Agent 详细设计第 5.2.1 节的最小四表字段表作为本 Change 的唯一字段、类型、长度、可空性、默认值、CHECK、唯一键和索引依据。该表冻结 `agent_session`、`agent_run`、`agent_message`、`agent_run_step` 的状态、角色、消息类型、终态时间和组合关系。详细设计的未来完整模型 MUST 标明不适用于本次迁移；A 最终分配 V007 或 V008 时不得因版本不同改变该字段表。
+
+#### Scenario: 迁移实现只采用最小四表字段表
+- **WHEN** A 已正式分配本 Change 的迁移版本并授权实现
+- **THEN** B 只按最小四表字段表创建迁移和持久化映射
+- **AND** 不从未来 `agent_event`、`agent_action`、`agent_feedback` 或 `agent_tool_call` 模型复制字段
+
+### Requirement: 步骤推进必须使用版本 CAS，运行恢复不得自动重放工具
+系统 SHALL 为 `agent_run_step` 保存非负 `version`，并以版本 CAS 加预期状态条件推进步骤。`PROCESSING` 和进程崩溃造成的遗留节点 MUST 保持可诊断的 `RUNNING + recovery_pending=true`，但 V007/V008 的恢复器 MUST NOT 自动调用工具；运行超过 30 秒或启动扫描到遗留运行时，恢复器只能条件更新为失败、保存安全错误并以当前内部 run ID 条件清空活动会话。到期清理 MUST 只删除终态记录，并且不得留下 `active_run_id` 悬空关联。
+
+#### Scenario: 旧步骤更新不会覆盖新状态
+- **WHEN** 两个调度器以相同步骤版本尝试推进节点
+- **THEN** 只有一个 `id + version + status` 条件更新成功并递增版本
+- **AND** 另一个调度器重新读取当前状态，不覆盖已保存结果
+
+#### Scenario: 崩溃运行超时后安全结束
+- **WHEN** 运行超过 30 秒或启动扫描发现遗留 `RUNNING` 运行
+- **THEN** 恢复器不调用任何工具，将未完成只读步骤和运行条件更新为失败
+- **AND** 只有会话仍指向该内部 run ID 时才清空 `active_run_id`

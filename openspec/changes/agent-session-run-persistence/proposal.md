@@ -26,6 +26,6 @@
 
 - 受影响代码：`backend/src/main/java/com/miaoyu/ticket/agent/**`、Agent 测试、`backend/src/main/resources/db/migration/**`。
 - 依赖：C 已提供的 `CurrentUserAccessor`；已有 `MinimalReadOnlyAgentService`、计划校验器、状态机和 `rankMoviePlan` 类型化适配器。
-- 数据库：新增 B 的 Agent 表；V008 仅为候选版本，A 复核 Change 后才正式分配；不修改 A/C/D 已有表、Repository 或业务规则。
+- 数据库：新增 B 的 Agent 表；V007 已由 D 的出行迁移使用，V008 是本 Change 的候选版本，A 复核 Change 后才正式分配；不修改 A/C/D 已有表、Repository 或业务规则。
 - 接口：本 Change 只定义 B 的 Application 用例与内部 DTO，不新增 Controller、SSE、确认接口或前端协议。
 - 已确认边界：D 的出行任务、快照刷新、邮件、位置、路线和餐饮不在本 Change；B 仅会在未来读取 D 已校验的只读摘要。
