@@ -3,13 +3,13 @@
 - [x] 1.1 A 确认 `PaymentSucceededEvent`、`OrderInvalidated` 的字段、事务提交后发布方式和 A→D 的 `ensureTask`、`ensureTaskCancelled` 补偿调用；验证：A、D 在本 change 记录确认，且事件不含邮箱、支付密码、座位明细、精确位置或路线几何。
 - [x] 1.2 D 通过公开 Application API 提供 A 发布事件所需的 `cinemaArea` 摘要；验证：A 不访问 D 的 Entity、Mapper、Repository 或表即可组装事件。
 - [x] 1.3 C 确认 `EmailDeliveryPort` 的 `deliveryKey` 发送/查询语义、Mock Provider 和已验证邮箱解析边界；验证：D 仅传 `recipientUserId`，重复键可查回原结果。
-- [ ] 1.4 A 在 D 提交完整迁移申请后分配 Flyway 版本号并确认 `travel_task`、`travel_advice_snapshot`、`travel_notification_log` 的字段、索引、保留期、非负计数和终态时间 CHECK 及兼容方案；验证：记录 Owner 确认，未修改已发布迁移。
+- [x] 1.4 A 已正式分配 V007，并确认 `travel_task`、`travel_advice_snapshot`、`travel_notification_log` 的字段、索引、保留期、非负计数和终态时间 CHECK 及兼容方案；验证：记录 Owner 确认，未修改已发布迁移。
 - [x] 1.5 B、C、D 确认只读出行工具和卡片边界；验证：B 对话读取不创建任务、刷新快照、发送邮件或请求位置，C 只在用户主动操作时发起路线和餐饮请求。
 
 ## 2. 任务、事件与数据基础
 
-- [ ] 2.1 D 建立 `travel` 的 api/application/domain/infrastructure 分层、任务状态和值对象；验证：模块架构测试通过，生产源文件中文有效注释率不低于 30%。
-- [ ] 2.2 A 按确认版本新增三张出行表的前向 Flyway 迁移，D 复核字段与约束；验证：独立 `cinewise_migration_check` MySQL 8 执行迁移，并覆盖非负计数、任务 `closed_at`、通知 `resolved_at` 的正反 CHECK、索引和唯一键、追加式建议快照及版本更新与快照写入同事务的并发/回滚验证。
+- [x] 2.1 D 建立 `travel` 的 api/application/domain/infrastructure 分层、任务状态和值对象；验证：模块架构测试通过，生产源文件中文有效注释率不低于 30%。
+- [ ] 2.2 D 向 A 提交正式 V007 的三张出行表字段、约束和生命周期申请；A 复核通过后在隔离迁移提交中创建最终 Flyway SQL，并负责授权和执行迁移验证，D 复核字段与约束；验证：独立 `cinewise_migration_check` MySQL 8 执行迁移，并覆盖非负计数、任务 `closed_at`、通知 `resolved_at` 的正反 CHECK、索引和唯一键、追加式建议快照及版本更新与快照写入同事务的并发/回滚验证。
 - [ ] 2.3 D 实现 `PaymentSucceededEvent` 的 AFTER_COMMIT 消费、`eventId` 去重、`orderId` 唯一任务创建及 A 补偿共用的 `ensureTask`；验证：重复事件、首次消费失败后补偿和并发创建仅保留一个任务。
 - [ ] 2.4 D 实现 `OrderInvalidated` 的版本比较、任务取消和建议过期处理；验证：新事件取消任务，旧事件不改变任务，取消后不再生成提醒。
 - [ ] 2.5 D 提供本人任务查询、提醒时间更新与只读建议摘要 Application/API 边界；验证：跨用户不可访问，取消任务返回 `207002`，刷新频率限制返回 `107001`。

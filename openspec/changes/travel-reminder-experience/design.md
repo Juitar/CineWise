@@ -46,7 +46,7 @@ D 以 `eventId` 记录已处理事件，以 `travel_task.order_id` 建唯一约�
 
 `TravelTaskApplicationService` 提供 `ensureTask(PaymentSucceededEvent)` 与 `ensureTaskCancelled(OrderInvalidated)` 供 A 对账调用，并返回仅含 `taskId`、`status`、`orderVersion` 的最小任务摘要；实现不访问票务持久层。D 用 `CurrentUserAccessor` 校验本人资源；通知只调用 C 的 `EmailDeliveryPort(recipientUserId, deliveryKey, templateCode, variables, traceId)`；B 的工具只调用 D 的只读 Application Service 并返回公共 `ToolResult<T>`。
 
-已确认：A 已接通 `cinemaArea` 摘要和支付事件登记方式；C 已确认邮件端口及 Mock 查询语义；B、C 已确认只读工具和卡片边界。仍需 A 复核退款失效补偿入口，并在 D 提供完整迁移申请后分配迁移版本。C 的邮件端口代码交付前，D 不接通邮件适配器或邮件联调。
+已确认：A 已接通 `cinemaArea` 摘要和支付事件登记方式，并正式分配 V007；C 已确认邮件端口及 Mock 查询语义；B、C 已确认只读工具和卡片边界。D 负责提交本节字段、约束和生命周期申请供 A 静态复核；最终 V007 前向迁移 SQL 由 A 创建、决定是否授权验证并以隔离迁移提交进入 `dev`。C 的邮件端口代码交付前，D 不接通邮件适配器或邮件联调。
 
 ### 6. 迁移申请的表契约
 
@@ -70,13 +70,13 @@ D 以 `eventId` 记录已处理事件，以 `travel_task.order_id` 建唯一约�
 
 ## Migration Plan
 
-1. D 向 A 提交本设计第 6 节的完整迁移申请；A 完成全局版本复核后分配正式 Flyway 版本，并确认三张 D 表的字段、唯一键、索引、保留期和兼容方案。
-2. 在独立 `cinewise_migration_check` MySQL 8 库执行新迁移；已发布迁移不修改。
+1. D 向 A 提交本设计第 6 节的完整迁移申请；不得创建或提交最终 `V007__create_travel_reminder_tables.sql`，也不得修改 V001～V006 或自行执行 Flyway。
+2. A 静态复核通过并明确授权后，在独立 `cinewise_migration_check` MySQL 8 库创建、执行并验证最终 V007 迁移；已发布迁移不修改。
 3. 部署后先启用 Demo Provider 和 Mock 邮件 Provider，验证支付事件、任务创建、建议和恢复；真实 Provider 只在密钥、配额和域名白名单就绪后启用。
 4. 回退应用版本时停止新的调度与真实 Provider 调用，保留任务和通知日志只读；后续结构调整必须以新的前向迁移处理。
 
 ## Open Questions
 
-- A 已确认 `ensureTask(PaymentSucceededEvent)` 与 `ensureTaskCancelled(OrderInvalidated)` 的调用方向；本 change 已补齐乱序与终态保护规则，待 A 从实际 change 再次复核。
-- A 尚未分配正式 Flyway 版本；当前 `V007` 仅为候选，不能用于迁移文件名或执行。
+- A 已确认 `ensureTask(PaymentSucceededEvent)` 与 `ensureTaskCancelled(OrderInvalidated)` 的调用方向；本 change 已补齐乱序与终态保护规则。
+- A 已于 2026-08-04 正式分配 `V007`，专用于新增 `travel_task`、`travel_advice_snapshot`、`travel_notification_log` 三张表。版本分配不等于 SQL 创建、验证库迁移或共享库发布授权；最终 V007 前向迁移由 A 在静态复核和授权后以隔离提交处理。
 - C 的真实邮件 Provider 是否支持以 `deliveryKey` 查询；不支持时按既定 `UNKNOWN` 不自动重发规则运行。
