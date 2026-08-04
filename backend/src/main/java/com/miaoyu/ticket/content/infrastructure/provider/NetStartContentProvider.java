@@ -134,26 +134,42 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
      * 由上层审计记录本轮统计。</p>
      */
     @Override
-    public List<SynchronizedContent> fetchForDailySync() {
+    public DailySyncBatch fetchForDailySync() {
         if (!properties.enabled() || !isLearningEnvironment()) {
-            return List.of();
+            return new DailySyncBatch(List.of(), 0, Outcome.PROVIDER_DISABLED, null);
         }
         java.util.ArrayList<SynchronizedContent> synchronizedContent = new java.util.ArrayList<>();
+        int attemptedCount = 0;
         try {
             JsonNode hotList = rawClient.fetch(new ContentQuery(
                     com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE, null, null, null));
             for (JsonNode movie : hotList.path("movieList")) {
-                if (!movie.path("id").canConvertToLong()) { continue; }
+                attemptedCount++;
+                if (!movie.path("id").canConvertToLong()) {
+                    continue;
+                }
                 ContentQuery query = new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
                         movie.path("id").longValue(), null, null);
                 query(query).ifPresent(result -> synchronizedContent.add(new SynchronizedContent(query, result)));
             }
             ContentQuery cinemas = new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA,
                     null, "70", "影");
+            attemptedCount++;
             query(cinemas).ifPresent(result -> synchronizedContent.add(new SynchronizedContent(cinemas, result)));
+            Outcome outcome = synchronizedContent.size() == attemptedCount ? Outcome.SUCCESS : Outcome.FIELD_REJECTED;
+            return new DailySyncBatch(synchronizedContent, attemptedCount, outcome, null);
+        } catch (ResourceAccessException exception) {
+            return new DailySyncBatch(synchronizedContent, Math.max(1, attemptedCount),
+                    Outcome.CONNECTION_FAILED, null);
+        } catch (RestClientResponseException exception) {
+            Outcome outcome = exception.getStatusCode().value() == 429
+                    ? Outcome.RATE_LIMITED : Outcome.UPSTREAM_FAILED;
+            return new DailySyncBatch(synchronizedContent, Math.max(1, attemptedCount), outcome,
+                    exception.getStatusCode().value());
         } catch (RuntimeException ignored) {
             // 外部源不可用时本轮不写半截数据；页面继续走既有真实快照和 Demo 回退。
+            return new DailySyncBatch(synchronizedContent, Math.max(1, attemptedCount),
+                    Outcome.FIELD_REJECTED, null);
         }
-        return List.copyOf(synchronizedContent);
     }
 }

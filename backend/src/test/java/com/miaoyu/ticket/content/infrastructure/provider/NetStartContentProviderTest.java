@@ -122,10 +122,32 @@ class NetStartContentProviderTest {
         assertThat(calls).hasValue(2);
     }
 
-    private NetStartContentProvider provider(NetStartRawClient rawClient) {
-        return new NetStartContentProvider(new NetStartProperties(true, "https://apis.netstart.cn/maoyan", "0 0 3 * * *",
-                Duration.ofMillis(500), Duration.ofMillis(1500), 10, 1, Duration.ofMillis(1)),
+    @Test
+    void givenDisabledOrNonLearningEnvironment_whenQuery_thenItNeverCallsProvider() {
+        AtomicInteger calls = new AtomicInteger();
+        NetStartRawClient rawClient = query -> {
+            calls.incrementAndGet();
+            return json("{}");
+        };
+        NetStartContentProvider disabled = new NetStartContentProvider(properties(false),
                 new MockEnvironment().withProperty("spring.profiles.active", "dev"), CLOCK, rawClient);
+        NetStartContentProvider production = new NetStartContentProvider(properties(true),
+                new MockEnvironment().withProperty("spring.profiles.active", "prod"), CLOCK, rawClient);
+
+        // 缺少显式开关或不在学习环境时只能走缓存、快照和 Demo，不能偷偷请求第三方。
+        assertThat(disabled.query(movieDetail())).isEmpty();
+        assertThat(production.query(movieDetail())).isEmpty();
+        assertThat(calls).hasValue(0);
+    }
+
+    private NetStartContentProvider provider(NetStartRawClient rawClient) {
+        return new NetStartContentProvider(properties(true),
+                new MockEnvironment().withProperty("spring.profiles.active", "dev"), CLOCK, rawClient);
+    }
+
+    private NetStartProperties properties(boolean enabled) {
+        return new NetStartProperties(enabled, "https://apis.netstart.cn/maoyan", "0 0 3 * * *",
+                Duration.ofMillis(500), Duration.ofMillis(1500), 10, 1, Duration.ofMillis(1));
     }
 
     private ContentQuery movieDetail() { return new ContentQuery(ContentResourceType.MOVIE, 1L, null, null); }

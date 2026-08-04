@@ -6,6 +6,7 @@ import com.miaoyu.ticket.content.domain.ContentSourceType;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,7 +50,8 @@ public class ContentSyncService {
     @Transactional
     public int synchronizeDailyContent() {
         LocalDateTime startedAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
-        List<LiveContentSyncPort.SynchronizedContent> contents = provider.fetchForDailySync();
+        LiveContentSyncPort.DailySyncBatch batch = provider.fetchForDailySync();
+        List<LiveContentSyncPort.SynchronizedContent> contents = batch.contents();
         int synchronizedCount = 0;
         for (LiveContentSyncPort.SynchronizedContent content : contents) {
             // 端口的契约要求 LIVE；再次校验可防止错误实现把 Demo 或旧快照污染真实读取层。
@@ -62,9 +64,44 @@ public class ContentSyncService {
         }
         // 审计只保存统计值和固定状态，不保存 Provider 原始 JSON、关键词或任何用户数据。
         LocalDateTime finishedAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
+        int failureCount = Math.max(0, batch.attemptedCount() - synchronizedCount);
         persistence.insertSyncLog(new ContentPersistencePort.SyncLogRow(idGenerator.nextId(), "NETSTART_MAOYAN",
-                "DAILY_CONTENT", "daily-" + startedAt, ContentPersistencePort.SyncStatus.SUCCESS, null,
-                contents.size(), synchronizedCount, contents.size() - synchronizedCount, startedAt, finishedAt, null));
+                "DAILY_CONTENT", "daily-" + startedAt, statusOf(batch, synchronizedCount, failureCount),
+                batch.errorCode(), batch.attemptedCount(), synchronizedCount, failureCount, startedAt, finishedAt,
+                auditSummary(batch, contents, synchronizedCount, failureCount, startedAt, finishedAt)));
         return synchronizedCount;
+    }
+
+    /** 数据库现有四种状态已足够表达本轮结果，无须为了审计摘要新增字段或枚举值。 */
+    private ContentPersistencePort.SyncStatus statusOf(LiveContentSyncPort.DailySyncBatch batch,
+                                                        int synchronizedCount, int failureCount) {
+        if (batch.attemptedCount() == 0) {
+            return ContentPersistencePort.SyncStatus.SUCCESS;
+        }
+        if (synchronizedCount == 0) {
+            return ContentPersistencePort.SyncStatus.FAILED;
+        }
+        return failureCount == 0 ? ContentPersistencePort.SyncStatus.SUCCESS
+                : ContentPersistencePort.SyncStatus.PARTIAL;
+    }
+
+    /**
+     * 复用 `error_summary` 写入固定键值的脱敏审计摘要，字段不够时也不记录原始 Provider 内容。
+     *
+     * <p>来源、资源、状态、耗时和计数已经分别保存在结构化列；这里补充数据时间、质量计数和降级层级。
+     * 影片标题、影院地址、搜索词、影评和任何 HTTP 响应正文均不允许进入该字符串。</p>
+     */
+    private String auditSummary(LiveContentSyncPort.DailySyncBatch batch,
+                                List<LiveContentSyncPort.SynchronizedContent> contents,
+                                int synchronizedCount, int failureCount, LocalDateTime startedAt,
+                                LocalDateTime finishedAt) {
+        Optional<LocalDateTime> latestDataTime = contents.stream()
+                .map(content -> content.result().dataTime()).max(LocalDateTime::compareTo);
+        String fallback = contents.stream().anyMatch(content -> content.result().degraded())
+                ? "DEGRADED" : "NONE";
+        long elapsedMillis = java.time.Duration.between(startedAt, finishedAt).toMillis();
+        return "outcome=" + batch.outcome() + ";elapsedMs=" + elapsedMillis + ";dataTime="
+                + latestDataTime.map(LocalDateTime::toString).orElse("NONE") + ";quality=accepted:"
+                + synchronizedCount + ",rejected:" + failureCount + ";fallback=" + fallback;
     }
 }
