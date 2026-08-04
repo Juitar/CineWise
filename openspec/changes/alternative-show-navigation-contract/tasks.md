@@ -14,4 +14,4 @@
 ## 3. 文档与交付
 
 - [x] 3.1 同步 A 后端设计与前端消费接口中的替代场次字段；验证：设计不再声明缺少 `movieId` 的旧结构。
-- [ ] 3.2 执行 `mvnw.cmd verify`、OpenSpec strict 校验、`git diff --check` 和变更范围核对；验证：定向 10 个测试通过，排除 `ContentControllerIntegrationTest` 后完整生命周期通过；最新 `dev` 的该 D 内容测试仍因期望 `fallbackType=MOCK`、实际 `CACHE` 失败，待领域 Owner 修复后重跑无排除的 `verify`。
+- [x] 3.2 执行 `mvnw.cmd verify`、OpenSpec strict 校验、`git diff --check` 和变更范围核对；验证：本地定向 10 个测试与排除 `ContentControllerIntegrationTest` 后的完整生命周期通过；本地全量验证受该 D 内容测试 `MOCK/CACHE` 环境差异影响，GitHub Backend Verify #123 未排除测试并完整通过。
