@@ -209,6 +209,16 @@ class AdminOrderQueryIntegrationTest {
     }
 
     @Test
+    void givenMaximumDateToHttpRequest_whenQueryAdminOrders_thenReturnStable400Error() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/orders")
+                        .param("dateTo", "+999999999-12-31")
+                        .with(authentication(authenticationFor(RoleCode.ADMIN)))
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(CommonErrorCode.INVALID_PARAMETER.code()));
+    }
+
+    @Test
     void givenMissingOrder_whenQueryDetail_thenReturnOrderNotFound() {
         assertThatThrownBy(() -> queryService.queryOrder("CW-NOT-FOUND"))
                 .isInstanceOfSatisfying(BusinessException.class, exception -> assertThat(exception.getErrorCode())

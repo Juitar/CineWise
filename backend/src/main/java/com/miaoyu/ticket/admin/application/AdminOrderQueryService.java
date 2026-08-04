@@ -467,6 +467,10 @@ public class AdminOrderQueryService {
      * 无界历史数据扫描。只提供单侧边界时仍允许按索引查询全部之前或之后的数据。</p>
      */
     private void validateDateRange(LocalDate dateFrom, LocalDate dateTo) {
+        if (LocalDate.MAX.equals(dateTo)) {
+            // 结束日需要转换为次日零点；MAX无法形成左闭右开上界，必须在日期运算前拒绝。
+            throw new BusinessException(CommonErrorCode.INVALID_PARAMETER, "结束日期超出可查询范围");
+        }
         if (dateFrom == null || dateTo == null) {
             return;
         }
