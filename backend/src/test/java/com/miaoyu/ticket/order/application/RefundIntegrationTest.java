@@ -7,20 +7,29 @@ import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.auth.application.RoleCode;
 import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.content.application.ContentSummaryQueryPort;
 import com.miaoyu.ticket.order.domain.ElectronicTicketStatus;
 import com.miaoyu.ticket.order.domain.OrderStatus;
 import com.miaoyu.ticket.order.domain.RefundStatus;
+import com.miaoyu.ticket.order.event.OrderInvalidated;
+import com.miaoyu.ticket.ticketing.application.ShowContextQueryService;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,8 +38,13 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 @ActiveProfiles("test")
 @SpringBootTest(properties = {
@@ -60,6 +74,12 @@ class RefundIntegrationTest {
     @Autowired
     private RefundCurrentUserAccessor currentUserAccessor;
 
+    @Autowired
+    private OrderInvalidatedProbe orderInvalidatedProbe;
+
+    @Autowired
+    private RefundTravelEventContextResolver travelEventContextResolver;
+
     @BeforeEach
     void resetTransactionData() {
         jdbcTemplate.update("DELETE FROM ticket_order_operation");
@@ -76,6 +96,8 @@ class RefundIntegrationTest {
                        version = 0
                 """);
         currentUserAccessor.useUser(USER_A);
+        orderInvalidatedProbe.reset();
+        travelEventContextResolver.reset();
     }
 
     @Test
@@ -112,6 +134,19 @@ class RefundIntegrationTest {
         assertThat(countRows("refund_request")).isEqualTo(1);
         assertThat(paidOrder.order().seatIds()).allSatisfy(
                 seatId -> assertThat(seatStatus(seatId)).isEqualTo("AVAILABLE"));
+        assertThat(orderInvalidatedProbe.events()).singleElement().satisfies(event -> {
+            assertThat(event.eventId()).isNotBlank();
+            assertThat(event.orderId()).isEqualTo(Long.toString(paidOrder.order().orderId()));
+            assertThat(event.showId()).isEqualTo(Long.toString(paidOrder.order().showId()));
+            assertThat(event.userId()).isEqualTo(Long.toString(USER_A));
+            assertThat(event.cinemaArea()).isNotBlank();
+            assertThat(event.startAt().getOffset()).isEqualTo(ZoneOffset.ofHours(8));
+            assertThat(event.orderVersion()).isEqualTo(refunded.stateVersion());
+            assertThat(event.occurredAt()).isEqualTo(OffsetDateTime.of(
+                    FIXED_LOCAL_TIME,
+                    ZoneOffset.ofHours(8)));
+            assertThat(event.invalidReason()).isEqualTo("REFUNDED");
+        });
     }
 
     @Test
@@ -189,6 +224,7 @@ class RefundIntegrationTest {
         assertThat(ticketStatus(ticketMismatch.order().orderId())).isEqualTo("INVALIDATED");
         assertThat(ticketStatus(seatMismatch.order().orderId())).isEqualTo("VALID");
         assertThat(seatStatus(seatMismatch.order().seatIds().getFirst())).isEqualTo("SOLD");
+        assertThat(orderInvalidatedProbe.events()).isEmpty();
     }
 
     @Test
@@ -233,6 +269,83 @@ class RefundIntegrationTest {
         assertThat(orderStatus(paidOrder.order().orderId())).isEqualTo("REFUNDED");
         assertThat(ticketStatus(paidOrder.order().orderId())).isEqualTo("REFUNDED");
         assertThat(seatStatus(paidOrder.order().seatIds().getFirst())).isEqualTo("AVAILABLE");
+        assertThat(orderInvalidatedProbe.events()).hasSize(1);
+    }
+
+    @Test
+    void givenExpiredCinemaSummary_whenRefund_thenCommitWithoutFabricatingEvent() {
+        PaidOrder paidOrder = createPaidOrder("refund-expired-area", 1);
+        long cinemaId = cinemaId(paidOrder.order().showId());
+        Timestamp originalExpiresAt = jdbcTemplate.queryForObject(
+                "SELECT expires_at FROM cinema WHERE id = ?",
+                Timestamp.class,
+                cinemaId);
+        try {
+            jdbcTemplate.update(
+                    "UPDATE cinema SET expires_at = ? WHERE id = ?",
+                    Timestamp.valueOf(FIXED_LOCAL_TIME.minusSeconds(1)),
+                    cinemaId);
+
+            RefundView refunded = refundApplicationService.requestRefund(command(
+                    paidOrder.order().orderNo(),
+                    "refund-expired-area-request",
+                    null,
+                    "refund-expired-area-key"));
+
+            assertThat(refunded.orderStatus()).isEqualTo(OrderStatus.REFUNDED);
+            assertThat(orderInvalidatedProbe.events()).isEmpty();
+        } finally {
+            jdbcTemplate.update("UPDATE cinema SET expires_at = ? WHERE id = ?", originalExpiresAt, cinemaId);
+        }
+    }
+
+    @Test
+    void givenContextQueryFails_whenRefund_thenCommitAndWaitForReconciliation() {
+        PaidOrder paidOrder = createPaidOrder("refund-context-failure", 1);
+        travelEventContextResolver.rejectNextResolve();
+
+        RefundView refunded = refundApplicationService.requestRefund(command(
+                paidOrder.order().orderNo(),
+                "refund-context-failure-request",
+                null,
+                "refund-context-failure-key"));
+
+        assertThat(refunded.orderStatus()).isEqualTo(OrderStatus.REFUNDED);
+        assertThat(refundApplicationService.queryRefund(paidOrder.order().orderNo())).isEqualTo(refunded);
+        assertThat(orderInvalidatedProbe.events()).isEmpty();
+    }
+
+    @Test
+    void givenSpringPublisherRejectsRegistration_whenRefund_thenRefundStillCommits() {
+        PaidOrder paidOrder = createPaidOrder("refund-publisher-failure", 1);
+        orderInvalidatedProbe.rejectNextRegistration();
+
+        RefundView refunded = refundApplicationService.requestRefund(command(
+                paidOrder.order().orderNo(),
+                "refund-publisher-failure-request",
+                null,
+                "refund-publisher-failure-key"));
+
+        assertThat(refunded.orderStatus()).isEqualTo(OrderStatus.REFUNDED);
+        assertThat(refundApplicationService.queryRefund(paidOrder.order().orderNo())).isEqualTo(refunded);
+        assertThat(orderInvalidatedProbe.events()).isEmpty();
+    }
+
+    @Test
+    void givenAfterCommitConsumerFails_whenRefund_thenReturnAndRecoverRefundedOrder() {
+        PaidOrder paidOrder = createPaidOrder("refund-consumer-failure", 1);
+        orderInvalidatedProbe.failNextAfterCommit();
+
+        RefundView refunded = refundApplicationService.requestRefund(command(
+                paidOrder.order().orderNo(),
+                "refund-consumer-failure-request",
+                null,
+                "refund-consumer-failure-key"));
+
+        RefundView recovered = refundApplicationService.queryRefund(paidOrder.order().orderNo());
+        assertThat(refunded.orderStatus()).isEqualTo(OrderStatus.REFUNDED);
+        assertThat(recovered).isEqualTo(refunded);
+        assertThat(orderInvalidatedProbe.events()).isEmpty();
     }
 
     @Test
@@ -367,6 +480,13 @@ class RefundIntegrationTest {
                 showId);
     }
 
+    private long cinemaId(long showId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT cinema_id FROM movie_show WHERE id = ?",
+                Long.class,
+                showId);
+    }
+
     private record ShowSeats(long showId, List<Long> seatIds) {
     }
 
@@ -386,6 +506,90 @@ class RefundIntegrationTest {
         @Primary
         RefundCurrentUserAccessor refundCurrentUserAccessor() {
             return new RefundCurrentUserAccessor();
+        }
+
+        @Bean
+        OrderInvalidatedProbe orderInvalidatedProbe() {
+            return new OrderInvalidatedProbe();
+        }
+
+        @Bean
+        @Primary
+        RefundTravelEventContextResolver refundTravelEventContextResolver(
+                ShowContextQueryService showContextQueryService,
+                ContentSummaryQueryPort contentSummaryQueryPort) {
+            return new RefundTravelEventContextResolver(showContextQueryService, contentSummaryQueryPort);
+        }
+    }
+
+    /** 同时验证Spring同步登记失败隔离和AFTER_COMMIT成功消费时机。 */
+    static final class OrderInvalidatedProbe {
+
+        private final List<OrderInvalidated> events = new CopyOnWriteArrayList<>();
+        private final AtomicBoolean rejectNextRegistration = new AtomicBoolean();
+        private final AtomicBoolean failNextAfterCommit = new AtomicBoolean();
+
+        @Order(Ordered.HIGHEST_PRECEDENCE)
+        @EventListener
+        public void rejectRegistrationWhenRequested(OrderInvalidated event) {
+            if (rejectNextRegistration.compareAndSet(true, false)) {
+                throw new IllegalStateException("测试退款事件登记失败");
+            }
+        }
+
+        /** 只有退款事务成功提交后才把事件加入测试探针。 */
+        @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+        public void captureAfterCommit(OrderInvalidated event) {
+            if (failNextAfterCommit.compareAndSet(true, false)) {
+                throw new IllegalStateException("测试退款AFTER_COMMIT消费者失败");
+            }
+            events.add(event);
+        }
+
+        List<OrderInvalidated> events() {
+            return List.copyOf(events);
+        }
+
+        void rejectNextRegistration() {
+            rejectNextRegistration.set(true);
+        }
+
+        void failNextAfterCommit() {
+            failNextAfterCommit.set(true);
+        }
+
+        void reset() {
+            events.clear();
+            rejectNextRegistration.set(false);
+            failNextAfterCommit.set(false);
+        }
+    }
+
+    /** 可控故障仅用于证明D公开摘要异常不会进入退款事务。 */
+    static final class RefundTravelEventContextResolver extends TravelEventContextResolver {
+
+        private final AtomicBoolean rejectNextResolve = new AtomicBoolean();
+
+        RefundTravelEventContextResolver(
+                ShowContextQueryService showContextQueryService,
+                ContentSummaryQueryPort contentSummaryQueryPort) {
+            super(showContextQueryService, contentSummaryQueryPort);
+        }
+
+        @Override
+        public Optional<TravelEventContext> resolve(OrderRepository.OrderSnapshot order) {
+            if (rejectNextResolve.compareAndSet(true, false)) {
+                throw new IllegalStateException("测试出行上下文查询失败");
+            }
+            return super.resolve(order);
+        }
+
+        void rejectNextResolve() {
+            rejectNextResolve.set(true);
+        }
+
+        void reset() {
+            rejectNextResolve.set(false);
         }
     }
 

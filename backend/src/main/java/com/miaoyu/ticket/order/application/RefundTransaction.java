@@ -6,12 +6,18 @@ import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import com.miaoyu.ticket.order.domain.ElectronicTicketStatus;
 import com.miaoyu.ticket.order.domain.OrderStatus;
 import com.miaoyu.ticket.order.domain.RefundStatus;
+import com.miaoyu.ticket.order.event.OrderInvalidated;
+import com.miaoyu.ticket.order.event.OrderInvalidatedPublisher;
 import com.miaoyu.ticket.ticketing.application.RefundShowRepository;
 import com.miaoyu.ticket.ticketing.application.RefundShowService;
 import com.miaoyu.ticket.ticketing.application.SeatRefundService;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,7 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RefundTransaction {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(RefundTransaction.class);
     private static final String REFUND_NUMBER_PREFIX = "RFD";
+    private static final String REFUNDED_INVALID_REASON = "REFUNDED";
 
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
@@ -41,6 +49,7 @@ public class RefundTransaction {
     private final SeatRefundService seatRefundService;
     private final BusinessIdGenerator idGenerator;
     private final Clock clock;
+    private final OrderInvalidatedPublisher orderInvalidatedPublisher;
 
     public RefundTransaction(
             OrderRepository orderRepository,
@@ -51,7 +60,8 @@ public class RefundTransaction {
             RefundShowService refundShowService,
             SeatRefundService seatRefundService,
             BusinessIdGenerator idGenerator,
-            Clock clock) {
+            Clock clock,
+            OrderInvalidatedPublisher orderInvalidatedPublisher) {
         this.orderRepository = orderRepository;
         this.paymentRepository = paymentRepository;
         this.refundRepository = refundRepository;
@@ -61,13 +71,17 @@ public class RefundTransaction {
         this.seatRefundService = seatRefundService;
         this.idGenerator = idGenerator;
         this.clock = clock;
+        this.orderInvalidatedPublisher = orderInvalidatedPublisher;
     }
 
     /**
      * 行锁使同一订单的重复退票串行化，数据库唯一约束处理跨订单幂等键竞争。
      */
     @Transactional
-    public RefundView refund(long userId, RefundCommand command) {
+    public RefundView refund(
+            long userId,
+            RefundCommand command,
+            Optional<TravelEventContextResolver.TravelEventContext> eventContext) {
         OrderRepository.OrderSnapshot order = orderRepository
                 .findByOrderNoForUpdate(userId, command.orderNo())
                 .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
@@ -136,7 +150,50 @@ public class RefundTransaction {
         requireTransition(
                 orderRepository.markOrderRefunded(order.orderId(), order.version() + 1, refundedAt),
                 "订单退款完成状态迁移失败");
-        return loadAuthoritativeResult(order.orderId());
+        RefundView refundedResult = loadAuthoritativeResult(order.orderId());
+        eventContext.ifPresent(context -> publishOrderInvalidatedSafely(
+                order,
+                refundedResult,
+                context,
+                refundedAt));
+        return refundedResult;
+    }
+
+    /**
+     * 事件在首次退款事务仍活动时登记，D只能在AFTER_COMMIT阶段消费。
+     * 同步登记异常被隔离，避免非关键出行链路回滚已经完成的权威退款状态。
+     *
+     * <p>既有退款在前置幂等分支返回，因此不会为重放生成新eventId；若数据库提交失败，
+     * Spring也不会执行绑定到提交阶段的消费者。</p>
+     */
+    private void publishOrderInvalidatedSafely(
+            OrderRepository.OrderSnapshot originalOrder,
+            RefundView refundedResult,
+            TravelEventContextResolver.TravelEventContext context,
+            LocalDateTime refundedAt) {
+        if (context.showId() != originalOrder.showId()) {
+            LOGGER.warn("退款失效事件场次上下文不匹配, orderId={}", originalOrder.orderId());
+            return;
+        }
+        OrderInvalidated event = new OrderInvalidated(
+                UUID.randomUUID().toString(),
+                Long.toString(originalOrder.orderId()),
+                Long.toString(originalOrder.showId()),
+                Long.toString(originalOrder.userId()),
+                context.cinemaArea(),
+                context.startAt().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime(),
+                refundedResult.stateVersion(),
+                refundedAt.atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime(),
+                REFUNDED_INVALID_REASON);
+        try {
+            orderInvalidatedPublisher.publish(event);
+        } catch (RuntimeException exception) {
+            LOGGER.warn(
+                    "退款失效事件登记失败, orderId={}, eventId={}, errorType={}",
+                    originalOrder.orderId(),
+                    event.eventId(),
+                    exception.getClass().getSimpleName());
+        }
     }
 
     /** 同键命中其他订单时必须在读取任何目标退款状态前拒绝。 */
