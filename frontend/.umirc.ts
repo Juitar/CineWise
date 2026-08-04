@@ -31,6 +31,17 @@ export default defineConfig({
         { path: '/', component: '@/pages/home' },
         { path: '/movies', component: '@/pages/movies' },
         { path: '/cinemas', component: '@/pages/cinemas' },
+        { path: '/shows', component: '@/pages/shows' },
+        {
+          path: '/shows/:showId/seats',
+          component: '@/pages/seats',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
+          path: '/orders/confirm',
+          component: '@/pages/orders/confirm',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
         {
           path: '/profile',
           component: '@/pages/profile',
