@@ -236,7 +236,7 @@ test('订单确认页发生 RESULT_UNKNOWN (502) 时自动发起等幂查询恢�
   expect(postCount).toBe(1);
 });
 
-test('订单确认页发生座位不可锁定 (409 / 204001) 时呈现专有提示并引导返回重选', async ({ page }) => {
+test('订单确认页发生座位不可锁定 (409 / 204001) 时刷新座位图并清理失效选择', async ({ page }) => {
   await page.route('**/api/v1/shows*', async (route) => {
     await route.fulfill({
       status: 200,
@@ -245,11 +245,29 @@ test('订单确认页发生座位不可锁定 (409 / 204001) 时呈现专有提�
     });
   });
 
+  let seatGetCount = 0;
   await page.route('**/api/v1/shows/2084194401305432066/seats*', async (route) => {
+    seatGetCount++;
+    const latestSeatMapPayload =
+      seatGetCount === 1
+        ? seatMapPayload
+        : {
+            ...seatMapPayload,
+            data: {
+              ...seatMapPayload.data,
+              availableSeatCount: 97,
+              stateVersion: 3,
+              seats: seatMapPayload.data.seats.map((seat) =>
+                seat.seatId === '2084194402305432067'
+                  ? { ...seat, status: 'LOCKED', stateVersion: 1 }
+                  : seat,
+              ),
+            },
+          };
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(seatMapPayload),
+      body: JSON.stringify(latestSeatMapPayload),
     });
   });
 
@@ -271,13 +289,13 @@ test('订单确认页发生座位不可锁定 (409 / 204001) 时呈现专有提�
   );
   await page.getByRole('button', { name: '确认并提交订单' }).click();
 
-  await expect(page.getByText('座位不可锁定')).toBeVisible();
-  await expect(page.getByRole('button', { name: '重选座位' })).toBeVisible();
-
-  // 409后刷新仍不是RESULT_UNKNOWN，不会进入未知保护态锁死
-  await page.reload();
+  await expect(page.getByText('座位不可锁定，请重新选择')).toBeVisible();
+  await expect(page).toHaveURL(
+    /\/shows\/2084194401305432066\/seats\?movieId=2084194398004512769&cinemaId=2084194399128586242$/,
+  );
+  expect(seatGetCount).toBeGreaterThanOrEqual(2);
+  expect(new URL(page.url()).searchParams.getAll('seatId')).toHaveLength(0);
   await expect(page.getByText('重新查询订单结果')).not.toBeVisible();
-  await expect(page.getByRole('button', { name: '确认并提交订单' })).toBeVisible();
 });
 
 test('订单确认页发生 RESULT_UNKNOWN 且恢复查询 404 后仍禁止第二次 POST，只能通过按钮再次查询', async ({

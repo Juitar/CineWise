@@ -3,6 +3,7 @@ import { history, useSearchParams } from 'umi';
 import { Button, Spin, Alert, message } from 'antd';
 import { useShows, useSeatMap } from '../../../modules/ticketing/hooks';
 import { useCreateOrder } from '../../../modules/order/hooks';
+import { ApiError } from '../../../shared/api/ApiError';
 import './index.css';
 
 interface PendingOrderSession {
@@ -203,8 +204,15 @@ export default function OrderConfirmPage() {
       if (res) {
         clearOrderSession(showId, requestedSeatIds);
       }
-    } catch {
-      // Hook已经保存明确错误；这里仅阻止未处理Promise，不写RESULT_UNKNOWN。
+    } catch (error: unknown) {
+      if (error instanceof ApiError && error.code === 204001) {
+        // 204001 是明确失败，可以清除本次幂等会话；刷新后回到座位图，避免旧 URL 继续携带失效选择。
+        await refetchSeats();
+        clearOrderSession(showId, requestedSeatIds);
+        message.error('座位不可锁定，请重新选择');
+        handleReturnToSeats();
+      }
+      // 其他明确错误由 Hook 保存；这里仅阻止未处理 Promise，不写 RESULT_UNKNOWN。
     }
   };
 
