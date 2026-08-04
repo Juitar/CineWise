@@ -11,6 +11,7 @@ import com.miaoyu.ticket.order.domain.OrderStatus;
 import com.miaoyu.ticket.order.domain.PaymentStatus;
 import com.miaoyu.ticket.order.domain.RefundStatus;
 import java.math.BigDecimal;
+import java.net.URI;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -25,11 +26,14 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.ApplicationContextInitializer;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 
 /**
  * 使用A的本地隔离MySQL库验证管理订单只读查询。
@@ -37,8 +41,8 @@ import org.springframework.test.context.ActiveProfiles;
  * <p>用例直接经过Application Service和真实MyBatis XML，因此可以发现H2无法暴露的
  * MySQL枚举、DECIMAL、DATETIME(3)、动态IN和LIMIT/OFFSET映射问题。</p>
  *
- * <p>测试启动后先校验库名和MySQL版本，只使用预留的高位ID写入夹具，
- * 每个用例前后按ID精确清理，不会删除固定种子或其他开发数据。</p>
+ * <p>上下文刷新前先校验最终JDBC URL的主机和库名，阻止DataSource或Flyway连接错误目标。
+ * 测试只使用预留的高位ID写入夹具，每个用例前后按ID精确清理。</p>
  */
 @EnabledIfEnvironmentVariable(named = "CINEWISE_MYSQL_ADMIN_ORDER_IT", matches = "true")
 @ActiveProfiles("dev")
@@ -51,9 +55,11 @@ import org.springframework.test.context.ActiveProfiles;
     "cinewise.auth.audit-hash-secret=mysql-admin-it-audit-secret-at-least-32-bytes"
 })
 @Import(AdminOrderQueryMySqlIntegrationTest.MySqlAdminOrderTestConfiguration.class)
+@ContextConfiguration(initializers = AdminOrderQueryMySqlIntegrationTest.DedicatedMySqlSafetyInitializer.class)
 class AdminOrderQueryMySqlIntegrationTest {
 
     private static final String REQUIRED_DATABASE = "cinewise_ticketing_concurrency_check";
+    private static final Set<String> ALLOWED_DATABASE_HOSTS = Set.of("localhost", "127.0.0.1", "::1", "mysql");
     private static final long ADMIN_ID = 8_804_000_001L;
     private static final long USER_PAID = 8_804_010_001L;
     private static final long USER_REFUNDED = 8_804_010_002L;
@@ -74,6 +80,8 @@ class AdminOrderQueryMySqlIntegrationTest {
     @Autowired
     private FakeUserAdminQueryPort userAdminQueryPort;
 
+    private boolean fixtureInitializationStarted;
+
     @BeforeEach
     void requireDedicatedMySqlAndCreateFixtures() {
         assertThat(jdbcTemplate.queryForObject("SELECT DATABASE()", String.class))
@@ -81,6 +89,7 @@ class AdminOrderQueryMySqlIntegrationTest {
                 .isEqualTo(REQUIRED_DATABASE);
         // 功能集成覆盖MySQL 8.x查询语义；8.4迁移兼容性由专项迁移门禁验收。
         assertThat(jdbcTemplate.queryForObject("SELECT VERSION()", String.class)).startsWith("8.");
+        fixtureInitializationStarted = true;
         cleanupFixtures();
         userAdminQueryPort.reset();
         insertFixtures();
@@ -88,7 +97,14 @@ class AdminOrderQueryMySqlIntegrationTest {
 
     @AfterEach
     void cleanupMySqlFixtures() {
-        cleanupFixtures();
+        if (!fixtureInitializationStarted) {
+            return;
+        }
+        try {
+            cleanupFixtures();
+        } finally {
+            fixtureInitializationStarted = false;
+        }
     }
 
     @Test
@@ -455,6 +471,38 @@ class AdminOrderQueryMySqlIntegrationTest {
         @Primary
         FakeUserAdminQueryPort fakeUserAdminQueryPort() {
             return new FakeUserAdminQueryPort();
+        }
+    }
+
+    /** 在Spring刷新上下文和创建DataSource之前拒绝非隔离MySQL目标。 */
+    static final class DedicatedMySqlSafetyInitializer
+            implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+
+        @Override
+        public void initialize(ConfigurableApplicationContext applicationContext) {
+            validateDataSourceUrl(applicationContext.getEnvironment()
+                    .getRequiredProperty("spring.datasource.url"));
+        }
+
+        /** 只允许本机或GitHub Actions的MySQL服务名连接固定隔离库。 */
+        static void validateDataSourceUrl(String dataSourceUrl) {
+            URI uri;
+            try {
+                if (dataSourceUrl == null || !dataSourceUrl.startsWith("jdbc:mysql://")) {
+                    throw new IllegalArgumentException("JDBC URL must use MySQL");
+                }
+                uri = URI.create(dataSourceUrl.substring("jdbc:".length()));
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalStateException("管理订单MySQL测试的数据源URL不合法", exception);
+            }
+
+            String host = uri.getHost();
+            String path = uri.getPath();
+            String database = path != null && path.startsWith("/") ? path.substring(1) : null;
+            if (!ALLOWED_DATABASE_HOSTS.contains(host) || !REQUIRED_DATABASE.equals(database)) {
+                throw new IllegalStateException(
+                        "管理订单MySQL测试只允许本机或CI MySQL服务上的固定隔离库");
+            }
         }
     }
 
