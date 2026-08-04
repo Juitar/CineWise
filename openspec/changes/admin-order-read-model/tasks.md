@@ -20,6 +20,7 @@
 - [x] 3.2 覆盖完整邮箱、JWT、Cookie、幂等键、二维码载荷、impactSnapshot和actionId敏感字段扫描。
 - [x] 3.3 运行`mvnw.cmd verify`、`openspec validate admin-order-read-model --strict`和`git diff --check`；结果：全部通过，PR有效注释率30.93%，admin模块30.19%。
 - [ ] 3.4 C正式认证合入后验证安全链ADMIN/USER/匿名HTTP语义；当前A测试不得冒充C认证验收。
+- [x] 3.5 在A本地隔离MySQL库验证有界用户ID筛选、稳定分页、聚合映射和严格只读；结果：MySQL 8.0.40下4个用例通过，目标8.4迁移兼容性仍由专项迁移门禁验收。
 
 ## 4. 后续非本PR任务
 
