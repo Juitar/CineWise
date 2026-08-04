@@ -85,7 +85,7 @@ A 分配 Flyway 版本后，迁移 MUST 为 `travel_task.order_version`、`trave
 
 ### Requirement: 提醒任务必须生成可降级的建议快照
 
-系统 SHALL 在到达提醒时间或用户合法刷新时，以任务的影院区域和开场时间生成天气与确定性通用交通建议，并保存带 `source`、`dataTime`、`expiresAt`、`isExpired`、`degraded`、`fallbackType` 的建议快照。天气不可用时 MUST 保留通用建议并明确天气不可用，不得编造天气事实。
+系统 SHALL 在到达提醒时间或用户合法刷新时，以任务的影院区域和开场时间生成天气与确定性通用交通建议，并为新的任务版本追加一条带 `source`、`dataTime`、`expiresAt`、`isExpired`、`degraded`、`fallbackType` 的不可变建议快照。天气不可用时 MUST 保留通用建议并明确天气不可用，不得编造天气事实。任务取消时不得更新旧快照；查询层必须将该任务的所有快照作为只读过期数据返回。
 
 #### Scenario: 天气查询成功
 - **GIVEN** 任务有效且天气结果未过期
@@ -98,6 +98,18 @@ A 分配 Flyway 版本后，迁移 MUST 为 `travel_task.order_version`、`trave
 - **WHEN** 系统生成提醒建议
 - **THEN** 系统返回通用交通建议和明确的天气不可用信息
 - **AND** 任务仍可进入 `READY`，电子票展示不受影响
+
+#### Scenario: 用户刷新建议
+- **GIVEN** 任务处于允许刷新状态且达到刷新间隔
+- **WHEN** 系统生成新的建议
+- **THEN** 系统在条件更新任务版本成功后追加一条新的 `travel_advice_snapshot`
+- **AND** 不更新旧快照、旧快照仍可按原版本只读查询
+
+#### Scenario: 任务取消后的建议查询
+- **GIVEN** 任务已变为 `CANCELLED`
+- **WHEN** 用户查询既有建议
+- **THEN** 系统返回原快照内容并标记 `isExpired=true`
+- **AND** 不更新任何快照记录或生成新版本
 
 ### Requirement: EMAIL 投递必须可查询恢复且不重复发送
 
