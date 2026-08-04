@@ -1,38 +1,856 @@
-.home-page {
-  padding: 48px 0;
+/* ==========================================================================
+   Home Page / 首页布局与样式
+   ========================================================================== */
+
+.home-page-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
-.home-page-label {
-  margin: 0 0 8px;
+/* --- 移动端顶部 Agent 入口 --- */
+.home-mobile-agent-banner {
+  padding: 12px;
+  background: #fff;
+}
 
-  color: var(--color-primary);
+.home-mobile-agent-banner-inner {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(122, 114, 255, 10%) 0%, rgba(91, 77, 240, 10%) 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(99, 91, 255, 15%);
+  gap: 16px;
+}
+
+.home-mobile-agent-banner-header {
+  display: flex;
+  align-items: center;
+}
+
+.home-mobile-agent-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #7a72ff 0%, #5b4df0 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  margin-right: 12px;
+}
+
+.home-mobile-agent-text {
+  flex: 1;
+}
+
+.home-mobile-agent-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2329;
+}
+
+.home-mobile-agent-subtitle {
+  font-size: 13px;
+  color: #646a73;
+  margin-top: 2px;
+}
+
+.home-mobile-agent-input-container {
+  display: flex;
+  background: #fff;
+  border-radius: 24px;
+  padding: 4px;
+  border: 1px solid #e2e4eb;
+  box-shadow: 0 4px 12px rgba(99, 91, 255, 5%);
+}
+
+.home-mobile-agent-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0 16px;
+  font-size: 14px;
+  outline: none;
+}
+
+.home-mobile-agent-send-btn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #7a72ff 0%, #5b4df0 100%);
+  color: white;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* --- 首页主体双栏布局 --- */
+.home-page-main {
+  display: flex;
+  flex: 1;
+  gap: 24px;
+  width: 100%;
+  padding: 0 24px;
+}
+
+.home-page-content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 左侧影片内容区 */
+.home-main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 12px 0 40px;
+}
+
+/* 筛选条件栏 */
+.home-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  padding: 6px 14px;
+  border-radius: 16px;
+  background: white;
+  border: 1px solid rgba(226, 228, 235, 60%);
+  font-size: 13px;
+  color: #1f2937;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-chip:hover {
+  background: #f8f7ff;
+  border-color: #6c5ce7;
+  color: #6c5ce7;
+}
+
+.filter-chip .arrow {
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+.filter-chip.more-filter {
+  background: transparent;
+  border-color: transparent;
+  color: #6b7280;
+}
+
+/* 区块通用样式 */
+.home-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.home-section-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.section-subtitle {
+  font-size: 13px;
+  font-weight: normal;
+  color: #9ca3af;
+  margin-left: 12px;
+}
+
+.section-link {
+  font-size: 13px;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.section-link:hover {
+  color: #6c5ce7;
+}
+
+/* 正在热映电影列表 */
+.movies-list {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  position: relative;
+}
+
+.movies-list::-webkit-scrollbar {
+  display: none;
+}
+
+.movie-card {
+  width: 140px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(226, 228, 235, 40%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 2%);
+}
+
+.movie-poster-large {
+  width: 100%;
+  height: 196px;
+  background: #e2e4eb;
+}
+
+.poster--navy {
+  background: #1c2938;
+}
+
+.poster--blue-gray {
+  background: #4a5b6c;
+}
+
+.poster--pink {
+  background: #ffb6c1;
+}
+
+.poster--peach {
+  background: #ffdab9;
+}
+
+.poster--sky {
+  background: #87ceeb;
+}
+
+.movie-card-info {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.movie-card-name {
   font-size: 14px;
   font-weight: 600;
+  color: #1f2937;
+  width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.home-page-title {
-  margin: 0;
-
-  color: var(--color-text);
-  font-size: 40px;
-  line-height: 1.2;
+.movie-card-score {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ff5722;
 }
 
-.home-page-description {
-  max-width: 640px;
-  margin: 16px 0 0;
+.buy-ticket-btn {
+  width: 100%;
+  padding: 6px 0;
+  background: #f5f3ff;
+  color: #6c5ce7;
+  border: none;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
 
-  color: var(--color-text-secondary);
+.buy-ticket-btn:hover {
+  background: linear-gradient(135deg, #6c5ce7 0%, #8b7bff 100%);
+  color: white;
+}
+
+.scroll-arrow-right {
+  position: absolute;
+  right: 0;
+  top: 98px;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  background: white;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 10%);
+  cursor: pointer;
+  color: #1f2937;
+  font-weight: bold;
+}
+
+/* 附近影院列表 */
+.cinemas-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.cinema-card {
+  background: white;
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid rgba(226, 228, 235, 60%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 2%);
+}
+
+.cinema-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.cinema-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cinema-icon-placeholder {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: #e2e4eb;
+}
+
+.cinema-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.cinema-dist {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.cinema-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cinema-tag {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f8f7ff;
+  color: #6c5ce7;
+  font-size: 11px;
+}
+
+.cinema-price-row {
+  margin-top: 4px;
+}
+
+.cinema-price {
+  font-size: 18px;
+  font-weight: 600;
+  color: #ff5722;
+}
+
+.price-suffix {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: normal;
+}
+
+.cinema-times {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.cinema-time {
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #f4f5f7;
+  color: #1f2937;
+  font-size: 12px;
+}
+
+/* 个性化横幅 */
+.personalized-banner {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(135deg, rgba(108, 92, 231, 5%) 0%, rgba(139, 123, 255, 10%) 100%);
+  border-radius: 16px;
+  padding: 20px 24px;
+  border: 1px solid rgba(108, 92, 231, 10%);
+}
+
+.personalized-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #6c5ce7 0%, #8b7bff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  margin-right: 16px;
+}
+
+.personalized-content {
+  flex: 1;
+}
+
+.personalized-title {
   font-size: 16px;
-  line-height: 1.75;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 4px;
 }
 
+.personalized-desc {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.personalized-btn {
+  padding: 8px 20px;
+  border-radius: 20px;
+  background: transparent;
+  border: 1px solid #6c5ce7;
+  color: #6c5ce7;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.personalized-btn:hover {
+  background: #6c5ce7;
+  color: white;
+}
+
+/* --- PC 端右侧 Agent 面板 (Glassmorphism & Premium Design) --- */
+.home-page-agent-sidebar {
+  width: 380px;
+  flex-shrink: 0;
+  padding: 24px 0;
+}
+
+.home-agent-panel {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 112px); /* 减去 TopBar 和 Padding */
+  position: sticky;
+  top: 88px;
+  background: rgba(255, 255, 255, 85%);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(108, 92, 231, 8%);
+  border: 1px solid rgba(255, 255, 255, 60%);
+  overflow: hidden;
+}
+
+/* 头部 */
+.home-agent-header {
+  padding: 16px 24px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(226, 228, 235, 40%);
+}
+
+.home-agent-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-agent-icon-bg {
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #6c5ce7 0%, #8b7bff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.home-agent-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.home-agent-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.home-agent-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background-color: #22c55e;
+}
+
+.home-agent-status-text {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* 聊天内容区 */
+.home-agent-body {
+  flex: 1;
+  padding: 20px 24px;
+  background: #f8f7ff;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 消息气泡通用 */
+.home-agent-message {
+  display: flex;
+  width: 100%;
+}
+
+.user-message {
+  justify-content: flex-end;
+}
+
+.agent-message {
+  justify-content: flex-start;
+  flex-direction: column;
+}
+
+.message-bubble {
+  position: relative;
+  max-width: 85%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.user-bubble {
+  background: linear-gradient(135deg, #6c5ce7 0%, #8b7bff 100%);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 12px rgba(108, 92, 231, 20%);
+}
+
+.message-time {
+  font-size: 11px;
+  opacity: 0.7;
+  text-align: right;
+  margin-top: 4px;
+}
+
+.agent-text-reply {
+  font-size: 14px;
+  color: #1f2937;
+  margin-bottom: 8px;
+  padding-left: 8px;
+}
+
+/* 结构化卡片 (Agent Card) */
+.agent-card {
+  background: rgba(255, 255, 255, 90%);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 4%);
+  border: 1px solid rgba(226, 228, 235, 60%);
+  width: 100%;
+}
+
+.agent-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.agent-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.agent-card-title .subtitle {
+  font-size: 12px;
+  font-weight: normal;
+  color: #9ca3af;
+  margin-left: 4px;
+}
+
+.agent-card-action {
+  font-size: 13px;
+  color: #6c5ce7;
+  cursor: pointer;
+}
+
+/* 需求列表 */
+.requirements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.requirement-item {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+}
+
+.requirement-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f5f3ff;
+  margin-right: 8px;
+  display: inline-block;
+}
+
+.requirement-label {
+  color: #6b7280;
+  width: 60px;
+}
+
+.requirement-value {
+  color: #1f2937;
+  font-weight: 500;
+}
+
+/* 推荐电影信息 */
+.recommendation-movie {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f5f3ff;
+  border-radius: 12px;
+}
+
+.movie-poster {
+  width: 54px;
+  height: 72px;
+  border-radius: 8px;
+  background: #e2e4eb;
+}
+
+.movie-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.movie-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.movie-tags {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.movie-rating {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.movie-rating span {
+  color: #ff5722;
+  font-weight: 600;
+  font-size: 14px;
+  margin-left: 4px;
+}
+
+/* 推荐详情列表 */
+.recommendation-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+}
+
+.detail-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #e2e4eb;
+  margin-right: 8px;
+  display: inline-block;
+}
+
+.detail-text {
+  color: #6b7280;
+  flex: 1;
+}
+
+.detail-right {
+  color: #9ca3af;
+}
+
+.highlight-tag {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 10%);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+.price-row {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(226, 228, 235, 80%);
+}
+
+.detail-price {
+  font-size: 12px;
+  color: #6b7280;
+  margin-right: 12px;
+}
+
+.price-num {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ff5722;
+}
+
+.view-plan-btn {
+  background: linear-gradient(135deg, #6c5ce7 0%, #8b7bff 100%);
+  color: white;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(108, 92, 231, 20%);
+}
+
+/* 底部输入区 */
+.home-agent-footer {
+  padding: 16px 24px;
+  background: rgba(255, 255, 255, 90%);
+  border-top: 1px solid rgba(226, 228, 235, 40%);
+}
+
+.agent-input-wrapper {
+  display: flex;
+  align-items: center;
+  background: #f8f7ff;
+  border: 1px solid rgba(108, 92, 231, 20%);
+  border-radius: 20px;
+  padding: 4px;
+  margin-bottom: 12px;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.agent-input-wrapper:focus-within {
+  border-color: #6c5ce7;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(108, 92, 231, 10%);
+}
+
+.agent-input-field {
+  flex: 1;
+  height: 32px;
+  border: none;
+  background: transparent;
+  padding: 0 12px;
+  font-size: 13px;
+  outline: none;
+  color: #1f2937;
+}
+
+.agent-input-field::placeholder {
+  color: #9ca3af;
+}
+
+.agent-send-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #6c5ce7 0%, #8b7bff 100%);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(108, 92, 231, 20%);
+}
+
+.agent-suggestions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.suggestion-label {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.suggestion-chip {
+  font-size: 12px;
+  color: #6c5ce7;
+  background: rgba(108, 92, 231, 8%);
+  padding: 4px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.suggestion-chip:hover {
+  background: rgba(108, 92, 231, 15%);
+}
+
+/* --- 移动端适配 --- */
 @media (max-width: 1023px) {
-  .home-page {
-    padding: 32px 0;
+  .home-page-main {
+    padding: 0 16px;
   }
 
-  .home-page-title {
-    font-size: 32px;
+  .home-page-content {
+    padding: 16px 0;
+  }
+
+  .home-movies-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 16px;
   }
 }

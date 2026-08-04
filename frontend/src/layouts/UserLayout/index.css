@@ -1,49 +1,271 @@
+/* ==========================================================================
+   UserLayout / 全局壳层布局样式
+   ========================================================================== */
+
+/* 布局根容器 */
 .user-layout {
+  display: flex;
   min-height: 100vh;
+  background-color: #f5f7fa;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  color: #1f2329;
 }
 
-.user-layout-header {
-  border-bottom: 1px solid var(--color-border);
-
-  background: var(--color-surface);
+.user-layout-desktop {
+  flex-direction: row;
 }
 
-.user-layout-mobile-header {
-  border-bottom: 1px solid var(--color-border);
-
-  background: var(--color-surface);
+.user-layout-mobile {
+  flex-direction: column;
 }
 
-.user-layout-header-content {
+/* --- 桌面端左侧边栏 (DesktopSidebar) --- */
+.desktop-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background-color: #fff;
+  border-right: 1px solid rgba(226, 228, 235, 60%);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+/* 侧边栏 Logo */
+.desktop-sidebar-logo {
+  height: 80px;
   display: flex;
   align-items: center;
-  max-width: var(--content-max-width);
-  min-height: 64px;
-  margin: 0 auto;
-  padding: 0 var(--spacing-page);
+  padding: 0 24px;
 }
 
-.user-layout-brand {
-  color: var(--color-primary);
-  font-size: 20px;
-  font-weight: 600;
+.brand-logo-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   text-decoration: none;
+  transition: transform 0.2s ease;
 }
 
+.brand-logo-link:hover {
+  transform: translateY(-1px);
+}
+
+.brand-logo-text {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  background: linear-gradient(135deg, #1d1e25 0%, #3a3b45 100%);
+  background-clip: text;
+  /* stylelint-disable-next-line property-no-vendor-prefix */
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* 侧边栏菜单区域 */
+.desktop-sidebar-menu-wrapper {
+  flex: 1;
+  padding: 12px 12px 0;
+  overflow-y: auto;
+}
+
+.desktop-sidebar-menu.ant-menu {
+  border-inline-end: none !important;
+}
+
+.desktop-sidebar-menu .ant-menu-item {
+  border-radius: 8px;
+  margin-bottom: 8px !important;
+  color: #646a73;
+}
+
+.desktop-sidebar-menu .ant-menu-item-selected {
+  background-color: rgba(99, 91, 255, 10%) !important;
+  color: #635bff !important;
+  font-weight: 600;
+}
+
+/* 侧边栏底部个人信息 */
+.desktop-sidebar-footer {
+  padding: 24px 16px;
+  border-top: 1px solid rgba(226, 228, 235, 60%);
+}
+
+.desktop-user-profile-sidebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.desktop-user-profile-sidebar:hover {
+  background-color: #f0f2f5;
+}
+
+.user-avatar-small {
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #7a72ff 0%, #5b4df0 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-info-small {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2329;
+  line-height: 1.2;
+}
+
+.user-action {
+  font-size: 12px;
+  color: #8f959e;
+  margin-top: 2px;
+}
+
+/* --- 右侧主体列布局 --- */
+.user-layout-main-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- 桌面端顶部导航栏 (DesktopTopBar) --- */
+.desktop-top-bar {
+  height: 64px;
+  background-color: #fff;
+  border-bottom: 1px solid rgba(226, 228, 235, 60%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 99;
+}
+
+.desktop-top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.desktop-location-selector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #1f2329;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+
+.desktop-location-selector:hover {
+  background-color: #f5f7fa;
+}
+
+.desktop-top-bar-right {
+  display: flex;
+  align-items: center;
+}
+
+.desktop-search-input {
+  width: 280px;
+  border-radius: 20px;
+  border-color: #e2e4eb;
+  background-color: #f8f9fa;
+}
+
+.desktop-search-input:focus,
+.desktop-search-input:hover {
+  border-color: #635bff;
+  background-color: #fff;
+}
+
+.desktop-user-profile {
+  cursor: pointer;
+}
+
+.desktop-location-arrow {
+  margin-left: 2px;
+  color: #8f959e;
+  font-size: 12px;
+}
+
+.desktop-search-icon {
+  color: #8f959e;
+}
+
+.logout-menu-label {
+  color: #ff4d4f;
+}
+
+/* --- 主体内容区布局 --- */
 .user-layout-content {
-  width: 100%;
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-  padding: var(--spacing-page);
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
+/* --- 移动端 H5 布局覆盖 --- */
 @media (max-width: 1023px) {
-  .user-layout-header-content {
-    min-height: 56px;
-    padding: 0 var(--spacing-page-mobile);
+  .user-layout {
+    background-color: #fff;
+  }
+
+  .user-layout-header-placeholder {
+    height: 46px; /* NavBar 占位 */
   }
 
   .user-layout-content {
-    padding: var(--spacing-page-mobile);
+    padding-bottom: 50px; /* 给 TabBar 留出空间 */
   }
+
+  /* 定制 antd-mobile TabBar */
+  .mobile-tab-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: rgba(255, 255, 255, 95%);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(0, 0, 0, 5%);
+    z-index: 100;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+.mobile-user-header {
+  position: fixed;
+  z-index: 100;
+  inset: 0 0 auto;
+  background-color: #fff;
+}
+
+.mobile-user-navbar {
+  --height: 46px;
+
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.mobile-user-title {
+  font-size: 17px;
+  font-weight: 600;
 }

@@ -1,0 +1,264 @@
+.movies-page-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.movies-page-main {
+  display: flex;
+  width: 100%;
+  gap: 24px;
+  padding: 0 24px;
+}
+
+.movies-page-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0 40px;
+}
+
+/* 面包屑 */
+.movies-breadcrumb {
+  font-size: 13px;
+  color: #9ca3af;
+  margin-bottom: 24px;
+}
+
+.movies-breadcrumb .current {
+  color: #1f2937;
+  font-weight: 500;
+}
+
+/* 导航 Tab */
+.movies-nav-tabs {
+  display: flex;
+  gap: 32px;
+  border-bottom: 1px solid rgba(226, 228, 235, 60%);
+  margin-bottom: 24px;
+}
+
+.nav-tab {
+  padding-bottom: 12px;
+  font-size: 16px;
+  color: #6b7280;
+  cursor: pointer;
+  position: relative;
+}
+
+.nav-tab.active {
+  color: #6c5ce7;
+  font-weight: 600;
+}
+
+.nav-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #6c5ce7;
+  border-radius: 3px 3px 0 0;
+}
+
+/* 过滤器 */
+.movies-filters-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.filter-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-pill {
+  padding: 6px 16px;
+  border-radius: 16px;
+  font-size: 13px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-pill:hover {
+  background: #f8f7ff;
+  color: #6c5ce7;
+}
+
+.filter-pill.active {
+  background: #f5f3ff;
+  color: #6c5ce7;
+  font-weight: 500;
+}
+
+.filter-dropdown {
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(226, 228, 235, 60%);
+  font-size: 13px;
+  color: #1f2937;
+  cursor: pointer;
+  background: white;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-dropdown .arrow {
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+/* 电影网格 */
+.movies-grid-view {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+}
+
+.movie-grid-card {
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(226, 228, 235, 40%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 2%);
+  transition: transform 0.2s;
+  cursor: pointer;
+}
+
+.movie-grid-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(108, 92, 231, 8%);
+}
+
+.movie-grid-poster {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  background: #e2e4eb;
+}
+
+.movie-grid-info {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.movie-grid-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.movie-grid-score-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.movie-grid-score-icon {
+  color: #ff5722;
+  font-size: 12px;
+}
+
+.movie-grid-score {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ff5722;
+}
+
+.movie-grid-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.movie-tag {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f4f5f7;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.movie-grid-desc {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+@media (max-width: 1440px) {
+  .movies-grid-view {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 1023px) {
+  .movies-page-main {
+    flex-direction: column;
+  }
+
+  .movies-grid-view {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .movies-grid-view {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.movie-grid-poster--peach {
+  background: #ffdab9;
+}
+
+.movie-grid-poster--navy {
+  background: #1c2938;
+}
+
+.movie-grid-poster--pink {
+  background: #ffb6c1;
+}
+
+.movie-grid-poster--blue-gray {
+  background: #4a5b6c;
+}
+
+.movie-grid-poster--sky {
+  background: #87ceeb;
+}
+
+.movie-grid-poster--green {
+  background: #2f4f4f;
+}
+
+.movie-grid-poster--orange {
+  background: #d2691e;
+}
+
+.movie-grid-poster--blue {
+  background: #1e90ff;
+}
+
+.movie-grid-poster--slate {
+  background: #708090;
+}
+
+.movie-grid-poster--deep-blue {
+  background: #2c3e50;
+}

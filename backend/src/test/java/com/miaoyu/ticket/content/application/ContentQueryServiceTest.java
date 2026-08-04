@@ -86,7 +86,7 @@ class ContentQueryServiceTest {
     @Test
     void givenMissingOrInvalidLocator_whenCreatingQuery_thenItRejectsBeforeAnyProviderAccess() {
         // 无定位条件和非正业务 ID 都必须在 Application 边界失败，避免生成无意义的缓存或快照键。
-        assertThatThrownBy(() -> new ContentQuery(ContentResourceType.MOVIE, null, " ", ""))
+        assertThatThrownBy(() -> new ContentQuery(ContentResourceType.CINEMA, null, " ", ""))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ContentQuery(ContentResourceType.CINEMA, 0L, null, null))
                 .isInstanceOf(IllegalArgumentException.class);

@@ -1,0 +1,92 @@
+/* ==========================================================================
+   Register Page Specific Styles
+   ========================================================================== */
+
+.register-tabs {
+  display: flex;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.register-tab {
+  padding: 8px 16px;
+  font-size: 14px;
+  color: #646a73;
+  cursor: pointer;
+  position: relative;
+}
+
+.register-tab.active {
+  color: #635bff;
+  font-weight: 600;
+}
+
+.register-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 16px;
+  right: 16px;
+  height: 2px;
+  background-color: #635bff;
+  border-radius: 2px;
+}
+
+.verify-code-group .ant-input-affix-wrapper {
+  padding-right: 4px;
+}
+
+.send-code-btn {
+  background: white;
+  border: 1px solid #635bff;
+  color: #635bff;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  height: 28px;
+  line-height: 1;
+}
+
+.send-code-btn:not(:disabled):hover {
+  background: rgba(99, 91, 255, 10%);
+}
+
+.register-agreement {
+  margin: 16px 0 24px;
+}
+
+.register-agreement .ant-checkbox-wrapper {
+  font-size: 13px;
+  color: #646a73;
+}
+
+.register-agreement a {
+  color: #635bff;
+  text-decoration: none;
+}
+
+.login-link-row {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 14px;
+  color: #646a73;
+}
+
+.login-link-row a {
+  color: #635bff;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.register-preview-notice {
+  margin: -8px 0 16px;
+  color: #8f5a00;
+  font-size: 13px;
+  text-align: center;
+}
+
+.send-code-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}

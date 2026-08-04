@@ -60,7 +60,7 @@
 ## 6. 验收与归档
 
 - [ ] 6.1 D 执行 `backend\mvnw.cmd verify`；验证方式：编译、单元测试、架构检查、Checkstyle、SpotBugs 和 JaCoCo 均通过，失败项有负责人和复现步骤。
-- [ ] 6.2 A、B、C 分别复核场次边界、工具结果和展示字段；验证方式：所有影响当前范围的问题均有结论。
+- [ ] 6.2 A 已确认场次边界通过；B 已确认 `RankMoviePlanTool.execute` 的输入、结果和只读语义不变；D 已完成四个公开内容 REST 接口、字段映射、公开权限、OpenAPI、响应示例和后端响应测试。`frontend/src/shared` 由 C 维护，前端类型及响应测试待 C 在其分支完成并最终确认；在此之前不得勾选本项。后端验证：`backend\mvnw.cmd verify` 通过，日期：2026-08-04。
 - [ ] 6.3 D 核对实现、配置、固定数据、用例和设计文档一致，并记录关联提交和验证结果；验证方式：无未说明的行为差异。
 - [ ] 6.4 D 执行 `openspec validate d-demo-content-recommendation-baseline --strict`；验证方式：严格校验通过。
 - [ ] 6.5 D 在全部任务和验收完成后归档变更；验证方式：主规格已同步，变更进入归档目录。
