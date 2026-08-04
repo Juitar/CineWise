@@ -113,7 +113,8 @@ class NetStartContentProviderTest {
         NetStartContentProvider provider = provider(query -> {
             calls.incrementAndGet();
             if (query.resourceType() == ContentResourceType.CINEMA) {
-                return json("[{\"id\":41478,\"info\":{\"name\":\"测试影城\",\"address\":\"测试地址\"}}]");
+                return json("[{\"id\":41478,\"info\":{\"name\":\"测试影城一号\",\"address\":\"测试一区\"}},"
+                        + "{\"id\":41479,\"info\":{\"name\":\"测试影城二号\",\"address\":\"测试二区\"}}]");
             }
             if (query.contentId() == null) {
                 return json("{\"movieList\":[{\"id\":1},{\"id\":2},{\"id\":3},{\"id\":4},"
@@ -128,6 +129,8 @@ class NetStartContentProviderTest {
         // 一轮保留热映列表、八部详情和影院共十次额度，不能因十部详情挤掉影院或越过本地限制。
         assertThat(calls).hasValue(10);
         assertThat(batch.contents()).hasSize(9);
+        // 八部影片和两家影院都合格时，成功内容总数为十；不能因影院来自同一查询被误判字段不合格。
+        assertThat(batch.attemptedCount()).isEqualTo(10);
         assertThat(batch.outcome())
                 .isEqualTo(com.miaoyu.ticket.content.application.LiveContentSyncPort.Outcome.SUCCESS);
     }

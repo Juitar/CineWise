@@ -211,8 +211,9 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
         }
         int acceptedItemCount = synchronizedContent.stream().mapToInt(content -> content.result().data().size()).sum();
         int attemptedCount = acceptedItemCount + rejectedItemCount;
+        // 成功与否必须和内容项统计使用同一口径；一条影院查询可返回多家影院，不能按查询条数判断。
         Outcome outcome = failureOutcome != null ? failureOutcome
-                : synchronizedContent.size() == attemptedCount ? Outcome.SUCCESS : Outcome.FIELD_REJECTED;
+                : rejectedItemCount == 0 ? Outcome.SUCCESS : Outcome.FIELD_REJECTED;
         return new DailySyncBatch(synchronizedContent, attemptedCount, outcome, failureCode);
     }
 
