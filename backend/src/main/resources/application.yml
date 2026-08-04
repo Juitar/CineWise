@@ -73,6 +73,26 @@ cinewise:
       allowed-origins:
         - http://localhost:8000
         - http://localhost:5173
+  auth:
+    jwt-secret: ${JWT_SECRET:}
+    audit-hash-secret: ${AUTH_AUDIT_HASH_SECRET:${JWT_SECRET:}}
+    access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:30m}
+    access-cookie-name: ${AUTH_ACCESS_COOKIE_NAME:cinewise_access_token}
+    csrf-cookie-name: ${AUTH_CSRF_COOKIE_NAME:cinewise_csrf}
+    csrf-header-name: X-XSRF-TOKEN
+    cookie-secure: ${AUTH_COOKIE_SECURE:true}
+    cookie-same-site: Lax
+    login-log-retention-days: ${AUTH_LOGIN_LOG_RETENTION_DAYS:30}
+    login-log-cleanup-delay-milliseconds: ${AUTH_LOGIN_LOG_CLEANUP_DELAY_MILLISECONDS:86400000}
+    demo-seed:
+      enabled: ${AUTH_DEMO_SEED_ENABLED:false}
+      user-email: ${AUTH_DEMO_USER_EMAIL:}
+      user-password: ${AUTH_DEMO_USER_PASSWORD:}
+      user-nickname: ${AUTH_DEMO_USER_NICKNAME:}
+      admin-email: ${AUTH_DEMO_ADMIN_EMAIL:}
+      admin-password: ${AUTH_DEMO_ADMIN_PASSWORD:}
+      admin-nickname: ${AUTH_DEMO_ADMIN_NICKNAME:}
+      privacy-policy-version: ${AUTH_DEMO_PRIVACY_POLICY_VERSION:}
   scheduling:
     pool-size: 4
     thread-name-prefix: cinewise-job-

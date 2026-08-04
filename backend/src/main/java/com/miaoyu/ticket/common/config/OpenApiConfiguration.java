@@ -16,13 +16,20 @@ public class OpenApiConfiguration {
         SecurityScheme cookieAuth = new SecurityScheme()
                 .type(SecurityScheme.Type.APIKEY)
                 .in(SecurityScheme.In.COOKIE)
-                .name("cinewise_access")
+                .name("cinewise_access_token")
                 .description("由浏览器自动携带的 Secure、HttpOnly JWT Cookie");
+        SecurityScheme csrfToken = new SecurityScheme()
+                .type(SecurityScheme.Type.APIKEY)
+                .in(SecurityScheme.In.HEADER)
+                .name("X-XSRF-TOKEN")
+                .description("浏览器写请求必须携带的 CSRF Token；通过 /api/v1/auth/csrf 获取");
         return new OpenAPI()
                 .info(new Info()
                         .title("CineWise REST API")
                         .version("v1")
                         .description("业务 ID 与金额均使用字符串；写请求需要 CSRF 与幂等语义。"))
-                .components(new Components().addSecuritySchemes("cookieAuth", cookieAuth));
+                .components(new Components()
+                        .addSecuritySchemes("cookieAuth", cookieAuth)
+                        .addSecuritySchemes("csrfToken", csrfToken));
     }
 }
