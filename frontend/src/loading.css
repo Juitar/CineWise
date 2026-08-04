@@ -1,0 +1,87 @@
+/* 全局加载骨架屏样式 */
+.global-loading-container {
+  padding: 24px;
+  width: 100%;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.skeleton-header {
+  margin-bottom: 32px;
+}
+
+.skeleton-title {
+  width: 200px;
+  height: 28px;
+  background-color: #f0f2f5;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.skeleton-subtitle {
+  width: 120px;
+  height: 16px;
+  background-color: #f0f2f5;
+  border-radius: 4px;
+}
+
+.skeleton-tabs {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid rgba(226, 228, 235, 60%);
+  padding-bottom: 12px;
+}
+
+.skeleton-tab {
+  width: 64px;
+  height: 20px;
+  background-color: #f0f2f5;
+  border-radius: 4px;
+}
+
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 24px;
+}
+
+.skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeleton-poster {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  background-color: #f0f2f5;
+  border-radius: 12px;
+}
+
+.skeleton-text-line {
+  width: 80%;
+  height: 16px;
+  background-color: #f0f2f5;
+  border-radius: 4px;
+}
+
+.skeleton-text-short {
+  width: 50%;
+  height: 14px;
+  background-color: #f0f2f5;
+  border-radius: 4px;
+}

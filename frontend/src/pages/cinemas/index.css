@@ -1,0 +1,321 @@
+.cinemas-page-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.cinemas-page-main {
+  display: flex;
+  width: 100%;
+  gap: 24px;
+  padding: 0 24px;
+}
+
+.cinemas-page-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0 40px;
+}
+
+.cinemas-breadcrumb {
+  margin-bottom: 24px;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.cinemas-breadcrumb .current {
+  color: #1f2937;
+  font-weight: 500;
+}
+
+/* AI 推荐影院区块 */
+.cinemas-ai-recommendation {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ai-rec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ai-rec-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.ai-rec-refresh {
+  font-size: 13px;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.ai-rec-cards {
+  display: flex;
+  gap: 16px;
+}
+
+.ai-rec-card {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: white;
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid rgba(226, 228, 235, 60%);
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 2%);
+}
+
+.ai-rec-poster {
+  width: 72px;
+  height: 54px;
+  border-radius: 6px;
+  background: #e2e4eb;
+  flex-shrink: 0;
+}
+
+.ai-rec-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-rec-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ai-rec-score-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ai-rec-score-icon {
+  color: #ff5722;
+  font-size: 12px;
+}
+
+.ai-rec-score {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ff5722;
+}
+
+.ai-rec-dist-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-rec-dist {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.ai-rec-tag {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f5f3ff;
+  color: #6c5ce7;
+  font-size: 11px;
+}
+
+/* 过滤器 */
+.cinemas-filters-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.filter-map-mode {
+  font-size: 13px;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 影院列表视图 */
+.cinemas-list-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cinema-list-item {
+  display: flex;
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid rgba(226, 228, 235, 60%);
+  gap: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 2%);
+  transition: transform 0.2s;
+  cursor: pointer;
+  position: relative;
+}
+
+.cinema-list-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(108, 92, 231, 8%);
+}
+
+.cinema-list-logo {
+  width: 100px;
+  height: 75px;
+  border-radius: 8px;
+  background: #e2e4eb;
+  flex-shrink: 0;
+}
+
+.cinema-list-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.cinema-list-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cinema-list-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.cinema-list-score {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ff5722;
+}
+
+.cinema-list-crown {
+  font-size: 14px;
+}
+
+.cinema-list-address {
+  font-size: 13px;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.address-icon {
+  font-size: 12px;
+}
+
+.cinema-list-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cinema-list-tag {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f8f7ff;
+  color: #6c5ce7;
+  font-size: 12px;
+}
+
+.cinema-list-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 8px;
+  padding-right: 24px;
+}
+
+.cinema-right-row {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.highlight-text {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.price-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: #ff5722;
+}
+
+.cinema-list-arrow {
+  position: absolute;
+  right: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  font-size: 16px;
+}
+
+@media (max-width: 1023px) {
+  .cinemas-page-main {
+    flex-direction: column;
+  }
+
+  .ai-rec-cards {
+    flex-direction: column;
+  }
+
+  .cinema-list-item {
+    flex-direction: column;
+    padding-right: 20px;
+  }
+
+  .cinema-list-right {
+    align-items: flex-start;
+    padding-right: 0;
+  }
+
+  .cinema-list-arrow {
+    display: none;
+  }
+}
+
+.cinema-poster--navy {
+  background: #1c2938;
+}
+
+.cinema-poster--red {
+  background: #d32f2f;
+}
+
+.cinema-poster--blue {
+  background: #1976d2;
+}
+
+.cinema-poster--black {
+  background: #000;
+}
+
+.cinema-poster--brown {
+  background: #5d4037;
+}

@@ -1,0 +1,520 @@
+/* ==========================================================================
+   Profile Page / 个人中心样式
+   ========================================================================== */
+
+.profile-page-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.profile-page-main {
+  display: flex;
+  flex: 1;
+  gap: 24px;
+  width: 100%;
+  padding: 0 24px;
+}
+
+.profile-page-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 12px 0 40px;
+}
+
+/* Breadcrumb */
+.profile-breadcrumb {
+  font-size: 14px;
+  color: #8f959e;
+  margin-bottom: -12px;
+}
+
+.profile-breadcrumb .current {
+  color: #1f2329;
+  font-weight: 500;
+}
+
+/* --- Profile Header Card --- */
+.profile-header-card {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  display: flex;
+  justify-content: space-between;
+  border: 1px solid rgba(226, 228, 235, 60%);
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-header-left {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  z-index: 1;
+}
+
+.profile-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7a72ff 0%, #5b4df0 100%);
+  border: 4px solid white;
+  box-shadow: 0 4px 16px rgba(99, 91, 255, 20%);
+  flex-shrink: 0;
+}
+
+.profile-info-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.profile-name {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.profile-edit-icon {
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.profile-bio {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 16px;
+}
+
+.profile-ai-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-tag-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-right: 4px;
+}
+
+.ai-tag {
+  background: rgba(99, 91, 255, 10%);
+  color: #635bff;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.profile-header-illustration {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 300px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0%) 0%, rgba(99, 91, 255, 5%) 100%);
+  z-index: 0;
+}
+
+/* --- Section Shared --- */
+.profile-section {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid rgba(226, 228, 235, 60%);
+}
+
+.profile-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 20px;
+}
+
+.section-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.section-more-link {
+  font-size: 14px;
+  color: #635bff;
+  cursor: pointer;
+}
+
+/* --- Orders Section --- */
+.profile-order-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.order-tab {
+  padding: 6px 16px;
+  border-radius: 16px;
+  font-size: 14px;
+  color: #6b7280;
+  background: #f3f4f6;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.order-tab.active {
+  background: rgba(99, 91, 255, 10%);
+  color: #635bff;
+  font-weight: 500;
+}
+
+.tab-badge {
+  background: #635bff;
+  color: white;
+  font-size: 12px;
+  padding: 0 6px;
+  border-radius: 10px;
+  line-height: 1.4;
+}
+
+.order-tab:not(.active) .tab-badge {
+  background: #9ca3af;
+}
+
+.order-card {
+  display: flex;
+  padding: 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  gap: 20px;
+}
+
+.order-poster {
+  width: 90px;
+  height: 120px;
+  border-radius: 8px;
+  background: #1c2938;
+  flex-shrink: 0;
+}
+
+.order-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.order-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.order-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.order-tag {
+  font-size: 12px;
+  padding: 2px 6px;
+  background: #f3f4f6;
+  color: #635bff;
+  border-radius: 4px;
+  font-weight: normal;
+}
+
+.order-status {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.order-status.warning {
+  color: #ef4444;
+}
+
+.order-cinema {
+  font-size: 14px;
+  color: #4b5563;
+  margin-bottom: 6px;
+}
+
+.order-time {
+  font-size: 14px;
+  color: #4b5563;
+  margin-bottom: 6px;
+}
+
+.order-seats {
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.order-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+.order-price {
+  font-size: 20px;
+  font-weight: 600;
+  color: #ef4444;
+  margin-bottom: 8px;
+}
+
+.order-countdown {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 12px;
+}
+
+.pay-btn {
+  background: #635bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.profile-section-footer {
+  text-align: center;
+  font-size: 14px;
+  color: #635bff;
+  margin-top: 24px;
+  cursor: pointer;
+}
+
+/* --- Viewing History Section --- */
+.history-movies-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+}
+
+.history-movie-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.history-movie-poster {
+  width: 100%;
+  aspect-ratio: 3/4;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.history-movie-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+.history-movie-score {
+  font-size: 13px;
+  color: #f59e0b;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* --- Right Sidebar --- */
+.profile-page-sidebar {
+  width: 380px;
+  flex-shrink: 0;
+  padding: 32px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.profile-sidebar-card {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid rgba(226, 228, 235, 60%);
+}
+
+.sidebar-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.sidebar-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+/* AI Profile */
+.ai-profile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ai-profile-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.item-icon {
+  font-size: 16px;
+}
+
+.item-label {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.item-value {
+  font-size: 14px;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.ai-recommendation-box {
+  background: rgba(245, 243, 255, 60%);
+  border-radius: 12px;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-recommendation-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 8px;
+}
+
+.ai-recommendation-text {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+  position: relative;
+  z-index: 1;
+}
+
+/* Settings */
+.settings-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+}
+
+.settings-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.settings-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  color: #374151;
+}
+
+.settings-arrow {
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+/* Responsive */
+@media (max-width: 1023px) {
+  .profile-page-main {
+    flex-direction: column;
+  }
+
+  .profile-page-sidebar {
+    width: 100%;
+    padding: 0;
+  }
+
+  .history-movies-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .profile-header-card {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .profile-header-left {
+    flex-direction: column;
+  }
+
+  .profile-ai-tags {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+}
+
+.history-poster--brown {
+  background: #4a2311;
+}
+
+.history-poster--navy {
+  background: #1c2938;
+}
+
+.history-poster--orange {
+  background: #d2691e;
+}
+
+.history-poster--blue-gray {
+  background: #4a5b6c;
+}
+
+.history-poster--blue {
+  background: #1e90ff;
+}
+
+.history-poster--deep-blue {
+  background: #2c3e50;
+}
