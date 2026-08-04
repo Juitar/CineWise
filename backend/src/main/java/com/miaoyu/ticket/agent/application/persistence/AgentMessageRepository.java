@@ -9,4 +9,6 @@ public interface AgentMessageRepository {
     void insert(AgentMessage message);
 
     List<AgentMessage> findBySessionIdAndUserId(long sessionId, long userId, int limit);
+
+    List<AgentMessage> findByRunIdAndUserId(long runId, long userId);
 }

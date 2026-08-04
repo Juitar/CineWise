@@ -37,4 +37,15 @@ class AgentRequestHashFactoryTest {
 
         assertThrows(IllegalArgumentException.class, () -> factory.create("内容", new SlotSnapshot(1L, slots)));
     }
+
+    @Test
+    void shouldAcceptEmojiButRejectAnUnpairedSurrogate() {
+        String canonical = factory.canonicalize("推荐😀电影", new SlotSnapshot(1L, Map.of("偏好", "🎬")));
+
+        String expected = "{\"v\":\"v1\",\"content\":\"推荐😀电影\",\"slotSnapshotVersion\":1,"
+                + "\"slots\":{\"偏好\":\"🎬\"}}";
+        assertEquals(expected, canonical);
+        assertThrows(IllegalArgumentException.class,
+                () -> factory.create("错误\uD83D", new SlotSnapshot(1L, Map.of())));
+    }
 }

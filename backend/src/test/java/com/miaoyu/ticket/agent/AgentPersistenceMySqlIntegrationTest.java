@@ -155,6 +155,33 @@ class AgentPersistenceMySqlIntegrationTest {
     }
 
     @Test
+    void shouldReturnWinnerForConcurrentSameClientRequestId() throws Exception {
+        insertSession(FIRST_SESSION_ID, FIRST_SESSION);
+        Mockito.when(minimalReadOnlyAgentService.run(Mockito.any())).thenReturn(invalidResult());
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<AgentMessageSubmissionResult> first = executor.submit(() -> {
+                start.await();
+                return messageSubmissionService.submit(command(FIRST_SESSION, "same-request"));
+            });
+            Future<AgentMessageSubmissionResult> second = executor.submit(() -> {
+                start.await();
+                return messageSubmissionService.submit(command(FIRST_SESSION, "same-request"));
+            });
+            start.countDown();
+
+            List<AgentMessageSubmissionResult> results = List.of(first.get(), second.get());
+            assertThat(results.getFirst().snapshot().run().id()).isEqualTo(results.get(1).snapshot().run().id());
+            assertThat(results).filteredOn(AgentMessageSubmissionResult::reused).hasSize(1);
+            assertThat(count("SELECT COUNT(*) FROM agent_run WHERE session_id = ?", FIRST_SESSION_ID)).isEqualTo(1);
+            assertThat(count("SELECT COUNT(*) FROM agent_message WHERE session_id = ?", FIRST_SESSION_ID)).isEqualTo(2);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     void shouldCallReadOnlyAgentOutsideDatabaseTransactionAndPersistFailureResult() {
         insertSession(FIRST_SESSION_ID, FIRST_SESSION);
         Mockito.when(minimalReadOnlyAgentService.run(Mockito.any())).thenAnswer(invocation -> {

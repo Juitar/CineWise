@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.miaoyu.ticket.agent.application.persistence.AgentInitialRunResult;
 import com.miaoyu.ticket.agent.application.persistence.AgentInitialRunTransaction;
+import com.miaoyu.ticket.agent.application.persistence.AgentConcurrentRequestLookupTransaction;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionCommand;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionService;
@@ -36,6 +37,8 @@ class AgentMessageSubmissionServiceTest {
     void shouldPropagateCurrentUserSessionInvalidWithoutAgentSpecificMapping() {
         CurrentUserAccessor currentUserAccessor = mock(CurrentUserAccessor.class);
         AgentInitialRunTransaction initialRunTransaction = mock(AgentInitialRunTransaction.class);
+        AgentConcurrentRequestLookupTransaction concurrentRequestLookupTransaction =
+                mock(AgentConcurrentRequestLookupTransaction.class);
         AgentRunResultTransaction runResultTransaction = mock(AgentRunResultTransaction.class);
         MinimalReadOnlyAgentService minimalReadOnlyAgentService = mock(MinimalReadOnlyAgentService.class);
         AgentMessageRepository messageRepository = mock(AgentMessageRepository.class);
@@ -46,6 +49,7 @@ class AgentMessageSubmissionServiceTest {
         AgentMessageSubmissionService service = new AgentMessageSubmissionService(
                 currentUserAccessor,
                 initialRunTransaction,
+                concurrentRequestLookupTransaction,
                 runResultTransaction,
                 minimalReadOnlyAgentService,
                 messageRepository,
@@ -65,6 +69,8 @@ class AgentMessageSubmissionServiceTest {
     void shouldReturnPersistedSnapshotWithoutCallingAgentForReusedRequest() {
         CurrentUserAccessor currentUserAccessor = mock(CurrentUserAccessor.class);
         AgentInitialRunTransaction initialRunTransaction = mock(AgentInitialRunTransaction.class);
+        AgentConcurrentRequestLookupTransaction concurrentRequestLookupTransaction =
+                mock(AgentConcurrentRequestLookupTransaction.class);
         AgentRunResultTransaction runResultTransaction = mock(AgentRunResultTransaction.class);
         MinimalReadOnlyAgentService minimalReadOnlyAgentService = mock(MinimalReadOnlyAgentService.class);
         AgentMessageRepository messageRepository = mock(AgentMessageRepository.class);
@@ -73,11 +79,12 @@ class AgentMessageSubmissionServiceTest {
         AgentRun run = run();
         when(currentUserAccessor.requireCurrentUserId()).thenReturn(7L);
         when(initialRunTransaction.submit(7L, command())).thenReturn(new AgentInitialRunResult(run, true));
-        when(messageRepository.findBySessionIdAndUserId(1L, 7L, 100)).thenReturn(List.of());
+        when(messageRepository.findByRunIdAndUserId(100L, 7L)).thenReturn(List.of());
         when(stepRepository.findByRunId(100L)).thenReturn(List.of());
         AgentMessageSubmissionService service = new AgentMessageSubmissionService(
                 currentUserAccessor,
                 initialRunTransaction,
+                concurrentRequestLookupTransaction,
                 runResultTransaction,
                 minimalReadOnlyAgentService,
                 messageRepository,
@@ -88,6 +95,7 @@ class AgentMessageSubmissionServiceTest {
 
         assertTrue(result.reused());
         verify(staleRecoveryService).recoverStaleRuns();
+        verify(messageRepository).findByRunIdAndUserId(100L, 7L);
         verify(minimalReadOnlyAgentService, never()).run(org.mockito.ArgumentMatchers.any());
         verify(runResultTransaction, never()).record(
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());

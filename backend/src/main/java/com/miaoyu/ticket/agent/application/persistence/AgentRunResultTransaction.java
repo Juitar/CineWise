@@ -129,11 +129,14 @@ public class AgentRunResultTransaction {
 
     private static AgentRunStatus nextRunStatus(ExecutionRunState state) {
         if (state == null || state.nodeStates().values().stream()
-                .anyMatch(node -> node.status() == PlanNodeStatus.FAILED || node.status() == PlanNodeStatus.PENDING)) {
+                .anyMatch(node -> node.status() == PlanNodeStatus.FAILED)) {
             return AgentRunStatus.FAILED;
         }
         if (state.nodeStates().values().stream().anyMatch(node -> node.status() == PlanNodeStatus.RUNNING)) {
             return AgentRunStatus.RUNNING;
+        }
+        if (state.nodeStates().values().stream().anyMatch(node -> node.status() == PlanNodeStatus.PENDING)) {
+            return AgentRunStatus.FAILED;
         }
         return AgentRunStatus.COMPLETED;
     }

@@ -133,6 +133,10 @@ public interface AgentPersistenceMapper {
     List<AgentMessageEntity> findMessagesBySessionIdAndUserId(
             @Param("sessionId") long sessionId, @Param("userId") long userId, @Param("limit") int limit);
 
+    @Select("SELECT " + MESSAGE_COLUMNS + " FROM agent_message WHERE run_id = #{runId}"
+            + " AND user_id = #{userId} ORDER BY id ASC")
+    List<AgentMessageEntity> findMessagesByRunIdAndUserId(@Param("runId") long runId, @Param("userId") long userId);
+
     @Insert("""
             INSERT INTO agent_run_step (
                 id, run_id, plan_version, node_id, node_type, depends_on_json, input_refs_json, status,

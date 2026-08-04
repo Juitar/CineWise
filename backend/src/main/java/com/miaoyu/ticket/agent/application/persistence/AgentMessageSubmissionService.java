@@ -18,6 +18,7 @@ public class AgentMessageSubmissionService {
 
     private final CurrentUserAccessor currentUserAccessor;
     private final AgentInitialRunTransaction initialRunTransaction;
+    private final AgentConcurrentRequestLookupTransaction concurrentRequestLookupTransaction;
     private final AgentRunResultTransaction runResultTransaction;
     private final MinimalReadOnlyAgentService minimalReadOnlyAgentService;
     private final AgentMessageRepository messageRepository;
@@ -27,6 +28,7 @@ public class AgentMessageSubmissionService {
     public AgentMessageSubmissionService(
             CurrentUserAccessor currentUserAccessor,
             AgentInitialRunTransaction initialRunTransaction,
+            AgentConcurrentRequestLookupTransaction concurrentRequestLookupTransaction,
             AgentRunResultTransaction runResultTransaction,
             MinimalReadOnlyAgentService minimalReadOnlyAgentService,
             AgentMessageRepository messageRepository,
@@ -34,6 +36,7 @@ public class AgentMessageSubmissionService {
             AgentRunStaleRecoveryService staleRecoveryService) {
         this.currentUserAccessor = currentUserAccessor;
         this.initialRunTransaction = initialRunTransaction;
+        this.concurrentRequestLookupTransaction = concurrentRequestLookupTransaction;
         this.runResultTransaction = runResultTransaction;
         this.minimalReadOnlyAgentService = minimalReadOnlyAgentService;
         this.messageRepository = messageRepository;
@@ -46,7 +49,13 @@ public class AgentMessageSubmissionService {
         AgentMessageSubmissionCommand request = Objects.requireNonNull(command, "提交命令不能为空");
         long userId = currentUserAccessor.requireCurrentUserId();
         staleRecoveryService.recoverStaleRuns();
-        AgentInitialRunResult initial = initialRunTransaction.submit(userId, request);
+        AgentInitialRunResult initial;
+        try {
+            initial = initialRunTransaction.submit(userId, request);
+        } catch (AgentConcurrentDuplicateRequestException exception) {
+            AgentRun winner = concurrentRequestLookupTransaction.findWinner(userId, request, exception.requestHash());
+            return new AgentMessageSubmissionResult(snapshot(winner, userId), true);
+        }
         if (initial.reused()) {
             return new AgentMessageSubmissionResult(snapshot(initial.run(), userId), true);
         }
@@ -68,8 +77,7 @@ public class AgentMessageSubmissionService {
     }
 
     private AgentPersistedRunSnapshot snapshot(AgentRun run, long userId) {
-        List<AgentMessage> messages = messageRepository.findBySessionIdAndUserId(
-                        run.sessionId(), userId, SNAPSHOT_MESSAGE_LIMIT)
+        List<AgentMessage> messages = messageRepository.findByRunIdAndUserId(run.id(), userId)
                 .stream()
                 .filter(message -> message.runId() == run.id())
                 .sorted(Comparator.comparingLong(AgentMessage::id))

@@ -25,4 +25,11 @@ public class MybatisAgentMessageRepository implements AgentMessageRepository {
                 .map(AgentPersistenceMappings::toDomain)
                 .toList();
     }
+
+    @Override
+    public List<AgentMessage> findByRunIdAndUserId(long runId, long userId) {
+        return mapper.findMessagesByRunIdAndUserId(runId, userId).stream()
+                .map(AgentPersistenceMappings::toDomain)
+                .toList();
+    }
 }

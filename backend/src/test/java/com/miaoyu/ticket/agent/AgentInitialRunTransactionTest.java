@@ -95,23 +95,18 @@ class AgentInitialRunTransactionTest {
     }
 
     @Test
-    void shouldReturnConcurrentExistingRunAfterUniqueKeyConflict() {
+    void shouldRollbackBeforeConcurrentWinnerIsReadInAnotherTransaction() {
         Fixture fixture = fixture(true);
-        var existing = new com.miaoyu.ticket.agent.domain.persistence.AgentRun(
-                88L, "run-existing", 1L, 7L, "request-1",
-                new AgentRequestHashFactory().create("推荐电影", new SlotSnapshot(1L, Map.of())), null, null,
-                com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus.RUNNING,
-                "trace", NOW, null, 0L, NOW, NOW, NOW.plusDays(30));
-        when(fixture.runRepository().findByClientRequestId(7L, 1L, "request-1"))
-                .thenReturn(Optional.empty(), Optional.of(existing));
         doThrow(new DuplicateKeyException("duplicate"))
                 .when(fixture.runRepository())
                 .insert(any());
 
-        var result = fixture.transaction().submit(7L, command());
+        var exception = assertThrows(
+                com.miaoyu.ticket.agent.application.persistence.AgentConcurrentDuplicateRequestException.class,
+                () -> fixture.transaction().submit(7L, command()));
 
-        assertEquals(existing, result.run());
-        assertEquals(true, result.reused());
+        assertEquals(new AgentRequestHashFactory().create("推荐电影", new SlotSnapshot(1L, Map.of())),
+                exception.requestHash());
         verify(fixture.messageRepository(), never()).insert(any());
     }
 

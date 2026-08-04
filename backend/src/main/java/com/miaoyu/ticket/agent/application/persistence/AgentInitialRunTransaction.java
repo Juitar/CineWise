@@ -75,14 +75,8 @@ public class AgentInitialRunTransaction {
         try {
             runRepository.insert(run);
         } catch (DuplicateKeyException exception) {
-            // 两个同幂等键请求同时越过首次查询时，只读取胜者，不能再创建消息或调用工具。
-            AgentRun concurrentRun = runRepository
-                    .findByClientRequestId(userId, session.id(), command.clientRequestId())
-                    .orElseThrow(() -> exception);
-            if (!concurrentRun.requestHash().equals(requestHash)) {
-                throw new BusinessException(AgentErrorCode.REQUEST_HASH_MISMATCH);
-            }
-            return new AgentInitialRunResult(concurrentRun, true);
+            // MySQL REPEATABLE READ 下当前事务可能看不到胜者，必须回滚后再由外层新事务读取。
+            throw new AgentConcurrentDuplicateRequestException(requestHash, exception);
         }
         messageRepository.insert(new AgentMessage(
                 idGenerator.nextId(), UUID.randomUUID().toString(), session.id(), runId, userId,

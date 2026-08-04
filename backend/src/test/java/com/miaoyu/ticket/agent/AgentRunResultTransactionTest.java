@@ -74,6 +74,26 @@ class AgentRunResultTransactionTest {
     }
 
     @Test
+    void shouldKeepRunRunningWhenDownstreamNodeIsPending() {
+        Fixture fixture = fixture();
+        ExecutionPlan plan = new ExecutionPlan("plan-2", 1, List.of(
+                new ExecutionPlanNode("running", PlanNodeType.ASK_USER, null, List.of(), List.of(),
+                        FailurePolicy.ASK_USER, PlanNodeStatus.PENDING, false, false, null, null,
+                        new SlotSnapshot(3L, Map.of())),
+                new ExecutionPlanNode("downstream", PlanNodeType.ASK_USER, null, List.of(), List.of("running"),
+                        FailurePolicy.ASK_USER, PlanNodeStatus.PENDING, false, false, null, null,
+                        new SlotSnapshot(3L, Map.of()))));
+        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(new ToolRegistry(List.of()));
+        var state = stateMachine.startNode(stateMachine.initialize(plan), "running");
+        when(fixture.runRepository().updateRunningPlanWithCas(any(), eq(0L))).thenReturn(true);
+
+        AgentRun recorded = fixture.transaction().record(run(), result(plan, state));
+
+        assertEquals(AgentRunStatus.RUNNING, recorded.status());
+        verify(fixture.sessionRepository(), never()).releaseActiveRun(any(Long.class), any(Long.class));
+    }
+
+    @Test
     void shouldReleaseSessionOnlyAfterTerminalCasSucceeds() {
         Fixture fixture = fixture();
         when(fixture.runRepository().updateTerminalWithCas(any(), eq(0L))).thenReturn(false);

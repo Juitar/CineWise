@@ -100,25 +100,33 @@ public final class AgentRequestHashFactory {
                 case '\n' -> target.append("\\n");
                 case '\r' -> target.append("\\r");
                 case '\t' -> target.append("\\t");
-                default -> appendJsonCharacter(target, character);
+                default -> index += appendJsonCharacter(target, value, index);
             }
         }
         target.append('"');
     }
 
-    private static void appendJsonCharacter(StringBuilder target, char character) {
+    private static int appendJsonCharacter(StringBuilder target, String value, int index) {
+        char character = value.charAt(index);
         if (character < 0x20) {
             target.append("\\u");
             target.append(HEX[(character >>> 12) & 0x0f]);
             target.append(HEX[(character >>> 8) & 0x0f]);
             target.append(HEX[(character >>> 4) & 0x0f]);
             target.append(HEX[character & 0x0f]);
-            return;
+            return 0;
+        }
+        if (Character.isHighSurrogate(character)
+                && index + 1 < value.length()
+                && Character.isLowSurrogate(value.charAt(index + 1))) {
+            target.append(character).append(value.charAt(index + 1));
+            return 1;
         }
         if (Character.isSurrogate(character)) {
             throw new IllegalArgumentException("请求摘要输入不能包含未配对的 UTF-16 代理字符");
         }
         target.append(character);
+        return 0;
     }
 
     private static String sha256Hex(String value) {
