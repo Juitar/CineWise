@@ -165,3 +165,17 @@
 - **THEN** A 可以使用明确标识 `MOCK/demo-seed` 的临时 Demo Adapter
 - **AND** Adapter 只返回内容摘要并复用共享稳定 ID
 - **AND** Adapter 不写入内容表、不维护第二套内容数据，也不生成票务事实
+
+### Requirement: 内容 REST 接口必须使用 C 确认的展示格式
+系统 SHALL 公开 `GET /api/v1/movies`、`GET /api/v1/movies/{movieId}`、`GET /api/v1/cinemas` 和 `GET /api/v1/cinemas/{cinemaId}`。列表分页从 1 开始，默认 `page=1,size=20`，size 为 1 至 50；影片按 movieId、影院按 cinemaId 升序。列表来源字段在分页包装中，详情字段直接返回；字段名固定为 `source/sourceType/dataTime/expiresAt/isExpired/degraded/fallbackType`，时间使用带 `+08:00` 的 ISO 8601。Demo 返回 `DEMO_CONTENT/MOCK`、`degraded=true`、`fallbackType=MOCK`；不得返回 `expired`、坐标或距离。
+
+#### Scenario: 查询 Demo 影片和影院
+- **WHEN** 调用方以合法分页、影片 keyword/genre 或影院 location/keyword 查询
+- **THEN** 返回 HTTP 200 和稳定分页结果
+- **AND** records 中的业务 ID 是正十进制字符串，genres 是数组，posterUrl 与 summary 在当前 Demo 中为 null
+
+#### Scenario: 查询不存在或格式错误的详情
+- **WHEN** movieId 或 cinemaId 不是正十进制字符串
+- **THEN** 返回 HTTP 400
+- **WHEN** 内容不存在、已删除或不可展示
+- **THEN** 返回 HTTP 404 和稳定错误码

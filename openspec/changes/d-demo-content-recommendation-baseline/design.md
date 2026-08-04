@@ -72,6 +72,43 @@ agent/tool/         B 的工具协议适配器，仅调用 recommendation Applic
 
 `ContentSummaryQueryPort` 尚未实现时，A 可以使用经 D 确认、明确标识 `MOCK/demo-seed` 的临时 Demo Adapter。该 Adapter 只返回场次展示所需的内容摘要，必须复用共享固定数据的稳定 ID；不得写入 `movie/cinema`、维护另一套内容数据，或生成场次、票价、座位和库存。
 
+### 3.1 C 确认的公开内容 REST 接口
+
+`ContentController` 只调用 `ContentQueryService`，不直接访问 JDBC、缓存或 A 的票务模块。四个接口均为不登录即可访问的只读接口：
+
+- `GET /api/v1/movies?keyword=&genre=&page=1&size=20`
+- `GET /api/v1/movies/{movieId}`
+- `GET /api/v1/cinemas?location=330100&keyword=&page=1&size=20`
+- `GET /api/v1/cinemas/{cinemaId}`
+
+列表统一返回 `Result<ContentPageResponse<T>>`。页码从 1 开始，默认 `page=1,size=20`，`size` 限制为 1 至 50；影片按数值 `movieId` 升序，影院按数值 `cinemaId` 升序。影片 `keyword` 只对标题做不区分大小写的包含查询，`genre` 与 genres 数组元素精确匹配；影院 `location` 必填且精确等于 `cityCode`，`keyword` 对名称、区域和地址做包含查询。空白关键字按未传处理，筛选条件最长 100 个字符；无效分页、ID 或筛选条件返回 `100001` 和 HTTP 400，详情不存在、已删除或不可展示返回 `100404` 和 HTTP 404。
+
+影片列表记录为 `movieId/title/posterUrl/genres/durationMinutes/rating`，影片详情额外返回 `summary` 与来源时效字段；影院列表记录为 `cinemaId/name/cityCode/area/address`，影院详情额外返回来源时效字段。列表来源字段放入分页包装，不在单条记录重复。`posterUrl`、`summary` 在本期 Demo 固定返回 null；`genres` 始终返回数组。接口不返回坐标、距离或路线时间，避免前端把影院静态信息误作用户路线结果。
+
+来源字段固定为 `source/sourceType/dataTime/expiresAt/isExpired/degraded/fallbackType`，其中时间序列化为带 `+08:00` 的 ISO 8601。API 层把内部 `expired` 映射为 `isExpired`，不返回内部字段名；当 `degraded=false` 时 `fallbackType` 必须为 null。当前 Demo 固定返回 `DEMO_CONTENT/MOCK`、`isExpired=false`、`degraded=true` 和 `fallbackType=MOCK`，前端据此显示“演示数据”。
+
+影片列表成功响应示例：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "records": [{"movieId": "2084453322754805762", "title": "星河远征", "posterUrl": null, "genres": ["科幻", "冒险"], "durationMinutes": 128, "rating": 8.6}],
+    "total": 1,
+    "page": 1,
+    "size": 20,
+    "source": "DEMO_CONTENT",
+    "sourceType": "MOCK",
+    "dataTime": "2026-08-03T08:00:00+08:00",
+    "expiresAt": "2026-08-03T14:00:00+08:00",
+    "isExpired": false,
+    "degraded": true,
+    "fallbackType": "MOCK"
+  }
+}
+```
+
 ### 4. 缓存、快照和 Demo 回退顺序固定
 
 查询流程固定为：
@@ -156,7 +193,7 @@ B 已于 2026-08-03 确认工具类名为 `RankMoviePlanTool`，`ToolRegistry` �
 4. D 接管 A 演示阶段已有的 10 部影片、4 家影院，固定为唯一的 `demo-content-v1`；内容种子返回实际数据库 ID，A 的票务种子只消费该返回值。
 5. D 实现内容查询、`ContentSummaryQueryPort`、缓存、快照和固定推荐边界。
 6. D 建立并执行应用查询、缓存降级和固定回归测试；A 的场次查询完成后，增加推荐引用其公开 Application 查询结果的集成测试。
-7. 由 A、B、C 分别确认场次边界、工具结果和展示字段后完成验收。
+7. 由 A、B、C 分别确认场次边界、工具结果和展示字段后完成验收；C 确认后实现四个公开内容 REST 接口、OpenAPI、前端类型和响应测试。
 
 迁移或初始化失败时，停止应用新版本并回退到上一稳定应用和数据库备份。已经共享或执行的 Flyway 脚本不得修改；修正必须追加新的向前迁移。
 
@@ -164,5 +201,5 @@ B 已于 2026-08-03 确认工具类名为 `RankMoviePlanTool`，`ToolRegistry` �
 
 - A 与 D 确认 `ContentSummaryQueryPort` 和场次公开 Application 查询的方法名、包位置及 DTO 字段；在实现前补入双方变更。
 - `demo-content-v1` 的资源文件落位、Provider 读取和固定时钟夹具由 D 在 3.1、3.2、5.1 实现；本阶段仅以来源 ID 清单作为交接证据。
-- B 已确认 `RankMoviePlanTool`、`rankMoviePlan` 和 `RankMoviePlanCommand` 的字段；A 还需保证公开场次 Application DTO 返回本变更所需的 `expiresAt`，D 才能完成可购候选的时效校验。
-- C 首版页面是否需要直接调用影片/影院 REST 接口？若需要，在实现阶段补 API 层和 OpenAPI，不改变内部查询规格。
+- B 已确认 `RankMoviePlanTool.execute` 的输入、结果和只读语义不变；D 不改工具结果含义。
+- A 已确认场次公开 Application DTO 提供 `expiresAt` 和 `dataType`；C 已确认四个内容 REST 接口及展示字段，相关实现和测试纳入 6.2 验收。

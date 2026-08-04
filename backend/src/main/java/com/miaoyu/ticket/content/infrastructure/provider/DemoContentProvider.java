@@ -17,6 +17,8 @@ import com.miaoyu.ticket.content.domain.MovieContent;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.Locale;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
@@ -74,6 +76,7 @@ public class DemoContentProvider implements ContentProvider {
         if (content.isEmpty()) {
             return Optional.empty();
         }
+        content = attachActualIds(query.resourceType(), content, query.contentId());
         LocalDateTime dataTime = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         ContentSource source = new ContentSource(catalog.source(), catalog.sourceType());
         return Optional.of(new ContentResult<>(
@@ -84,6 +87,48 @@ public class DemoContentProvider implements ContentProvider {
                 false,
                 true,
                 ContentFallbackType.MOCK));
+    }
+
+    private List<? extends ContentItem> attachActualIds(
+            ContentResourceType type, List<? extends ContentItem> items, Long requestedId) {
+        if (requestedId != null) {
+            return items;
+        }
+        Set<String> sourceIds = items.stream()
+                .map(this::sourceIdOf)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<String, Long> ids = identityLookupPort.findContentIds(type, sourceIds);
+        return items.stream().map(item -> attachActualId(item, ids)).toList();
+    }
+
+    private String sourceIdOf(ContentItem item) {
+        if (item instanceof MovieContent movie) {
+            return movie.sourceMovieId();
+        }
+        return ((CinemaContent) item).sourceCinemaId();
+    }
+
+    /** 只替换环境相关的数据库 ID，保留 JSON 目录中受 D 管理的内容字段。 */
+    private ContentItem attachActualId(ContentItem item, Map<String, Long> ids) {
+        if (item instanceof MovieContent movie) {
+            return new MovieContent(
+                    ids.get(movie.sourceMovieId()),
+                    movie.sourceMovieId(),
+                    movie.title(),
+                    movie.genresJson(),
+                    movie.durationMinutes(),
+                    movie.rating());
+        }
+        CinemaContent cinema = (CinemaContent) item;
+        return new CinemaContent(
+                ids.get(cinema.sourceCinemaId()),
+                cinema.sourceCinemaId(),
+                cinema.name(),
+                cinema.cityCode(),
+                cinema.area(),
+                cinema.address(),
+                cinema.longitude(),
+                cinema.latitude());
     }
 
     /**
@@ -110,7 +155,7 @@ public class DemoContentProvider implements ContentProvider {
         return cinemas.stream()
                 .filter(cinema -> requestedSourceId == null || requestedSourceId.equals(cinema.sourceCinemaId()))
                 .filter(cinema -> query.cityCode() == null || query.cityCode().equals(cinema.cityCode()))
-                .filter(cinema -> matches(query.keyword(), cinema.name(), cinema.sourceCinemaId()))
+                .filter(cinema -> matchesCinema(query.keyword(), cinema))
                 .map(cinema -> query.contentId() == null ? cinema : new CinemaContent(query.contentId(),
                         cinema.sourceCinemaId(), cinema.name(), cinema.cityCode(), cinema.area(), cinema.address(),
                         cinema.longitude(), cinema.latitude()))
@@ -136,5 +181,18 @@ public class DemoContentProvider implements ContentProvider {
         String normalizedKeyword = keyword.toLowerCase(Locale.ROOT);
         return title.toLowerCase(Locale.ROOT).contains(normalizedKeyword)
                 || sourceId.toLowerCase(Locale.ROOT).contains(normalizedKeyword);
+    }
+
+    /**
+     * 影院 REST 只允许按名称、行政区和地址搜索，不把内部来源 ID 暴露为页面搜索条件。
+     */
+    private boolean matchesCinema(String keyword, CinemaContent cinema) {
+        if (keyword == null) {
+            return true;
+        }
+        String normalizedKeyword = keyword.toLowerCase(Locale.ROOT);
+        return cinema.name().toLowerCase(Locale.ROOT).contains(normalizedKeyword)
+                || cinema.area().toLowerCase(Locale.ROOT).contains(normalizedKeyword)
+                || cinema.address().toLowerCase(Locale.ROOT).contains(normalizedKeyword);
     }
 }

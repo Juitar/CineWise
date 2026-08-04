@@ -53,6 +53,12 @@ public class SecuritySkeletonConfiguration {
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/shows")
                         .permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/movies",
+                                "/api/v1/movies/*",
+                                "/api/v1/cinemas",
+                                "/api/v1/cinemas/*")
+                        .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf")
                         .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login/password", "/api/v1/admin/auth/login")
