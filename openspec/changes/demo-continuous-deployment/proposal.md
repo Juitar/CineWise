@@ -8,6 +8,7 @@
 - 部署前重新执行前后端质量门，只部署触发工作流的精确 Git SHA。
 - 使用 GitHub `demo` Environment secrets 建立 SSH 连接，不向仓库写入服务器或业务凭据。
 - 使用 Docker Compose 构建并等待健康检查，失败时恢复部署前提交。
+- 在质量门中使用真实生产前端镜像验证 SPA 回退、静态资源 404、API 代理和资源 MIME，避免 Nginx 把缺失脚本伪装成 HTML 200。
 - 演示应用通过服务器 `.env` 连接独立基础服务 ECS 上的 MySQL、Redis 和可选 MinIO，不在应用 Compose 中重复启动基础服务。
 - 文档、OpenSpec、迁移记录和仅 Flyway SQL 的变更不触发应用部署。
 - CD 不执行 Flyway、种子初始化、数据库修数或共享数据库权限变更。
@@ -25,6 +26,7 @@
 ## Impact
 
 - `.github/workflows/`：新增演示环境 CD；复用现有 CI 已覆盖 `dev` push 的集成基线。
+- `frontend/nginx.conf` 与前端 E2E：明确 API、静态资源和 SPA 路由边界，并增加生产镜像浏览器冒烟。
 - `docs/`：新增服务器准备、Secrets、触发边界和恢复说明。
 - `compose.yaml` 与 `.env.example`：Redis 改为显式外部连接，MinIO 应用变量透传给后端容器。
 - 演示服务器：需要预装 Git、Docker、Compose，准备只读仓库访问和被 Git 忽略的 `.env`；不再运行重复的 Redis 容器。
