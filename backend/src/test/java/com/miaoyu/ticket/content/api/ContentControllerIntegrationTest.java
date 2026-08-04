@@ -4,9 +4,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.miaoyu.ticket.content.application.ContentCachePort;
 import com.miaoyu.ticket.content.application.ContentQuery;
 import com.miaoyu.ticket.content.application.ContentResult;
+import com.miaoyu.ticket.content.application.ContentSnapshotPort;
 import com.miaoyu.ticket.content.domain.ContentItem;
 import com.miaoyu.ticket.content.domain.ContentResourceType;
 import com.miaoyu.ticket.content.domain.ContentSource;
@@ -43,7 +43,7 @@ class ContentControllerIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private ContentCachePort contentCachePort;
+    private ContentSnapshotPort contentSnapshotPort;
 
     /**
      * 公共内容页面不应依赖登录；列表同时校验 C 要求的分页、Demo 标识和 ISO 偏移时间。
@@ -101,7 +101,8 @@ class ContentControllerIntegrationTest {
                         new BigDecimal("8.0"))),
                 new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE),
                 LocalDateTime.of(2026, 8, 3, 8, 0), LocalDateTime.of(2026, 8, 3, 14, 0), false, false, null);
-        contentCachePort.save(query, synchronizedMovie);
+        // Redis 是可选加速层，CI 未启动 Redis 时保存会被安全忽略；用快照验证同步后的持久化读取契约。
+        contentSnapshotPort.save(query, synchronizedMovie);
 
         mockMvc.perform(get("/api/v1/movies").param("keyword", "同步验证影片"))
                 .andExpect(status().isOk())
