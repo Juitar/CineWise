@@ -50,10 +50,10 @@
 
 ## 6. 文档、迁移与联调验收
 
-- [ ] 6.1 修正认证设计和前端应用设计中残留的 Umi `request` 描述，统一为现有原生 `fetch` 公共客户端。
-- [ ] 6.2 修正后端总系分中认证 REST `CurrentUser.userId/email` 和登录详细接口缺少 `clientRequestId` 的旧描述。
+- [x] 6.1 修正认证设计和前端应用设计中残留的 Umi `request` 描述，统一为现有原生 `fetch` 公共客户端。
+- [x] 6.2 修正后端总系分中认证 REST `CurrentUser.userId/email` 和登录详细接口缺少 `clientRequestId` 的旧描述。
 - [x] 6.3 C 按静态审查意见完成 `V006` 修订草案并私下交给 A；A 固化最终 SQL、完成 AI 只读复核并将验证通过的文件直提 `dev`。C 不提交、不推送、不执行迁移。
 - [x] 6.4 A 在独立空 MySQL 8.4 验证迁移、重复执行、字段、索引、约束、字符集和排序规则，并记录证据。
 - [x] 6.5 使用受控测试账号完成用户/管理员真实 MySQL 登录、刷新恢复、登出、401/403、CSRF 和 Cookie 冒烟。
 - [x] 6.6 执行 `openspec validate password-login-and-session --strict`、后端 `mvnw.cmd verify`、前端 `pnpm check` 和相关 E2E，并记录实际结果。
-- [ ] 6.7 导出 `/v3/api-docs`，由 A/B/C/D 复核认证响应、Cookie 安全方案、CSRF Header 和公共错误码。
+- [x] 6.7 导出 `/v3/api-docs`，由 A/B/C/D 复核认证响应、Cookie 安全方案、CSRF Header 和公共错误码。

@@ -2,6 +2,8 @@ package com.miaoyu.ticket.auth.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -66,6 +68,70 @@ class AuthControllerIntegrationTest {
         insertUser(1001L, "user@cinewise.test", "USER", "NORMAL", 0L);
         insertUser(1002L, "admin@cinewise.test", "ADMIN", "NORMAL", 0L);
         insertUser(1003L, "disabled@cinewise.test", "USER", "DISABLED", 0L);
+    }
+
+    @Test
+    void shouldPublishCompleteAuthenticationOpenApiContract() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.components.securitySchemes.cookieAuth.name")
+                        .value(ACCESS_COOKIE))
+                .andExpect(jsonPath("$.components.securitySchemes.cookieAuth.in")
+                        .value("cookie"))
+                .andExpect(jsonPath("$.components.securitySchemes.csrfToken.name")
+                        .value(CSRF_HEADER))
+                .andExpect(jsonPath("$.components.securitySchemes.csrfToken.in")
+                        .value("header"))
+                .andExpect(jsonPath("$.components.schemas.PasswordLoginRequest.required[*]")
+                        .value(containsInAnyOrder("clientRequestId", "email", "password")))
+                .andExpect(jsonPath("$.components.schemas.CurrentUserResponse.required[*]")
+                        .value(containsInAnyOrder(
+                                "id",
+                                "role",
+                                "nickname",
+                                "emailMasked",
+                                "emailVerified",
+                                "status",
+                                "privacyPolicyVersion")))
+                .andExpect(jsonPath("$.components.schemas.CurrentUserResponse.properties.userId")
+                        .doesNotExist())
+                .andExpect(jsonPath("$.components.schemas.CurrentUserResponse.properties.email")
+                        .doesNotExist())
+                .andExpect(jsonPath("$.components.schemas.CurrentUserResponse.properties.tokenVersion")
+                        .doesNotExist())
+                .andExpect(jsonPath("$.components.schemas.CsrfTokenResponse.required[*]")
+                        .value(containsInAnyOrder("token", "headerName")))
+                .andExpect(jsonPath("$.components.schemas.LogoutResponse.required[*]")
+                        .value(containsInAnyOrder("loggedOut")))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/login/password'].post.security[0].csrfToken")
+                        .isArray())
+                .andExpect(jsonPath("$.paths['/api/v1/auth/login/password'].post.responses['200'].content"
+                                + "['application/json'].schema['$ref']")
+                        .value("#/components/schemas/ResultCurrentUserResponse"))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/login/password'].post.responses['401'].description")
+                        .value(containsString("201001")))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/login/password'].post.responses['403'].description")
+                        .value(containsString("201009")))
+                .andExpect(jsonPath("$.paths['/api/v1/admin/auth/login'].post.responses['401'].description")
+                        .value(containsString("201001")))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/me'].get.security[0].cookieAuth")
+                        .isArray())
+                .andExpect(jsonPath("$.paths['/api/v1/auth/me'].get.responses['200']")
+                        .exists())
+                .andExpect(jsonPath("$.paths['/api/v1/auth/me'].get.responses['401'].description")
+                        .value(containsString("201006")))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.security.length()")
+                        .value(1))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.security[0].csrfToken")
+                        .isArray())
+                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.security[0].cookieAuth")
+                        .doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.description")
+                        .value(containsString("认证 Cookie 可选")))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.responses['200']")
+                        .exists())
+                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.responses['403'].description")
+                        .value(containsString("201009")));
     }
 
     @Test
@@ -206,6 +272,13 @@ class AuthControllerIntegrationTest {
 
     @Test
     void shouldAllowRepeatedLogoutAndEnforceLoginLogConstraintAndCleanupIndex() throws Exception {
+        CsrfSession anonymousCsrf = getCsrf();
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .cookie(anonymousCsrf.cookie())
+                        .header(CSRF_HEADER, anonymousCsrf.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.loggedOut").value(true));
+
         Cookie accessCookie = loginAndGetAccessCookie("user@cinewise.test", "/api/v1/auth/login/password");
         CsrfSession firstCsrf = getCsrf(accessCookie);
         mockMvc.perform(post("/api/v1/auth/logout")
