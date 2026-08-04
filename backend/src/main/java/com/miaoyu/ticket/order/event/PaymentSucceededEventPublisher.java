@@ -1,6 +1,6 @@
 package com.miaoyu.ticket.order.event;
 
-/** 支付事务提交后的事件发布端口；D区域摘要未就绪前不提供伪造实现。 */
+/** 支付事务内的事件登记端口；消费者必须绑定AFTER_COMMIT阶段。 */
 @FunctionalInterface
 public interface PaymentSucceededEventPublisher {
 

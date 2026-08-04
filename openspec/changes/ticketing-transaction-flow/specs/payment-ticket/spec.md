@@ -90,11 +90,43 @@
 
 ### Requirement: 支付成功事件生产边界
 
-系统 SHALL 定义冻结字段的`PaymentSucceededEvent`和发布端口。事件只允许在支付事务提交后发布；监听或发布失败 SHALL NOT 回滚已提交支付。A SHALL NOT 为补齐`cinemaArea`而读取D的私有Mapper或表。
+系统 SHALL 定义冻结字段的`PaymentSucceededEvent`和发布端口。A SHALL 在支付事务全部权威写入完成后、事务仍活动时登记事件，
+D SHALL 仅在`AFTER_COMMIT`阶段消费；事务回滚 SHALL NOT 触发消费者。监听或发布失败 SHALL NOT 改变已提交支付，A SHALL NOT
+为补齐`cinemaArea`而读取D的私有Mapper、Repository、Entity或表。
 
-#### Scenario: D公开影院区域端口尚未就绪
+#### Scenario: 首次支付成功后发布完整事件
 
-- GIVEN D尚未提供包含`cinemaArea`的公开Application API
-- WHEN A实现支付主事务
-- THEN A保留事件类型和发布适配位置，但不伪造`cinemaArea`或跨模块查询D私表
-- AND 支付、座位和电子票闭环仍可独立完成
+- GIVEN A可从权威订单和场次取得`orderId/showId/userId/cinemaId/startAt/orderVersion`
+- AND D的`ContentSummaryQueryPort`返回未过期且`area`非空的影院摘要
+- WHEN 首次Mock支付事务成功提交
+- THEN D的AFTER_COMMIT消费者收到一次字段完整的`PaymentSucceededEvent`
+- AND 事件不包含模拟密码、JWT、Cookie、完整订单明细或二维码载荷
+
+#### Scenario: 幂等支付重放
+
+- GIVEN 某订单已经成功支付并登记过支付成功事件
+- WHEN 使用原幂等键或新幂等键再次支付同一订单
+- THEN 返回原支付和电子票结果
+- AND 不重复登记`PaymentSucceededEvent`
+
+#### Scenario: 支付事务回滚
+
+- GIVEN 支付过程中座位归属、订单版本或唯一记录校验失败
+- WHEN 支付事务回滚
+- THEN D的AFTER_COMMIT消费者不收到支付成功事件
+- AND 订单、支付、座位和电子票保持回滚前状态
+
+#### Scenario: 影院摘要暂不可用于事件
+
+- GIVEN D的公开影院摘要不存在、已过期、`area`为空或查询异常
+- WHEN A执行Mock支付
+- THEN 支付、座位和电子票事务仍可成功提交
+- AND 本次不伪造`cinemaArea`或跨模块读取D私有数据
+- AND 后续按PAID订单对账补偿缺失的提醒任务
+
+#### Scenario: 发布或消费失败
+
+- GIVEN 支付权威写入已经完成
+- WHEN Spring事件登记失败或D的AFTER_COMMIT消费者抛出异常
+- THEN 已提交订单保持`PAID`、支付保持`SUCCESS`、座位保持`SOLD`且电子票保持`VALID`
+- AND 调用方可按`orderNo`查询恢复权威支付结果
