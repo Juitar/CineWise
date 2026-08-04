@@ -26,6 +26,8 @@ cinewise:
     login-log-cleanup-delay-milliseconds: 86400000
   transaction:
     expiry-job-enabled: false
+    paid-travel-reconciliation:
+      enabled: false
 
 springdoc:
   api-docs:

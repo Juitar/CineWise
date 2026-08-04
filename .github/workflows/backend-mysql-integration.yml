@@ -50,6 +50,7 @@ jobs:
       CINEWISE_MYSQL_LIFECYCLE_IT: "true"
       CINEWISE_MYSQL_PAYMENT_IT: "true"
       CINEWISE_MYSQL_REFUND_IT: "true"
+      CINEWISE_MYSQL_PAID_TRAVEL_RECONCILIATION_IT: "true"
       CINEWISE_MYSQL_ADMIN_ORDER_IT: "true"
     steps:
       - name: Checkout
@@ -72,7 +73,7 @@ jobs:
         working-directory: backend
         run: >-
           bash ./mvnw --batch-mode --no-transfer-progress
-          -Dtest=ShowQueryMySqlIntegrationTest,OrderCreationMySqlConcurrencyIntegrationTest,OrderLifecycleMySqlIntegrationTest,PaymentMySqlIntegrationTest,RefundMySqlIntegrationTest,AdminOrderQueryMySqlIntegrationTest
+          -Dtest=ShowQueryMySqlIntegrationTest,OrderCreationMySqlConcurrencyIntegrationTest,OrderLifecycleMySqlIntegrationTest,PaymentMySqlIntegrationTest,RefundMySqlIntegrationTest,PaidTravelTaskReconciliationMySqlIntegrationTest,AdminOrderQueryMySqlIntegrationTest
           test
       - name: Run Agent MySQL persistence integration tests
         working-directory: backend

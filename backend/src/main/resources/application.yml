@@ -81,6 +81,12 @@ cinewise:
     expiry-job-enabled: ${ORDER_EXPIRY_JOB_ENABLED:true}
     expiry-job-delay-milliseconds: ${ORDER_EXPIRY_JOB_DELAY_MILLISECONDS:30000}
     expiry-batch-size: ${ORDER_EXPIRY_BATCH_SIZE:100}
+    paid-travel-reconciliation:
+      # 进程内支付事件遗漏时，按PAID权威状态恢复D的唯一出行任务。
+      enabled: ${PAID_TRAVEL_RECONCILIATION_ENABLED:true}
+      delay-milliseconds: ${PAID_TRAVEL_RECONCILIATION_DELAY_MILLISECONDS:300000}
+      window-hours: ${PAID_TRAVEL_RECONCILIATION_WINDOW_HOURS:24}
+      batch-size: ${PAID_TRAVEL_RECONCILIATION_BATCH_SIZE:100}
   api:
     default-page: 1
     default-page-size: 20
