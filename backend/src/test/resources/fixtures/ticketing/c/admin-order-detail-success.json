@@ -1,0 +1,64 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "summary": {
+      "orderId": "3002",
+      "orderNo": "CW-REFUNDED-1",
+      "userId": "1002",
+      "emailMasked": "r***@example.com",
+      "showId": "2002",
+      "movieId": "502",
+      "cinemaId": "602",
+      "showStartTime": "2026-08-06T09:00:00+08:00",
+      "ticketCount": 1,
+      "unitPrice": "68.00",
+      "totalAmount": "68.00",
+      "orderStatus": "REFUNDED",
+      "expireTime": "2026-08-04T08:15:00+08:00",
+      "paymentStatus": "SUCCESS",
+      "ticketStatus": "REFUNDED",
+      "refundStatus": "SUCCESS",
+      "stateVersion": 3,
+      "createdAt": "2026-08-04T08:00:00+08:00",
+      "updatedAt": "2026-08-04T09:00:00+08:00"
+    },
+    "paidTime": "2026-08-04T08:05:00+08:00",
+    "refundedTime": "2026-08-04T08:50:00+08:00",
+    "seats": [
+      {
+        "seatId": "4002",
+        "rowNo": "B",
+        "seatNo": "08",
+        "unitPrice": "68.00"
+      }
+    ],
+    "payment": {
+      "paymentNo": "PAY-REFUNDED-1",
+      "amount": "68.00",
+      "status": "SUCCESS",
+      "requestedAt": "2026-08-04T08:10:00+08:00",
+      "paidAt": "2026-08-04T08:20:00+08:00",
+      "stateVersion": 1,
+      "updatedAt": "2026-08-04T08:20:00+08:00"
+    },
+    "ticket": {
+      "ticketCode": "TICKET-REFUNDED-1",
+      "status": "REFUNDED",
+      "issuedAt": "2026-08-04T08:20:00+08:00",
+      "invalidatedAt": "2026-08-04T08:50:00+08:00",
+      "stateVersion": 1,
+      "updatedAt": "2026-08-04T08:50:00+08:00"
+    },
+    "refund": {
+      "refundNo": "REFUND-1",
+      "reason": "行程变化",
+      "status": "SUCCESS",
+      "requestedAt": "2026-08-04T08:40:00+08:00",
+      "processedAt": "2026-08-04T08:50:00+08:00",
+      "stateVersion": 2,
+      "updatedAt": "2026-08-04T08:50:00+08:00"
+    }
+  },
+  "traceId": "1234567890abcdef1234567890abcdef"
+}

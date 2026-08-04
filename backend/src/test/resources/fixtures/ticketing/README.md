@@ -33,6 +33,10 @@
 | `c/idempotency-mismatch-error.json` | 幂等写请求失败响应 | 同对应写接口 | HTTP `409`；保留原请求，不得把同一键用于不同参数。 |
 | `c/order-not-found-error.json` | 本人订单查询失败响应 | Cookie 认证 | HTTP `404`；不泄露资源归属。 |
 | `c/unauthenticated-error.json` | 受保护接口失败响应 | 缺少或失效 Cookie | HTTP `401`；交由公共请求层进入登录恢复。 |
+| `c/admin-order-page-success.json` | `GET /api/v1/admin/orders` | ADMIN Cookie认证 | 只读查询，可保留筛选条件后手动重试。 |
+| `c/admin-order-detail-success.json` | `GET /api/v1/admin/orders/{orderNo}` | ADMIN Cookie认证 | 只读查询，可按原订单号刷新。 |
+| `c/admin-user-query-too-broad-error.json` | 用户关键字命中超过100人 | ADMIN Cookie认证 | HTTP `400/201010`；补充更多关键字。 |
+| `c/admin-user-directory-unavailable-error.json` | 用户目录暂不可用 | ADMIN Cookie认证 | HTTP `503/301002`；保留筛选上下文并手动重试。 |
 
 `c/unauthenticated-error.json` 是 C 已确认的最终目标格式，依赖 C 后续认证 PR 用自定义 `AuthenticationEntryPoint` 返回完整 `Result` JSON。当前 `SecuritySkeletonConfiguration` 仍使用 `HttpStatusEntryPoint`，运行时可能只返回空的 HTTP `401`；在认证实现合并前，不得把该夹具表述为当前接口已经支持的响应体。
 

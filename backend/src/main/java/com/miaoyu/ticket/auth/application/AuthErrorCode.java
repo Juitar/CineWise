@@ -10,7 +10,11 @@ public enum AuthErrorCode implements ErrorCode {
     ACCOUNT_UNAVAILABLE(201005, "账号已禁用或锁定", HttpStatus.FORBIDDEN),
     SESSION_INVALID(201006, "登录状态已失效，请重新登录", HttpStatus.UNAUTHORIZED),
     FORBIDDEN(201007, "当前账号无权执行该操作", HttpStatus.FORBIDDEN),
-    CSRF_INVALID(201009, "安全校验已失效，请重新操作", HttpStatus.FORBIDDEN);
+    CSRF_INVALID(201009, "安全校验已失效，请重新操作", HttpStatus.FORBIDDEN),
+    /** 有限用户ID集合无法安全表达过宽的邮箱包含匹配。 */
+    USER_QUERY_TOO_BROAD(201010, "用户查询条件过宽，请补充更多关键字", HttpStatus.BAD_REQUEST),
+    /** 用户目录基础设施故障不能伪装成没有匹配用户。 */
+    USER_DIRECTORY_UNAVAILABLE(301002, "用户信息查询暂不可用，请稍后重试", HttpStatus.SERVICE_UNAVAILABLE);
 
     private final int code;
     private final String message;
