@@ -1,0 +1,33 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "total": 1,
+    "page": 1,
+    "size": 20,
+    "records": [
+      {
+        "orderId": "3002",
+        "orderNo": "CW-REFUNDED-1",
+        "userId": "1002",
+        "emailMasked": "r***@example.com",
+        "showId": "2002",
+        "movieId": "502",
+        "cinemaId": "602",
+        "showStartTime": "2026-08-06T09:00:00+08:00",
+        "ticketCount": 1,
+        "unitPrice": "68.00",
+        "totalAmount": "68.00",
+        "orderStatus": "REFUNDED",
+        "expireTime": "2026-08-04T08:15:00+08:00",
+        "paymentStatus": "SUCCESS",
+        "ticketStatus": "REFUNDED",
+        "refundStatus": "SUCCESS",
+        "stateVersion": 3,
+        "createdAt": "2026-08-04T08:00:00+08:00",
+        "updatedAt": "2026-08-04T09:00:00+08:00"
+      }
+    ]
+  },
+  "traceId": "0123456789abcdef0123456789abcdef"
+}

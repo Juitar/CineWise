@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.miaoyu.ticket.admin.infrastructure.persistence.AdminOrderQueryMapper">
+
+    <!-- 主查询只连接A拥有的场次表；禁止在此加入sys_user或认证模块表。 -->
+    <sql id="orderFromAndFilters">
+        FROM ticket_order orders
+        INNER JOIN movie_show shows ON shows.id = orders.show_id
+        WHERE 1 = 1
+        <if test="criteria.orderNo != null">
+            AND orders.order_no = #{criteria.orderNo}
+        </if>
+        <if test="criteria.userIds != null">
+            AND orders.user_id IN
+            <foreach collection="criteria.userIds" item="userId" open="(" separator="," close=")">
+                #{userId}
+            </foreach>
+        </if>
+        <if test="criteria.status != null">
+            AND orders.status = #{criteria.status}
+        </if>
+        <if test="criteria.movieId != null">
+            AND shows.movie_id = #{criteria.movieId}
+        </if>
+        <if test="criteria.showId != null">
+            AND orders.show_id = #{criteria.showId}
+        </if>
+        <if test="criteria.createdAtOrAfter != null">
+            AND orders.create_time &gt;= #{criteria.createdAtOrAfter}
+        </if>
+        <if test="criteria.createdBefore != null">
+            AND orders.create_time &lt; #{criteria.createdBefore}
+        </if>
+    </sql>
+
+    <sql id="orderColumns">
+        orders.id AS order_id,
+        orders.order_no,
+        orders.user_id,
+        orders.show_id,
+        shows.movie_id,
+        shows.cinema_id,
+        shows.start_time AS show_start_time,
+        orders.ticket_count,
+        orders.unit_price,
+        orders.total_amount,
+        orders.status,
+        orders.expire_time,
+        orders.paid_time,
+        orders.cancelled_time,
+        orders.refunded_time,
+        orders.version,
+        orders.create_time AS created_at,
+        orders.update_time AS updated_at
+    </sql>
+
+    <select id="countOrders" resultType="long">
+        SELECT COUNT(*)
+        <include refid="orderFromAndFilters"/>
+    </select>
+
+    <select id="findOrderPage"
+            resultType="com.miaoyu.ticket.admin.application.AdminOrderRepository$OrderSnapshot">
+        SELECT <include refid="orderColumns"/>
+        <include refid="orderFromAndFilters"/>
+        ORDER BY orders.create_time DESC, orders.id DESC
+        LIMIT #{criteria.limit} OFFSET #{criteria.offset}
+    </select>
+
+    <select id="findByOrderNo"
+            resultType="com.miaoyu.ticket.admin.application.AdminOrderRepository$OrderSnapshot">
+        SELECT <include refid="orderColumns"/>
+        FROM ticket_order orders
+        INNER JOIN movie_show shows ON shows.id = orders.show_id
+        WHERE orders.order_no = #{orderNo}
+    </select>
+
+    <select id="findSeatsByOrderIds"
+            resultType="com.miaoyu.ticket.admin.application.AdminOrderRepository$SeatSnapshot">
+        SELECT order_id,
+               show_seat_id AS seat_id,
+               row_no_snapshot AS row_no,
+               seat_no_snapshot AS seat_no,
+               unit_price
+        FROM ticket_order_seat
+        WHERE order_id IN
+        <foreach collection="orderIds" item="orderId" open="(" separator="," close=")">
+            #{orderId}
+        </foreach>
+        ORDER BY order_id, show_seat_id
+    </select>
+
+    <select id="findPaymentsByOrderIds"
+            resultType="com.miaoyu.ticket.admin.application.AdminOrderRepository$PaymentSnapshot">
+        SELECT order_id,
+               payment_no,
+               amount,
+               status,
+               request_time AS requested_at,
+               paid_time AS paid_at,
+               version,
+               update_time AS updated_at
+        FROM mock_payment
+        WHERE order_id IN
+        <foreach collection="orderIds" item="orderId" open="(" separator="," close=")">
+            #{orderId}
+        </foreach>
+        ORDER BY order_id
+    </select>
+
+    <select id="findTicketsByOrderIds"
+            resultType="com.miaoyu.ticket.admin.application.AdminOrderRepository$TicketSnapshot">
+        SELECT order_id,
+               ticket_code,
+               status,
+               issued_time AS issued_at,
+               invalidated_time AS invalidated_at,
+               version,
+               update_time AS updated_at
+        FROM electronic_ticket
+        WHERE order_id IN
+        <foreach collection="orderIds" item="orderId" open="(" separator="," close=")">
+            #{orderId}
+        </foreach>
+        ORDER BY order_id
+    </select>
+
+    <select id="findRefundsByOrderIds"
+            resultType="com.miaoyu.ticket.admin.application.AdminOrderRepository$RefundSnapshot">
+        SELECT order_id,
+               refund_no,
+               reason,
+               status,
+               request_time AS requested_at,
+               processed_time AS processed_at,
+               version,
+               update_time AS updated_at
+        FROM refund_request
+        WHERE order_id IN
+        <foreach collection="orderIds" item="orderId" open="(" separator="," close=")">
+            #{orderId}
+        </foreach>
+        ORDER BY order_id
+    </select>
+</mapper>
