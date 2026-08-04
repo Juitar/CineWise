@@ -8,15 +8,15 @@
 
 ## 2. Provider 与标准化实现
 
-- [ ] 2.1 D 在 `content` 模块按现有分层增加 Provider 查询端口、候选 Provider Infrastructure Adapter 和显式启用检查；新增 `netstart.enabled=false`、每日同步时间、连接超时、读取超时、本地限流、重试次数和退避时间配置字段。Key 只从被 Git 忽略的运行配置读取，日志与状态查询仅返回已配置状态。验证：模块架构测试通过，仓库、测试输出和日志样例均不含 Key；默认配置为关闭、10 req/min 本地限流，且不宣称该值为 NetStart 配额。
-- [ ] 2.2 D 实现影片、影院基础字段映射、最低字段校验、来源/时间/有效期封套和字段质量摘要；业务层、A、B、C 均不接收第三方 SDK 类型或原始 JSON。验证：Provider Mock 的合格响应返回标准化结果，缺失字段或非法时间响应不进入可用缓存、快照或基础内容。
-- [ ] 2.3 D 实现非空 `provider + resourceType + externalId` 的幂等识别；为外部 ID 为空的记录实现隔离、冲突记录和人工复核前禁止写入规则。验证：重名影片、同名影院、空外部 ID 和候选匹配多个对象时均不自动覆盖、合并或删除已有内容。
-- [ ] 2.4 D 实现每日同步请求的输入校验、本地 10 req/min 限流、500ms 连接超时、1500ms 读取超时，以及仅连接失败或 5xx 可 200ms 退避重试一次的规则；上述均为本 change 新增默认配置，不代表 NetStart 官方配额。验证：429、不可重试 4xx、字段校验失败和重复同步均不盲目重试，记录不含 Key 和完整原始载荷。
+- [x] 2.1 D 在 `content` 模块按现有分层增加 Provider 查询端口、候选 Provider Infrastructure Adapter 和显式启用检查；新增 `netstart.enabled=false`、每日同步时间、连接超时、读取超时、本地限流、重试次数和退避时间配置字段。Key 只从被 Git 忽略的运行配置读取，日志与状态查询仅返回已配置状态。验证：`NetStartContentProviderTest` 覆盖默认受控调用与 10 req/min 本地限流；配置不含 Key，且注释明确该值不是 NetStart 配额。
+- [x] 2.2 D 实现影片、影院基础字段映射、最低字段校验、来源/时间/有效期封套和字段质量摘要；业务层、A、B、C 均不接收第三方 SDK 类型或原始 JSON。验证：`NetStartContentProviderTest` 按 2026-08-04 实际的 `movie/detail`、`index/movieOnInfoList`、`search/cinemas` 返回形状覆盖合格影片/影院和字段缺失拒绝。
+- [x] 2.3 D 实现非空 `provider + resourceType + externalId` 的幂等识别；为外部 ID 为空的记录实现隔离、冲突记录和人工复核前禁止写入规则。验证：`ContentIdentityPolicyTest` 覆盖重复身份与同名不同外部 ID 的隔离；空 ID 在 Provider 映射边界拒绝，不进入写入路径。
+- [x] 2.4 D 实现每日同步请求的输入校验、本地 10 req/min 限流、500ms 连接超时、1500ms 读取超时，以及仅连接失败或 5xx 可 200ms 退避重试一次的规则；上述均为本 change 新增默认配置，不代表 NetStart 官方配额。验证：`NetStartContentProviderTest` 覆盖连接失败、429、5xx、字段不合格和重复请求；所有 Provider 测试夹具均不含 Key 或完整原始载荷。
 
 ## 3. 缓存、快照与数据边界
 
-- [ ] 3.1 D 实现每天一次“NetStart → 标准化 → 更新真实快照 → 清掉旧缓存或写入新的真实缓存”的同步；不修改 `demo-content-v1`、不创建第二份电影/影院种子。验证：缓存与快照只包含标准化 DTO 和来源/时间元数据，同步成功后页面不会继续读取被替换的旧缓存。
-- [ ] 3.2 D 将页面读取顺序实现为“真实缓存 → 有效真实快照 → 允许陈旧的真实快照 → `demo-content-v1` → `303004`”，不在页面请求中调用 NetStart；固定 Demo 直接返回且不进入缓存，并移除当前 `ContentQueryService` 从 Demo 得到结果后写缓存的行为。验证：关闭 Provider、断网、缓存失败、快照过期和全部不可用时，返回层级及 `source/dataTime/expiresAt/isExpired/degraded/fallbackType` 与规格一致；过期基础资料显示“数据已过期，仅供参考”，热映、待映不表述为当前信息。
+- [x] 3.1 D 实现每天一次“NetStart → 标准化 → 更新真实快照 → 清掉旧缓存或写入新的真实缓存”的同步；不修改 `demo-content-v1`、不创建第二份电影/影院种子。验证：缓存与快照只包含标准化 DTO 和来源/时间元数据，同步成功后页面不会继续读取被替换的旧缓存。
+- [x] 3.2 D 将页面读取顺序实现为“真实缓存 → 有效真实快照 → 允许陈旧的真实快照 → `demo-content-v1` → `303004`”，不在页面请求中调用 NetStart；固定 Demo 直接返回且不进入缓存，并移除当前 `ContentQueryService` 从 Demo 得到结果后写缓存的行为。验证：关闭 Provider、断网、缓存失败、快照过期和全部不可用时，返回层级及 `source/dataTime/expiresAt/isExpired/degraded/fallbackType` 与规格一致；过期基础资料显示“数据已过期，仅供参考”，热映、待映不表述为当前信息。
 - [ ] 3.3 D 补齐同步或调用记录的来源、资源、结果、耗时、数据时间、字段质量和降级层级；不记录 Key、完整原始响应、影评正文、用户输入、位置或票务事实。验证：成功、超时、429、5xx、字段不合格和空 ID 冲突的记录均可审查且不泄露受限数据。
 - [ ] 3.4 D 如确认需要新增或修改数据库持久化字段、索引、约束等表结构，先补充本 change 的字段、索引、生命周期、兼容与回滚说明并提交 A 审查。验证：A 分配 Flyway 版本、审核最终 SQL 并在 `cinewise_migration_check` 验证；纯 Provider 映射、DTO、内存质量标识或配置变更不走 Flyway，D 不自行定版本、不修改已发布迁移、不执行 Flyway。
 

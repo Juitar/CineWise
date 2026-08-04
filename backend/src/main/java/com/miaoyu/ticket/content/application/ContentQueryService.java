@@ -5,6 +5,7 @@ import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.error.ErrorCode;
 import com.miaoyu.ticket.content.domain.ContentFallbackType;
 import com.miaoyu.ticket.content.domain.ContentItem;
+import com.miaoyu.ticket.content.domain.ContentSourceType;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -54,7 +55,7 @@ public class ContentQueryService {
      * <p>参数校验由 ContentQuery 构造时完成，因此进入此方法后不会对缓存、数据库或 Demo 产生无效访问。</p>
      */
     public ContentResult<List<? extends ContentItem>> query(ContentQuery query) {
-        return cachePort.find(query).orElseGet(() -> findFromSnapshot(query)
+        return cachePort.find(query).filter(this::isVerifiedLiveContent).orElseGet(() -> findFromSnapshot(query)
                 // Demo 是离线最后回退层，绝不能写回 Redis 后被下一次查询伪装成真实缓存。
                 .orElseGet(() -> demoProvider.query(query)
                         .orElseThrow(() -> new BusinessException(ContentErrorCode.DATA_UNAVAILABLE))));
@@ -65,6 +66,10 @@ public class ContentQueryService {
         // 超过最大陈旧期的快照不返回，避免历史内容长期停留在用户页面。
         // 允许陈旧的边界采用闭区间，刚好到期的快照仍按只读信息处理。
         return snapshotPort.findLatest(query).flatMap(result -> {
+            // 历史版本可能在本规则前保存了 Demo 快照。它只能由最后一层直接读取，不能升级成真实资料。
+            if (!isVerifiedLiveContent(result)) {
+                return java.util.Optional.empty();
+            }
             LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
             if (!result.expiresAt().isBefore(now)) {
                 ContentResult<List<? extends ContentItem>> usable = withExpiration(result, false);
@@ -76,6 +81,16 @@ public class ContentQueryService {
             }
             return java.util.Optional.empty();
         });
+    }
+
+    /**
+     * 缓存和快照的优先级只属于通过 Provider 校验后留下的真实基础资料。
+     *
+     * <p>不能只根据 Redis 命中判断数据层级：旧版本可能已把 Demo 写入同一个键。拒绝非 LIVE 来源后，
+     * 固定目录仍会在最后一层按 MOCK 返回，页面不会把演示内容显示为缓存或历史真实数据。</p>
+     */
+    private boolean isVerifiedLiveContent(ContentResult<List<? extends ContentItem>> result) {
+        return result.source().type() == ContentSourceType.LIVE;
     }
 
     /**
