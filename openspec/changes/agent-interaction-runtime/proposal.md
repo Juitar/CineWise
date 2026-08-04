@@ -1,6 +1,6 @@
 ## Why
 
-Agent 已经能够在服务端保存最小只读运行、消息和步骤，但 C 还没有可调用的 Controller、POST SSE 返回、断线续传或运行详情接口。没有持久化事件，前端断线后也无法从最后事件位置继续读取，管理端无法按运行查看脱敏轨迹。
+Agent 已经能够在服务端保存最小只读运行、消息和步骤，但 C 还没有可调用的 Controller、POST SSE 返回、断线续传或运行详情接口。没有持久化事件，前端断线后也无法从最后事件位置继续读取，用户本人无法按运行查看脱敏轨迹。
 
 本 Change 把已合入的只读执行和四表持久化接到可联调的交互运行时，先交付只读对话的可恢复主流程；确认动作、A 的写工具和重规划留在后续 Change，避免在 A 的写接口尚未定稿时猜测参数。
 
@@ -18,7 +18,7 @@ Agent 已经能够在服务端保存最小只读运行、消息和步骤，但 C
 ### New Capabilities
 
 - `agent-post-sse-interaction`: 已登录用户提交只读 Agent 消息、接收固定事件并安全重连。
-- `agent-event-trajectory`: 持久化可续传事件，并向用户和管理端提供脱敏运行轨迹查询。
+- `agent-event-trajectory`: 持久化可续传事件，并向用户本人提供脱敏运行轨迹查询。
 - `agent-readonly-runtime-query`: 为 C 提供只读运行、消息和步骤的稳定查询 DTO 与结果恢复规则。
 
 ### Modified Capabilities

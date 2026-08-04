@@ -42,9 +42,9 @@ SSE 读取只读已提交事件。读取与下一批事件提交交错时，当�
 
 ### 3. POST SSE 复用消息提交的幂等键和固定事件格式
 
-请求体固定为 `clientRequestId`、`content` 和已存在的只读验证上下文；`Last-Event-ID` 通过请求头传递且为十进制字符串。首次提交先走现有消息提交用例；相同请求标识只返回既有运行快照。随后按 `event_id > Last-Event-ID` 读取本会话事件，使用 `id:`、`event:`、`data:` 写入同一固定 JSON：`eventId`、`sessionId`、`runId`、可空 `planVersion`、可空 `nodeId`、`eventType`、用户可展示 `displayText` 和类型化 `payload`。
+请求体固定为 `clientRequestId`、`content` 和已存在的只读验证上下文；`Last-Event-ID` 通过请求头传递且为十进制字符串。首次提交先走现有消息提交用例；相同请求标识只返回既有运行快照。无请求头或值为 `"0"` 时按起始哨兵处理，直接从当前会话仍保留的事件中读取 `event_id > 0`；正整数才按 `event_id > Last-Event-ID` 续传。事件使用 `id:`、`event:`、`data:` 写入同一固定 JSON：`eventId`、`sessionId`、`runId`、可空 `planVersion`、可空 `nodeId`、`eventType`、用户可展示 `displayText` 和类型化 `payload`。
 
-持久化事件名只使用数据库 CHECK 白名单；心跳是 SSE 注释，`stream.reset` 是不入库的协议事件。带 `Last-Event-ID` 的连接按以下算法处理：先解析为非负十进制整数并读取当前会话游标行；ID 大于 `last_committed_event_id` 时按“未来游标”重置；若 ID 对应的保留事件行属于其他会话时按“跨会话游标”重置；若 ID 小于 `first_retained_event_id`，或当前已无保留事件但 ID 不大于已提交水位线时按“已清理游标”重置；在保留区间内但不存在本会话事件时按“未归属游标/全局空洞”重置。所有重置都不返回其他会话事件或数量，且使用当前 `last_committed_event_id` 作为不入库重置事件的水位线。只有确认属于当前会话且仍保留的游标，才读取 `event_id > Last-Event-ID` 的事件。客户端先用水位线重建运行和历史消息，再以它续传；服务端不重交原消息。相较于改成 EventSource 或 WebSocket，POST SSE 能保留 JSON 请求体、Cookie、取消和既有 C 客户端方案。
+持久化事件名只使用数据库 CHECK 白名单；心跳是 SSE 注释，`stream.reset` 是不入库的协议事件。无 `Last-Event-ID` 请求头或值为 `"0"` 是起始哨兵：不读取游标行、不做归属、过期、跨会话或未来值校验，只读取当前会话仍保留的事件；当前没有保留事件时返回空 SSE 流或心跳，不发送 `stream.reset`。只有正整数游标才按以下算法处理：读取当前会话游标行；ID 大于 `last_committed_event_id` 时按“未来游标”重置；若 ID 对应的保留事件行属于其他会话时按“跨会话游标”重置；若 ID 小于 `first_retained_event_id`，或当前已无保留事件但 ID 不大于已提交水位线时按“已清理游标”重置；在保留区间内但不存在本会话事件时按“未归属游标/全局空洞”重置。所有重置都不返回其他会话事件或数量，且使用当前 `last_committed_event_id` 作为不入库重置事件的水位线。只有确认属于当前会话且仍保留的正整数游标，才读取 `event_id > Last-Event-ID` 的事件。客户端先用水位线重建运行和历史消息，再以它续传；服务端不重交原消息。相较于改成 EventSource 或 WebSocket，POST SSE 能保留 JSON 请求体、Cookie、取消和既有 C 客户端方案。
 
 ### 4. 载荷失败必须回滚原事实，并以独立幂等事务记录安全失败
 

@@ -8,7 +8,7 @@
 
 - [ ] 2.1 在 A 分配 V009 后新增 `agent_event`、`agent_event_stream_cursor` 前向迁移、Entity、Mapper、Repository 和领域模型；验证：迁移不修改 V008，使用 V008 的 `VARCHAR(36)` UUID，包含会话/运行/过期索引、持久化事件类型 CHECK、不可变事件、可更新游标和 `expire_at >= create_time` 检查。
 - [ ] 2.2 实现事件记录、会话行锁和重放查询服务，确保运行/消息/步骤事实、事件和游标水位线在同一短事务保存；验证：真实 MySQL 并发测试覆盖第二个同会话写事务在第一个提交前等待、提交顺序递增、读取提交前缀后续传不漏事件，以及载荷超限/敏感字段回滚原事务并仅一次写安全失败。
-- [ ] 2.3 实现按当前用户、会话和十进制游标查询事件，以及按 runId 查询最后事件水位线；验证：单元和 MySQL 测试覆盖正常续传、已清理、跨会话、正常全局空洞、未来游标、`stream.reset` 水位线和 `idx_agent_event_run_event` 查询。
+- [ ] 2.3 实现按当前用户、会话和十进制游标查询事件，以及按 runId 查询最后事件水位线；验证：单元和 MySQL 测试覆盖无请求头与 `Last-Event-ID: 0` 的保留事件读取、两者在无事件时不发送 `stream.reset`、正常正整数续传、已清理、跨会话、正常全局空洞、未来游标、`stream.reset` 水位线和 `idx_agent_event_run_event` 查询。
 - [ ] 2.4 扩展运行详情装配 DTO，返回稳定的运行、消息、步骤、`lastEventId` 和安全恢复提示；验证：查询自己成功、越权资源不存在、查询没有任何副作用。
 
 ## 3. Agent 交互接口
@@ -21,6 +21,6 @@
 ## 4. 夹具、集成验证与交付检查
 
 - [ ] 4.1 新增 C 可消费的 SSE 和运行详情 JSON 夹具；验证：至少覆盖推荐卡、`PROCESSING`、失败、重复事件和 `stream.reset` 五种场景。
-- [ ] 4.2 扩展 Agent MySQL 8.4 临时库集成测试；验证：在 `cinewise_agent_it` 验证 V009 新迁移、同会话行锁与提交顺序、四类无效游标、断线续传、运行轨迹索引、统一到期时间、终态保护、固定删除顺序和重复请求不重复执行；A 的 MySQL 8.4 迁移验证另行执行，CI 不替代它。
+- [ ] 4.2 扩展 Agent MySQL 8.4 临时库集成测试；验证：在 `cinewise_agent_it` 验证 V009 新迁移、同会话行锁与提交顺序、无请求头和 `Last-Event-ID: 0` 在有/无事件时的起始读取且空流不发送 `stream.reset`、四类正整数无效游标、断线续传、运行轨迹索引、统一到期时间、终态保护、固定删除顺序和重复请求不重复执行；A 的 MySQL 8.4 迁移验证另行执行，CI 不替代它。
 - [ ] 4.3 执行 Agent 单元/接口/集成测试及 `backend/mvnw.cmd verify`；验证：记录实际通过、失败、跳过数和环境限制。
 - [ ] 4.4 执行 `openspec validate agent-interaction-runtime --strict`、`git diff --check`、`git status`，并把 C 的夹具联调结果和未验证项写入交付说明；验证：严格校验通过且不含 V008 修改或无关文件。
