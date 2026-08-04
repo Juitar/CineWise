@@ -14,8 +14,6 @@ import org.springframework.stereotype.Service;
 /** 最小只读提交外层；主控调用刻意位于初始数据库短事务之外。 */
 @Service
 public class AgentMessageSubmissionService {
-    private static final int SNAPSHOT_MESSAGE_LIMIT = 100;
-
     private final CurrentUserAccessor currentUserAccessor;
     private final AgentInitialRunTransaction initialRunTransaction;
     private final AgentConcurrentRequestLookupTransaction concurrentRequestLookupTransaction;

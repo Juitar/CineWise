@@ -8,4 +8,4 @@
 ## 2. 验证与交付
 
 - [x] 2.1 Owner B：定向 Agent 测试 19 项通过（4 项 MySQL 用例因本机安全开关跳过），`backend/mvnw.cmd verify`、OpenSpec 严格校验与 `git diff --check` 均通过。
-- [ ] 2.2 Owner B：提交并推送 PR #44 修复，按用户授权回复审查意见并请求复审。
+- [x] 2.2 Owner B：已提交并推送 PR #44 修复 `5699989`，并按用户授权评论请求复审。
