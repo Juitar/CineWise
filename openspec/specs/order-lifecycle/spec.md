@@ -1,7 +1,7 @@
 # order-lifecycle Specification
 
 ## Purpose
-TBD - created by archiving change ticketing-transaction-flow. Update Purpose after archive.
+定义本人订单查询、取消、过期释放及幂等恢复的订单生命周期规则。
 ## Requirements
 ### Requirement: 本人订单列表与详情
 

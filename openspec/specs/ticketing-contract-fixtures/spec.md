@@ -1,7 +1,7 @@
 # ticketing-contract-fixtures Specification
 
 ## Purpose
-TBD - created by archiving change ticketing-transaction-flow. Update Purpose after archive.
+定义票务 REST 与 Agent Tool 的版本化联调夹具，以及其与权威 API 契约的防漂移要求。
 ## Requirements
 ### Requirement: A的票务页面REST夹具必须复用权威响应契约
 

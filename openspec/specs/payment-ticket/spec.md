@@ -1,7 +1,7 @@
 # payment-ticket Specification
 
 ## Purpose
-TBD - created by archiving change ticketing-transaction-flow. Update Purpose after archive.
+定义固定成功 Mock 支付、电子票生成、支付结果恢复和支付成功事件的交易契约。
 ## Requirements
 ### Requirement: 固定成功Mock支付
 

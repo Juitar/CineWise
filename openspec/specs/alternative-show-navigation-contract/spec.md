@@ -1,7 +1,7 @@
 # alternative-show-navigation-contract Specification
 
 ## Purpose
-TBD - created by archiving change alternative-show-navigation-contract. Update Purpose after archive.
+定义替代场次查询返回影片 ID 的兼容契约，使用户可从替代场次恢复到正确的选座上下文。
 ## Requirements
 ### Requirement: 替代场次必须返回可恢复选座上下文的影片 ID
 

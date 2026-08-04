@@ -1,7 +1,7 @@
 # ticketing-available-dates-query Specification
 
 ## Purpose
-TBD - created by archiving change ticketing-available-dates-query. Update Purpose after archive.
+定义按影片和影院只读查询未来可售日期及场次数量的公开接口契约。
 ## Requirements
 ### Requirement: 公开查询指定影片和影院的可售日期
 

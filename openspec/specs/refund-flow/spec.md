@@ -1,7 +1,7 @@
 # refund-flow Specification
 
 ## Purpose
-TBD - created by archiving change ticketing-transaction-flow. Update Purpose after archive.
+定义本人退票影响查询、原子退票、结果恢复与替代场次查询的规则。
 ## Requirements
 ### Requirement: 本人退票影响查询
 

@@ -1,7 +1,7 @@
 # ticketing-database Specification
 
 ## Purpose
-TBD - created by archiving change ticketing-transaction-flow. Update Purpose after archive.
+定义票务订单、支付、电子票和退票数据约束，以及原子锁座建单的持久化保证。
 ## Requirements
 ### Requirement: 订单主表约束
 
