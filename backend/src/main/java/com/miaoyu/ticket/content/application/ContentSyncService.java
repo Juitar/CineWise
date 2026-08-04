@@ -78,7 +78,7 @@ public class ContentSyncService {
         ContentIdentityPolicy.Decision identityDecision = identityPolicy.decide("NETSTART_MAOYAN", allItems);
         java.util.Set<ContentItem> acceptedItems = Collections.newSetFromMap(new IdentityHashMap<>());
         acceptedItems.addAll(identityDecision.accepted());
-        int synchronizedCount = 0;
+        int synchronizedItemCount = 0;
         int identityRejectedCount = identityDecision.rejected().size();
         for (LiveContentSyncPort.SynchronizedContent content : contents) {
             // 端口的契约要求 LIVE；再次校验可防止错误实现把 Demo 或旧快照污染真实读取层。
@@ -97,17 +97,20 @@ public class ContentSyncService {
                     content.result().fallbackType());
             snapshots.save(content.query(), accepted);
             writeCacheAfterCommit(content.query(), accepted);
-            synchronizedCount++;
+            synchronizedItemCount += acceptedForQuery.size();
         }
         // 审计只保存统计值和固定状态，不保存 Provider 原始 JSON、关键词或任何用户数据。
         LocalDateTime finishedAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
-        int failureCount = Math.max(0, batch.attemptedCount() - synchronizedCount) + identityRejectedCount;
+        // V004 的计数约束要求 total = success + failure。Provider 的候选数与身份隔离后的条目数取较大值，
+        // 既保留上游字段拒绝/请求失败，也保证额外隔离项不会让审计日志在真实 MySQL 中被 CHECK 拒绝。
+        int totalItemCount = Math.max(batch.attemptedCount(), synchronizedItemCount + identityRejectedCount);
+        int failureCount = totalItemCount - synchronizedItemCount;
         persistence.insertSyncLog(new ContentPersistencePort.SyncLogRow(idGenerator.nextId(), "NETSTART_MAOYAN",
-                "DAILY_CONTENT", "daily-" + startedAt, statusOf(batch, synchronizedCount, failureCount),
-                batch.errorCode(), batch.attemptedCount(), synchronizedCount, failureCount, startedAt, finishedAt,
-                auditSummary(batch, contents, synchronizedCount, failureCount, identityRejectedCount, startedAt,
+                "DAILY_CONTENT", "daily-" + startedAt, statusOf(totalItemCount, synchronizedItemCount, failureCount),
+                batch.errorCode(), totalItemCount, synchronizedItemCount, failureCount, startedAt, finishedAt,
+                auditSummary(batch, contents, synchronizedItemCount, failureCount, identityRejectedCount, startedAt,
                         finishedAt)));
-        return synchronizedCount;
+        return synchronizedItemCount;
     }
 
     /**
@@ -156,12 +159,12 @@ public class ContentSyncService {
     }
 
     /** 数据库现有四种状态已足够表达本轮结果，无须为了审计摘要新增字段或枚举值。 */
-    private ContentPersistencePort.SyncStatus statusOf(LiveContentSyncPort.DailySyncBatch batch,
-                                                        int synchronizedCount, int failureCount) {
-        if (batch.attemptedCount() == 0) {
+    private ContentPersistencePort.SyncStatus statusOf(int totalItemCount, int synchronizedItemCount,
+                                                        int failureCount) {
+        if (totalItemCount == 0) {
             return ContentPersistencePort.SyncStatus.SUCCESS;
         }
-        if (synchronizedCount == 0) {
+        if (synchronizedItemCount == 0) {
             return ContentPersistencePort.SyncStatus.FAILED;
         }
         return failureCount == 0 ? ContentPersistencePort.SyncStatus.SUCCESS

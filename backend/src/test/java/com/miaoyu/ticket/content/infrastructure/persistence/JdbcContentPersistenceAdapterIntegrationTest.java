@@ -71,6 +71,23 @@ class JdbcContentPersistenceAdapterIntegrationTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    /**
+     * 身份隔离后的同步日志按内容项写成一成一败，必须被真实数据库接受。
+     * 这防止 Application Service 只在假端口测试中通过，却在 V004 CHECK 处回滚整次同步。
+     */
+    @Test
+    void givenIdentityRejectedContent_whenPartialAuditIsInserted_thenDatabaseAcceptsConsistentCounts() {
+        SyncLogRow identityRejected = new SyncLogRow(8_000_022L, "test-provider", "DAILY_CONTENT",
+                "request-identity-rejected", SyncStatus.PARTIAL, null, 2, 1, 1, DATA_TIME,
+                DATA_TIME.plusMinutes(1), "identityRejected=1;rejectionReason=IDENTITY_REVIEW_REQUIRED");
+
+        persistencePort.insertSyncLog(identityRejected);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM data_sync_log WHERE request_id = 'request-identity-rejected'", Long.class))
+                .isOne();
+    }
+
     private MovieRow movie(long id) {
         return new MovieRow(id, "test-movie-001", "测试影片", "[\"剧情\"]", 120, new BigDecimal("8.5"),
                 ContentSourceType.MOCK, "test-provider", DATA_TIME, DATA_TIME.plusHours(6));

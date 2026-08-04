@@ -107,6 +107,11 @@ class ContentSyncServiceTest {
         assertThat(service.synchronizeDailyContent()).isEqualTo(1);
         assertThat(saved.get().data()).hasSize(1);
         assertThat(((MovieContent) saved.get().data().getFirst()).movieId()).isEqualTo(99L);
+        // 同步日志按内容项统计：两条候选中一条写入、一条因身份冲突拒绝，必须满足 V004 的 CHECK。
+        assertThat(audit.get().totalCount()).isEqualTo(2);
+        assertThat(audit.get().successCount()).isEqualTo(1);
+        assertThat(audit.get().failureCount()).isEqualTo(1);
+        assertThat(audit.get().status()).isEqualTo(ContentPersistencePort.SyncStatus.PARTIAL);
         assertThat(audit.get().errorSummary()).contains("identityRejected=1",
                 "rejectionReason=IDENTITY_REVIEW_REQUIRED");
     }
