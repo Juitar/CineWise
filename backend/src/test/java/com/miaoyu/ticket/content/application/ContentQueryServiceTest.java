@@ -29,18 +29,43 @@ class ContentQueryServiceTest {
 
     @Test
     void givenValidCache_whenQuery_thenItWinsOverSnapshotAndDemo() {
-        ContentResult<List<? extends ContentItem>> cache = result(NOW.plusHours(1), false, ContentFallbackType.CACHE);
+        ContentResult<List<? extends ContentItem>> cache = result(NOW.plusHours(1), false,
+                ContentFallbackType.CACHE, ContentSourceType.LIVE);
         ContentQueryService service = service(Optional.of(cache), Optional.of(result(NOW.plusHours(1), false,
-                ContentFallbackType.SNAPSHOT)), Optional.of(result(NOW.plusHours(1), false,
+                ContentFallbackType.SNAPSHOT, ContentSourceType.LIVE)), Optional.of(result(NOW.plusHours(1), false,
                 ContentFallbackType.MOCK)));
 
         assertThat(service.query(QUERY).fallbackType()).isEqualTo(ContentFallbackType.CACHE);
     }
 
     @Test
+    void givenLegacyDemoCache_whenQuery_thenItIsRejectedAndDemoRemainsLastFallback() {
+        ContentQueryService service = service(Optional.of(result(NOW.plusHours(1), false,
+                ContentFallbackType.CACHE)), Optional.empty(), Optional.of(result(NOW.plusHours(1), false,
+                ContentFallbackType.MOCK)));
+
+        ContentResult<List<? extends ContentItem>> result = service.query(QUERY);
+
+        // 3.2 要求 Demo 不得进入缓存；兼容清理前遗留的 MOCK 缓存也不能被页面误报为真实缓存。
+        assertThat(result.fallbackType()).isEqualTo(ContentFallbackType.MOCK);
+    }
+
+    @Test
+    void givenLegacyDemoSnapshot_whenQuery_thenItIsRejectedAndDemoRemainsLastFallback() {
+        ContentQueryService service = service(Optional.empty(), Optional.of(result(NOW.plusHours(1), false,
+                ContentFallbackType.SNAPSHOT)), Optional.of(result(NOW.plusHours(1), false,
+                ContentFallbackType.MOCK)));
+
+        ContentResult<List<? extends ContentItem>> result = service.query(QUERY);
+
+        // 快照层只允许同步得到的 LIVE 内容，不能把旧 Demo 快照提升成“历史真实资料”。
+        assertThat(result.fallbackType()).isEqualTo(ContentFallbackType.MOCK);
+    }
+
+    @Test
     void givenAllowedExpiredSnapshot_whenQuery_thenItIsExplicitlyReadonlyAndDemoIsNotUsed() {
         ContentResult<List<? extends ContentItem>> snapshot = result(
-                NOW.minusHours(1), false, ContentFallbackType.SNAPSHOT);
+                NOW.minusHours(1), false, ContentFallbackType.SNAPSHOT, ContentSourceType.LIVE);
         ContentQueryService service = service(Optional.empty(), Optional.of(snapshot), Optional.empty());
 
         // 过期快照可供页面标注时间展示，但 3.6 要求其 expired=true，推荐不能把它当作可购事实。
@@ -52,7 +77,7 @@ class ContentQueryServiceTest {
     @Test
     void givenCacheMissAndValidSnapshot_whenQuery_thenItReturnsSnapshotAndKeepsDegradedMarker() {
         ContentQueryService service = service(Optional.empty(), Optional.of(result(NOW.plusHours(1), false,
-                ContentFallbackType.SNAPSHOT)), Optional.empty());
+                ContentFallbackType.SNAPSHOT, ContentSourceType.LIVE)), Optional.empty());
 
         ContentResult<List<? extends ContentItem>> result = service.query(QUERY);
 
@@ -65,7 +90,7 @@ class ContentQueryServiceTest {
     @Test
     void givenSnapshotOlderThanMaximumStale_whenQuery_thenItFallsBackToDemo() {
         ContentQueryService service = service(Optional.empty(), Optional.of(result(NOW.minusDays(8), false,
-                ContentFallbackType.SNAPSHOT)), Optional.of(result(NOW.plusHours(1), false,
+                ContentFallbackType.SNAPSHOT, ContentSourceType.LIVE)), Optional.of(result(NOW.plusHours(1), false,
                 ContentFallbackType.MOCK)));
 
         ContentResult<List<? extends ContentItem>> result = service.query(QUERY);
@@ -151,9 +176,15 @@ class ContentQueryServiceTest {
 
     private ContentResult<List<? extends ContentItem>> result(LocalDateTime expiresAt, boolean expired,
                                                                ContentFallbackType fallbackType) {
+        return result(expiresAt, expired, fallbackType, ContentSourceType.MOCK);
+    }
+
+    private ContentResult<List<? extends ContentItem>> result(LocalDateTime expiresAt, boolean expired,
+                                                               ContentFallbackType fallbackType,
+                                                               ContentSourceType sourceType) {
         LocalDateTime dataTime = expiresAt.isBefore(NOW) ? expiresAt.minusHours(6) : NOW;
         return new ContentResult<>(List.of(new MovieContent("test-movie", "测试影片", "[\"剧情\"]", 100,
-                new BigDecimal("8.0"))), new ContentSource("TEST", ContentSourceType.MOCK), dataTime, expiresAt,
+                new BigDecimal("8.0"))), new ContentSource("TEST", sourceType), dataTime, expiresAt,
                 expired, true, fallbackType);
     }
 }

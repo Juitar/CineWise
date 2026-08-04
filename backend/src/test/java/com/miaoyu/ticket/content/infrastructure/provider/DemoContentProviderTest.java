@@ -73,8 +73,9 @@ class DemoContentProviderTest {
     void givenNoCatalogMatch_whenQueryDemoContent_thenItDoesNotInventContentOrTicketingFacts() {
         ContentQuery query = new ContentQuery(ContentResourceType.MOVIE, null, null, "不存在的影片");
 
-        // 空结果交给后续 3.5 的回退顺序处理，Provider 不补造影片、场次或价格。
-        assertThat(provider.query(query)).isEmpty();
+        // 合法筛选无匹配仍表示目录可用；返回空列表而不是补造影片、场次或价格。
+        ContentResult<List<? extends ContentItem>> result = provider.query(query).orElseThrow();
+        assertThat(result.data()).isEmpty();
     }
 
     @Test

@@ -41,8 +41,7 @@ public record CinemaContent(
         cityCode = requireText(cityCode, "cityCode");
         area = requireText(area, "area");
         address = requireText(address, "address");
-        longitude = Objects.requireNonNull(longitude, "longitude must not be null");
-        latitude = Objects.requireNonNull(latitude, "latitude must not be null");
+        // 外部影院资料未提供坐标时保留 null，不能把未知位置伪造成 0,0。
     }
 
     /** 影院模型只对应影院资源类型，避免 Provider 混用影片和影院结果。 */
