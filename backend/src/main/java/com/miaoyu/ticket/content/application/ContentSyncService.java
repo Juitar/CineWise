@@ -12,10 +12,12 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 每日内容同步用例；它只保存标准化结果，页面请求不会调用外部 Provider。
@@ -46,17 +48,34 @@ public class ContentSyncService {
     private final BusinessIdGenerator idGenerator;
     /** 统一业务时钟保证同步批次号和审计时间在测试、部署环境可复现。 */
     private final Clock clock;
+    /** 事务模板只包裹数据库写入，外部 Provider 调用必须在 execute 之前完成。 */
+    private final TransactionTemplate transactionTemplate;
     /** 同步前复用同一批次身份规则，避免重复外部 ID 或同名不同 ID 覆盖已有真实资料。 */
     private final ContentIdentityPolicy identityPolicy = new ContentIdentityPolicy();
 
+    @Autowired
     public ContentSyncService(LiveContentSyncPort provider, ContentSnapshotPort snapshots, ContentCachePort cache,
-                              ContentPersistencePort persistence, BusinessIdGenerator idGenerator, Clock clock) {
+                              ContentPersistencePort persistence, BusinessIdGenerator idGenerator, Clock clock,
+                              PlatformTransactionManager transactionManager) {
+        this(provider, snapshots, cache, persistence, idGenerator, clock, new TransactionTemplate(transactionManager));
+    }
+
+    /** 测试构造器不创建 Spring 事务；生产构造器始终注入事务管理器。 */
+    ContentSyncService(LiveContentSyncPort provider, ContentSnapshotPort snapshots, ContentCachePort cache,
+                       ContentPersistencePort persistence, BusinessIdGenerator idGenerator, Clock clock) {
+        this(provider, snapshots, cache, persistence, idGenerator, clock, (TransactionTemplate) null);
+    }
+
+    private ContentSyncService(LiveContentSyncPort provider, ContentSnapshotPort snapshots, ContentCachePort cache,
+                               ContentPersistencePort persistence, BusinessIdGenerator idGenerator, Clock clock,
+                               TransactionTemplate transactionTemplate) {
         this.provider = provider;
         this.snapshots = snapshots;
         this.cache = cache;
         this.persistence = persistence;
         this.idGenerator = idGenerator;
         this.clock = clock;
+        this.transactionTemplate = transactionTemplate;
     }
 
     /**
@@ -68,10 +87,16 @@ public class ContentSyncService {
      * <p>写入顺序固定为快照在前、缓存随后：即使 Redis 写入失败，下一次页面查询仍能读取刚更新的真实
      * 快照；Redis 成功时则覆盖同一查询键，避免旧缓存压过新快照。</p>
      */
-    @Transactional
     public int synchronizeDailyContent() {
         LocalDateTime startedAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         LiveContentSyncPort.DailySyncBatch batch = provider.fetchForDailySync();
+        // Spring 文档规定 TransactionTemplate 的 execute 回调才处于事务中；Provider 已在其外完成网络调用。
+        return transactionTemplate == null ? persistBatch(batch, startedAt)
+                : transactionTemplate.execute(status -> persistBatch(batch, startedAt));
+    }
+
+    /** 该方法仅被事务模板回调调用，保证业务 ID、快照和审计日志要么一起提交，要么一起回滚。 */
+    private int persistBatch(LiveContentSyncPort.DailySyncBatch batch, LocalDateTime startedAt) {
         List<LiveContentSyncPort.SynchronizedContent> contents = batch.contents();
         List<ContentItem> allItems = contents.stream().flatMap(content -> content.result().data().stream())
                 .map(item -> (ContentItem) item).toList();

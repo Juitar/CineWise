@@ -164,7 +164,7 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
             return new DailySyncBatch(List.of(), 0, Outcome.PROVIDER_DISABLED, null);
         }
         java.util.ArrayList<SynchronizedContent> synchronizedContent = new java.util.ArrayList<>();
-        int attemptedCount = 0;
+        int rejectedItemCount = 0;
         Outcome failureOutcome = null;
         Integer failureCode = null;
         ContentQuery hotMovieList = new ContentQuery(
@@ -180,32 +180,37 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
             if (processedMovies++ >= movieDetailLimit) {
                 break;
             }
-                attemptedCount++;
                 if (!movie.path("id").canConvertToLong()) {
+                    rejectedItemCount++;
                     continue;
                 }
                 ContentQuery query = new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
                         movie.path("id").longValue(), null, null);
                 RawFetchResult detail = fetchWithPolicy(query);
                 if (detail.payload() == null) {
+                    rejectedItemCount++;
                     failureOutcome = detail.outcome();
                     failureCode = detail.errorCode();
                     continue;
                 }
-                normalizeAll(query, detail.payload()).ifPresent(result -> synchronizedContent.add(
-                        new SynchronizedContent(query, result)));
+                Optional<ContentResult<List<? extends ContentItem>>> normalized = normalizeAll(query, detail.payload());
+                if (normalized.isEmpty()) { rejectedItemCount++; }
+                else { synchronizedContent.add(new SynchronizedContent(query, normalized.get())); }
         }
         ContentQuery cinemas = new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA,
                 null, "70", "影");
-        attemptedCount++;
         RawFetchResult cinema = fetchWithPolicy(cinemas);
         if (cinema.payload() == null) {
+            rejectedItemCount++;
             failureOutcome = cinema.outcome();
             failureCode = cinema.errorCode();
         } else {
-            normalizeAll(cinemas, cinema.payload()).ifPresent(result -> synchronizedContent.add(
-                    new SynchronizedContent(cinemas, result)));
+            Optional<ContentResult<List<? extends ContentItem>>> normalized = normalizeAll(cinemas, cinema.payload());
+            if (normalized.isEmpty()) { rejectedItemCount++; }
+            else { synchronizedContent.add(new SynchronizedContent(cinemas, normalized.get())); }
         }
+        int acceptedItemCount = synchronizedContent.stream().mapToInt(content -> content.result().data().size()).sum();
+        int attemptedCount = acceptedItemCount + rejectedItemCount;
         Outcome outcome = failureOutcome != null ? failureOutcome
                 : synchronizedContent.size() == attemptedCount ? Outcome.SUCCESS : Outcome.FIELD_REJECTED;
         return new DailySyncBatch(synchronizedContent, attemptedCount, outcome, failureCode);
