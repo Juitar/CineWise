@@ -11,6 +11,7 @@ import com.miaoyu.ticket.common.api.Result;
 import com.miaoyu.ticket.common.observability.TraceIdHolder;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -106,8 +107,9 @@ public class AuthController {
     }
 
     @PostMapping("/auth/logout")
-    @SecurityRequirement(name = "cookieAuth")
-    @SecurityRequirement(name = "csrfToken")
+    @Operation(
+            description = "CSRF Token 必需；认证 Cookie 可选。未登录或会话已失效时仍幂等清理 Cookie。",
+            security = @SecurityRequirement(name = "csrfToken"))
     @ApiResponses({
         @ApiResponse(
                 responseCode = "200",

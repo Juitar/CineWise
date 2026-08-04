@@ -63,7 +63,7 @@ C 从当前收尾分支使用测试密钥和内存 H2 启动后端，未读取 `
 - `POST /api/v1/auth/login/password`：`200/400/401/403`，请求必填 `clientRequestId/email/password`；
 - `POST /api/v1/admin/auth/login`：`200/400/401/403`，请求必填 `clientRequestId/email/password`；
 - `GET /api/v1/auth/me`：`200/401`，使用 `cookieAuth`；
-- `POST /api/v1/auth/logout`：`200/403`，同时声明 `cookieAuth` 和 `csrfToken`；
+- `POST /api/v1/auth/logout`：`200/403`；经 A 复核后明确为 `csrfToken` 必需、`cookieAuth` 可选；
 - `GET /api/v1/auth/csrf`：`200`，公开获取 CSRF Token；
 - `CurrentUserResponse` 必填字段为 `id/role/nickname/emailMasked/emailVerified/status/privacyPolicyVersion`，不存在 `userId/email/tokenVersion`；
 - `cookieAuth` 使用 Cookie `cinewise_access_token`，`csrfToken` 使用 Header `X-XSRF-TOKEN`；
@@ -82,3 +82,11 @@ Cookie 的 `Secure/HttpOnly/SameSite=Lax/Path=/` 属性由 `AuthSecurityAdapters
 D 已确认：普通 REST 请求层、`CurrentUserResponse` 和 401/403 处理不影响 D 的内容、画像、推荐和出行模块；D 现有业务 DTO 不需要调整，后续继续按现有公开接口和错误码联调。
 
 任务 6.7 仍等待 A、B 分别确认，当前不勾选完成。
+
+## 2026-08-04 A 完成 OpenAPI 复核
+
+A 已确认：订单、支付、退款和管理接口继续复用 Cookie 认证；浏览器写请求继续由公共 `apiRequest<T>()` 携带 `X-XSRF-TOKEN`；401、403、超时或断网时不自动重发建单、支付、退票等写请求；`CurrentUserResponse` 不影响 A，A 的业务 DTO 无需修改。
+
+A 指出原 `/api/v1/auth/logout` 同时生成两个独立 Security Requirement 时会被 OpenAPI 解释为二选一，与运行时“CSRF 必需、Cookie 可选”的幂等登出规则不一致。C 已改为只声明 `csrfToken`，并在接口说明及自动化契约测试中明确认证 Cookie 可选。A 的写接口尚未逐项声明 `csrfToken`，由 A 后续补充，不阻断本次认证兼容复核。
+
+任务 6.7 仍等待 B 确认，当前不勾选完成。

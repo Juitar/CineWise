@@ -120,10 +120,14 @@ class AuthControllerIntegrationTest {
                         .exists())
                 .andExpect(jsonPath("$.paths['/api/v1/auth/me'].get.responses['401'].description")
                         .value(containsString("201006")))
-                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.security[*].cookieAuth")
-                        .isNotEmpty())
-                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.security[*].csrfToken")
-                        .isNotEmpty())
+                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.security.length()")
+                        .value(1))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.security[0].csrfToken")
+                        .isArray())
+                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.security[0].cookieAuth")
+                        .doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.description")
+                        .value(containsString("认证 Cookie 可选")))
                 .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.responses['200']")
                         .exists())
                 .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.responses['403'].description")
@@ -268,6 +272,13 @@ class AuthControllerIntegrationTest {
 
     @Test
     void shouldAllowRepeatedLogoutAndEnforceLoginLogConstraintAndCleanupIndex() throws Exception {
+        CsrfSession anonymousCsrf = getCsrf();
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .cookie(anonymousCsrf.cookie())
+                        .header(CSRF_HEADER, anonymousCsrf.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.loggedOut").value(true));
+
         Cookie accessCookie = loginAndGetAccessCookie("user@cinewise.test", "/api/v1/auth/login/password");
         CsrfSession firstCsrf = getCsrf(accessCookie);
         mockMvc.perform(post("/api/v1/auth/logout")
