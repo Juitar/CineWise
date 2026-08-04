@@ -1,4 +1,10 @@
-## ADDED Requirements
+# agent-session-run-persistence Specification
+
+## Purpose
+
+定义 Agent 最小只读会话、运行、消息和步骤如何按当前用户持久化、处理重复请求和陈旧运行，并规定一次性 MySQL CI 验证的边界。
+
+## Requirements
 
 ### Requirement: Agent 会话和运行必须由当前用户隔离保存
 系统 SHALL 保存 B 所有的 Agent 会话、运行、消息和运行步骤。会话与运行必须关联 C 的认证用户 ID；所有读取、继续提交或写入会话的 Application 用例 MUST 仅使用 `CurrentUserAccessor` 获取当前用户，并拒绝访问不属于当前用户的会话或运行。系统 MUST NOT 从请求、模型计划、工具 Command 或回复事实取得用户 ID。`agent_session.active_run_id` MUST 为可空正数内部运行 ID，逻辑关联 `agent_run.id`，并且不得以对外 runId 字符串代替内部关联。
@@ -27,7 +33,7 @@
 - **AND** 运行保持 `RUNNING`，系统不得把结果未知改写为失败或重新调用工具
 
 ### Requirement: 同一会话只能有一个活动运行且重复请求不得再次执行
-系统 SHALL 使用数据库条件更新和唯一约束保证同一会话同一时刻最多一个 `RUNNING` 运行。新请求必须在同一短事务内插入 `agent_run`、写入用户消息并执行 `active_run_id IS NULL` 的条件更新；条件更新失败时整笔事务 MUST 回滚并返回 `409 / 206008`。相同当前用户、会话和 `clientRequestId` 的重复提交 MUST 返回既有运行及已保存结果，不得再次调用 `MinimalReadOnlyAgentService` 或 D 的只读工具；相同 `clientRequestId` 但请求摘要不同 MUST 被拒绝。`agent_run` MUST 对 `user_id + session_id + client_request_id` 建唯一约束。会话已有其他活动运行时，系统 MUST 返回 Agent 活动运行冲突，不创建第二个运行。
+系统 SHALL 使用数据库条件更新和唯一约束保证同一会话同一时刻最多一个 `RUNNING` 运行。新请求必须在同一短事务内插入 `agent_run`、写入用户消息并执行 `active_run_id IS NULL` 的条件更新；条件更新失败时整笔事务 MUST 回滚并返回 `409 / 206008`。相同当前用户、会话和 `clientRequestId` 的重复提交 MUST 返回既有运行及已保存结果，不得再次调用 `MinimalReadOnlyAgentService` 或 D 的只读工具；相同 `clientRequestId` 但请求摘要不同 MUST 返回 `409 / 206009`。`agent_run` MUST 对 `user_id + session_id + client_request_id` 建唯一约束。会话已有其他活动运行时，系统 MUST 返回 Agent 活动运行冲突，不创建第二个运行。
 
 #### Scenario: 网络重试返回既有运行
 - **WHEN** 同一用户对同一会话以相同 `clientRequestId` 和相同请求摘要重复提交消息
@@ -58,20 +64,28 @@
 - **AND** 后续运行继续保持会话活动占用
 
 ### Requirement: Agent 表迁移必须经过 A 的版本分配和授权
-系统 SHALL 在本 Change 中记录四张 Agent 表的完整字段、正数和状态 CHECK、唯一键、查询索引、`expire_at` 索引、30 天清理顺序和兼容方案。V008 只是候选版本；在 Change 推送至可审查分支、总体设计同步且 A 正式分配版本并授权前，B MUST NOT 创建可执行 Flyway 脚本、启用迁移或修改共享数据库。获授权后迁移 MUST 使用 B 自有的 `agent_session`、`agent_run`、`agent_message` 和 `agent_run_step` 表，不建立物理外键，并使用全局 ID、`DATETIME(3)`、必要索引和 30 天清理字段。本 Change MUST NOT 创建 `agent_event`、`agent_action`、`agent_feedback` 或 `agent_tool_call`。
+系统 SHALL 在本 Change 中记录四张 Agent 表的完整字段、正数和状态 CHECK、唯一键、查询索引、`expire_at` 索引、30 天清理顺序和兼容方案。A 已正式分配 V008 并完成 SQL 静态审查；迁移只使用 B 自有的 `agent_session`、`agent_run`、`agent_message` 和 `agent_run_step` 表，不建立物理外键，并使用全局 ID、`DATETIME(3)`、必要索引和 30 天清理字段。本 Change MUST NOT 创建 `agent_event`、`agent_action`、`agent_feedback` 或 `agent_tool_call`。B 不得修改共享数据库或已审查的 V008 SQL。
 
-#### Scenario: 未获得 A 授权时停止迁移实现
-- **WHEN** Change 规划已完成但 A 尚未分配迁移版本或授权执行
-- **THEN** B 可以保留数据模型、Repository 接口和测试设计
-- **AND** 不创建或执行 Flyway 脚本，不连接共享数据库
-
-#### Scenario: A 授权后生成受控迁移
-- **WHEN** A 已确认表字段、索引、生命周期并分配迁移版本
-- **THEN** B 使用该版本创建仅包含 Agent 表的迁移脚本和空 MySQL 验证
+#### Scenario: 已分配迁移保持受控
+- **WHEN** B 在本 Change 中开发或验证 Agent 持久化代码
+- **THEN** B 保持已静态审查的 V008 SQL 内容不变，且不连接或修改共享数据库
 - **AND** 迁移不修改 A、C 或 D 拥有的表
 
+### Requirement: Agent MySQL 集成测试必须使用 CI 一次性临时库
+系统 SHALL 在 GitHub Actions 的一次性 MySQL 8.4 服务中，为 Agent 集成测试额外创建 `cinewise_agent_it` 并只授权临时账号 `cinewise_ci`。`AgentPersistenceMySqlIntegrationTest` MUST 仅在 `CINEWISE_MYSQL_AGENT_PERSISTENCE_IT=true`、JDBC 数据库名为 `cinewise_agent_it`、用户名为 `cinewise_ci` 时执行。CI MUST 先在空库启动 Flyway 并运行测试，再以相同库重复启动一次以验证 Flyway 不重复执行历史迁移。该测试 MUST NOT 连接云端 `cinewise_migration_check`、读取云端凭据或使用共享 `cinewise` 数据库。
+
+#### Scenario: CI 在空库验证并重复初始化
+- **WHEN** 满足 CI Agent MySQL 集成测试的工作流触发条件
+- **THEN** 工作流在 `cinewise_agent_it` 执行 Agent 持久化测试，确认 V008 成功写入 `flyway_schema_history`
+- **AND** 第二次启动在相同临时库完成，不重复执行历史迁移
+
+#### Scenario: 非 CI 数据源拒绝执行
+- **WHEN** Agent MySQL 集成测试的数据源不是 `cinewise_agent_it / cinewise_ci`
+- **THEN** 测试上下文在执行业务断言前失败
+- **AND** 不会向其他数据库写入测试数据
+
 ### Requirement: 最小四表字段表必须是唯一迁移依据
-系统 SHALL 以 Agent 详细设计第 5.2 节的最小四表候选迁移字段表作为本 Change 的唯一字段、类型、长度、可空性、默认值、CHECK、唯一键和索引依据。该表冻结 `agent_session`、`agent_run`、`agent_message`、`agent_run_step` 的状态、角色、消息类型、终态时间和组合关系。详细设计的未来完整模型 MUST 标明不适用于本次迁移；A 正式分配 V008 时不得改变该字段表。
+系统 SHALL 以 Agent 详细设计第 5.2 节的最小四表候选迁移字段表作为本 Change 的唯一字段、类型、长度、可空性、默认值、CHECK、唯一键和索引依据。该表冻结 `agent_session`、`agent_run`、`agent_message`、`agent_run_step` 的状态、角色、消息类型、终态时间和组合关系。详细设计的未来完整模型 MUST 标明不适用于本次迁移；A 分配 V008 时未改变该字段表。
 
 #### Scenario: 迁移实现只采用最小四表字段表
 - **WHEN** A 已正式分配本 Change 的迁移版本并授权实现
@@ -90,3 +104,23 @@
 - **WHEN** 应用启动或新消息提交前扫描到 `update_time` 已超过 30 秒的遗留 `RUNNING` 运行
 - **THEN** 恢复器不调用任何工具，将未完成只读步骤和运行条件更新为失败
 - **AND** 只有会话仍指向该内部 run ID 时才清空 `active_run_id`
+
+### Requirement: 处理中运行与并发重复请求必须保持一致
+系统 MUST 在存在 `RUNNING` 节点时保持运行和会话占用，即使下游节点仍为 `PENDING`。同一请求标识并发触发唯一键冲突时，初始写事务 MUST 回滚，并在独立事务读取已提交的胜者；相同摘要返回该运行，不同摘要返回 `409 / 206009`。
+
+#### Scenario: 处理中节点存在下游待执行节点
+- **WHEN** 只读工具返回 `PROCESSING`，对应节点为 `RUNNING`，下游节点为 `PENDING`
+- **THEN** 运行保持 `RUNNING`，且不得释放 `active_run_id` 或把运行改为失败
+
+#### Scenario: 并发相同请求标识读取胜者
+- **WHEN** MySQL 并发提交相同用户、会话、`clientRequestId` 和请求摘要，且其中一个事务发生唯一键冲突
+- **THEN** 冲突请求在独立事务读取已提交的胜者并返回相同 runId
+- **AND** 不创建第二条运行或消息，也不返回数据库异常
+
+### Requirement: 请求摘要和重复运行快照必须完整处理 Unicode 与消息
+系统 MUST 接受合法 Unicode 代理对表示的 emoji 和其他非 BMP 字符，只拒绝未配对代理字符。重复请求读取 MUST 按当前用户和 run ID 返回该运行全部已保存消息，不得受会话最近消息数量限制。
+
+#### Scenario: emoji 与旧运行重复请求
+- **WHEN** 用户内容或槽位包含合法 emoji，或重复请求引用较早运行
+- **THEN** 系统生成稳定请求摘要并返回该运行完整消息快照
+- **AND** 不因合法代理对失败，也不返回空消息列表
