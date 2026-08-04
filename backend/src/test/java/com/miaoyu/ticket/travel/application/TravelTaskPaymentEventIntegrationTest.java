@@ -2,6 +2,7 @@ package com.miaoyu.ticket.travel.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.miaoyu.ticket.order.event.OrderInvalidated;
 import com.miaoyu.ticket.order.event.PaymentSucceededEvent;
 import java.time.Clock;
 import java.time.OffsetDateTime;
@@ -78,6 +79,40 @@ class TravelTaskPaymentEventIntegrationTest {
     }
 
     @Test
+    void givenCommittedRefundEvent_whenPublished_thenCancelTaskAndKeepAdviceReadOnly() {
+        TravelTaskSummary task = travelTaskApplicationService.ensureTask(paymentEvent("payment-refund", "88005"));
+        long internalTaskId = jdbcTemplate.queryForObject(
+                "SELECT id FROM travel_task WHERE task_id = ?", Long.class, task.taskId());
+        travelAdviceService.generate(internalTaskId);
+
+        transactionTemplate.executeWithoutResult(status -> eventPublisher.publishEvent(
+                invalidatedEvent("refund-committed", "88005", 6L)));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM travel_task WHERE id = ?", String.class, internalTaskId))
+                .isEqualTo("CANCELLED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT closed_at IS NOT NULL FROM travel_task WHERE id = ?", Boolean.class, internalTaskId))
+                .isTrue();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM travel_advice_snapshot WHERE travel_task_id = ?",
+                Long.class,
+                internalTaskId)).isOne();
+    }
+
+    @Test
+    void givenRefundEventBeforePayment_whenCompensatedPaymentArrives_thenKeepCancelledTombstone() {
+        transactionTemplate.executeWithoutResult(status -> eventPublisher.publishEvent(
+                invalidatedEvent("refund-first", "88006", 7L)));
+
+        TravelTaskSummary paymentResult = travelTaskApplicationService.ensureTask(
+                paymentEvent("payment-late", "88006"));
+
+        assertThat(paymentResult.status()).hasToString("CANCELLED");
+        assertThat(countTasks()).isOne();
+    }
+
+    @Test
     void givenPendingTask_whenGeneratingAdvice_thenAppendDemoSnapshotAndMarkTaskReady() {
         TravelTaskSummary task = travelTaskApplicationService.ensureTask(paymentEvent("event-advice", "88003"));
         long internalTaskId = jdbcTemplate.queryForObject(
@@ -123,6 +158,19 @@ class TravelTaskPaymentEventIntegrationTest {
                 OffsetDateTime.parse("2026-08-05T19:00:00+08:00"),
                 5L,
                 OffsetDateTime.parse("2026-08-04T08:00:00+08:00"));
+    }
+
+    private OrderInvalidated invalidatedEvent(String eventId, String orderId, long orderVersion) {
+        return new OrderInvalidated(
+                eventId,
+                orderId,
+                "66001",
+                "55001",
+                "西湖区",
+                OffsetDateTime.parse("2026-08-05T19:00:00+08:00"),
+                orderVersion,
+                OffsetDateTime.parse("2026-08-04T08:10:00+08:00"),
+                "REFUNDED");
     }
 
     private long countTasks() {

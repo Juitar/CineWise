@@ -29,6 +29,16 @@ public interface TravelTaskPersistenceMapper {
     TravelTaskRow findByPaymentEventId(@Param("paymentEventId") String paymentEventId);
 
     @Select("""
+            SELECT id, task_id AS task_id, user_id AS user_id, order_id AS order_id,
+                   show_id AS show_id, cinema_area AS cinema_area, start_at AS start_at,
+                   trigger_at AS trigger_at, order_version AS order_version, version, status,
+                   closed_at AS closed_at, update_time AS updated_at
+              FROM travel_task
+             WHERE invalidation_event_id = #{invalidationEventId}
+            """)
+    TravelTaskRow findByInvalidationEventId(@Param("invalidationEventId") String invalidationEventId);
+
+    @Select("""
             SELECT id,
                    task_id AS task_id,
                    user_id AS user_id,
@@ -78,6 +88,23 @@ public interface TravelTaskPersistenceMapper {
             @Param("triggerAt") java.time.LocalDateTime triggerAt,
             @Param("updatedAt") java.time.LocalDateTime updatedAt);
 
+    /**
+     * 用订单版本作为退款事件的顺序裁决，不能因旧事件或重复对账取消较新的任务状态。
+     */
+    @org.apache.ibatis.annotations.Update("""
+            UPDATE travel_task
+               SET invalidation_event_id = #{invalidationEventId}, order_version = #{orderVersion},
+                   version = version + 1, status = 'CANCELLED', closed_at = #{closedAt},
+                   update_time = #{closedAt}
+             WHERE id = #{id} AND order_version <= #{orderVersion}
+               AND status NOT IN ('COMPLETED', 'CANCELLED', 'FAILED')
+            """)
+    int cancel(
+            @Param("id") long id,
+            @Param("orderVersion") long orderVersion,
+            @Param("invalidationEventId") String invalidationEventId,
+            @Param("closedAt") java.time.LocalDateTime closedAt);
+
     @Insert("""
             INSERT INTO travel_task (
                 id, task_id, payment_event_id, invalidation_event_id,
@@ -92,4 +119,20 @@ public interface TravelTaskPersistenceMapper {
             )
             """)
     int insert(@Param("row") TravelTaskInsertRow row);
+
+    /** 退款先到时写入取消墓碑，支付补偿只能按订单唯一键读回它。 */
+    @Insert("""
+            INSERT INTO travel_task (
+                id, task_id, payment_event_id, invalidation_event_id,
+                user_id, order_id, show_id, cinema_area,
+                start_at, trigger_at, order_version, version,
+                status, retry_count, closed_at, create_time, update_time
+            ) VALUES (
+                #{row.id}, #{row.taskId}, NULL, #{row.invalidationEventId},
+                #{row.userId}, #{row.orderId}, #{row.showId}, #{row.cinemaArea},
+                #{row.startAt}, #{row.triggerAt}, #{row.orderVersion}, 0,
+                'CANCELLED', 0, #{row.closedAt}, #{row.closedAt}, #{row.closedAt}
+            )
+            """)
+    int insertCancelled(@Param("row") TravelTaskCancelledInsertRow row);
 }

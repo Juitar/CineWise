@@ -2,6 +2,7 @@ package com.miaoyu.ticket.travel.application;
 
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
+import com.miaoyu.ticket.order.event.OrderInvalidated;
 import com.miaoyu.ticket.order.event.PaymentSucceededEvent;
 import com.miaoyu.ticket.travel.domain.TravelTaskStatus;
 import java.time.Clock;
@@ -55,6 +56,24 @@ public class TravelTaskApplicationService {
                 .orElseGet(() -> insertOrRecover(input));
     }
 
+    /**
+     * 按退款事件取消任务，供退款监听器和 A 的 REFUNDED 对账共同调用。
+     *
+     * <p>退款可能早于支付事件抵达。此时必须先保留 CANCELLED 墓碑，后续支付补偿按 orderId 只能读回
+     * 墓碑，绝不能重新生成提醒。已有任务则由数据库条件更新比较订单版本，旧退款不会影响较新任务。</p>
+     *
+     * @param event A 在退款完成后登记的最小失效事件
+     * @return 取消后的或原有的最小任务摘要
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public TravelTaskSummary ensureTaskCancelled(OrderInvalidated event) {
+        InvalidationTaskInput input = InvalidationTaskInput.from(event);
+
+        return travelTaskRepository.findByInvalidationEventId(input.eventId())
+                .map(this::toSummary)
+                .orElseGet(() -> cancelOrCreateTombstone(input));
+    }
+
     private TravelTaskSummary insertOrRecover(PaymentTaskInput input) {
         LocalDateTime createdAt = currentBusinessTime();
         long internalId = idGenerator.nextId();
@@ -78,6 +97,53 @@ public class TravelTaskApplicationService {
             return travelTaskRepository.findByOrderId(input.orderId())
                     .map(this::toSummary)
                     .orElseThrow(() -> new IllegalStateException("出行任务唯一键冲突后未找到原任务", exception));
+        }
+    }
+
+    private TravelTaskSummary cancelOrCreateTombstone(InvalidationTaskInput input) {
+        return travelTaskRepository.findByOrderId(input.orderId())
+                .map(task -> cancelExistingTask(task, input))
+                .orElseGet(() -> insertCancelledOrRecover(input));
+    }
+
+    private TravelTaskSummary cancelExistingTask(
+            TravelTaskRepository.TravelTaskSnapshot task, InvalidationTaskInput input) {
+        if (task.orderVersion() > input.orderVersion() || task.status().isTerminal()) {
+            return toSummary(task);
+        }
+        if (travelTaskRepository.cancel(task.id(), input.orderVersion(), input.eventId(), currentBusinessTime())) {
+            return new TravelTaskSummary(task.taskId(), TravelTaskStatus.CANCELLED, input.orderVersion());
+        }
+        // 条件更新失败说明另一个实例已更新状态或版本，必须读取数据库结果，不能用旧内存对象返回。
+        return travelTaskRepository.findByOrderId(input.orderId())
+                .map(this::toSummary)
+                .orElseThrow(() -> new IllegalStateException("出行任务取消竞争后未找到原任务"));
+    }
+
+    private TravelTaskSummary insertCancelledOrRecover(InvalidationTaskInput input) {
+        LocalDateTime closedAt = currentBusinessTime();
+        long internalId = idGenerator.nextId();
+        TravelTaskRepository.NewCancelledTravelTask task = new TravelTaskRepository.NewCancelledTravelTask(
+                internalId,
+                Long.toString(internalId),
+                input.eventId(),
+                input.userId(),
+                input.orderId(),
+                input.showId(),
+                input.cinemaArea(),
+                input.startAt(),
+                input.startAt().minusHours(REMINDER_ADVANCE_HOURS),
+                input.orderVersion(),
+                closedAt);
+        try {
+            travelTaskRepository.insertCancelled(task);
+            return new TravelTaskSummary(task.taskId(), TravelTaskStatus.CANCELLED, task.orderVersion());
+        } catch (DuplicateKeyException exception) {
+            // 支付和退款可能并发插入同一 orderId；唯一键赢家后续仍要按退款版本完成取消。
+            return travelTaskRepository.findByInvalidationEventId(input.eventId())
+                    .or(() -> travelTaskRepository.findByOrderId(input.orderId()))
+                    .map(existing -> cancelExistingTask(existing, input))
+                    .orElseThrow(() -> new IllegalStateException("出行取消墓碑唯一键冲突后未找到原任务", exception));
         }
     }
 
@@ -138,6 +204,37 @@ public class TravelTaskApplicationService {
             } catch (NumberFormatException exception) {
                 throw new IllegalArgumentException(fieldName + " 必须是十进制业务ID", exception);
             }
+        }
+    }
+
+    /** 将退款事件校验为任务取消所需的内部数据，字段规则与支付事件保持一致。 */
+    private record InvalidationTaskInput(
+            String eventId,
+            long orderId,
+            long showId,
+            long userId,
+            String cinemaArea,
+            LocalDateTime startAt,
+            long orderVersion) {
+
+        private static InvalidationTaskInput from(OrderInvalidated event) {
+            Objects.requireNonNull(event, "order invalidated event 不能为空");
+            if (event.orderVersion() < 0) {
+                throw new IllegalArgumentException("order invalidated event 的 orderVersion 不能为负数");
+            }
+            if (!"REFUNDED".equals(event.invalidReason())) {
+                throw new IllegalArgumentException("order invalidated event 的 invalidReason 必须为 REFUNDED");
+            }
+            return new InvalidationTaskInput(
+                    PaymentTaskInput.requiredText(event.eventId(), "eventId"),
+                    PaymentTaskInput.parseBusinessId(event.orderId(), "orderId"),
+                    PaymentTaskInput.parseBusinessId(event.showId(), "showId"),
+                    PaymentTaskInput.parseBusinessId(event.userId(), "userId"),
+                    PaymentTaskInput.requiredText(event.cinemaArea(), "cinemaArea"),
+                    Objects.requireNonNull(event.startAt(), "startAt 不能为空")
+                            .atZoneSameInstant(ClockConfiguration.BUSINESS_ZONE_ID)
+                            .toLocalDateTime(),
+                    event.orderVersion());
         }
     }
 }

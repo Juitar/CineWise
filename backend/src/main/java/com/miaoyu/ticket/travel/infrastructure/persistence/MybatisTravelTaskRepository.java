@@ -25,6 +25,11 @@ public class MybatisTravelTaskRepository implements TravelTaskRepository {
     }
 
     @Override
+    public Optional<TravelTaskSnapshot> findByInvalidationEventId(String invalidationEventId) {
+        return Optional.ofNullable(mapper.findByInvalidationEventId(invalidationEventId)).map(this::toSnapshot);
+    }
+
+    @Override
     public Optional<TravelTaskSnapshot> findByOrderId(long orderId) {
         return Optional.ofNullable(mapper.findByOrderId(orderId)).map(this::toSnapshot);
     }
@@ -46,6 +51,12 @@ public class MybatisTravelTaskRepository implements TravelTaskRepository {
     }
 
     @Override
+    public boolean cancel(long id, long invalidatedOrderVersion, String invalidationEventId,
+                          java.time.LocalDateTime closedAt) {
+        return mapper.cancel(id, invalidatedOrderVersion, invalidationEventId, closedAt) == 1;
+    }
+
+    @Override
     public void insert(NewTravelTask task) {
         int inserted = mapper.insert(new TravelTaskInsertRow(
                 task.id(),
@@ -61,6 +72,16 @@ public class MybatisTravelTaskRepository implements TravelTaskRepository {
                 task.createdAt()));
         if (inserted != 1) {
             throw new IllegalStateException("出行任务写入行数异常");
+        }
+    }
+
+    @Override
+    public void insertCancelled(NewCancelledTravelTask task) {
+        int inserted = mapper.insertCancelled(new TravelTaskCancelledInsertRow(
+                task.id(), task.taskId(), task.invalidationEventId(), task.userId(), task.orderId(), task.showId(),
+                task.cinemaArea(), task.startAt(), task.triggerAt(), task.orderVersion(), task.closedAt()));
+        if (inserted != 1) {
+            throw new IllegalStateException("出行取消墓碑写入行数异常");
         }
     }
 

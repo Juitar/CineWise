@@ -14,6 +14,11 @@ public interface TravelTaskRepository {
 
     Optional<TravelTaskSnapshot> findByPaymentEventId(String paymentEventId);
 
+    /** 默认实现供只验证查询能力的测试桩保持兼容；生产适配器必须按退款事件键查询。 */
+    default Optional<TravelTaskSnapshot> findByInvalidationEventId(String invalidationEventId) {
+        return Optional.empty();
+    }
+
     Optional<TravelTaskSnapshot> findByOrderId(long orderId);
 
     /** 仅供 D 的调度和建议服务按内部主键读取，外部接口仍使用 taskId 与本人校验。 */
@@ -23,7 +28,25 @@ public interface TravelTaskRepository {
 
     boolean updateTriggerAt(long id, long expectedVersion, LocalDateTime triggerAt, LocalDateTime updatedAt);
 
+    /**
+     * 仅将尚未结束、且订单版本不高于退款事件的任务置为取消。
+     *
+     * <p>条件更新同时阻止迟到的旧退款覆盖新版本，并让建议生成中的竞争方在提交时看到状态已经变化。</p>
+     */
+    default boolean cancel(
+            long id,
+            long invalidatedOrderVersion,
+            String invalidationEventId,
+            LocalDateTime closedAt) {
+        return false;
+    }
+
     void insert(NewTravelTask task);
+
+    /** 退款先于支付事件到达时创建的终态墓碑，防止随后补偿支付重新开启提醒。 */
+    default void insertCancelled(NewCancelledTravelTask task) {
+        throw new UnsupportedOperationException("当前任务仓储不支持退款取消墓碑");
+    }
 
     /** 任务的最小持久化投影，不向 REST 或其他模块暴露数据库字段。 */
     record TravelTaskSnapshot(
@@ -59,5 +82,20 @@ public interface TravelTaskRepository {
             LocalDateTime triggerAt,
             long orderVersion,
             LocalDateTime createdAt) {
+    }
+
+    /** 取消墓碑仍保留 A 事件中的最小订单事实，不读取订单模块私有数据。 */
+    record NewCancelledTravelTask(
+            long id,
+            String taskId,
+            String invalidationEventId,
+            long userId,
+            long orderId,
+            long showId,
+            String cinemaArea,
+            LocalDateTime startAt,
+            LocalDateTime triggerAt,
+            long orderVersion,
+            LocalDateTime closedAt) {
     }
 }
