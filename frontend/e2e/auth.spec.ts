@@ -107,6 +107,11 @@ test('管理员从统一入口登录后进入管理工作台', async ({ page }) 
   await submitLogin(page, 'admin@cinewise.test');
   await expect(page).toHaveURL('/admin');
   await expect(page.getByText('内容同步状态').first()).toBeVisible();
+
+  const adminMenuButton = page.getByRole('button', { name: /演示管理员/ });
+  await adminMenuButton.focus();
+  await page.keyboard.press('Space');
+  await expect(page.getByText('退出登录')).toBeVisible();
 });
 
 test('桌面端退出后旧会话不能再访问个人中心', async ({ page }, testInfo) => {
@@ -117,8 +122,12 @@ test('桌面端退出后旧会话不能再访问个人中心', async ({ page }, 
   await submitLogin(page, 'user@cinewise.test');
   await expect(page).toHaveURL('/');
 
-  await page.getByText('演示用户').click();
-  await page.getByText('退出登录').click();
+  const userMenuButton = page.getByRole('button', { name: /演示用户/ });
+  await userMenuButton.focus();
+  await page.keyboard.press('Enter');
+  const logoutMenuItem = page.getByText('退出登录');
+  await expect(logoutMenuItem).toBeVisible();
+  await logoutMenuItem.click();
   await expect(page).toHaveURL('/login');
   expect(state.authenticated).toBe(false);
 

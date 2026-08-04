@@ -38,15 +38,19 @@ export function AdminTopBar() {
           <span className="bell-icon">🔔</span>
           <span className="notification-badge">3</span>
         </div>
-        <Dropdown menu={{ items: menuItems, onClick: handleMenuClick }} placement="bottomRight">
-          <div className="admin-user-profile">
+        <Dropdown
+          menu={{ items: menuItems, onClick: handleMenuClick }}
+          placement="bottomRight"
+          trigger={['click']}
+        >
+          <button type="button" className="admin-user-profile">
             <div className="admin-avatar" aria-hidden="true">
               管
             </div>
             <span className="admin-name">
               {currentUser?.nickname ?? '管理员'} <span className="arrow-down">v</span>
             </span>
-          </div>
+          </button>
         </Dropdown>
       </div>
     </header>

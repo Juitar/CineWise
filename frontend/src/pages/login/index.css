@@ -273,14 +273,6 @@
   box-shadow: 0 4px 12px rgba(99, 91, 255, 20%) !important;
 }
 
-/* 底部版权备案信息 Footer */
-.login-footer {
-  text-align: center;
-  padding: 16px 20px 24px;
-  font-size: 13px;
-  color: #9a9ea9;
-}
-
 /* ==========================================================================
    移动端响应式布局适配 (小于 1024px，匹配 移动-登录.png 原型)
    ========================================================================== */
@@ -342,11 +334,6 @@
 
   .login-submit-btn-antd {
     height: 46px;
-  }
-
-  .login-footer {
-    padding: 12px 16px 20px;
-    font-size: 12px;
   }
 }
 

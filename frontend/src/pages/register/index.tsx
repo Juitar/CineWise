@@ -173,10 +173,6 @@ export default function RegisterPage() {
           </section>
         </div>
       </main>
-
-      <footer className="login-footer">
-        <p>© 2024 妙语购票 · 浙ICP备2024001234号-1 · 浙公网安备 33011002012345号</p>
-      </footer>
     </div>
   );
 }

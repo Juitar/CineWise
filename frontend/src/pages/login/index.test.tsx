@@ -102,6 +102,7 @@ describe('LoginPage', () => {
     expect(screen.getByText('登录后继续购票、查看订单与个性化观影服务')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '立即注册' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '查看隐私政策' })).toHaveAttribute('href', '/privacy');
+    expect(screen.queryByText(/ICP备|公网安备/)).not.toBeInTheDocument();
   });
 
   it('已登录管理员访问统一登录页时自动进入管理端', () => {

@@ -68,12 +68,13 @@ export const DesktopTopBar: React.FC = () => {
           <Dropdown
             menu={{ items: userMenu, onClick: handleUserMenuClick }}
             placement="bottomRight"
+            trigger={['click']}
             arrow
           >
-            <div className="desktop-user-profile">
+            <button type="button" className="desktop-user-profile">
               <Avatar className="user-avatar" icon={<UserIcon size={18} />} />
               <span className="desktop-user-name">{currentUser.nickname}</span>
-            </div>
+            </button>
           </Dropdown>
         ) : (
           <Link className="desktop-login-link" to="/login">
