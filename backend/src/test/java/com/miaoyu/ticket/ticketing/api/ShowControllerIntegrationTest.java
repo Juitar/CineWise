@@ -2,6 +2,7 @@ package com.miaoyu.ticket.ticketing.api;
 
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
@@ -105,11 +106,73 @@ class ShowControllerIntegrationTest {
     }
 
     @Test
+    void givenMovieAndCinema_whenQueryAvailableDates_thenReturnPublicSortedDateSummary() throws Exception {
+        Map<String, Object> show = jdbcTemplate.queryForMap("""
+                SELECT movie_id, cinema_id
+                  FROM movie_show
+                 WHERE status = 'ON_SALE'
+                   AND start_time > '2026-08-02 08:00:00'
+                 ORDER BY start_time, id
+                 LIMIT 1
+                """);
+
+        mockMvc.perform(get("/api/v1/shows/available-dates")
+                        .param("movieId", show.get("MOVIE_ID").toString())
+                        .param("cinemaId", show.get("CINEMA_ID").toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.dates").isArray())
+                .andExpect(jsonPath("$.data.dates").isNotEmpty())
+                .andExpect(jsonPath("$.data.dates[*].date", everyItem(matchesPattern("2026-08-0[2-8]"))))
+                .andExpect(jsonPath("$.data.dates[*].showCount", everyItem(greaterThan(0))));
+    }
+
+    @Test
+    void givenMissingInvalidOrUnknownIds_whenQueryAvailableDates_thenReturnBadRequestOrEmptyDates() throws Exception {
+        String cinemaId = jdbcTemplate.queryForObject("SELECT MIN(id) FROM cinema", String.class);
+        mockMvc.perform(get("/api/v1/shows/available-dates")
+                        .param("cinemaId", cinemaId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(100001));
+
+        mockMvc.perform(get("/api/v1/shows/available-dates")
+                        .param("movieId", "not-a-number")
+                        .param("cinemaId", cinemaId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(100001));
+
+        mockMvc.perform(get("/api/v1/shows/available-dates")
+                        .param("movieId", "0")
+                        .param("cinemaId", cinemaId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(100001));
+
+        mockMvc.perform(get("/api/v1/shows/available-dates")
+                        .param("movieId", "-1")
+                        .param("cinemaId", cinemaId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(100001));
+
+        mockMvc.perform(get("/api/v1/shows/available-dates")
+                        .param("movieId", Long.toString(Long.MAX_VALUE))
+                        .param("cinemaId", Long.toString(Long.MAX_VALUE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.dates").isEmpty());
+    }
+
+    @Test
     void givenTicketingEndpoints_whenReadOpenApi_thenExposeReadAndOrderContracts() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paths['/api/v1/shows'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/shows'].get.security").doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/v1/shows/available-dates'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/shows/available-dates'].get.security").doesNotExist())
+                .andExpect(jsonPath("$.components.schemas.AvailableDatesResponse.properties.dates").exists())
+                .andExpect(jsonPath("$.components.schemas.AvailableDateItemResponse.properties.date.format")
+                        .value("date"))
+                .andExpect(jsonPath("$.components.schemas.AvailableDateItemResponse.properties.showCount.type")
+                        .value("integer"))
                 .andExpect(jsonPath("$.components.schemas.ShowSummaryResponse.properties.expiresAt.format")
                         .value("date-time"))
                 .andExpect(jsonPath("$.paths['/api/v1/shows/{showId}/seats'].get").exists())

@@ -51,7 +51,9 @@ public class SecuritySkeletonConfiguration {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(PUBLIC_ENDPOINTS)
                         .permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/shows")
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/shows",
+                                "/api/v1/shows/available-dates")
                         .permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/movies",

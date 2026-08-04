@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.common.api.PageResult;
+import com.miaoyu.ticket.ticketing.api.AvailableDatesResponse;
 import com.miaoyu.ticket.ticketing.api.SeatMapResponse;
 import com.miaoyu.ticket.ticketing.api.ShowSummaryResponse;
 import java.io.IOException;
@@ -70,6 +71,8 @@ class TicketingContractFixtureTest {
             "dataType",
             "stateVersion",
             "updatedAt");
+    private static final Set<String> AVAILABLE_DATES_FIELDS = Set.of("dates");
+    private static final Set<String> AVAILABLE_DATE_FIELDS = Set.of("date", "showCount");
     private static final Set<String> SEAT_MAP_FIELDS = Set.of(
             "showId",
             "auditoriumId",
@@ -99,6 +102,7 @@ class TicketingContractFixtureTest {
     private static final Set<String> ALTERNATIVE_SHOW_FIELDS = Set.of(
             "showId", "movieId", "cinemaId", "startTime", "basePrice", "status", "availableSeatCount");
     private static final List<String> REST_FIXTURES = List.of(
+            "c/available-dates-success.json",
             "c/show-list-success.json",
             "c/seat-map-success.json",
             "c/create-order-success.json",
@@ -171,6 +175,19 @@ class TicketingContractFixtureTest {
             assertThat(root.required("message").isTextual()).as(fixture).isTrue();
             assertThat(root.required("traceId").asText()).as(fixture).matches("[0-9a-f]{32}");
             assertNoSensitiveFields(root.toString(), fixture);
+        }
+
+        AvailableDatesResponse availableDates = readSuccessData(
+                "c/available-dates-success.json", AvailableDatesResponse.class);
+        JsonNode availableDatesData = readFixture("c/available-dates-success.json").required("data");
+        assertExactFields(availableDatesData, "C available-dates data", AVAILABLE_DATES_FIELDS);
+        assertExactRecordFields(availableDatesData, AvailableDatesResponse.class);
+        assertThat(availableDates.dates()).hasSize(2);
+        for (JsonNode availableDate : availableDatesData.required("dates")) {
+            assertExactFields(availableDate, "C available-date record", AVAILABLE_DATE_FIELDS);
+            assertExactRecordFields(availableDate, AvailableDatesResponse.AvailableDateItemResponse.class);
+            assertThat(availableDate.required("showCount").asInt()).isPositive();
+            java.time.LocalDate.parse(availableDate.required("date").asText());
         }
 
         List<ShowSummaryResponse> showResponses =
@@ -306,6 +323,8 @@ class TicketingContractFixtureTest {
                 .isFalse();
 
         assertSchemaProperty(openApi, "ShowSummaryResponse", "showId", "string");
+        assertSchemaProperty(openApi, "AvailableDateItemResponse", "date", "string");
+        assertSchemaProperty(openApi, "AvailableDateItemResponse", "showCount", "integer");
         assertSchemaProperty(openApi, "ShowSummaryResponse", "basePrice", "string");
         assertSchemaProperty(openApi, "OrderResponse", "orderId", "string");
         assertSchemaProperty(openApi, "OrderResponse", "totalAmount", "string");

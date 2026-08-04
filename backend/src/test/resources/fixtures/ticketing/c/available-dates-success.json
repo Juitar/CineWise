@@ -1,0 +1,17 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "dates": [
+      {
+        "date": "2026-08-05",
+        "showCount": 6
+      },
+      {
+        "date": "2026-08-06",
+        "showCount": 4
+      }
+    ]
+  },
+  "traceId": "01010101010101010101010101010101"
+}
