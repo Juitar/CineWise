@@ -1,7 +1,9 @@
 # agent-rank-movie-plan-execution Specification
 
 ## Purpose
-TBD - created by archiving change agent-rank-movie-plan-execution. Update Purpose after archive.
+
+定义 Agent 如何把已校验的 `rankMoviePlan` 节点按类型调用 D 的推荐工具，并将统一结果交给既有运行状态机；不包含计划生成、SSE、持久化或其他工具。
+
 ## Requirements
 ### Requirement: rankMoviePlan 必须作为只读类型化工具登记
 
