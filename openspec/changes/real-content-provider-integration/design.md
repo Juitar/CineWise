@@ -53,6 +53,12 @@
 
 NetStart 使用本 change 新增的默认配置，不复用现有内容参数，也不代表 NetStart 官方配额：`netstart.enabled=false`、每日同步时间、连接超时 500ms、读取超时 1500ms、本地限流 10 req/min、重试次数 1 次和退避时间 200ms。每天同步一次的调用量很低，10 req/min 只用于本地保护 NetStart；仅连接错误或 5xx 可按退避时间重试一次，429、校验失败和不可重试 4xx 不重试。调用和同步使用现有 `data_sync_log` 记录来源、资源、结果、耗时、数据时间和质量摘要，异常日志脱敏。只有新增或修改数据库持久化字段、索引、约束等表结构时，D 才先定义生命周期并向 A 提交迁移申请；A 分配版本、审核 SQL 并在空 MySQL 验证。纯 Provider 映射、DTO、内存质量标识或配置变化不进入 Flyway。
 
+### 6.1 开发验证的单次启动同步
+
+默认 `netstart.enabled=false`、`netstart.sync-on-startup=false`，Spring Boot 的环境变量松散绑定分别对应 `CINEWISE_CONTENT_NETSTART_ENABLED`、`CINEWISE_CONTENT_NETSTART_SYNC_ON_STARTUP`。开发或演示环境同时显式设置为 true 时，`NetStartStartupSyncRunner` 在应用启动完成后仅调用一次 `ContentSyncService.synchronizeDailyContent()`；它不新增 REST 刷新接口，也不绕过 Provider 的 dev/demo 校验、限流、超时、身份隔离、事务和审计规则。
+
+验证窗口可设置 `CINEWISE_SCHEDULING_ENABLED=false`，使公共 `@EnableScheduling` 配置不注册任何自动任务；一次性启动同步不依赖调度器，仍可执行。窗口结束后移除两个 NetStart 开关并恢复调度默认值。该配置只控制触发时机，不授权连接共享数据库、Redis 或执行 Flyway；真实环境仍须先取得 A 的独立环境和时间确认。
+
 ### 7. 跨模块消费者保持只读和兼容
 
 A 继续只通过 `ContentSummaryQueryPort.findCinemaSummaries(Set<Long>)` 获取标准化影院摘要；现有 `CinemaSummary` 字段和含义不变，本 change 不新增影片摘要。C 按确认规则展示 LIVE 来源与更新时间、过期、降级、回退类型和“来源尚未验证”，不读取 Provider Key、原始内容或影评正文。B 只通过 `RankMoviePlanTool.execute` 读取标准化 `FixedRecommendationResult`，不触发同步、不读取 Provider 原始数据；其中的场次事实只能原样来自 A 的公开查询，B 不补全、不推断且不作为下单依据。Provider 不提供场次、价格、库存、座位或订单信息。

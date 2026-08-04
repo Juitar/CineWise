@@ -12,6 +12,7 @@
 - [x] 2.2 D 实现影片、影院基础字段映射、最低字段校验、来源/时间/有效期封套和字段质量摘要；业务层、A、B、C 均不接收第三方 SDK 类型或原始 JSON。验证：`NetStartContentProviderTest` 按 2026-08-04 实际的 `movie/detail`、`index/movieOnInfoList`、`search/cinemas` 返回形状覆盖合格影片/影院和字段缺失拒绝。
 - [x] 2.3 D 实现非空 `provider + resourceType + externalId` 的幂等识别；名称候选键同样加入 `resourceType` 命名空间，为外部 ID 为空的记录实现隔离、冲突记录和人工复核前禁止写入规则。验证：`ContentIdentityPolicyTest` 覆盖重复身份、同名不同外部 ID 隔离及同名影片/影院互不隔离；空 ID 在 Provider 映射边界拒绝，不进入写入路径。
 - [x] 2.4 D 实现每日同步请求的输入校验、本地 10 req/min 限流、500ms 连接超时、1500ms 读取超时，以及仅连接失败或 5xx 可 200ms 退避重试一次的规则；上述均为本 change 新增默认配置，不代表 NetStart 官方配额。验证：`NetStartContentProviderTest` 覆盖连接失败、429、5xx、字段不合格和重复请求；所有 Provider 测试夹具均不含 Key 或完整原始载荷。
+- [x] 2.5 D 增加开发/演示环境的一次性启动同步和调度关闭配置：`CINEWISE_CONTENT_NETSTART_ENABLED=true` 与 `CINEWISE_CONTENT_NETSTART_SYNC_ON_STARTUP=true` 同时开启时只同步一次；`CINEWISE_SCHEDULING_ENABLED=false` 时不注册自动定时任务。验证：`NetStartStartupSyncRunnerTest` 覆盖 Provider 开启时仅调用一次、关闭时不调用；Spring 上下文测试覆盖一次性入口注册和调度配置关闭；`NetStartEnvironmentBindingTest` 加载真实 `application.yml` 并模拟两个操作系统环境变量，确认只绑定 NetStart、虚拟线程仍为关闭；`mvnw.cmd verify` 通过。
 
 ## 3. 缓存、快照与数据边界
 
@@ -26,9 +27,9 @@
 - [x] 4.2 D 编写每天同步、缓存、快照和回退测试，覆盖同步成功后的缓存清理或覆盖、身份冲突隔离、内部业务 ID 回填、事务回滚无 LIVE 缓存残留、LIVE 快照经 Controller 可读、有效真实缓存、有效真实快照、允许陈旧快照、Redis 故障、Demo 直接回退且不写缓存和 `303004`。验证：`ContentSyncServiceTest` 覆盖身份隔离后一成一败的内容项审计统计；`JdbcContentPersistenceAdapterIntegrationTest` 覆盖该 PARTIAL 审计可通过真实 V004 数据库 CHECK。页面请求不访问 NetStart；真实 Provider 失败时现有 Demo 离线演示保持可用，过期基础资料标注“数据已过期，仅供参考”，热映、待映和票务事实不被当作当前信息。
 - [x] 4.3 D 编写数据质量与身份识别测试，覆盖标准化字段、来源/时效封套、非空外部 ID 幂等更新、空 ID 隔离、候选冲突不自动合并，以及 Provider 响应中影评正文、场次、价格、库存、座位和订单字段被过滤。验证：A 继续仅通过 `ContentSummaryQueryPort`，B、C 不会取得被禁止字段。
 - [ ] 4.4 D 在 Provider 关闭、外网断开和受控学习 Provider 环境分别执行验证；NetStart 仅限开发/演示环境，配额未知时使用本地保守限流，不进入正式生产或商业环境。验证：记录脱敏环境信息、Provider 成功率/耗时/限流、缓存命中、快照时效、降级层级、数据质量结果和缺陷编号；不执行或改写 Flyway。
-- [x] 4.5 D 在 `backend` 执行 `mvnw.cmd verify`，执行 `openspec validate real-content-provider-integration --strict`、`git diff --check` 并核对变更范围。验证：2026-08-04 修复复审意见后，`mvnw.cmd verify` 通过（186 个测试，10 个受控 MySQL 测试跳过），构建、架构检查、Checkstyle、SpotBugs、JaCoCo 和 OpenSpec 严格校验通过；未通过项明确到负责人和复现步骤。
+- [x] 4.5 D 在 `backend` 执行 `mvnw.cmd verify`，执行 `openspec validate real-content-provider-integration --strict`、`git diff --check` 并核对变更范围。验证：2026-08-04 在 `feat/netstart-content-sync` 工作树复跑 `mvnw.cmd verify` 通过（194 个测试，0 失败、0 错误、10 个受控 MySQL 测试跳过），构建、架构检查、Checkstyle、SpotBugs、JaCoCo 和 OpenSpec 严格校验通过；`git diff --check` 无输出，工作树干净。
 
 ## 5. 交付与发布准备
 
 - [ ] 5.1 D、A、B、C 分别复核本 change 中的 Provider 启用材料、公开摘要兼容性、Agent 只读边界和前端来源展示；已确认的 A、B、C 边界结论保留在任务中，私下确认记录不上传；未取得后续实现确认时 Provider 保持关闭。验证：任务结论、消费者夹具、OpenAPI/展示样例和验证结果与实现一致。
-- [ ] 5.2 D 准备独立实现分支的 PR 说明，列出内容基线依赖提交、Provider 启用状态、Owner 确认、验证命令、未验证项和关闭 Provider 的回退方式。验证：不包含 Key、未授权数据、无关改动或第二份内容种子；用户明确要求后才提交、推送或创建 PR。
+- [x] 5.2 D 已准备并推送独立实现分支材料：远端分支 `origin/feat/netstart-content-sync`，实现已由 PR #42 合入 `origin/dev`；内容基线依赖为 V001、V004 和归档的 `d-demo-content-recommendation-baseline`，本 change 未新增 Flyway。Provider 默认 `cinewise.content.netstart.enabled=false`，仅在 A 提供的独立学习测试环境临时启用；A、B、C 的既有只读和展示边界见 1.3 至 1.5。验证命令与结果见 4.5；未验证项仅为 4.4 和 5.1。4.4 的实际 `requestId` 由代码按上海开始时间生成 `daily-<startedAt>`，实际 `externalId` 仅以本次受控 Provider 返回并通过校验的 `source_movie_id`、`source_cinema_id` 为准，均须在写入前后记录，不预置或伪造。定向清理只针对本次实际 `requestId`、实际外部 ID 清单及其生成的快照查询键：逐项删除 `data_sync_log`、`external_data_snapshot`、`movie`、`cinema` 的本次测试行和隔离 Redis 对应键；不使用 `FLUSHDB`，不删除其他来源或已有行，不改写/执行 Flyway。Provider 关闭或验证失败时保持开关关闭，页面继续按真实缓存、快照、Demo 的既有顺序回退。验证：材料不含 Key、未授权数据、无关改动或第二份内容种子；用户已要求推送，远端分支可审查。
