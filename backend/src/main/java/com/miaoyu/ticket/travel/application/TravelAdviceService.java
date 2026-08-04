@@ -71,7 +71,7 @@ public class TravelAdviceService {
         }
         LocalDateTime now = currentBusinessTime();
         if (!adviceRepository.claimVersionForAdvice(task.id(), task.version(), now)) {
-            return adviceRepository.findByTaskIdAndVersion(task.id(), task.version() + 1)
+            return adviceRepository.findCommittedByTaskIdAndVersion(task.id(), task.version() + 1)
                     .orElseThrow(() -> new IllegalStateException("建议版本抢占失败后未找到已生成快照"));
         }
         WeatherObservation weather = weatherQueryService.query(task.cinemaArea());

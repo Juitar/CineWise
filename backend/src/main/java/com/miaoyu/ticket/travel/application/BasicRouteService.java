@@ -42,8 +42,16 @@ public class BasicRouteService {
         String origin = requireText(command.originValue(), "起点不能为空");
         String mode = requireText(command.travelMode(), "出行方式不能为空");
         OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
-        return routeProvider.plan(origin, task.cinemaArea(), mode, now)
-                .orElseThrow(() -> new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE));
+        try {
+            return routeProvider.plan(origin, task.cinemaArea(), mode, now)
+                    .orElseThrow(() -> new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE));
+        } catch (RuntimeException exception) {
+            // Provider 异常与空结果对用户都表示路线暂不可用；异常中不得拼接 origin，防止位置泄漏。
+            if (exception instanceof BusinessException businessException) {
+                throw businessException;
+            }
+            throw new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE);
+        }
     }
 
     private TravelTaskRepository.TravelTaskSnapshot requireMyTask(String taskId) {

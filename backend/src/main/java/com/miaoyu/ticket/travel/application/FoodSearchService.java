@@ -48,7 +48,7 @@ public class FoodSearchService {
             throw new BusinessException(TravelErrorCode.FOOD_RADIUS_OUT_OF_RANGE);
         }
         OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
-        FoodSearchResult result = realProvider.search(task.cinemaArea(), radius, now)
+        FoodSearchResult result = searchRealSafely(task.cinemaArea(), radius, now)
                 .map(item -> foodCache.save(task.cinemaArea(), radius, item))
                 .or(() -> foodCache.findValid(task.cinemaArea(), radius, now))
                 .or(() -> demoProvider.search(task.cinemaArea(), radius, now))
@@ -58,6 +58,16 @@ public class FoodSearchService {
                 .toList();
         return new FoodSearchResult(sorted, result.source(), result.dataTime(), result.expiresAt(), result.isExpired(),
                 result.degraded(), result.fallbackType());
+    }
+
+    /** 真实餐饮服务超时或网络失败时视为本次来源不可用，仍要继续缓存和 Demo 回退。 */
+    private java.util.Optional<FoodSearchResult> searchRealSafely(
+            String cinemaArea, int radiusMeters, OffsetDateTime now) {
+        try {
+            return realProvider.search(cinemaArea, radiusMeters, now);
+        } catch (RuntimeException exception) {
+            return java.util.Optional.empty();
+        }
     }
 
     /** 缓存只按影院区域和半径保存公开餐饮结果，绝不包含用户位置。 */

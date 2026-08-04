@@ -44,6 +44,18 @@ class FoodSearchServiceTest {
     }
 
     @Test
+    void givenRealProviderThrows_whenSearching_thenFallbackToDemo() {
+        OffsetDateTime now = OffsetDateTime.parse("2026-08-04T08:00:00+08:00");
+        CountingProvider demo = new CountingProvider(Optional.of(new FoodSearchResult(
+                List.of(new FoodPoi("演示餐饮", 300, true, "OPEN")), "DEMO_FOOD_V1", now, now.plusMinutes(15),
+                false, true, "DEMO")));
+        FoodSearchResult result = service(new ThrowingProvider(), demo).searchMyFood("90001", null);
+
+        assertThat(result.source()).isEqualTo("DEMO_FOOD_V1");
+        assertThat(result.fallbackType()).isEqualTo("DEMO");
+    }
+
+    @Test
     void givenExpiredRealProviderAfterCachedSuccess_whenSearching_thenReadValidCache() {
         OffsetDateTime now = OffsetDateTime.parse("2026-08-04T08:00:00+08:00");
         CountingProvider real = new CountingProvider(Optional.of(new FoodSearchResult(
@@ -72,11 +84,11 @@ class FoodSearchServiceTest {
         assertThat(result.degraded()).isTrue();
     }
 
-    private FoodSearchService service(CountingProvider real, CountingProvider demo) {
+    private FoodSearchService service(FoodPoiProvider real, FoodPoiProvider demo) {
         return service(real, demo, new InMemoryCache());
     }
 
-    private FoodSearchService service(CountingProvider real, CountingProvider demo, InMemoryCache cache) {
+    private FoodSearchService service(FoodPoiProvider real, FoodPoiProvider demo, InMemoryCache cache) {
         CurrentUserAccessor user = () -> new CurrentUser(1L, RoleCode.USER, 0L);
         return new FoodSearchService(new StubRepository(), user, real, demo, cache,
                 new FoodQueryProperties(1000, 300, 3000),
@@ -101,6 +113,12 @@ class FoodSearchServiceTest {
         @Override public Optional<FoodSearchResult> search(String area, int radius, OffsetDateTime at) {
             calls++;
             return result;
+        }
+    }
+
+    private static final class ThrowingProvider implements FoodPoiProvider {
+        @Override public Optional<FoodSearchResult> search(String area, int radius, OffsetDateTime at) {
+            throw new IllegalStateException("餐饮网络超时");
         }
     }
 

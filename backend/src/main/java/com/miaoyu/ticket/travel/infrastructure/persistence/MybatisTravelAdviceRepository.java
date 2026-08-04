@@ -10,6 +10,8 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 只负责建议快照 SQL 的 MyBatis 适配器。
@@ -39,6 +41,18 @@ public class MybatisTravelAdviceRepository implements TravelAdviceRepository {
 
     @Override
     public Optional<TravelAdviceSnapshot> findByTaskIdAndVersion(long taskId, long taskVersion) {
+        return Optional.ofNullable(mapper.findByTaskIdAndVersion(taskId, taskVersion));
+    }
+
+    /**
+     * 版本抢占失败后必须跳出原事务读取视图，才能读到竞争赢家已经提交的新增快照。
+     *
+     * <p>该查询不加写锁，也不改变快照；新事务只用于获得最新已提交数据，避免在多实例部署时把短暂竞争
+     * 误判成数据缺失。</p>
+     */
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public Optional<TravelAdviceSnapshot> findCommittedByTaskIdAndVersion(long taskId, long taskVersion) {
         return Optional.ofNullable(mapper.findByTaskIdAndVersion(taskId, taskVersion));
     }
 

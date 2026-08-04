@@ -37,7 +37,19 @@ class BasicRouteServiceTest {
                                 .isEqualTo(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE));
     }
 
-    private BasicRouteService service(CountingProvider provider) {
+    @Test
+    void givenProviderThrows_whenPlanning_thenReturnStableCodeWithoutOrigin() {
+        BasicRouteService service = service(new ThrowingProvider());
+
+        assertThatThrownBy(() -> service.planMyRoute("90001", command(true)))
+                .isInstanceOfSatisfying(BusinessException.class, error -> {
+                    org.assertj.core.api.Assertions.assertThat(error.getErrorCode())
+                            .isEqualTo(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE);
+                    org.assertj.core.api.Assertions.assertThat(error.getMessage()).doesNotContain("西湖文化广场");
+                });
+    }
+
+    private BasicRouteService service(BasicRouteProvider provider) {
         CurrentUserAccessor user = () -> new CurrentUser(1L, RoleCode.USER, 0L);
         return new BasicRouteService(new StubRepository(), user, provider,
                 Clock.fixed(Instant.parse("2026-08-04T00:00:00Z"), ZoneOffset.UTC));
@@ -54,6 +66,14 @@ class BasicRouteServiceTest {
                 String origin, String area, String mode, java.time.OffsetDateTime at) {
             calls++;
             return Optional.empty();
+        }
+    }
+
+    private static final class ThrowingProvider implements BasicRouteProvider {
+        @Override
+        public Optional<BasicRouteResult> plan(
+                String origin, String area, String mode, java.time.OffsetDateTime at) {
+            throw new IllegalStateException("地图服务超时：" + origin);
         }
     }
 

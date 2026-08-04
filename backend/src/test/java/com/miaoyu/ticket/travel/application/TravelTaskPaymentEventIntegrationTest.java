@@ -3,7 +3,9 @@ package com.miaoyu.ticket.travel.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.miaoyu.ticket.order.event.PaymentSucceededEvent;
+import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +13,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 验证 D 只在发布事务提交后创建任务，且补偿与事件共用同一唯一任务。 */
@@ -29,6 +33,12 @@ class TravelTaskPaymentEventIntegrationTest {
 
     @Autowired
     private TravelAdviceService travelAdviceService;
+
+    @Autowired
+    private TravelAdviceRepository travelAdviceRepository;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -84,6 +94,25 @@ class TravelTaskPaymentEventIntegrationTest {
                 "SELECT status FROM travel_task WHERE id = ?", String.class, internalTaskId)).isEqualTo("READY");
     }
 
+    @Test
+    void givenEarlierRepeatableReadTransaction_whenWinnerCommits_thenFreshReadFindsSnapshot() {
+        TravelTaskSummary task = travelTaskApplicationService.ensureTask(paymentEvent("event-multi-instance", "88004"));
+        long internalTaskId = jdbcTemplate.queryForObject(
+                "SELECT id FROM travel_task WHERE task_id = ?", Long.class, task.taskId());
+        TransactionTemplate repeatableRead = new TransactionTemplate(transactionManager);
+        repeatableRead.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        TravelAdviceSnapshot recovered = repeatableRead.execute(status -> {
+            // 先建立外层可重复读事务的旧读取视图，再由独立服务事务完成赢家写入。
+            assertThat(travelAdviceRepository.findByTaskIdAndVersion(internalTaskId, 1L)).isEmpty();
+            TravelAdviceSnapshot winner = runWinnerInSeparateTransaction(internalTaskId);
+            assertThat(winner.taskVersion()).isEqualTo(1L);
+            return travelAdviceRepository.findCommittedByTaskIdAndVersion(internalTaskId, 1L)
+                    .orElseThrow(() -> new AssertionError("独立事务未读取到赢家快照"));
+        });
+
+        assertThat(recovered.taskVersion()).isEqualTo(1L);
+    }
+
     private PaymentSucceededEvent paymentEvent(String eventId, String orderId) {
         return new PaymentSucceededEvent(
                 eventId,
@@ -106,5 +135,16 @@ class TravelTaskPaymentEventIntegrationTest {
                 "SELECT FORMATDATETIME(trigger_at, 'yyyy-MM-dd HH:mm:ss') FROM travel_task WHERE order_id = ?",
                 String.class,
                 orderId);
+    }
+
+    private TravelAdviceSnapshot runWinnerInSeparateTransaction(long taskId) {
+        try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            return executor.submit(() -> travelAdviceService.generate(taskId)).get();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("赢家事务被中断", exception);
+        } catch (ExecutionException exception) {
+            throw new AssertionError("赢家事务生成建议失败", exception.getCause());
+        }
     }
 }
