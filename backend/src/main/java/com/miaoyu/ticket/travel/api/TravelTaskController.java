@@ -45,6 +45,12 @@ public class TravelTaskController {
         return Result.success(toResponse(travelTaskQueryService.getMyTaskByOrderId(orderId)));
     }
 
+    /** 仅本人可读取已生成建议，路线和位置相关字段不属于该响应。 */
+    @GetMapping("/{taskId}/advice")
+    public Result<TravelAdviceResponse> getAdvice(@PathVariable String taskId) {
+        return Result.success(toAdviceResponse(travelTaskQueryService.getMyAdviceSummary(taskId)));
+    }
+
     /** 只更新提醒时间；If-Match 与请求 version 同时存在时必须一致，防止旧页面覆盖新设置。 */
     @PutMapping("/{taskId}/reminder")
     public Result<TravelTaskResponse> updateReminder(
@@ -65,7 +71,8 @@ public class TravelTaskController {
     /** 页面显式触发的建议刷新，不允许 B 的只读查询复用这个写入口。 */
     @PostMapping("/{taskId}/advice/refresh")
     public Result<TravelAdviceResponse> refreshAdvice(@PathVariable String taskId) {
-        return Result.success(toAdviceResponse(travelTaskQueryService.refreshMyAdvice(taskId)));
+        travelTaskQueryService.refreshMyAdvice(taskId);
+        return Result.success(toAdviceResponse(travelTaskQueryService.getMyAdviceSummary(taskId)));
     }
 
     private long parseVersion(String ifMatch) {
@@ -82,11 +89,15 @@ public class TravelTaskController {
     }
 
     private TravelAdviceResponse toAdviceResponse(
-            com.miaoyu.ticket.travel.application.TravelAdviceSnapshot advice) {
+            TravelTaskQueryService.TravelAdviceSummary advice) {
         return new TravelAdviceResponse(
-                advice.taskVersion(), advice.source(), advice.dataTime().atZone(ClockConfiguration.BUSINESS_ZONE_ID)
-                        .toOffsetDateTime(), advice.expiresAt().atZone(ClockConfiguration.BUSINESS_ZONE_ID)
-                        .toOffsetDateTime(), advice.isExpired(), advice.degraded(), advice.fallbackType());
+                advice.available(), advice.weatherJson(), advice.adviceJson(), advice.source(),
+                toOffsetDateTime(advice.dataTime()), toOffsetDateTime(advice.expiresAt()), advice.expired(),
+                advice.degraded(), advice.fallbackType());
+    }
+
+    private OffsetDateTime toOffsetDateTime(LocalDateTime time) {
+        return time == null ? null : time.atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime();
     }
 
     public record UpdateReminderRequest(@NotNull OffsetDateTime triggerAt, @PositiveOrZero long version) {
@@ -97,7 +108,7 @@ public class TravelTaskController {
     }
 
     public record TravelAdviceResponse(
-            long taskVersion, String source, OffsetDateTime dataTime, OffsetDateTime expiresAt,
-            boolean isExpired, boolean degraded, String fallbackType) {
+            boolean available, String weatherJson, String adviceJson, String source, OffsetDateTime dataTime,
+            OffsetDateTime expiresAt, boolean isExpired, boolean degraded, String fallbackType) {
     }
 }

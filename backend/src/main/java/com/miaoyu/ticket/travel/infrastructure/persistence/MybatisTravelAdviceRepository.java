@@ -42,6 +42,11 @@ public class MybatisTravelAdviceRepository implements TravelAdviceRepository {
         return Optional.ofNullable(mapper.findByTaskIdAndVersion(taskId, taskVersion));
     }
 
+    @Override
+    public Optional<TravelAdviceSnapshot> findLatestByTaskId(long taskId) {
+        return Optional.ofNullable(mapper.findLatestByTaskId(taskId));
+    }
+
     /** MyBatis 注解 SQL 放在适配器内部，应用层不会接触表名或 JSON 字段。 */
     @Mapper
     public interface TravelAdvicePersistenceMapper {
@@ -75,5 +80,16 @@ public class MybatisTravelAdviceRepository implements TravelAdviceRepository {
                 """)
         TravelAdviceSnapshot findByTaskIdAndVersion(
                 @Param("taskId") long taskId, @Param("taskVersion") long taskVersion);
+
+        @Select("""
+                SELECT id, travel_task_id AS task_id, task_version, weather_json AS weather_json,
+                       advice_json AS advice_json, source, data_time AS data_time, expires_at AS expires_at,
+                       is_expired AS is_expired, degraded, fallback_type AS fallback_type,
+                       create_time AS created_at
+                  FROM travel_advice_snapshot
+                 WHERE travel_task_id = #{taskId}
+                 ORDER BY task_version DESC LIMIT 1
+                """)
+        TravelAdviceSnapshot findLatestByTaskId(@Param("taskId") long taskId);
     }
 }

@@ -16,4 +16,8 @@ public interface TravelAdviceRepository {
     void insert(TravelAdviceSnapshot snapshot);
 
     Optional<TravelAdviceSnapshot> findByTaskIdAndVersion(long taskId, long taskVersion);
+
+    default Optional<TravelAdviceSnapshot> findLatestByTaskId(long taskId) {
+        return Optional.empty();
+    }
 }

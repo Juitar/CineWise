@@ -53,10 +53,37 @@ class TravelTaskQueryServiceTest {
                                 .isEqualTo(TravelErrorCode.REFRESH_TOO_FREQUENT));
     }
 
+    @Test
+    void givenGeneratedAdvice_whenOwnerReads_thenReturnDisplayContent() {
+        StubRepository repository = new StubRepository(task(1L, TravelTaskStatus.READY));
+        TravelTaskQueryService service = service(repository, new StubAdviceRepository(snapshot()));
+
+        TravelTaskQueryService.TravelAdviceSummary advice = service.getMyAdviceSummary("90001");
+
+        assertThat(advice.available()).isTrue();
+        assertThat(advice.adviceJson()).contains("交通");
+        assertThat(advice.weatherJson()).contains("多云");
+    }
+
     private TravelTaskQueryService service(StubRepository repository, long userId) {
+        return service(repository, new StubAdviceRepository(null), userId);
+    }
+
+    private TravelTaskQueryService service(StubRepository repository, StubAdviceRepository adviceRepository) {
+        return service(repository, adviceRepository, 1L);
+    }
+
+    private TravelTaskQueryService service(
+            StubRepository repository, StubAdviceRepository adviceRepository, long userId) {
         CurrentUserAccessor accessor = () -> new CurrentUser(userId, RoleCode.USER, 0L);
-        return new TravelTaskQueryService(repository, accessor, null,
+        return new TravelTaskQueryService(repository, accessor, adviceRepository, null,
                 Clock.fixed(Instant.parse("2026-08-04T00:00:00Z"), ZoneOffset.UTC));
+    }
+
+    private TravelAdviceSnapshot snapshot() {
+        return new TravelAdviceSnapshot(11L, 1L, 1L, "{\"condition\":\"多云\"}",
+                "{\"transport\":\"交通建议\"}", "DEMO_WEATHER_V1", LocalDateTime.of(2026, 8, 4, 8, 0),
+                LocalDateTime.of(2026, 8, 4, 8, 15), false, true, "DEMO", LocalDateTime.of(2026, 8, 4, 8, 0));
     }
 
     private TravelTaskRepository.TravelTaskSnapshot task(long userId, TravelTaskStatus status) {
@@ -87,5 +114,18 @@ class TravelTaskQueryServiceTest {
             return true;
         }
         @Override public void insert(NewTravelTask newTask) { throw new UnsupportedOperationException(); }
+    }
+
+    private static final class StubAdviceRepository implements TravelAdviceRepository {
+        private final TravelAdviceSnapshot snapshot;
+        private StubAdviceRepository(TravelAdviceSnapshot snapshot) { this.snapshot = snapshot; }
+        @Override public boolean claimVersionForAdvice(long taskId, long version, LocalDateTime time) { return false; }
+        @Override public void insert(TravelAdviceSnapshot item) { throw new UnsupportedOperationException(); }
+        @Override public Optional<TravelAdviceSnapshot> findByTaskIdAndVersion(long taskId, long version) {
+            return Optional.ofNullable(snapshot);
+        }
+        @Override public Optional<TravelAdviceSnapshot> findLatestByTaskId(long taskId) {
+            return Optional.ofNullable(snapshot);
+        }
     }
 }

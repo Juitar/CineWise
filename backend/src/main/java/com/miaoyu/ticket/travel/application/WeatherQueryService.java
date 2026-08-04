@@ -32,12 +32,21 @@ public class WeatherQueryService {
 
     public WeatherObservation query(String cinemaArea) {
         OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
-        return realWeatherProvider.query(cinemaArea, now)
+        return queryRealSafely(cinemaArea, now)
                 .map(result -> weatherCache.save(result))
                 .or(() -> weatherCache.findValid(cinemaArea, now))
                 .or(() -> demoWeatherProvider.query(cinemaArea, now))
                 .orElseGet(() -> new WeatherObservation(cinemaArea, null, "天气暂不可用", "UNAVAILABLE", now, now,
                         true, true, "NONE"));
+    }
+
+    /** 外部网络异常等同于本次来源不可用，不能跳过缓存和 Demo 回退。 */
+    private Optional<WeatherObservation> queryRealSafely(String cinemaArea, OffsetDateTime now) {
+        try {
+            return realWeatherProvider.query(cinemaArea, now);
+        } catch (RuntimeException exception) {
+            return Optional.empty();
+        }
     }
 
     /** 缓存端口不保存用户位置，只按影院区域保存短期天气结果。 */

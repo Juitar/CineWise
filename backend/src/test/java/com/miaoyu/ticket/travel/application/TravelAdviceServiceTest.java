@@ -11,7 +11,12 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class TravelAdviceServiceTest {
@@ -44,6 +49,33 @@ class TravelAdviceServiceTest {
         assertThat(snapshots.size()).isEqualTo(1);
     }
 
+    @Test
+    void givenConcurrentSameVersion_whenGenerating_thenCallWeatherProviderOnlyOnce() throws Exception {
+        InMemoryTaskRepository tasks = new InMemoryTaskRepository();
+        InMemoryAdviceRepository snapshots = new InMemoryAdviceRepository();
+        AtomicInteger weatherCalls = new AtomicInteger();
+        WeatherQueryService weather = new WeatherQueryService(
+                (area, time) -> {
+                    weatherCalls.incrementAndGet();
+                    return Optional.of(observation("REAL", false, null));
+                },
+                (area, time) -> Optional.empty(), new EmptyCache(), CLOCK);
+        TravelAdviceService service = service(tasks, snapshots, weather);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<TravelAdviceSnapshot> first = executor.submit(() -> generateAfterSignal(service, start));
+            Future<TravelAdviceSnapshot> second = executor.submit(() -> generateAfterSignal(service, start));
+            start.countDown();
+
+            assertThat(first.get().taskVersion()).isEqualTo(1L);
+            assertThat(second.get().taskVersion()).isEqualTo(1L);
+            assertThat(weatherCalls).hasValue(1);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private TravelAdviceService service(
             InMemoryTaskRepository tasks, InMemoryAdviceRepository snapshots, WeatherQueryService weather) {
         AtomicLong ids = new AtomicLong(100L);
@@ -54,6 +86,18 @@ class TravelAdviceServiceTest {
     private WeatherQueryService unavailableWeather() {
         return new WeatherQueryService((area, now) -> Optional.empty(), (area, now) -> Optional.empty(),
                 new EmptyCache(), CLOCK);
+    }
+
+    private WeatherObservation observation(String source, boolean degraded, String fallback) {
+        OffsetDateTime now = OffsetDateTime.ofInstant(CLOCK.instant(), ZoneOffset.UTC);
+        return new WeatherObservation("西湖区", "多云", "提前出发", source, now, now.plusMinutes(15),
+                false, degraded, fallback);
+    }
+
+    private TravelAdviceSnapshot generateAfterSignal(TravelAdviceService service, CountDownLatch start)
+            throws InterruptedException {
+        start.await();
+        return service.generate(1L);
     }
 
     private static final class EmptyCache implements WeatherQueryService.WeatherCache {

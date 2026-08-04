@@ -19,11 +19,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TravelAdviceService {
 
+    private static final int GENERATION_LOCK_COUNT = 64;
+
     private final TravelTaskRepository taskRepository;
     private final TravelAdviceRepository adviceRepository;
     private final WeatherQueryService weatherQueryService;
     private final BusinessIdGenerator idGenerator;
     private final Clock clock;
+    private final Object[] generationLocks = new Object[GENERATION_LOCK_COUNT];
 
     public TravelAdviceService(
             TravelTaskRepository taskRepository,
@@ -36,27 +39,42 @@ public class TravelAdviceService {
         this.weatherQueryService = weatherQueryService;
         this.idGenerator = idGenerator;
         this.clock = clock;
+        for (int index = 0; index < GENERATION_LOCK_COUNT; index++) {
+            generationLocks[index] = new Object();
+        }
     }
 
     /**
      * 为指定任务追加一个新版本建议。
      *
-     * <p>两个并发请求都读到旧版本时，只允许其中一个条件更新成功。另一个读取成功写入的快照返回，
-     * 不能覆盖旧版本或再次请求天气。</p>
+     * <p>先用数据库条件更新抢占版本，再查询天气。这样同一任务版本只有赢家会调用外部 Provider；
+     * 输家直接读取赢家写入的快照，不能在高并发时额外消耗天气配额。</p>
      */
     @Transactional
     public TravelAdviceSnapshot generate(long taskId) {
+        synchronized (generationLocks[Math.floorMod(Long.hashCode(taskId), GENERATION_LOCK_COUNT)]) {
+            return generateUnderTaskLock(taskId);
+        }
+    }
+
+    /**
+     * 同一 JVM 先按任务串行，避免输家在数据库版本竞争前访问天气来源。
+     *
+     * <p>多实例仍由 {@code claimVersionForAdvice} 的数据库条件更新裁决，因此本地锁只是减少重复外部
+     * 调用，不能替代版本和唯一约束。</p>
+     */
+    private TravelAdviceSnapshot generateUnderTaskLock(long taskId) {
         TravelTaskRepository.TravelTaskSnapshot task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new IllegalArgumentException("出行任务不存在"));
         if (task.status().isTerminal()) {
             throw new IllegalStateException("已结束的出行任务不能生成建议");
         }
-        WeatherObservation weather = weatherQueryService.query(task.cinemaArea());
         LocalDateTime now = currentBusinessTime();
         if (!adviceRepository.claimVersionForAdvice(task.id(), task.version(), now)) {
             return adviceRepository.findByTaskIdAndVersion(task.id(), task.version() + 1)
                     .orElseThrow(() -> new IllegalStateException("建议版本抢占失败后未找到已生成快照"));
         }
+        WeatherObservation weather = weatherQueryService.query(task.cinemaArea());
 
         TravelAdviceSnapshot snapshot = new TravelAdviceSnapshot(
                 idGenerator.nextId(), task.id(), task.version() + 1, weatherJson(weather), adviceJson(weather),

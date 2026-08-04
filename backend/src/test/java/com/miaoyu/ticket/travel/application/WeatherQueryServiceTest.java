@@ -31,6 +31,16 @@ class WeatherQueryServiceTest {
         assertThat(unavailable.query("西湖区").source()).isEqualTo("UNAVAILABLE");
     }
 
+    @Test
+    void givenRealProviderThrows_whenQuerying_thenFallbackToDemo() {
+        WeatherQueryService service = new WeatherQueryService(
+                (area, time) -> { throw new IllegalStateException("天气网络超时"); },
+                (area, time) -> Optional.of(observation("DEMO_WEATHER_V1", true, "DEMO")),
+                new InMemoryCache(), CLOCK);
+
+        assertThat(service.query("西湖区").fallbackType()).isEqualTo("DEMO");
+    }
+
     private WeatherObservation observation(String source, boolean degraded, String fallback) {
         OffsetDateTime now = OffsetDateTime.ofInstant(CLOCK.instant(), ZoneOffset.UTC);
         return new WeatherObservation(

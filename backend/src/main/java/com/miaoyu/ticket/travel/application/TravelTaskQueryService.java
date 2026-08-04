@@ -13,24 +13,27 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 本人任务的只读与提醒时间更新入口。
  *
- * <p>本阶段不生成建议快照；建议摘要先稳定地返回任务状态和“尚未生成”，后续天气任务只补充快照内容，
- * 不改变 C、B 已依赖的本人校验边界。</p>
+ * <p>建议尚未生成时明确返回 {@code available=false}；生成后返回最新不可变快照的安全摘要。无论哪种
+ * 情况都必须先完成本人校验，避免通过任务号读取其他用户的出行信息。</p>
  */
 @Service
 public class TravelTaskQueryService {
 
     private final TravelTaskRepository travelTaskRepository;
     private final CurrentUserAccessor currentUserAccessor;
+    private final TravelAdviceRepository travelAdviceRepository;
     private final TravelAdviceService travelAdviceService;
     private final Clock clock;
 
     public TravelTaskQueryService(
             TravelTaskRepository travelTaskRepository,
             CurrentUserAccessor currentUserAccessor,
+            TravelAdviceRepository travelAdviceRepository,
             TravelAdviceService travelAdviceService,
             Clock clock) {
         this.travelTaskRepository = travelTaskRepository;
         this.currentUserAccessor = currentUserAccessor;
+        this.travelAdviceRepository = travelAdviceRepository;
         this.travelAdviceService = travelAdviceService;
         this.clock = clock;
     }
@@ -53,12 +56,10 @@ public class TravelTaskQueryService {
     @Transactional(readOnly = true)
     public TravelAdviceSummary getMyAdviceSummary(String taskId) {
         TravelTaskRepository.TravelTaskSnapshot task = requireMyTask(taskId);
-        return new TravelAdviceSummary(
-                task.taskId(),
-                task.status(),
-                task.status() == TravelTaskStatus.CANCELLED,
-                false,
-                null);
+        return travelAdviceRepository.findLatestByTaskId(task.id())
+                .map(snapshot -> toAdviceSummary(task, snapshot))
+                .orElseGet(() -> new TravelAdviceSummary(task.taskId(), task.status(), task.status().isTerminal(),
+                        false, null, null, null, null, null, false, null));
     }
 
     /**
@@ -79,6 +80,14 @@ public class TravelTaskQueryService {
             throw new BusinessException(TravelErrorCode.REFRESH_TOO_FREQUENT);
         }
         return travelAdviceService.generate(task.id());
+    }
+
+    private TravelAdviceSummary toAdviceSummary(
+            TravelTaskRepository.TravelTaskSnapshot task, TravelAdviceSnapshot snapshot) {
+        boolean expired = task.status() == TravelTaskStatus.CANCELLED || snapshot.isExpired();
+        return new TravelAdviceSummary(task.taskId(), task.status(), expired, true, snapshot.weatherJson(),
+                snapshot.adviceJson(), snapshot.source(), snapshot.dataTime(), snapshot.expiresAt(),
+                snapshot.degraded(), snapshot.fallbackType());
     }
 
     /**
@@ -153,6 +162,12 @@ public class TravelTaskQueryService {
             TravelTaskStatus taskStatus,
             boolean expired,
             boolean available,
-            String summary) {
+            String weatherJson,
+            String adviceJson,
+            String source,
+            LocalDateTime dataTime,
+            LocalDateTime expiresAt,
+            boolean degraded,
+            String fallbackType) {
     }
 }
