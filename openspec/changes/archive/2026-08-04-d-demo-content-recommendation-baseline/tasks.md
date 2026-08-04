@@ -29,7 +29,7 @@
 - [x] 2.6 D 与 A 已确认唯一 `demo-content-v1` 的数据维护边界：沿用 A 演示阶段的 10 部影片、4 家影院，来源 ID 清单见 `demo-content-v1-manifest.md`。A 保留 `DemoSeedInitializer` 的初始化编排和票务种子，D 维护影片、影院清单及内容种子规则；确认日期：2026-08-03。
 - [x] 2.7 D 已将唯一的 `demo-content-v1` 落为 classpath JSON，目录只保存来源 ID 和内容字段；数据库持久化业务键保持既有 `demo-seed`，首次写入使用雪花 ID，重复初始化按来源 ID 查回既有记录并经 `ContentSeedCatalog` 交给 A 的票务种子。验证：`backend\mvnw.cmd verify` 通过；固定时钟下已有 `demo-seed` 数据再次初始化后保持 10 部影片、4 家影院、8 个影厅、168 个场次、13440 个座位，已锁座位状态不变，日期：2026-08-03。
 - [x] 2.8 A 已于 2026-08-02 完成共享 `cinewise` 的历史、checksum、备份和兼容性检查，并使用独立 `cinewise_migrator` 执行 V004；首次应用 1 个迁移，重复执行应用 0 个迁移，两张空表、索引、6 个 CHECK 和排序规则检查通过，证据见 `docs/V004_SHARED_MIGRATION_2026-08-02.md`。应用环境的 `FLYWAY_ENABLED` 保持 `false`。
-- [ ] 2.9 D 使用日常应用账号完成依赖 V004 的持久层和真实 MySQL 集成测试；验证方式：覆盖两张表的正常写入、唯一键和 CHECK 拒绝场景，不执行 Flyway，不使用迁移账号。
+- [x] 2.9 D 已通过 SSH 通道使用日常 `cinewise_app` 账号连接共享 `cinewise` MySQL 8.4.11 完成 V004 持久层验证；runId=`d-content-it-20260803211621-5221`。两张表正常写入成功；`external_data_snapshot`、`data_sync_log` 唯一键均返回预期 `1062`；过期时间和同步统计非法数据均被对应 CHECK 以预期 `3819` 拒绝。未执行 Flyway、未使用迁移账号；按本次主键和 runId 精确删除，并完成残留核对，日期：2026-08-03。
 
 ## 3. Demo 内容、快照和缓存实现
 
@@ -55,12 +55,12 @@
 - [x] 5.3 D 已补齐缓存和快照测试，覆盖缓存命中、Redis 读取失败按未命中回退、有效快照、允许的过期快照、超过陈旧期回退 Demo 和全部不可用。验证：回退顺序、`303004` 和降级标识测试通过，日期：2026-08-03。
 - [x] 5.4 D 已补齐固定推荐测试，覆盖可复现顺序、不完整候选、过期候选、A 场次查询不可用和引用 A 公开查询结果。验证：没有可购场次事实时不返回 `showId`、价格或可购卡片，日期：2026-08-03。
 - [x] 5.5 D 已建立第一版回归用例清单 `regression-cases.md`，字段完整且未包含敏感输入。验证：覆盖内容来源、缓存/快照、过期、`303004`、固定推荐及 A 场次不可用，日期：2026-08-03。
-- [ ] 5.6 D 在 A 已完成迁移验证的 MySQL 8 和 Redis 环境执行内容查询、缓存降级与推荐集成测试；验证方式：记录环境、命令、通过数、失败数和缺陷编号，不在此任务中执行 Flyway 结构迁移。
+- [x] 5.6 D 已通过 SSH 通道在共享 MySQL 8.4.11 和 Redis 7.4 环境完成集成测试；未执行 Flyway、未启用种子。Redis 使用 runId=`d-content-it-20260803-redis-2124` 的唯一查询键和 60 秒 TTL，`RedisContentCacheAdapterIntegrationTest` 通过（1 通过、0 失败），并在 `@AfterEach` 精确删除本次缓存 key。`RecommendationShowtimeMySqlIntegrationTest` 通过（1 通过、0 失败），仅通过 A 的 `ShowQueryService` 引用在售场次的 ID、两位小数价格和有效期；无缺陷编号。日期：2026-08-03。
 
 ## 6. 验收与归档
 
-- [ ] 6.1 D 执行 `backend\mvnw.cmd verify`；验证方式：编译、单元测试、架构检查、Checkstyle、SpotBugs 和 JaCoCo 均通过，失败项有负责人和复现步骤。
-- [ ] 6.2 A 已确认场次边界通过；B 已确认 `RankMoviePlanTool.execute` 的输入、结果和只读语义不变；D 已完成四个公开内容 REST 接口、字段映射、公开权限、OpenAPI、响应示例和后端响应测试。`frontend/src/shared` 由 C 维护，前端类型及响应测试待 C 在其分支完成并最终确认；在此之前不得勾选本项。后端验证：`backend\mvnw.cmd verify` 通过，日期：2026-08-04。
-- [ ] 6.3 D 核对实现、配置、固定数据、用例和设计文档一致，并记录关联提交和验证结果；验证方式：无未说明的行为差异。
-- [ ] 6.4 D 执行 `openspec validate d-demo-content-recommendation-baseline --strict`；验证方式：严格校验通过。
-- [ ] 6.5 D 在全部任务和验收完成后归档变更；验证方式：主规格已同步，变更进入归档目录。
+- [x] 6.1 D 已执行 `backend\mvnw.cmd verify`；编译、单元测试、架构检查、Checkstyle、SpotBugs 和 JaCoCo 全部通过，退出码 0，未发现失败项，日期：2026-08-04。
+- [x] 6.2 A 已确认场次边界通过；B 已确认 `RankMoviePlanTool.execute` 的输入、结果和只读语义不变；C 已在 PR #26（合并提交 `e3b4aeb`）完成并合并 `frontend/src/shared` 的内容 DTO 和四组响应契约测试。C 记录 `pnpm exec vitest run src/shared/api/content-contract.test.ts` 4 项通过、`pnpm check` 通过；D 已核对类型与后端 DTO/OpenAPI 一致。后端 `ContentControllerIntegrationTest` 及 `backend\mvnw.cmd verify` 通过，日期：2026-08-04。
+- [x] 6.3 D 已核对 `demo-content-v1`、`fixed-rec-v1`、内容/推荐测试、回归清单、proposal/spec/design/tasks、运行配置及合并提交 `47cda31`、`3462eb2`、`e3b4aeb`；唯一数据版本、来源 ID、固定时钟、缓存 TTL 与 A 场次公开查询边界一致，无未说明行为差异，日期：2026-08-04。
+- [x] 6.4 D 已执行 `openspec validate d-demo-content-recommendation-baseline --strict`，严格校验通过，日期：2026-08-04。
+- [x] 6.5 D 已同步 `demo-content-query`、`fixed-recommendation-candidates` 两份主规格，并于 2026-08-04 将变更归档至 `openspec/changes/archive/2026-08-04-d-demo-content-recommendation-baseline/`；全量 `openspec validate --all --strict` 通过。
