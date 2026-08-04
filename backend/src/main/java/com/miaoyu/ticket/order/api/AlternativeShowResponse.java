@@ -15,6 +15,7 @@ import java.time.OffsetDateTime;
  */
 public record AlternativeShowResponse(
         @Schema(example = "70002") String showId,
+        @Schema(example = "10001") String movieId,
         @Schema(example = "20001") String cinemaId,
         OffsetDateTime startTime,
         @Schema(example = "39.00") String basePrice,

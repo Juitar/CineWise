@@ -161,6 +161,7 @@ public class RefundApplicationService {
                 refundShowService.queryAlternatives(criteria).stream()
                         .map(show -> new AlternativeShowView(
                                 show.showId(),
+                                originalShow.movieId(),
                                 show.cinemaId(),
                                 show.startTime(),
                                 show.basePrice(),

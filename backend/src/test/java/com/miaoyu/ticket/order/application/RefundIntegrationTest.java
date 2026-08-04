@@ -248,6 +248,7 @@ class RefundIntegrationTest {
         assertThat(result.shows()).isNotEmpty();
         assertThat(result.shows()).allSatisfy(show -> {
             assertThat(show.showId()).isNotEqualTo(paidOrder.order().showId());
+            assertThat(show.movieId()).isEqualTo(originalMovieId);
             assertThat(show.status()).isEqualTo("ON_SALE");
             assertThat(show.startTime()).isAfter(FIXED_LOCAL_TIME);
             assertThat(movieId(show.showId())).isEqualTo(originalMovieId);
