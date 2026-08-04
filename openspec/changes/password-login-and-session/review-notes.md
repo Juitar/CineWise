@@ -76,3 +76,9 @@ C 预检查结论为通过。任务 6.7 仍需以下负责人基于同一提交�
 - D：确认普通 REST 客户端、`CurrentUserResponse`、401/403 处理以及 D 的业务 DTO 不需要修改。
 
 Cookie 的 `Secure/HttpOnly/SameSite=Lax/Path=/` 属性由 `AuthSecurityAdaptersTest` 和 `AuthControllerIntegrationTest` 验证；OpenAPI 只声明 Cookie 名称与用途，不能替代运行时 `Set-Cookie` 验证。A/B/D 均确认后，C 才可勾选任务 6.7。
+
+## 2026-08-04 D 完成 OpenAPI 复核
+
+D 已确认：普通 REST 请求层、`CurrentUserResponse` 和 401/403 处理不影响 D 的内容、画像、推荐和出行模块；D 现有业务 DTO 不需要调整，后续继续按现有公开接口和错误码联调。
+
+任务 6.7 仍等待 A、B 分别确认，当前不勾选完成。
