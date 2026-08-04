@@ -85,7 +85,7 @@ A 分配 Flyway 版本后，迁移 MUST 为 `travel_task.order_version`、`trave
 
 ### Requirement: 提醒任务必须生成可降级的建议快照
 
-系统 SHALL 在到达提醒时间或用户合法刷新时，以任务的影院区域和开场时间生成天气与确定性通用交通建议，并为新的任务版本追加一条带 `source`、`dataTime`、`expiresAt`、`isExpired`、`degraded`、`fallbackType` 的不可变建议快照。天气不可用时 MUST 保留通用建议并明确天气不可用，不得编造天气事实。任务取消时不得更新旧快照；查询层必须将该任务的所有快照作为只读过期数据返回。
+系统 SHALL 在到达提醒时间或用户合法刷新时，以任务的影院区域和开场时间生成天气与确定性通用交通建议，并为新的任务版本追加一条带 `source`、`dataTime`、`expiresAt`、`isExpired`、`degraded`、`fallbackType` 的不可变建议快照。任务 `version` 的条件更新与快照 INSERT MUST 在同一本地事务完成；快照 INSERT 失败时 MUST 回滚该次版本更新。天气不可用时 MUST 保留通用建议并明确天气不可用，不得编造天气事实。任务取消时不得更新旧快照；查询层必须将该任务的所有快照作为只读过期数据返回。
 
 #### Scenario: 天气查询成功
 - **GIVEN** 任务有效且天气结果未过期
@@ -104,6 +104,19 @@ A 分配 Flyway 版本后，迁移 MUST 为 `travel_task.order_version`、`trave
 - **WHEN** 系统生成新的建议
 - **THEN** 系统在条件更新任务版本成功后追加一条新的 `travel_advice_snapshot`
 - **AND** 不更新旧快照、旧快照仍可按原版本只读查询
+
+#### Scenario: 并发刷新同一任务
+- **GIVEN** 两个刷新请求读取到同一任务版本
+- **WHEN** 两个请求并发执行任务版本条件更新和快照 INSERT
+- **THEN** 只有一个事务取得新版本并写入对应的一条快照
+- **AND** 未取得新版本的请求返回当前任务或在读取新版本后重新计算
+- **AND** 重试不覆盖旧快照，也不产生相同 `travel_task_id`、`task_version` 的重复快照
+
+#### Scenario: 快照写入失败
+- **GIVEN** 任务版本条件更新已在本地事务中成功
+- **WHEN** 同一事务的快照 INSERT 失败
+- **THEN** 整个事务回滚，任务版本保持原值
+- **AND** 不留下没有对应快照的新任务版本
 
 #### Scenario: 任务取消后的建议查询
 - **GIVEN** 任务已变为 `CANCELLED`
