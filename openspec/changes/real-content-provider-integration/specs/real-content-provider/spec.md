@@ -4,20 +4,32 @@
 
 ## ADDED Requirements
 
-### Requirement: 真实 Provider 必须满足启用门槛
-系统 SHALL 仅在每个 Provider 的数据许可、允许使用范围、请求 Key 保管方式、配额或速率限制、接口版本、字段映射和契约样例均已由 D 记录并经相关 Owner 确认后启用。任一项未确认、Key 缺失或运行配置未显式启用时，系统 MUST 不调用该 Provider，并继续使用既有非实时回退来源。
+### Requirement: 学习模式 Provider 必须明确用途和限制
+系统 SHALL 将 NetStart 标识为学习/演示模式外部来源，只能在开发或演示环境按已公开的非商业学习用途使用；不得宣称官方合作或实时官方票务数据。D MUST 记录接口范围、字段映射、公开使用声明、Key 是否有要求、配额是否公开和停用条件；Key 或配额未在公开文档中说明时，系统 MUST 将其记录为未知风险、设置本地保守限流并保持可关闭，不得把未知内容描述为已获授权或无限配额。正式生产或商业模式 MUST 不启用该 Provider，除非另有正式授权。
+
+#### Scenario: 学习用途和字段范围已公开
+- **GIVEN** NetStart 公开文档声明仅供学习交流、不得商业使用，并列出影片和影院查询接口
+- **WHEN** D 将其配置为开发/演示环境的外部来源
+- **THEN** 系统可以调用影片和影院基础信息接口
+- **AND** 页面和对外说明必须标明学习用途、第三方来源和非官方数据，不得把结果称为猫眼官方实时票务数据
 
 #### Scenario: 许可或字段映射未确认
-- **GIVEN** 候选数据源尚未确认许可、配额或影片/影院字段映射
+- **GIVEN** 候选数据源尚未确认允许的使用范围或影片/影院字段映射
 - **WHEN** 系统收到内容查询或同步请求
 - **THEN** 系统不得向该数据源发出请求或把数据标识为真实内容
 - **AND** 系统继续按既有缓存、快照和 Demo 规则返回可用结果
 
 #### Scenario: 运行环境缺少 Provider Key
-- **GIVEN** Provider 已完成文档确认但当前环境缺少有效 Key 或未显式启用
+- **GIVEN** Provider 需要 Key 但当前环境缺少有效 Key，或运行配置未显式启用
 - **WHEN** 系统启动或收到内容查询
 - **THEN** 系统不得在响应、日志、缓存、快照或同步记录中暴露 Key
 - **AND** 系统保持 Demo 与离线演示可用
+
+#### Scenario: 配额未公开
+- **GIVEN** NetStart 公开文档未说明每日配额或每分钟限制
+- **WHEN** 系统在开发/演示环境启用 NetStart
+- **THEN** 系统必须使用本地保守限流、超时、一次短重试和随时关闭开关
+- **AND** 不得宣称 Provider 具有无限配额；触发 429、持续失败或服务条款变化时立即回退到缓存、快照和 Demo
 
 ### Requirement: 真实基础信息必须标准化并具有时效
 系统 SHALL 只接收和返回标准化的影片、影院基础信息；每条结果 MUST 包含可展示的来源、数据时间、有效期、过期标识、降级标识和回退类型。影片至少按标题、类型、片长、评分等已确认基础字段标准化；影院至少按名称、城市、行政区域和地址等已确认基础字段标准化。字段不满足对应资源的最低质量规则时，系统 MUST 拒绝该条实时数据，不得将其写为可用缓存或快照。
@@ -74,10 +86,17 @@
 - **AND** 系统继续执行既有回退顺序并记录不含 Key 的限流结果
 
 ### Requirement: 真实内容不得越过内容和票务边界
-真实 Provider 只可提供影片和影院基础信息。系统 MUST NOT 接入或保存影评正文，MUST NOT 根据 Provider 响应生成、更新或推断影厅、场次、价格、库存、座位、订单、支付或退款事实。A 获取内容摘要时 MUST 继续通过 `ContentSummaryQueryPort`；B 的 Agent 工具只能读取相同的标准化内容结果；C 的前端展示只能使用确认后的来源和时效字段。
+真实 Provider 只可提供影片和影院基础信息。系统 MUST NOT 接入或保存影评正文，MUST NOT 根据 Provider 响应生成、更新或推断影厅、场次、价格、库存、座位、订单、支付或退款事实。A 查询影院摘要时 MUST 继续只使用 `ContentSummaryQueryPort.findCinemaSummaries(Set<Long>)` 返回的 `CinemaSummary(cinemaId/name/area/source/dataTime/expiresAt/expired)`；本 change MUST NOT 新增影片摘要或影片查询方法。B 只能通过 `RankMoviePlanTool.execute` 读取标准化 `FixedRecommendationResult`，不读取 Provider 原始响应或实现；其中存在的 `showId`、`price`、`startTime` 必须原样来自 A 的公开场次查询，B 不补全、不推断且不作为下单依据。C 的前端展示只能使用已确认的来源和时效字段。
 
 #### Scenario: Provider 响应包含排期或影评正文
 - **GIVEN** Provider 响应包含场次、价格、库存、座位信息或影评正文
 - **WHEN** 系统标准化该响应
 - **THEN** 系统不得持久化、缓存或向 A、B、C 返回这些字段
 - **AND** 场次和交易事实仍只能由 A 的公开能力提供
+
+#### Scenario: 前端同时展示来源、过期和降级状态
+- **GIVEN** 前端收到包含 `source`、`sourceType`、`dataTime`、`expiresAt`、`isExpired`、`degraded` 和 `fallbackType` 的标准化内容结果
+- **WHEN** 前端展示该内容
+- **THEN** `sourceType=LIVE`、`isExpired=false`、`degraded=false` 时显示“来源：{source}”和更新时间；`isExpired=true` 时显示“数据已过期，仅供参考”
+- **AND** `degraded=true` 时显示“当前为降级数据”，并按 `fallbackType=MOCK|CACHE|SNAPSHOT` 分别显示“演示数据”“缓存数据”“历史快照”
+- **AND** `source` 缺失、无法识别或未通过运行时校验时显示“来源尚未验证”，且该状态与过期、降级状态分别判断并可同时展示

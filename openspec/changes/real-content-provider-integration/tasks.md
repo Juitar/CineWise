@@ -1,10 +1,10 @@
 ## 1. 实现前置条件与协作确认
 
-- [ ] 1.1 D 核对 `d-demo-content-recommendation-baseline` 的 2.9、5.6、6.1 至 6.5 完成情况，并确认其内容实现提交已进入目标开发基线；未满足时只维护本 change 文档，不创建实现分支。验证：记录基线提交、OpenSpec 任务状态和 `git status`，确认可从该稳定提交创建独立 `feat/real-content-provider-integration` 分支。
-- [ ] 1.2 D 选定候选影片/影院基础数据 Provider，并记录许可或合同、允许使用范围、接口版本、区域限制、Key 权限、配额、限流规则、停用条件和字段样例；未确认则保持 Provider 关闭。验证：审查材料不含 Key、完整原始受限内容或影评正文，且每项启用门槛有负责人和日期。
-- [ ] 1.3 A 确认 `ContentSummaryQueryPort` 的现有摘要字段和语义可继续兼容真实来源，并确认 Provider 不得写入或推断场次、价格、库存、座位、订单与支付事实。验证：A 在本 change 记录确认；无需新增票务 DTO 或跨模块持久化访问。
-- [ ] 1.4 C 确认页面展示真实来源、更新时间、有效期、过期、降级和未验证来源提示的字段及文案边界。验证：确认前不修改 C 的公共请求层或前端类型；确认后以现有来源封套完成展示夹具和响应测试。
-- [ ] 1.5 B 确认 Agent 工具只能读取标准化内容结果，不读取原始 Provider 响应、不触发同步、不生成票务事实。验证：工具输入输出和只读语义没有新增 Provider 私有字段。
+- [x] 1.1 D 已于 2026-08-04 核对 `d-demo-content-recommendation-baseline` 的 2.9、5.6、6.1 至 6.5 仍未勾选；内容实现提交 `20c7c1e`、`5d715f7`、`82129d1`、`ea53a1e`、`88d67eb`、`a546ce8`、`1de9291`、`40544f3`、`47cda31` 均已进入 `origin/dev`。当前 `openspec list` 仍显示基线为 29/36，与 `origin/dev` 的归档提交 `88158bd` 不一致；实现前必须复核这 7 项的最终验收记录。验证：`git merge-base --is-ancestor <commit> origin/dev` 对上述提交均返回成功；当前分支为 `feat/real-content-provider-integration`，工作区无未提交改动。
+- [x] 1.2 D 已于 2026-08-04 选定 NetStart 作为学习/演示环境的影片与影院基础信息 Provider。公开文档确认其接口范围包含城市、热映/待映、电影详情、影院搜索和影院详情，并声明“仅供学习交流使用，请勿用于商业用途”；本项目据此标明第三方非官方来源，不宣称猫眼官方合作或实时官方票务数据。公开文档未说明 API Key、配额和长期字段稳定性，已登记为风险；开发/演示实现必须使用显式开关、本地保守限流、超时、一次短重试和随时关闭，正式生产/商业环境不启用。验证：已读取公开 README、城市接口、热映接口和影院搜索接口；接口返回影片/影院外部 ID 样例，未保存 Key、影评正文或完整原始响应。
+- [x] 1.3 A 已于 2026-08-04 有条件确认：`ContentSummaryQueryPort` 仅保留 `findCinemaSummaries(Set<Long>)`；`CinemaSummary` 固定为 `cinemaId/name/area/source/dataTime/expiresAt/expired`，真实 Provider 接入后字段和含义不变。A 仍只通过该 Port 查询，不访问 D 的 Entity、Mapper、Repository、缓存、快照或内部查询实现。本 change 不新增 `MovieSummary` 或影片查询方法；如未来需要，先由 D 列出准确方法、字段、缺失结果和过期语义，再由受影响消费者确认。A 同时确认 Provider 不得创建、修改或推断票务事实。验证：无需新增票务 DTO 或跨模块持久化访问。
+- [x] 1.4 C 已于 2026-08-04 确认展示字段和文案：继续使用 `source/sourceType/dataTime/expiresAt/isExpired/degraded/fallbackType`；LIVE、未过期、未降级时显示来源和更新时间；过期显示“数据已过期，仅供参考”；降级显示“当前为降级数据”，并按 MOCK/CACHE/SNAPSHOT 显示演示数据/缓存数据/历史快照；来源缺失、无法识别或未通过运行时校验时显示“来源尚未验证”。来源未验证、过期和降级分别判断且可同时展示。前端不读取、保存或展示 Key、原始响应或影评正文。验证：确认前不修改 C 的公共请求层或前端类型。
+- [x] 1.5 B 已于 2026-08-04 确认：B 只调用 `RankMoviePlanTool.execute`，读取 D 返回的标准化 `FixedRecommendationResult`，不读取 Provider 原始响应、Provider 实现、Controller、Repository 或持久化对象，不触发内容同步、不新增或透传 Provider 私有字段。`RankMoviePlanCommand` 仅包含 `movieId/cinemaId/date/timeFrom?/timeTo?`，不接收票务或用户字段；结果中的 `showId/price/startTime` 若存在，只能由 D 从 A 的公开场次查询原样取得，B 不补全、不推断、不作为下单依据，交易仍由 A 重新校验。验证：当前无需调整代码边界。
 
 ## 2. Provider 与标准化实现
 
@@ -18,14 +18,14 @@
 - [ ] 3.1 D 将通过校验的真实影片、影院基础信息写入现有标准化缓存和快照，不修改 `demo-content-v1`、不创建第二份电影/影院种子。验证：缓存与快照只包含标准化 DTO 和来源/时间元数据，Demo 仍只作读取回退和测试夹具。
 - [ ] 3.2 D 将读取顺序实现为“实时 Provider 成功 → 有效缓存 → 有效快照 → 允许陈旧快照 → `demo-content-v1` → `303004`”，保留内容基线的缓存键、TTL、最大陈旧时间和来源封套。验证：关闭 Provider、断网、缓存失败、快照过期和全部不可用时，返回层级及 `source/dataTime/expiresAt/isExpired/degraded/fallbackType` 与规格一致。
 - [ ] 3.3 D 补齐同步或调用记录的来源、资源、结果、耗时、数据时间、字段质量和降级层级；不记录 Key、完整原始响应、影评正文、用户输入、位置或票务事实。验证：成功、超时、429、5xx、字段不合格和空 ID 冲突的记录均可审查且不泄露受限数据。
-- [ ] 3.4 D 如确认需要新增 Provider 映射或数据质量持久化字段，先补充本 change 的字段、索引、生命周期、兼容与回滚说明并提交 A 审查。验证：A 分配 Flyway 版本、审核最终 SQL 并在 `cinewise_migration_check` 验证；D 不自行定版本、不修改已发布迁移、不执行 Flyway。
+- [ ] 3.4 D 如确认需要新增或修改数据库持久化字段、索引、约束等表结构，先补充本 change 的字段、索引、生命周期、兼容与回滚说明并提交 A 审查。验证：A 分配 Flyway 版本、审核最终 SQL 并在 `cinewise_migration_check` 验证；纯 Provider 映射、DTO、内存质量标识或配置变更不走 Flyway，D 不自行定版本、不修改已发布迁移、不执行 Flyway。
 
 ## 4. 测试与真实环境验证
 
 - [ ] 4.1 D 编写 Provider Mock 和契约测试，覆盖合格影片/影院、配置缺失、许可未确认、超时、连接失败、429、5xx、不可重试 4xx、字段缺失、非法时间、空外部 ID、重名和冲突匹配。验证：每种异常均不将未校验数据当作真实内容，且不会暴露 Key 或原始受限载荷。
 - [ ] 4.2 D 编写缓存、快照和回退测试，覆盖实时成功写入、有效缓存、有效快照、允许陈旧快照、Redis 故障、Demo 回退和 `303004`。验证：真实 Provider 失败时现有 Demo 离线演示保持可用，过期数据不被当作当前票务事实。
 - [ ] 4.3 D 编写数据质量与身份识别测试，覆盖标准化字段、来源/时效封套、非空外部 ID 幂等更新、空 ID 隔离、候选冲突不自动合并，以及 Provider 响应中影评正文、场次、价格、库存、座位和订单字段被过滤。验证：A 继续仅通过 `ContentSummaryQueryPort`，B、C 不会取得被禁止字段。
-- [ ] 4.4 D 在 Provider 关闭、外网断开和受控真实 Provider 环境分别执行验证；真实环境仅在许可、Key、配额、Mock/契约测试和 Owner 确认完成后进行。验证：记录脱敏环境信息、Provider 成功率/耗时/限流、缓存命中、快照时效、降级层级、数据质量结果和缺陷编号；不执行或改写 Flyway。
+- [ ] 4.4 D 在 Provider 关闭、外网断开和受控学习 Provider 环境分别执行验证；NetStart 仅限开发/演示环境，配额未知时使用本地保守限流，不进入正式生产或商业环境。验证：记录脱敏环境信息、Provider 成功率/耗时/限流、缓存命中、快照时效、降级层级、数据质量结果和缺陷编号；不执行或改写 Flyway。
 - [ ] 4.5 D 在 `backend` 执行 `mvnw.cmd verify`，执行 `openspec validate real-content-provider-integration --strict`、`git diff --check` 并核对变更范围。验证：构建、测试、架构检查、Checkstyle、SpotBugs、JaCoCo 和 OpenSpec 严格校验通过；未通过项明确到负责人和复现步骤。
 
 ## 5. 交付与发布准备

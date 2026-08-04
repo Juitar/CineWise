@@ -4,7 +4,7 @@
 
 ## What Changes
 
-- 新增真实影片与影院基础信息 Provider 的接入规则：只有数据源许可、使用范围、Key 保管方式、配额、接口字段与映射完成确认后，才能在受控环境启用。
+- 新增学习/演示模式下的真实影片与影院基础信息 Provider 接入规则：选定 NetStart 作为首选外部源，记录其“仅供学习交流、不得商业使用”的公开声明、接口范围和已知限制；配额、Key 和字段稳定性未公开的部分登记为风险，并限制在开发/演示环境使用。
 - 新增影片、影院标准化、来源、更新时间、有效期、字段质量、外部 ID 身份识别和去重规则；Provider 原始响应不向业务调用方暴露。
 - 保持并细化既有读取顺序：真实 Provider 成功后写入标准化缓存和快照；失败、超时、限流、字段不合格或未配置时继续使用既有缓存、快照和唯一 `demo-content-v1`，不得影响离线演示。
 - 明确真实数据只覆盖影片和影院基础信息，不接入影评正文，不生成或覆盖场次、价格、库存、座位、订单或支付事实。
@@ -14,7 +14,7 @@
 ### 非范围
 
 - 不在本次 change 中编写 Java、SQL、配置、测试代码，不提交、不推送。
-- 不选择、采购、抓取或宣称任何未确认许可的数据源；未通过启用门槛时保持 `DemoContentProvider`。
+- 不把 NetStart 宣称为猫眼官方合作或实时官方票务数据，不把学习接口用于商业服务；不抓取登录后页面或绕过验证码。正式生产或商业使用仍保持 `DemoContentProvider`，除非另有正式授权。
 - 不接入影评正文、用户评论、版权受限媒体或任何个人数据。
 - 不创建场次、影厅、票价、库存、座位、订单、支付或退款事实；A 的票务数据仍是这些事实的唯一提供方。
 - 不新增第二份电影或影院种子，不复制 A 的票务种子，也不让其他模块访问 D 的 Entity、Mapper、Repository、缓存或快照实现。
@@ -32,6 +32,6 @@
 ## Impact
 
 - 计划影响 D 的 `content` 模块 Provider 适配、标准化 DTO、快照/缓存写入、同步日志、数据质量检查和回归测试；实现必须以内容基线已提交到开发基线为前置条件，并在独立 `feat/real-content-provider-integration` 分支完成。
-- `ContentSummaryQueryPort` 仍是 A 获取影片和影院摘要的唯一公开 Java Application API；本 change 不允许 A 访问 D 的持久化或缓存实现。
-- C 需确认前端可展示的真实来源、更新时间、有效期、过期与降级字段及未验证来源提示；B 需确认 Agent 只能读取同一标准化内容结果，不接收原始 Provider 数据、不触发同步；A 需确认公开摘要兼容性、票务事实边界及 Flyway 分配、审核和验证。
+- `ContentSummaryQueryPort` 仍是 A 获取影院摘要的唯一公开 Java Application API；现有 `findCinemaSummaries(Set<Long>)` 和 `CinemaSummary(cinemaId/name/area/source/dataTime/expiresAt/expired)` 保持不变。本 change 不新增影片摘要 Port，也不允许 A 访问 D 的持久化或缓存实现。
+- C 已确认前端使用 `source/sourceType/dataTime/expiresAt/isExpired/degraded/fallbackType` 分别展示来源、时效和降级；B 已确认只通过 `RankMoviePlanTool.execute` 读取标准化 `FixedRecommendationResult`；A 已有条件确认影院摘要兼容性、票务事实边界，并仅在表结构变更时负责 Flyway 分配、审核和验证。
 - 外部 Provider 的 URL、Key、配额、许可证明和原始响应都属于运行期或受控审查材料，不写入 OpenSpec、仓库、日志、缓存或快照。
