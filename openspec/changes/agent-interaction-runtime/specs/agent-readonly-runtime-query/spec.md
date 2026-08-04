@@ -22,7 +22,7 @@
 - **AND** 工具调用次数和运行版本不因查询增加
 
 ### Requirement: 运行详情的最后事件游标必须来自已提交事件水位线
-系统 SHALL 以当前用户有权读取的该 runId 的最大已提交 `agent_event.event_id` 作为 `lastEventId`；没有已提交事件时 MUST 返回十进制字符串 `"0"`。查询 MUST 走 `idx_agent_event_run_event(run_id, event_id)`，不得从消息表推导续传游标。
+系统 SHALL 以当前用户有权读取的该 runId 的最大已提交 `agent_event.event_id` 作为 `lastEventId`；没有已提交事件时 MUST 返回十进制字符串 `"0"`。查询 MUST 走 `idx_agent_event_run_event(run_id, event_id)`，不得从消息表推导续传游标。会话级 `agent_event_stream_cursor.last_committed_event_id` 只用于 SSE 重置水位线，不得误作单个 runId 的最后事件。
 
 #### Scenario: 运行结果保存但事件尚未提交
 - **WHEN** 运行事实和事件仍在同一未提交短事务中

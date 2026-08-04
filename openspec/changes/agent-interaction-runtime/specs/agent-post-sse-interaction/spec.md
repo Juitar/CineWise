@@ -27,7 +27,7 @@
 - **AND** 不创建第二个用户消息、运行、步骤或 SSE 事件
 
 ### Requirement: SSE 只能发送固定、已持久化的公共事件
-系统 SHALL 使用 `id: <eventId>`、`event: <eventType>` 和 JSON `data` 发送事件。JSON MUST 包含十进制字符串 `eventId`、`sessionId`、`runId`、可空 `planVersion`、可空 `nodeId`、`eventType`、`displayText` 和类型化 `payload`。`eventType` MUST 限于 `message.start`、`message.delta`、`plan.created`、`plan.replanned`、`step.start`、`step.complete`、`step.failed`、`tool.start`、`tool.result`、`card`、`message.complete`、`message.error`、`run.complete`、`stream.reset`；心跳 MUST 是无 ID 的 SSE 注释。
+系统 SHALL 使用 `id: <eventId>`、`event: <eventType>` 和 JSON `data` 发送事件。JSON MUST 包含十进制字符串 `eventId`、`sessionId`、`runId`、可空 `planVersion`、可空 `nodeId`、`eventType`、`displayText` 和类型化 `payload`。持久化事件只允许 `message.start`、`message.delta`、`plan.created`、`plan.replanned`、`step.start`、`step.complete`、`step.failed`、`tool.start`、`tool.result`、`card`、`message.complete`、`message.error`、`run.complete`；`stream.reset` 是不入库的恢复协议事件，心跳 MUST 是无 ID 的 SSE 注释。
 
 #### Scenario: 最小只读运行输出事件
 - **WHEN** 最小只读运行保存计划、步骤和结构化回复

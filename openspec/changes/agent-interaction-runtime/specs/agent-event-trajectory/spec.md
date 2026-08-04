@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: 可续传的 Agent 事件必须独立持久化
-系统 SHALL 在 A 分配 V009 后通过 Agent 专用前向迁移创建 `agent_event`，并使用 `event_id BIGINT AUTO_INCREMENT` 作为唯一事件序列。`session_id` 与 `run_id` MUST 使用和 V008 一致的 `VARCHAR(36)` UUID 业务格式。每条事件 MUST 保存 `session_id`、`run_id`、固定事件类型、受控 `payload_json`、`expire_at` 和 `create_time`；计划版本、节点、展示文本和发生时间保存于受控载荷。事件创建后不可更新，不设置 `update_time` 或更新路径。事件保留 30 天并随所属运行清理。系统 MUST NOT 修改 V008 或把事件写入 A、C、D 的表。
+系统 SHALL 在 A 分配 V009 后通过 Agent 专用前向迁移创建 `agent_event` 和 `agent_event_stream_cursor`。`agent_event` 使用 `event_id BIGINT AUTO_INCREMENT` 作为唯一事件序列，`session_id` 与 `run_id` MUST 使用和 V008 一致的 `VARCHAR(36)` UUID 业务格式。每条事件 MUST 保存 `session_id`、`run_id`、固定事件类型、受控 `payload_json`、`expire_at` 和 `create_time`；计划版本、节点、展示文本和发生时间保存于受控载荷。事件创建后不可更新，不设置 `update_time` 或更新路径。每个会话 MUST 有一条可更新的游标记录，保存已提交最高事件 ID、可空最早保留事件 ID、版本与会话到期时间。事件保留 30 天并随所属运行清理，游标记录保留到会话可清理。系统 MUST NOT 修改 V008 或把事件写入 A、C、D 的表。
 
 #### Scenario: 运行事实和事件一起保存
 - **WHEN** Agent 保存可展示的消息、步骤或运行状态变化
@@ -9,36 +9,51 @@
 - **AND** 事件 ID 可作为该运行和会话的稳定重放游标
 
 ### Requirement: 同一会话的续传游标不得因并发事务遗漏事件
-系统 SHALL 用 `agent_session.active_run_id` 的条件占用保证同一会话同一时刻只有一个运行写入事件，并用运行/步骤的 `version + status` CAS 保证同一运行状态变化只能保存一次。每次状态变化的消息、步骤、运行事实和对应事件 MUST 在同一短事务提交；SSE 读取 MUST 只返回已提交事件。连接读取到提交前缀后 MUST 可以用最后已处理的十进制 `eventId` 继续读取后续已提交事件。
+系统 SHALL 在分配同会话事件 ID 前，以 `SELECT ... FOR UPDATE` 先锁定 V008 的会话行，再锁定或创建该会话的游标行；清理同会话事件也 MUST 使用相同锁顺序。`active_run_id` 和运行/步骤的 `version + status` CAS 只负责业务状态，不得单独作为事件提交顺序证明。每次状态变化的消息、步骤、运行事实、事件和游标水位线 MUST 在同一短事务提交；SSE 读取 MUST 只返回已提交事件。连接读取到提交前缀后 MUST 可以用最后已处理的十进制 `eventId` 继续读取后续已提交事件。
 
 #### Scenario: 读取与后续事件事务交错
 - **WHEN** 同一会话的 SSE 读取发生在下一批事件事务提交之前
 - **THEN** 本次读取只返回已提交的连续会话事件前缀
 - **AND** 客户端再次以最后已处理事件 ID 续传时返回后续事件，运行、步骤和工具均不重复执行
 
+#### Scenario: 两个事务并发写同一会话
+- **WHEN** 第一个事务已锁定会话和游标行但尚未提交，第二个事务尝试写同一会话事件
+- **THEN** 第二个事务在事件 ID 分配前等待第一个事务提交或回滚
+- **AND** 两个事务最终提交的同会话事件按提交顺序递增，游标水位线等于后一个提交事件 ID
+
 ### Requirement: 客户端可以从同一会话的最后事件位置续传
-系统 SHALL 读取 `Last-Event-ID` 十进制字符串，并仅返回当前用户、当前会话中事件 ID 更大的记录。重复连接或重复事件不改变运行、步骤、消息和工具执行状态。
+系统 SHALL 读取 `Last-Event-ID` 非负十进制字符串，并根据当前会话的游标记录和保留事件行校验归属。只有仍保留且属于当前会话的游标才返回更大事件 ID；重复连接或重复事件不改变运行、步骤、消息和工具执行状态。
 
 #### Scenario: 正常续传
 - **WHEN** 当前用户携带仍在保留期内的同会话 `Last-Event-ID` 重连
 - **THEN** 系统按事件 ID 升序只返回该游标之后的已保存事件
 - **AND** 不再次提交消息、创建运行或执行工具
 
-#### Scenario: 游标不可续传
-- **WHEN** 当前会话最早保留的事件 ID 已大于 `Last-Event-ID`
+#### Scenario: 已清理游标
+- **WHEN** 游标不大于当前会话已提交水位线，且小于游标记录中的最早保留 ID，或该会话已经没有保留事件
 - **THEN** 系统只发送一个不入库的 `stream.reset` 事件，其 `eventId` 为当前会话最新已提交事件水位线
 - **AND** 客户端可通过运行详情和历史消息重建展示，不得自动重发原消息或确认操作
 
+#### Scenario: 跨会话或正常空洞游标
+- **WHEN** 游标对应的保留事件属于另一会话，或位于当前会话最早/最高保留区间内但没有对应事件
+- **THEN** 系统不返回另一会话事件、数量或原因，只发送当前会话水位线的 `stream.reset`
+- **AND** 全局 `AUTO_INCREMENT` 的正常空洞不得被当作当前会话已清理证据
+
+#### Scenario: 未来游标
+- **WHEN** 游标大于当前会话游标记录的最高已提交事件 ID
+- **THEN** 系统不执行事件查询，只发送当前会话水位线的 `stream.reset`
+- **AND** 客户端必须先重建投影再续传
+
 ### Requirement: 事件载荷必须受控、脱敏且有大小上限
-系统 SHALL 只接受白名单事件类型和类型化事件载荷。`event_type` MUST 是公共事件枚举的非空值；`payload_json` MUST 是非空 JSON 对象，序列化后的 UTF-8 字节数 MUST 不超过 16 KiB。载荷 MUST NOT 包含模型原始思维、系统提示词、认证信息、精确位置、完整订单、完整第三方响应或异常堆栈。
+系统 SHALL 只接受白名单事件类型和类型化事件载荷。持久化 `event_type` MUST 是公共枚举中除 `stream.reset` 外的非空值，并由数据库 CHECK 白名单约束；心跳和 `stream.reset` MUST NOT 写入 `agent_event`。`payload_json` MUST 是非空 JSON 对象，序列化后的 UTF-8 字节数 MUST 不超过 16 KiB。载荷 MUST NOT 包含模型原始思维、系统提示词、认证信息、精确位置、完整订单、完整第三方响应或异常堆栈。
 
 #### Scenario: 载荷超限或含敏感字段
 - **WHEN** 事件载荷超出 16 KiB 或违反字段白名单
-- **THEN** 系统拒绝保存该事件并把运行写为安全失败结果
-- **AND** SSE 不返回该事件的原始载荷
+- **THEN** 系统回滚本次消息、步骤、运行推进和事件的原事实事务
+- **AND** 系统在独立的 `version + status` CAS 安全失败事务中最多一次写入固定安全错误，SSE 不返回原始载荷
 
 ### Requirement: 事件查询和清理必须使用明确索引及过期条件
-系统 SHALL 创建 `idx_agent_event_stream(session_id, event_id)`、`idx_agent_event_run_event(run_id, event_id)` 和 `idx_agent_event_expire(expire_at)`。迁移 MUST 约束 `expire_at >= create_time`。清理任务 MUST 只删除 `expire_at < 当前时间` 的事件，每日 02:30 每批最多 500 条，先删除 `agent_event`，只记录数量且不输出原始载荷。
+系统 SHALL 创建 `idx_agent_event_stream(session_id, event_id)`、`idx_agent_event_run_event(run_id, event_id)` 和 `idx_agent_event_expire(expire_at, event_id)`。迁移 MUST 约束 `expire_at >= create_time`。每条事件的 `expire_at` MUST 原样等于所属运行的统一到期时间；游标记录的到期时间 MUST 等于会话的最大运行到期时间。清理任务 MUST 每日 02:30 按 `expire_at ASC, event_id ASC` 每批最多 500 条处理，只清理终态运行的子记录，并先锁会话/游标、删除 `agent_event`、更新最早保留游标。当前 V008/V009 实际删除顺序固定为 `agent_event → agent_run_step → agent_message → agent_run → agent_event_stream_cursor → 无活动 agent_session`；后续 `agent_tool_call`、`agent_feedback`、`agent_action` 表引入后必须分别插入到 `agent_event` 之后、`agent_run_step` 之后、`agent_message` 之后。运行中的会话或运行不得清理。清理只记录数量且不输出原始载荷。
 
 #### Scenario: 查询运行轨迹
 - **WHEN** 当前用户查询自己的 runId 或 SSE 按会话续传
