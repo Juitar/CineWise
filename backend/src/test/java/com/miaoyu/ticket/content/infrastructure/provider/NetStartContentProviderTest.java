@@ -177,7 +177,7 @@ class NetStartContentProviderTest {
     }
 
     private NetStartProperties properties(boolean enabled) {
-        return new NetStartProperties(enabled, "https://apis.netstart.cn/maoyan", "0 0 3 * * *",
+        return new NetStartProperties(enabled, false, "https://apis.netstart.cn/maoyan", "0 0 3 * * *",
                 Duration.ofMillis(500), Duration.ofMillis(1500), 10, 1, Duration.ofMillis(1));
     }
 

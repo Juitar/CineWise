@@ -31,6 +31,13 @@
 - **THEN** 系统必须使用本 change 新增的本地 10 req/min 限流、超时、一次短重试和随时关闭开关
 - **AND** 不得宣称 Provider 具有无限配额；触发 429、持续失败或服务条款变化时立即回退到缓存、快照和 Demo
 
+#### Scenario: 开发环境启动后受控执行一次同步
+- **GIVEN** 当前 profile 为 `dev` 或 `demo`，并同时设置 `CINEWISE_CONTENT_NETSTART_ENABLED=true`、`CINEWISE_CONTENT_NETSTART_SYNC_ON_STARTUP=true`
+- **WHEN** 应用启动完成
+- **THEN** 系统只调用一次真实内容同步，不新增公开刷新接口
+- **AND** `CINEWISE_SCHEDULING_ENABLED=false` 时不注册自动定时任务，测试窗口只保留该次启动同步
+- **AND** 任一 NetStart 开关为 false 时不得访问 Provider、MySQL 或 Redis，页面继续使用原有回退
+
 ### Requirement: 真实基础信息必须标准化并具有时效
 系统 SHALL 只接收和返回标准化的影片、影院基础信息；每条结果 MUST 包含可展示的来源、数据时间、有效期、过期标识、降级标识和回退类型。影片至少按标题、类型、片长、评分等已确认基础字段标准化；影院至少按名称、城市、行政区域和地址等已确认基础字段标准化。字段不满足对应资源的最低质量规则时，系统 MUST 拒绝该条实时数据，不得将其写为可用缓存或快照。
 

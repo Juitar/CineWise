@@ -12,6 +12,7 @@
 - [x] 2.2 D 实现影片、影院基础字段映射、最低字段校验、来源/时间/有效期封套和字段质量摘要；业务层、A、B、C 均不接收第三方 SDK 类型或原始 JSON。验证：`NetStartContentProviderTest` 按 2026-08-04 实际的 `movie/detail`、`index/movieOnInfoList`、`search/cinemas` 返回形状覆盖合格影片/影院和字段缺失拒绝。
 - [x] 2.3 D 实现非空 `provider + resourceType + externalId` 的幂等识别；名称候选键同样加入 `resourceType` 命名空间，为外部 ID 为空的记录实现隔离、冲突记录和人工复核前禁止写入规则。验证：`ContentIdentityPolicyTest` 覆盖重复身份、同名不同外部 ID 隔离及同名影片/影院互不隔离；空 ID 在 Provider 映射边界拒绝，不进入写入路径。
 - [x] 2.4 D 实现每日同步请求的输入校验、本地 10 req/min 限流、500ms 连接超时、1500ms 读取超时，以及仅连接失败或 5xx 可 200ms 退避重试一次的规则；上述均为本 change 新增默认配置，不代表 NetStart 官方配额。验证：`NetStartContentProviderTest` 覆盖连接失败、429、5xx、字段不合格和重复请求；所有 Provider 测试夹具均不含 Key 或完整原始载荷。
+- [x] 2.5 D 增加开发/演示环境的一次性启动同步和调度关闭配置：`CINEWISE_CONTENT_NETSTART_ENABLED=true` 与 `CINEWISE_CONTENT_NETSTART_SYNC_ON_STARTUP=true` 同时开启时只同步一次；`CINEWISE_SCHEDULING_ENABLED=false` 时不注册自动定时任务。验证：`NetStartStartupSyncRunnerTest` 覆盖 Provider 开启时仅调用一次、关闭时不调用；Spring 上下文测试覆盖一次性入口注册和调度配置关闭；`mvnw.cmd verify` 通过，默认配置仍保持关闭。
 
 ## 3. 缓存、快照与数据边界
 
