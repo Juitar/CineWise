@@ -9,7 +9,7 @@ import java.util.Objects;
  * <p>影片和影院查询统一走该对象，避免 Controller、Provider、缓存和快照各自解释城市、关键字
  * 和内容 ID。这个类型不包含用户、场次、价格、座位或库存，防止内容模块越过 A 的票务边界。</p>
  *
- * <p>调用方至少给出一种定位条件，避免无条件读取全部外部内容或生成无法复用的缓存键。</p>
+ * <p>公开影片列表允许没有筛选条件；影院列表由 API 层强制提供城市代码。</p>
  */
 public record ContentQuery(
         ContentResourceType resourceType,
@@ -27,8 +27,8 @@ public record ContentQuery(
         if (contentId != null && contentId <= 0L) {
             throw new IllegalArgumentException("contentId must be positive");
         }
-        if (contentId == null && cityCode == null && keyword == null) {
-            throw new IllegalArgumentException("contentId, cityCode or keyword is required");
+        if (resourceType == ContentResourceType.CINEMA && contentId == null && cityCode == null && keyword == null) {
+            throw new IllegalArgumentException("cinema query requires contentId, cityCode or keyword");
         }
     }
 

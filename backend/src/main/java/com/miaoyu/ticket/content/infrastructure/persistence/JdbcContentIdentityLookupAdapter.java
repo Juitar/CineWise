@@ -2,8 +2,12 @@ package com.miaoyu.ticket.content.infrastructure.persistence;
 
 import com.miaoyu.ticket.content.application.ContentIdentityLookupPort;
 import com.miaoyu.ticket.content.domain.ContentResourceType;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -39,5 +43,26 @@ public class JdbcContentIdentityLookupAdapter implements ContentIdentityLookupPo
                 """.formatted(sourceIdColumn, table),
                 (resultSet, rowNumber) -> resultSet.getString(sourceIdColumn), contentId, DEMO_SEED_SOURCE);
         return sourceIds.stream().findFirst();
+    }
+
+    @Override
+    public Map<String, Long> findContentIds(ContentResourceType resourceType, Set<String> sourceIds) {
+        if (sourceIds.isEmpty()) {
+            return Map.of();
+        }
+        String table = resourceType == ContentResourceType.MOVIE ? "movie" : "cinema";
+        String column = resourceType == ContentResourceType.MOVIE ? "source_movie_id" : "source_cinema_id";
+        String placeholders = String.join(",", Collections.nCopies(sourceIds.size(), "?"));
+        Object[] args = new Object[sourceIds.size() + 1];
+        int index = 0;
+        for (String sourceId : sourceIds) {
+            args[index++] = sourceId;
+        }
+        args[index] = DEMO_SEED_SOURCE;
+        String sql = "SELECT id, %s FROM %s WHERE %s IN (%s) AND source = ? AND deleted_at IS NULL"
+                .formatted(column, table, column, placeholders);
+        return jdbcTemplate.query(sql,
+                (resultSet, rowNumber) -> Map.entry(resultSet.getString(column), resultSet.getLong("id")), args)
+                .stream().collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 }
