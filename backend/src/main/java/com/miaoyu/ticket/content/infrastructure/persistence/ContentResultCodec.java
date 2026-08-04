@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.content.infrastructure.persistence;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.content.application.ContentQuery;
 import com.miaoyu.ticket.content.application.ContentResult;
@@ -59,7 +60,16 @@ final class ContentResultCodec {
     ContentResult<List<? extends ContentItem>> read(String payload, ContentQuery query,
                                                      ContentFallbackType fallbackType, boolean expired) {
         try {
-            StoredContent stored = objectMapper.readValue(payload, StoredContent.class);
+            JsonNode storedNode = objectMapper.readTree(payload);
+            // H2 may expose a JSON column as a JSON-encoded string while MySQL returns the object directly.
+            // Normalize the JDBC representation before mapping so the snapshot contract stays database-agnostic.
+            if (storedNode.isTextual()) {
+                storedNode = objectMapper.readTree(storedNode.textValue());
+            }
+            if (!storedNode.isObject()) {
+                throw new IllegalStateException("Normalized content payload must be a JSON object");
+            }
+            StoredContent stored = objectMapper.treeToValue(storedNode, StoredContent.class);
             List<? extends ContentItem> data = query.resourceType().name().equals("MOVIE")
                     ? stored.movies() : stored.cinemas();
             return new ContentResult<>(data, stored.source(), stored.dataTime(), stored.expiresAt(), expired,
