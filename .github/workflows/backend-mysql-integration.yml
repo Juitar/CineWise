@@ -50,6 +50,7 @@ jobs:
       CINEWISE_MYSQL_LIFECYCLE_IT: "true"
       CINEWISE_MYSQL_PAYMENT_IT: "true"
       CINEWISE_MYSQL_REFUND_IT: "true"
+      CINEWISE_MYSQL_ADMIN_ORDER_IT: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,5 +65,5 @@ jobs:
         working-directory: backend
         run: >-
           bash ./mvnw --batch-mode --no-transfer-progress
-          -Dtest=ShowQueryMySqlIntegrationTest,OrderCreationMySqlConcurrencyIntegrationTest,OrderLifecycleMySqlIntegrationTest,PaymentMySqlIntegrationTest,RefundMySqlIntegrationTest
+          -Dtest=ShowQueryMySqlIntegrationTest,OrderCreationMySqlConcurrencyIntegrationTest,OrderLifecycleMySqlIntegrationTest,PaymentMySqlIntegrationTest,RefundMySqlIntegrationTest,AdminOrderQueryMySqlIntegrationTest
           test
