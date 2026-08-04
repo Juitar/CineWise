@@ -56,4 +56,4 @@
 - [x] 6.4 A 在独立空 MySQL 8.4 验证迁移、重复执行、字段、索引、约束、字符集和排序规则，并记录证据。
 - [x] 6.5 使用受控测试账号完成用户/管理员真实 MySQL 登录、刷新恢复、登出、401/403、CSRF 和 Cookie 冒烟。
 - [x] 6.6 执行 `openspec validate password-login-and-session --strict`、后端 `mvnw.cmd verify`、前端 `pnpm check` 和相关 E2E，并记录实际结果。
-- [ ] 6.7 导出 `/v3/api-docs`，由 A/B/C/D 复核认证响应、Cookie 安全方案、CSRF Header 和公共错误码。
+- [x] 6.7 导出 `/v3/api-docs`，由 A/B/C/D 复核认证响应、Cookie 安全方案、CSRF Header 和公共错误码。
