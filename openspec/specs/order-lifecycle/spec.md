@@ -1,7 +1,7 @@
 # order-lifecycle Specification
 
 ## Purpose
-定义本人订单查询、取消、过期释放及幂等恢复的订单生命周期规则。
+定义本人订单查询、取消、过期释放及幂等恢复的订单生命周期规则，确保订单状态变化、座位释放与重复请求处理均以交易权威数据为准。
 ## Requirements
 ### Requirement: 本人订单列表与详情
 

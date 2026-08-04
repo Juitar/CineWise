@@ -1,7 +1,7 @@
 # alternative-show-navigation-contract Specification
 
 ## Purpose
-定义替代场次查询返回影片 ID 的兼容契约，使用户可从替代场次恢复到正确的选座上下文。
+定义替代场次查询返回影片 ID 的兼容契约，使用户可从替代场次恢复到正确的选座上下文，并保持既有订单归属、日期范围和可售过滤语义不变。
 ## Requirements
 ### Requirement: 替代场次必须返回可恢复选座上下文的影片 ID
 

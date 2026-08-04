@@ -1,7 +1,7 @@
 # payment-ticket Specification
 
 ## Purpose
-定义固定成功 Mock 支付、电子票生成、支付结果恢复和支付成功事件的交易契约。
+定义固定成功 Mock 支付、电子票生成、支付结果恢复和支付成功事件的交易契约，确保支付、座位和电子票的最终状态在重复请求及失败恢复中保持一致。
 ## Requirements
 ### Requirement: 固定成功Mock支付
 

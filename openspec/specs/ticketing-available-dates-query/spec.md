@@ -1,7 +1,7 @@
 # ticketing-available-dates-query Specification
 
 ## Purpose
-定义按影片和影院只读查询未来可售日期及场次数量的公开接口契约。
+定义按影片和影院只读查询未来可售日期及场次数量的公开接口契约，保证返回结果只基于 A 所有的场次权威事实且不产生任何业务写入副作用。
 ## Requirements
 ### Requirement: 公开查询指定影片和影院的可售日期
 
