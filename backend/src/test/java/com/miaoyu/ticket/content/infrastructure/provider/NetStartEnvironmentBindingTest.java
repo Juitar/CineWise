@@ -4,45 +4,44 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContextInitializer;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.core.env.Environment;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 
+@ActiveProfiles("test")
+@SpringBootTest(properties = "cinewise.scheduling.enabled=false")
+@ContextConfiguration(initializers = NetStartEnvironmentBindingTest.NetStartEnvironmentInitializer.class)
 class NetStartEnvironmentBindingTest {
 
-    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-            .withConfiguration(AutoConfigurations.of(NetStartPropertiesConfiguration.class))
-            .withPropertyValues(
-                    "cinewise.content.netstart.base-url=https://apis.netstart.cn/maoyan",
-                    "cinewise.content.netstart.daily-sync-cron=0 0 3 * * *",
-                    "cinewise.content.netstart.connect-timeout=500ms",
-                    "cinewise.content.netstart.read-timeout=1500ms",
-                    "cinewise.content.netstart.requests-per-minute=10",
-                    "cinewise.content.netstart.retry-count=1",
-                    "cinewise.content.netstart.retry-backoff=200ms",
-                    "spring.threads.virtual.enabled=false")
-            .withInitializer(context -> context.getEnvironment().getPropertySources().addFirst(
-                    new SystemEnvironmentPropertySource("test-netstart-environment", Map.of(
-                            "CINEWISE_CONTENT_NETSTART_ENABLED", "true",
-                            "CINEWISE_CONTENT_NETSTART_SYNC_ON_STARTUP", "true"))));
+    @Autowired
+    private NetStartProperties properties;
+
+    @Autowired
+    private Environment environment;
 
     @Test
     void givenNetStartEnvironmentVariables_whenPropertiesBind_thenOnlyNetStartSwitchesAreEnabled() {
-        contextRunner.run(context -> {
-            NetStartProperties properties = context.getBean(NetStartProperties.class);
-
-            // 模拟操作系统环境变量，避免测试只验证 YAML 的短横线属性而遗漏实际部署名称。
-            assertThat(properties.enabled()).isTrue();
-            assertThat(properties.syncOnStartup()).isTrue();
-            // NetStart 开关绝不能改变整个应用的虚拟线程模型。
-            assertThat(context.getEnvironment().getProperty("spring.threads.virtual.enabled")).isEqualTo("false");
-        });
+        // 测试上下文会加载仓库真实 application.yml；不手写 NetStart 或虚拟线程的 YAML 默认值。
+        assertThat(properties.enabled()).isTrue();
+        assertThat(properties.syncOnStartup()).isTrue();
+        // 若环境变量再次误放到 spring.threads.virtual，下列断言会直接失败。
+        assertThat(environment.getProperty("spring.threads.virtual.enabled")).isEqualTo("false");
     }
 
-    @Configuration(proxyBeanMethods = false)
-    @EnableConfigurationProperties(NetStartProperties.class)
-    static class NetStartPropertiesConfiguration {
+    /** 以系统环境属性源模拟部署变量，验证真实 YAML 占位符的绑定位置。 */
+    static class NetStartEnvironmentInitializer
+            implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+        @Override
+        public void initialize(ConfigurableApplicationContext context) {
+            context.getEnvironment().getPropertySources().addFirst(
+                    new SystemEnvironmentPropertySource("test-netstart-environment", Map.of(
+                            "CINEWISE_CONTENT_NETSTART_ENABLED", "true",
+                            "CINEWISE_CONTENT_NETSTART_SYNC_ON_STARTUP", "true")));
+        }
     }
 }
