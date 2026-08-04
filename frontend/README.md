@@ -32,19 +32,21 @@ docker compose up --build frontend
 
 ## 常用命令
 
-| 命令                 | 用途                                         |
-| -------------------- | -------------------------------------------- |
-| `pnpm dev`           | 启动开发服务器和热更新                       |
-| `pnpm build`         | 生成 `dist/` 生产文件                        |
-| `pnpm check`         | 依次执行排版、代码、类型、测试和生产构建检查 |
-| `pnpm format`        | 自动整理前端文件排版                         |
-| `pnpm format:check`  | 检查排版，不修改文件                         |
-| `pnpm lint`          | 检查 React、TypeScript 和 CSS 规则           |
-| `pnpm typecheck`     | 检查 TypeScript 类型，不生成文件             |
-| `pnpm test`          | 运行单元和组件测试                           |
-| `pnpm test:coverage` | 生成测试覆盖率报告                           |
-| `pnpm e2e:install`   | 安装 Playwright Chromium                     |
-| `pnpm e2e`           | 在桌面和手机尺寸执行浏览器流程测试           |
+| 命令                  | 用途                                         |
+| --------------------- | -------------------------------------------- |
+| `pnpm dev`            | 启动开发服务器和热更新                       |
+| `pnpm build`          | 生成 `dist/` 生产文件                        |
+| `pnpm build:verify`   | 构建并检查入口哈希与 HTML 静态资源完整性     |
+| `pnpm check`          | 依次执行排版、代码、类型、测试和生产产物检查 |
+| `pnpm format`         | 自动整理前端文件排版                         |
+| `pnpm format:check`   | 检查排版，不修改文件                         |
+| `pnpm lint`           | 检查 React、TypeScript 和 CSS 规则           |
+| `pnpm typecheck`      | 检查 TypeScript 类型，不生成文件             |
+| `pnpm test`           | 运行单元和组件测试                           |
+| `pnpm test:coverage`  | 生成测试覆盖率报告                           |
+| `pnpm e2e:install`    | 安装 Playwright Chromium                     |
+| `pnpm e2e`            | 在桌面和手机尺寸执行浏览器流程测试           |
+| `pnpm e2e:production` | 验证生产首页、懒加载页面和 JS/CSS 资源       |
 
 ## 源码目录
 

@@ -72,3 +72,32 @@
 
 - **WHEN** 新提交的 Compose 服务未在超时内全部健康
 - **THEN** 系统重新检出部署前 SHA、恢复旧服务并让本次工作流保持失败
+
+### Requirement: 生产前端正确区分页面路由、静态资源和 API
+
+系统 SHALL 让生产 Nginx 将 `/api/**` 明确代理到后端，让不存在的脚本、样式、图片和字体返回 404，并仅对非静态的前端页面路由回退到不缓存的 `index.html`。
+
+#### Scenario: 刷新前端嵌套路由
+
+- **WHEN** 浏览器直接访问 `/movies`
+- **THEN** Nginx 返回 200 `text/html` 的 `index.html`，且响应包含 `Cache-Control: no-store`
+
+#### Scenario: 请求不存在的静态资源
+
+- **WHEN** 浏览器请求不存在的 `/missing.js` 或 `/missing.css`
+- **THEN** Nginx 返回 404，不得返回 `index.html` 或其他 `text/html` 响应
+
+#### Scenario: 请求后端 API
+
+- **WHEN** 浏览器请求任意 `/api/**` 地址
+- **THEN** Nginx 将请求转发到后端，不得由静态资源规则或 SPA 回退处理
+
+#### Scenario: 加载生产入口资源
+
+- **WHEN** 浏览器打开生产镜像中的 `index.html`
+- **THEN** 入口引用的本地脚本和样式全部返回 200 及与文件类型相符的 MIME，并能在浏览器中启动应用
+
+#### Scenario: 缓存带内容哈希的静态资源
+
+- **WHEN** 浏览器请求文件名包含至少 8 位内容哈希且实际存在的生产静态资源
+- **THEN** Nginx 返回一年 `immutable` 缓存，而 `index.html`、`/api/**` 和缺失资源不得获得该长期缓存

@@ -23,7 +23,7 @@ Flyway SQL 进入 `dev` 不代表数据库已经执行。数据库迁移仍由 A
 ```text
 代码进入 dev
   → 后端 mvnw verify
-  → 前端 pnpm check 与 E2E
+  → 前端 pnpm check、开发服务器 E2E 与生产 Nginx 镜像冒烟
   → 使用 GitHub demo Environment 连接服务器
   → 获取本次 workflow 对应的精确 commit SHA
   → Docker Compose 构建并等待全部健康检查
@@ -106,3 +106,5 @@ docker compose logs --tail 100 frontend
 ```
 
 浏览器再完成首页、登录、场次查询和本次变更涉及的关键业务冒烟。自动健康检查只证明容器可用，不能替代业务验收。
+
+生产 Nginx 冒烟会在质量门中自动验证：`/movies` 可回退到不缓存的 SPA 入口，缺失 JS/CSS 返回 404，`/api/**` 到达后端，以及入口引用资源的状态、MIME 和缓存策略正确。C 已开启并确认 Umi `hash: true` 产物；只有文件名包含内容哈希且实际存在的静态资源使用一年 `immutable` 缓存，`index.html`、API、非哈希资源和缺失资源不得使用该长期缓存。

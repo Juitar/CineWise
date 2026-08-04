@@ -13,6 +13,7 @@
 - [x] 2.5 拒绝 `FLYWAY_ENABLED=true` 或 `SEED_ENABLED=true` 的自动部署。
 - [x] 2.6 移除应用 Compose 的 Redis 服务，显式注入共享 Redis 和可选 MinIO 环境变量。
 - [x] 2.7 后端 Dockerfile 使用服务器 BuildKit Maven cache mount，部署构建输出 plain progress；GitHub Runner 的 Maven 缓存继续只服务质量门，新提交取消同组旧工作流。
+- [x] 2.8 A 修正生产 Nginx 的 API 优先级、静态资源 404 和 SPA 回退，并把真实生产镜像 Playwright 冒烟加入前端质量门。
 
 ## 3. 文档与验证
 
@@ -20,3 +21,4 @@
 - [x] 3.2 工作流 YAML 解析、`docker compose config --quiet` 和 OpenSpec 严格校验均通过。
 - [ ] 3.3 A 配置真实 `demo` Environment，并在服务器完成首次 `workflow_dispatch` 部署和业务冒烟。
 - [x] 3.4 同步 README、本地 Docker 指南、部署指南和环境模板，并验证缺失共享 Redis 配置时 Compose 明确失败。
+- [x] 3.5 A 验证 `/movies`、缺失 JS/CSS、`/api/**`、入口资源 MIME、哈希资源缓存与浏览器启动。
