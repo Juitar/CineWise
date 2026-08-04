@@ -5,7 +5,7 @@
 ## ADDED Requirements
 
 ### Requirement: PC 与移动端共享登录业务逻辑
-前端 SHALL 提供 `/login` 和 `/admin/login` 路由。两端 SHALL 共用认证 DTO、API、状态 Hook、错误映射和结果恢复逻辑；桌面端使用 Ant Design，移动端优先使用 antd-mobile，视图以 `1024px` 为断点适配。
+前端 SHALL 只提供 `/login` 作为用户和管理员共用的登录入口。两端 SHALL 共用认证 DTO、API、状态 Hook、错误映射和结果恢复逻辑；桌面端使用 Ant Design，移动端沿用已确认的响应式表单，视图以 `1024px` 为断点适配。
 
 #### Scenario: 桌面端打开用户登录
 - **WHEN** 视口宽度大于等于 `1024px` 且用户访问 `/login`
@@ -27,11 +27,15 @@
 - **THEN** 页面可以展示可访问的说明链接和登录说明，但不会默认勾选、提交或更新隐私同意字段
 
 ### Requirement: 登录后以当前用户接口建立身份
-登录接口明确成功后，前端 SHALL 再调用一次 `/api/v1/auth/me`，并仅以该结果更新全局当前用户。用户登录 SHALL 只进入用户可访问路径，管理员登录 SHALL 只进入管理端路径。
+登录接口明确成功后，前端 SHALL 再调用一次 `/api/v1/auth/me`，并仅以该结果更新全局当前用户。前端不得让用户选择或提交角色；`USER` SHALL 只进入用户可访问路径，`ADMIN` SHALL 默认进入管理端路径。
 
 #### Scenario: 登录成功并安全回跳
 - **WHEN** `/auth/me` 返回有效用户且 `returnUrl` 是允许的站内相对路径
 - **THEN** 前端导航到该路径并清除登录表单中的密码
+
+#### Scenario: 统一入口按服务端角色跳转
+- **WHEN** 用户从 `/login` 完成登录且 `/auth/me` 返回 `ADMIN`
+- **THEN** 前端进入 `/admin` 或允许的管理端 `returnUrl`，不要求用户切换管理员登录模式
 
 #### Scenario: 非法回跳地址
 - **WHEN** `returnUrl` 包含协议、双斜线、控制字符、反斜线或当前角色无权访问的管理路径

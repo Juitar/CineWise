@@ -8,7 +8,7 @@
 - 增加 `/api/v1/auth/me` 会话恢复与幂等登出，登录成功后前端仍以 `/auth/me` 的结果建立当前用户状态。
 - 使用短期 JWT HttpOnly Cookie，服务端校验账号状态和 `tokenVersion`，前端不读取、保存或打印 JWT。
 - 增加浏览器写请求所需的 CSRF Token 获取接口和公共请求层 Header 注入；A/B/D 已确认具体接口、Header、服务端校验和失效处理规则。
-- 增加 PC Web 与移动 H5 共用业务逻辑的登录页面、安全 `returnUrl`、提交防重复和登录结果未知恢复。
+- 增加 PC Web 与移动 H5 共用业务逻辑的统一 `/login` 页面；登录后以 `/auth/me.role` 决定进入用户端或管理端，并支持安全 `returnUrl`、提交防重复和登录结果未知恢复。
 - 保留现有原生 `fetch` 公共 REST 客户端，不引入 Umi request 插件或第二套请求封装。
 - 认证 REST `CurrentUser` 使用字符串 `id`、脱敏邮箱和认证设计中的字段，不返回完整邮箱；内部安全上下文继续使用 `userId/role/tokenVersion`。
 - `sys_login_log` 作为只追加登录审计日志默认保留 30 天，到期后由认证清理任务按 `create_time` 物理删除；这是“审计记录不得物理删除”通用规范的有限保留期例外，不适用于订单、支付、退款等交易审计记录。

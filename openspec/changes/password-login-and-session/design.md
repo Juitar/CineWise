@@ -59,9 +59,11 @@ Controller 只校验请求、调用 Application Service、设置或清除 Cookie
 
 现有 `auth.application.CurrentUser(Long userId, RoleCode role, long tokenVersion)` 保持为跨模块内部身份，不直接作为 HTTP 响应。认证 API 新建 `CurrentUserResponse`，对外输出 `id` 字符串和 `emailMasked` 等字段，避免把内部 `tokenVersion` 或完整邮箱暴露给浏览器。
 
-### 8. 登录页面按端拆视图、共用 Hook
+### 8. 登录页面按端适配、共用统一入口和 Hook
 
-`modules/auth` 提供 DTO、API、`usePasswordLogin` 和会话恢复；`shared/auth` 提供当前用户 Provider、401 单次处理和安全回跳；`pages` 只读取 `returnUrl` 并组合视图。桌面端使用 Ant Design，移动端使用 antd-mobile，自定义样式全部放在 CSS 文件。
+`modules/auth` 提供 DTO、API、`usePasswordLogin` 和会话恢复；`shared/auth` 提供当前用户 Provider、401 单次处理和安全回跳；`pages` 只读取 `returnUrl` 并组合视图。前端只提供 `/login` 一个登录入口，不让用户选择角色；登录成功后再次查询 `/auth/me`，`ADMIN` 默认进入 `/admin`，`USER` 默认进入 `/`。管理员访问受保护管理路由但尚未登录时，也跳转统一 `/login` 并携带管理端 `returnUrl`。桌面端使用 Ant Design，移动端沿用已合并的响应式表单样式和公共 Hook，自定义样式全部放在 CSS 文件。
+
+后端已存在的 `/api/v1/admin/auth/login` 暂时保留兼容，但统一前端不再调用它；前端始终使用 `/api/v1/auth/login/password`，角色只以 `/auth/me.role` 为准，不在请求体中增加角色字段。安全回跳按服务端角色限制：`USER` 不得进入管理路径，`ADMIN` 只回到管理路径，否则进入各自默认页。
 
 当前范围不提供验证码、注册和重置密码页面，因此不渲染不可用的验证码 Tab 或会进入 404 的操作入口。用户协议和隐私政策只有在存在可访问页面时才显示链接；密码登录不提交隐私同意字段。
 

@@ -6,12 +6,25 @@ type QueryValue = QueryPrimitive | null | readonly QueryPrimitive[] | undefined;
 
 export interface ApiRequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;
+  handleUnauthorized?: boolean;
   query?: Record<string, QueryValue>;
+  skipCsrf?: boolean;
   timeoutMs?: number;
 }
 
+interface CsrfTokenPayload {
+  headerName: string;
+  token: string;
+}
+
+type UnauthorizedHandler = () => Promise<void> | void;
+
 const DEFAULT_TIMEOUT_MS = 10_000;
 const READ_METHODS = new Set(['GET', 'HEAD']);
+let csrfToken: CsrfTokenPayload | null = null;
+let csrfTokenRequest: Promise<CsrfTokenPayload> | null = null;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+let unauthorizedHandling: Promise<void> | null = null;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -83,6 +96,71 @@ async function readApiResult(response: Response): Promise<ApiResult<unknown>> {
   return payload;
 }
 
+function isCsrfTokenPayload(value: unknown): value is CsrfTokenPayload {
+  return isRecord(value) && typeof value.headerName === 'string' && typeof value.token === 'string';
+}
+
+async function getCsrfToken(): Promise<CsrfTokenPayload> {
+  if (csrfToken) {
+    return csrfToken;
+  }
+
+  if (!csrfTokenRequest) {
+    // CSRF 获取也复用唯一公共客户端；skipCsrf 防止递归获取 Token。
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define
+    csrfTokenRequest = apiRequest<unknown>('/api/v1/auth/csrf', {
+      handleUnauthorized: false,
+      skipCsrf: true,
+    })
+      .then((payload) => {
+        if (!isCsrfTokenPayload(payload) || !payload.headerName || !payload.token) {
+          throw new ApiError('服务返回的 CSRF Token 格式不正确', {
+            kind: 'INVALID_RESPONSE',
+          });
+        }
+        csrfToken = payload;
+        return payload;
+      })
+      .finally(() => {
+        csrfTokenRequest = null;
+      });
+  }
+
+  return csrfTokenRequest;
+}
+
+async function runUnauthorizedHandler(): Promise<void> {
+  if (!unauthorizedHandler) {
+    return;
+  }
+
+  if (!unauthorizedHandling) {
+    unauthorizedHandling = Promise.resolve(unauthorizedHandler()).finally(() => {
+      unauthorizedHandling = null;
+    });
+  }
+
+  await unauthorizedHandling;
+}
+
+/** 清除仅存在于运行内存中的 CSRF Token。登录、登出或会话切换后调用。 */
+export function clearCsrfToken(): void {
+  csrfToken = null;
+}
+
+/**
+ * 注册全局 401 处理器，同一批并发 401 只执行一次会话清理。
+ * 返回的函数只会移除本次注册，避免组件卸载时清除后续 Provider 的处理器。
+ */
+export function setUnauthorizedHandler(handler: UnauthorizedHandler): () => void {
+  unauthorizedHandler = handler;
+  return () => {
+    if (unauthorizedHandler === handler) {
+      unauthorizedHandler = null;
+    }
+  };
+}
+
 /**
  * 发送普通 REST 请求并解包后端统一响应。
  *
@@ -90,7 +168,14 @@ async function readApiResult(response: Response): Promise<ApiResult<unknown>> {
  * 写请求超时或断网时会标记 isResultUnknown，调用模块必须使用原业务 ID 查询结果。
  */
 export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-  const { body, query, timeoutMs = DEFAULT_TIMEOUT_MS, ...requestInit } = options;
+  const {
+    body,
+    handleUnauthorized = true,
+    query,
+    skipCsrf = false,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    ...requestInit
+  } = options;
   const method = (requestInit.method ?? 'GET').toUpperCase();
   const isWriteRequest = !READ_METHODS.has(method);
   const controller = new AbortController();
@@ -113,6 +198,10 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
   if (body !== undefined) {
     headers.set('Content-Type', 'application/json');
   }
+  if (isWriteRequest && !skipCsrf) {
+    const currentCsrfToken = await getCsrfToken();
+    headers.set(currentCsrfToken.headerName, currentCsrfToken.token);
+  }
   const url = buildApiUrl(path, query);
 
   try {
@@ -125,6 +214,19 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
       signal: controller.signal,
     });
     const result = await readApiResult(response);
+
+    if (response.status === 401 && handleUnauthorized) {
+      await runUnauthorizedHandler();
+    }
+
+    if (isWriteRequest && response.status === 403 && result.code === 201009) {
+      clearCsrfToken();
+      try {
+        await getCsrfToken();
+      } catch {
+        // 保留原始 201009，让页面提示用户重新确认；刷新失败不替换原错误。
+      }
+    }
 
     if (!response.ok) {
       throw new ApiError('请求未成功，请稍后重试', {
