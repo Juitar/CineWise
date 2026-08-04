@@ -7,6 +7,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import java.util.List;
+import com.miaoyu.ticket.content.application.ContentPersistencePort;
+import com.miaoyu.ticket.content.application.ContentQuery;
+import com.miaoyu.ticket.content.application.ContentResult;
+import com.miaoyu.ticket.content.application.ContentSnapshotPort;
+import com.miaoyu.ticket.content.domain.ContentResourceType;
+import com.miaoyu.ticket.content.domain.ContentSource;
+import com.miaoyu.ticket.content.domain.ContentSourceType;
+import com.miaoyu.ticket.content.domain.MovieContent;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -30,6 +41,12 @@ class ContentControllerIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ContentPersistencePort persistence;
+
+    @Autowired
+    private ContentSnapshotPort snapshots;
 
     /**
      * 公共内容页面不应依赖登录；列表同时校验 C 要求的分页、Demo 标识和 ISO 偏移时间。
@@ -76,6 +93,26 @@ class ContentControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.sourceType").value("MOCK"))
                 .andExpect(jsonPath("$.data.degraded").value(true))
                 .andExpect(jsonPath("$.data.fallbackType").value("MOCK"));
+    }
+
+    /** 同步回填数据库业务 ID 后，LIVE 快照必须能被公开接口读出，不能泄漏外部 sourceMovieId。 */
+    @Test
+    void shouldExposeSynchronizedLiveMovieWithBusinessIdAndGenreArray() throws Exception {
+        LocalDateTime dataTime = LocalDateTime.of(2026, 8, 3, 8, 0);
+        long movieId = persistence.ensureMovie(new ContentPersistencePort.MovieRow(9_000_001L, "live-movie-1",
+                "LIVE 测试片", "[\"剧情\",\"喜剧\"]", 100, new BigDecimal("8.8"), ContentSourceType.LIVE,
+                "NETSTART_MAOYAN", dataTime, dataTime.plusHours(6)));
+        ContentQuery query = new ContentQuery(ContentResourceType.MOVIE, null, null, "LIVE 测试片");
+        snapshots.save(query, new ContentResult<>(List.of(new MovieContent(movieId, "live-movie-1", "LIVE 测试片",
+                "[\"剧情\",\"喜剧\"]", 100, new BigDecimal("8.8"))),
+                new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), dataTime, dataTime.plusHours(6),
+                false, false, null));
+
+        mockMvc.perform(get("/api/v1/movies").param("keyword", "LIVE 测试片"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].movieId").value(Long.toString(movieId)))
+                .andExpect(jsonPath("$.data.records[0].genres[0]").value("剧情"))
+                .andExpect(jsonPath("$.data.sourceType").value("LIVE"));
     }
 
     /** 详情必须保留来源信息，但不能把内部坐标、距离字段泄漏给前端。 */

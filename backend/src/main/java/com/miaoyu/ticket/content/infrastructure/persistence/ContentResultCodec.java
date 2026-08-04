@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.content.infrastructure.persistence;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.content.application.ContentQuery;
 import com.miaoyu.ticket.content.application.ContentResult;
@@ -59,7 +60,11 @@ final class ContentResultCodec {
     ContentResult<List<? extends ContentItem>> read(String payload, ContentQuery query,
                                                      ContentFallbackType fallbackType, boolean expired) {
         try {
-            StoredContent stored = objectMapper.readValue(payload, StoredContent.class);
+            // MySQL/H2 的 JSON 列在不同 JDBC 驱动下可能返回对象文本，也可能返回被 JSON 再次包裹的字符串。
+            // 两种形态都来自本适配器写入的标准化内容，兼容读取可避免 LIVE 快照因驱动差异在公开接口变成 500。
+            JsonNode root = objectMapper.readTree(payload);
+            String storedPayload = root.isTextual() ? root.textValue() : payload;
+            StoredContent stored = objectMapper.readValue(storedPayload, StoredContent.class);
             List<? extends ContentItem> data = query.resourceType().name().equals("MOVIE")
                     ? stored.movies() : stored.cinemas();
             return new ContentResult<>(data, stored.source(), stored.dataTime(), stored.expiresAt(), expired,

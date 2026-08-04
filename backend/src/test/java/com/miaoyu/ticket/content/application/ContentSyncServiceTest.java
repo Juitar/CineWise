@@ -18,6 +18,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 class ContentSyncServiceTest {
     @Test
@@ -86,6 +87,54 @@ class ContentSyncServiceTest {
         assertFailureAudit(LiveContentSyncPort.Outcome.UPSTREAM_FAILED, 502);
         assertFailureAudit(LiveContentSyncPort.Outcome.FIELD_REJECTED, null);
     }
+
+    @Test
+    void givenDuplicateIdentityInSyncBatch_whenSynchronize_thenItPersistsOnlyAcceptedContentAndAuditsReason() {
+        ContentQuery query = new ContentQuery(ContentResourceType.MOVIE, 1L, null, null);
+        ContentResult<List<? extends ContentItem>> duplicate = new ContentResult<>(List.of(
+                new MovieContent("same-id", "测试片甲", "剧情", 90, new BigDecimal("8.0")),
+                new MovieContent("same-id", "测试片乙", "剧情", 90, new BigDecimal("8.1"))),
+                new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), LocalDateTime.of(2026, 8, 4, 9, 0),
+                LocalDateTime.of(2026, 8, 4, 15, 0), false, false, null);
+        AtomicReference<ContentResult<List<? extends ContentItem>>> saved = new AtomicReference<>();
+        AtomicReference<SyncLogRow> audit = new AtomicReference<>();
+        ContentSyncService service = new ContentSyncService(
+                () -> batch(List.of(new LiveContentSyncPort.SynchronizedContent(query, duplicate)), 2,
+                        LiveContentSyncPort.Outcome.FIELD_REJECTED, null), captureSnapshot(saved),
+                cachePort(new AtomicInteger()), persistence(new AtomicInteger(), audit), () -> 99L,
+                Clock.fixed(Instant.parse("2026-08-04T01:00:00Z"), ZoneId.of("Asia/Shanghai")));
+
+        assertThat(service.synchronizeDailyContent()).isEqualTo(1);
+        assertThat(saved.get().data()).hasSize(1);
+        assertThat(((MovieContent) saved.get().data().getFirst()).movieId()).isEqualTo(99L);
+        assertThat(audit.get().errorSummary()).contains("identityRejected=1",
+                "rejectionReason=IDENTITY_REVIEW_REQUIRED");
+    }
+
+    @Test
+    void givenTransactionRollsBack_whenSynchronize_thenItDoesNotPublishLiveCache() {
+        ContentQuery query = new ContentQuery(ContentResourceType.MOVIE, 1L, null, null);
+        ContentResult<List<? extends ContentItem>> result = new ContentResult<>(List.of(
+                new MovieContent("1", "测试片", "[\"剧情\"]", 90, new BigDecimal("8.0"))),
+                new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), LocalDateTime.of(2026, 8, 4, 9, 0),
+                LocalDateTime.of(2026, 8, 4, 15, 0), false, false, null);
+        AtomicInteger caches = new AtomicInteger();
+        ContentSyncService service = new ContentSyncService(
+                () -> batch(List.of(new LiveContentSyncPort.SynchronizedContent(query, result)), 1,
+                        LiveContentSyncPort.Outcome.SUCCESS, null), snapshotPort(new AtomicInteger()),
+                cachePort(caches),
+                persistence(new AtomicInteger(), new AtomicReference<>()), () -> 99L,
+                Clock.fixed(Instant.parse("2026-08-04T01:00:00Z"), ZoneId.of("Asia/Shanghai")));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.synchronizeDailyContent();
+            // 模拟事务回滚：不触发 afterCommit，Redis 不能得到无法由 MySQL 追溯的 LIVE 数据。
+            assertThat(caches).hasValue(0);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
     private ContentSnapshotPort snapshotPort(AtomicInteger saved) { return new ContentSnapshotPort() {
         @Override public Optional<ContentResult<List<? extends ContentItem>>> findLatest(ContentQuery query) {
             return Optional.empty();
@@ -102,6 +151,16 @@ class ContentSyncServiceTest {
             saved.incrementAndGet();
         }
     }; }
+    private ContentSnapshotPort captureSnapshot(AtomicReference<ContentResult<List<? extends ContentItem>>> saved) {
+        return new ContentSnapshotPort() {
+            @Override public Optional<ContentResult<List<? extends ContentItem>>> findLatest(ContentQuery query) {
+                return Optional.empty();
+            }
+            @Override public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) {
+                saved.set(result);
+            }
+        };
+    }
     private LiveContentSyncPort.DailySyncBatch batch(List<LiveContentSyncPort.SynchronizedContent> contents,
                                                       int attemptedCount, LiveContentSyncPort.Outcome outcome,
                                                       Integer errorCode) {

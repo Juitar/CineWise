@@ -39,6 +39,7 @@ class NetStartContentProviderTest {
         MovieContent movie = (MovieContent) result.data().getFirst();
         // 上游的场次数、影评等字段只能证明其存在，不能穿透为 A 的票务事实或 D 的内容字段。
         assertThat(movie.sourceMovieId()).isEqualTo("1525000");
+        assertThat(movie.genresJson()).isEqualTo("[\"剧情\",\"喜剧\"]");
         assertThat(movie.durationMinutes()).isEqualTo(118);
         assertThat(result.source().type()).isEqualTo(ContentSourceType.LIVE);
         assertThat(result.degraded()).isFalse();
@@ -74,6 +75,8 @@ class NetStartContentProviderTest {
         CinemaContent cinema = (CinemaContent) result.data().getFirst();
         assertThat(cinema.sourceCinemaId()).isEqualTo("41478");
         assertThat(cinema.address()).isEqualTo("大兴区康泰街26号");
+        assertThat(cinema.longitude()).isNull();
+        assertThat(cinema.latitude()).isNull();
     }
 
     @Test
@@ -102,6 +105,31 @@ class NetStartContentProviderTest {
 
         assertThat(provider.query(movieDetail())).isEmpty();
         assertThat(calls).hasValue(10);
+    }
+
+    @Test
+    void givenDailySync_whenHotListDetailsAndCinemaAreFetched_thenEveryRequestUsesTheSameLimit() throws Exception {
+        AtomicInteger calls = new AtomicInteger();
+        NetStartContentProvider provider = provider(query -> {
+            calls.incrementAndGet();
+            if (query.resourceType() == ContentResourceType.CINEMA) {
+                return json("[{\"id\":41478,\"info\":{\"name\":\"测试影城\",\"address\":\"测试地址\"}}]");
+            }
+            if (query.contentId() == null) {
+                return json("{\"movieList\":[{\"id\":1},{\"id\":2},{\"id\":3},{\"id\":4},"
+                        + "{\"id\":5},{\"id\":6},{\"id\":7},{\"id\":8},{\"id\":9},{\"id\":10}]}");
+            }
+            return json("{\"detailMovie\":{\"id\":" + query.contentId()
+                    + ",\"nm\":\"测试片\",\"cat\":\"剧情\",\"dur\":\"90分钟\",\"sc\":\"8.0\"}}");
+        });
+
+        var batch = provider.fetchForDailySync();
+
+        // 一轮保留热映列表、八部详情和影院共十次额度，不能因十部详情挤掉影院或越过本地限制。
+        assertThat(calls).hasValue(10);
+        assertThat(batch.contents()).hasSize(9);
+        assertThat(batch.outcome())
+                .isEqualTo(com.miaoyu.ticket.content.application.LiveContentSyncPort.Outcome.SUCCESS);
     }
 
     @Test
