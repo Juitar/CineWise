@@ -89,8 +89,9 @@ V003已有`mock_payment`和`electronic_ticket`及每订单唯一约束，本阶�
 
 支付编号、票码和二维码载荷由雪花ID派生；二维码载荷只包含`cinewise:ticket:<ticketCode>`演示引用，不含用户身份、模拟密码或订单明细。
 
-事件使用冻结字段`eventId/orderId/showId/userId/cinemaArea/startAt/orderVersion/occurredAt`。A先通过票务公开应用服务读取
-`showId/cinemaId/startAt`，再通过D的`ContentSummaryQueryPort.CinemaSummary.area()`补齐`cinemaArea`，不读取D私有Mapper、
+事件使用冻结字段`eventId/orderId/showId/userId/cinemaArea/startAt/orderVersion/occurredAt`。A先通过票务公开应用服务及独立的
+`ShowContextView`读取`showId/cinemaId/startAt`，不向订单模块暴露票务Repository类型；再通过D的
+`ContentSummaryQueryPort.CinemaSummary.area()`补齐`cinemaArea`，不读取D私有Mapper、
 Repository或Entity。影院摘要不存在、已过期或查询异常时，本次支付仍按MySQL事务完成但不登记事件，并记录不含敏感数据的告警；
 后续最近24小时PAID订单对账负责补偿。首次成功支付登记一次事件，幂等重放直接返回原支付结果且不重复登记。发布器同步登记失败被
 A隔离并交给对账恢复；D的AFTER_COMMIT消费者失败发生在支付提交之后，不能改变`PAID/SUCCESS/SOLD/VALID`权威状态。

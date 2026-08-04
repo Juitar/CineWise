@@ -24,7 +24,11 @@ public class ShowContextQueryService {
      * 支付事件调用方选择补偿，其他交易用例仍可对数据损坏采用更严格的拒绝策略。
      */
     @Transactional(readOnly = true)
-    public Optional<ShowQueryRepository.ShowContext> findContext(long showId) {
-        return repository.findShowContext(showId);
+    public Optional<ShowContextView> findContext(long showId) {
+        return repository.findShowContext(showId)
+                .map(context -> new ShowContextView(
+                        context.showId(),
+                        context.cinemaId(),
+                        context.startTime()));
     }
 }

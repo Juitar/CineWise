@@ -66,4 +66,5 @@
 - 需求/问题与修改范围：通过A公开场次上下文和D公开`ContentSummaryQueryPort.CinemaSummary.area()`补齐冻结事件字段；在支付事务完成`PAID/SUCCESS/SOLD/VALID`写入后登记Spring事件，由D的`AFTER_COMMIT`监听器在提交成功后消费。重复支付不重复登记，事务回滚不触发消费者，影院摘要缺失、过期、空区域或查询异常时支付继续并等待对账补偿。
 - 契约与数据影响：没有新增或修改REST、OpenAPI、数据库表、Flyway、认证或Agent契约；未访问D的Mapper、Repository、Entity或私有表。事件仍只包含`eventId/orderId/showId/userId/cinemaArea/startAt/orderVersion/occurredAt`，不含密码、JWT、Cookie、二维码载荷或完整订单明细。
 - 已执行的验证及结果：`PaymentIntegrationTest`共11个测试通过，新增覆盖首次完整事件、原键和新键支付重放不重复、事务回滚不发布、影院摘要过期降级、同步登记失败隔离及AFTER_COMMIT消费者失败不回滚。同步最新`origin/dev`后执行`mvnw.cmd verify`通过，共99个测试、0失败、0错误、6个需显式MySQL/Redis环境变量的测试跳过；Checkstyle、SpotBugs、ArchUnit和JaCoCo通过。新增及修改的生产代码按V1.6有效口径统计约34.97%，高于30%门槛。
+- PR #20评审修正：票务模块新增独立公开`ShowContextView`，由`ShowContextQueryService`转换仓储投影；订单模块不再导入或暴露`ShowQueryRepository`类型。
 - 未验证事项、剩余风险和后续负责人：本次没有连接共享库或执行Flyway；需显式MySQL 8.4环境变量的支付集成测试本轮未运行。D仍需在自己的change中实现并验证`AFTER_COMMIT`消费者按`orderId`幂等创建`travel_task`；A/D的最近24小时PAID订单对账补偿仍是后续独立任务。PR #18已合入，当前功能分支已纯快进同步最新`origin/dev`。

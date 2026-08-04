@@ -2,7 +2,7 @@ package com.miaoyu.ticket.order.application;
 
 import com.miaoyu.ticket.content.application.ContentSummaryQueryPort;
 import com.miaoyu.ticket.ticketing.application.ShowContextQueryService;
-import com.miaoyu.ticket.ticketing.application.ShowQueryRepository;
+import com.miaoyu.ticket.ticketing.application.ShowContextView;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
@@ -40,13 +40,12 @@ public class PaymentEventContextResolver {
      * 这里仅按cinemaId组合只读快照，不保存内容副本。</p>
      */
     public Optional<PaymentEventContext> resolve(OrderRepository.OrderSnapshot order) {
-        Optional<ShowQueryRepository.ShowContext> showContext =
-                showContextQueryService.findContext(order.showId());
+        Optional<ShowContextView> showContext = showContextQueryService.findContext(order.showId());
         if (showContext.isEmpty()) {
             return Optional.empty();
         }
 
-        ShowQueryRepository.ShowContext show = showContext.get();
+        ShowContextView show = showContext.get();
         Map<Long, ContentSummaryQueryPort.CinemaSummary> summaries =
                 contentSummaryQueryPort.findCinemaSummaries(Set.of(show.cinemaId()));
         ContentSummaryQueryPort.CinemaSummary cinema = summaries.get(show.cinemaId());
