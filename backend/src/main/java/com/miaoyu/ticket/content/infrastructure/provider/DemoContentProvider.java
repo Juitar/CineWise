@@ -73,7 +73,7 @@ public class DemoContentProvider implements ContentProvider {
         List<? extends ContentItem> content = query.resourceType() == ContentResourceType.MOVIE
                 ? findMovies(catalog.movies(), query, requestedSourceId.orElse(null))
                 : findCinemas(catalog.cinemas(), query, requestedSourceId.orElse(null));
-        if (content.isEmpty()) {
+        if (content.isEmpty() && query.contentId() != null) {
             return Optional.empty();
         }
         content = attachActualIds(query.resourceType(), content, query.contentId());

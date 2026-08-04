@@ -61,6 +61,23 @@ class ContentControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.records[0].cinemaId").isString());
     }
 
+    /** 合法筛选没有命中仍代表 Demo 来源可用，C 的列表页应进入空状态而不是失败页。 */
+    @Test
+    void shouldReturnEmptyMoviePageWhenKeywordDoesNotMatchAnyContent() throws Exception {
+        mockMvc.perform(get("/api/v1/movies")
+                        .param("keyword", "NO_SUCH_CINEWISE_MOVIE")
+                        .param("page", "1")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.records").isEmpty())
+                .andExpect(jsonPath("$.data.total").value(0))
+                .andExpect(jsonPath("$.data.source").value("DEMO_CONTENT"))
+                .andExpect(jsonPath("$.data.sourceType").value("MOCK"))
+                .andExpect(jsonPath("$.data.degraded").value(true))
+                .andExpect(jsonPath("$.data.fallbackType").value("MOCK"));
+    }
+
     /** 详情必须保留来源信息，但不能把内部坐标、距离字段泄漏给前端。 */
     @Test
     void shouldExposeDetailsWithoutTicketingOrRouteFields() throws Exception {
