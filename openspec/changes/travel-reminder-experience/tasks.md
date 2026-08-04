@@ -9,7 +9,7 @@
 ## 2. 任务、事件与数据基础
 
 - [x] 2.1 D 建立 `travel` 的 api/application/domain/infrastructure 分层、任务状态和值对象；验证：模块架构测试通过，生产源文件中文有效注释率不低于 30%。
-- [ ] 2.2 D 按正式 V007 新增三张出行表的前向 Flyway 迁移并提交 A 静态复核；A 复核通过后负责授权和执行迁移验证，D 复核字段与约束；验证：独立 `cinewise_migration_check` MySQL 8 执行迁移，并覆盖非负计数、任务 `closed_at`、通知 `resolved_at` 的正反 CHECK、索引和唯一键、追加式建议快照及版本更新与快照写入同事务的并发/回滚验证。
+- [ ] 2.2 D 向 A 提交正式 V007 的三张出行表字段、约束和生命周期申请；A 复核通过后在隔离迁移提交中创建最终 Flyway SQL，并负责授权和执行迁移验证，D 复核字段与约束；验证：独立 `cinewise_migration_check` MySQL 8 执行迁移，并覆盖非负计数、任务 `closed_at`、通知 `resolved_at` 的正反 CHECK、索引和唯一键、追加式建议快照及版本更新与快照写入同事务的并发/回滚验证。
 - [ ] 2.3 D 实现 `PaymentSucceededEvent` 的 AFTER_COMMIT 消费、`eventId` 去重、`orderId` 唯一任务创建及 A 补偿共用的 `ensureTask`；验证：重复事件、首次消费失败后补偿和并发创建仅保留一个任务。
 - [ ] 2.4 D 实现 `OrderInvalidated` 的版本比较、任务取消和建议过期处理；验证：新事件取消任务，旧事件不改变任务，取消后不再生成提醒。
 - [ ] 2.5 D 提供本人任务查询、提醒时间更新与只读建议摘要 Application/API 边界；验证：跨用户不可访问，取消任务返回 `207002`，刷新频率限制返回 `107001`。
