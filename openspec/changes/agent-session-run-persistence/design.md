@@ -27,7 +27,7 @@
 
 本 Change 只引入 `agent_session`、`agent_run`、`agent_message` 和 `agent_run_step`。
 
-V008 是本 Change 的候选版本；A 复核后才正式分配，候选不等于 SQL 执行或共享库发布授权。相邻《Agent 智能决策中心系统分析设计》第 5.2 节“最小四表候选迁移字段表”是本 Change 唯一字段来源，后续完整模型章节不能用于本次迁移。
+V008 已由 A 正式分配；静态审查和版本分配不等于共享库发布授权。相邻《Agent 智能决策中心系统分析设计》第 5.2 节“最小四表候选迁移字段表”是本 Change 唯一字段来源，后续完整模型章节不能用于本次迁移。
 
 - `agent_session`：内部 `id BIGINT`、对外唯一 `session_id VARCHAR(36)`、`user_id BIGINT`、最小摘要、`status`、`active_run_id BIGINT NULL`、`create_time`、`update_time`、`expire_at`。`active_run_id` 逻辑关联 `agent_run.id`，允许空值；使用 `CHECK (active_run_id IS NULL OR active_run_id > 0)`，并建唯一索引，防止同一运行被多个会话占用。
 - `agent_run`：内部 `id BIGINT`、对外唯一 `run_id VARCHAR(36)`、`session_id BIGINT`、`user_id BIGINT`、`client_request_id VARCHAR(36)`、请求摘要哈希、计划 ID/版本、`status`、开始/结束时间、`trace_id`、`create_time`、`update_time`、`expire_at`。对 `(user_id, session_id, client_request_id)` 建唯一键，确保同一请求返回原 runId。
@@ -58,7 +58,7 @@ V008 是本 Change 的候选版本；A 复核后才正式分配，候选不等�
 
 ### 2. 当前用户只能来自 C 的认证上下文
 
-Application Service 依赖 `CurrentUserAccessor`，使用其返回的用户 ID 查询或创建 B 的记录。Repository 方法均带 `userId + sessionId/runId` 条件；查询不到按“资源不存在”处理，避免暴露其他用户的会话是否存在。
+Application Service 依赖 `CurrentUserAccessor`，使用其返回的用户 ID 查询或创建 B 的记录。Repository 方法均带 `userId + sessionId/runId` 条件；查询不到按“资源不存在”处理，避免暴露其他用户的会话是否存在。C 已确认未认证时 `requireCurrentUserId()` 统一返回 `401 / 201006 / SESSION_INVALID`；B 直接复用，不新建身份解析逻辑，也不映射为 Agent 私有错误码。
 
 不采用由 Controller 传递 `userId`，因为本 Change 暂不新增 Controller，且请求体中的身份不可信。也不让模型或工具上下文携带用户身份。
 
@@ -74,17 +74,21 @@ Application Service 依赖 `CurrentUserAccessor`，使用其返回的用户 ID �
 
 ### 4. 数据库负责重复请求和活动运行的最终判断
 
-`agent_run` 对 `user_id + session_id + client_request_id` 建唯一索引，保存请求摘要哈希。相同摘要重复请求返回既有运行；摘要不同拒绝，防止客户端错误复用请求标识。并发插入触发唯一键冲突时重新读取既有运行并按摘要做同样判断。会话占用通过条件更新，并在 Repository 返回受影响行数为零时读取现有活动运行并返回 `206008`。
+`agent_run` 对 `user_id + session_id + client_request_id` 建唯一索引，保存请求摘要哈希。相同摘要重复请求返回既有运行；摘要不同返回 `409 / 206009`，防止客户端错误复用请求标识。并发插入触发唯一键冲突时重新读取既有运行并按摘要做同样判断。会话占用通过条件更新，并在 Repository 返回受影响行数为零时读取现有活动运行并返回 `206008`。
 
 不采用仅 Redis 锁或内存 Map：进程重启、Redis 故障和多实例都会使它们无法作为最终依据。Redis 活跃上下文会在后续 Change 作为加速层接入。
 
-### 5. 迁移先停在规划和接口层，等待 A 正式分配版本
+### 5. Agent MySQL 集成测试使用 CI 一次性容器
 
-仓库规则要求 A 分配 Flyway 版本并授权 MySQL 验证。V008 当前只是候选，不能据此创建迁移文件。本 Change 的设计和任务记录完整的表、索引和保留要求；A 未正式确认时不得创建迁移文件或执行共享数据库。Change 推送至可审查分支、总体设计同步并通过复核后，A 才能正式分配 V008；随后再创建仅属于 B 的受控迁移并做空 MySQL 和重复初始化验证。
+A 已正式分配 V008，并完成静态审查；已审查 SQL 的 SHA-256 为 `41E38D53F00C68A82E63F51847E7A27525B68336B176A68592A4990D871E1797`，本 Change 不修改该文件。A 已完成 V001–V008 的空 MySQL 8.4 验证；B 的 Agent 持久化集成测试不再请求或连接云端验证库。
+
+现有 `backend-mysql-integration.yml` 保留票务测试使用的 `cinewise_ticketing_concurrency_check`。工作流在同一 MySQL 8.4 服务中额外创建 `cinewise_agent_it`，仅给现有临时账号 `cinewise_ci` 授权。Agent 测试以单独 Maven 步骤运行，设置 `MYSQL_DATABASE=cinewise_agent_it` 和 `CINEWISE_MYSQL_AGENT_PERSISTENCE_IT=true`；测试安全初始化器同时校验 JDBC 是 MySQL、库名和账号精确匹配，避免误连共享库或票务测试库。
+
+工作流随后以同一临时库第二次启动相同测试类。两次 Spring 上下文均开启 Flyway：第一次执行首次迁移，第二次只校验既有历史，从而验证重复初始化不重复执行迁移。容器、数据库和账号均随 CI Job 销毁；不读取、请求、输出或保存云端 `cinewise_migration_check` 凭据。
 
 ## Risks / Trade-offs
 
-- [A 未正式分配 V008] → 只能完成规划和不依赖表的纯 Java 类型；表、Mapper、Repository 和集成测试暂停，直到 Change 可审查、总体设计同步并经 A 复核。
+- [CI 临时库初始化失败] → Agent Maven 步骤不会运行，CI 应直接失败；检查服务健康、建库授权和 `AgentPersistenceMySqlIntegrationTest` 的安全守卫，不连接云端库绕过。
 - [运行在工具调用后进程崩溃] → 初始 `RUNNING` 事实仍保留；仅启动或新消息提交时发现 `update_time` 已超过 30 秒的记录，才条件更新为失败并释放活动运行位，不自动重发工具。
 - [只读工具返回 PROCESSING] → 运行保持活动；陈旧恢复只结束超过阈值的记录，不调用工具。
 - [MySQL 不支持部分唯一索引] → 以会话活动 run 条件更新保证单会话活动约束，而非依赖 `RUNNING` 状态的部分唯一索引。
@@ -94,11 +98,10 @@ Application Service 依赖 `CurrentUserAccessor`，使用其返回的用户 ID �
 
 1. B 完成数据字段、索引、30 天保留和测试方案的 OpenSpec 规划。
 2. B 推送完整 Change 并同步总体和 Agent 详细设计；A 复核无物理外键、逐字段定义、状态 CHECK、索引、30 天清理顺序、CAS、陈旧恢复规则和请求哈希后，正式分配本 Change 的 V008。
-3. B 创建迁移脚本及 Entity/Mapper/Repository；A 授权后在空 MySQL 验证，再做重复初始化和旧应用兼容检查。
+3. B 创建迁移脚本及 Entity/Mapper/Repository；A 完成 V001–V008 空 MySQL 验证后，B 在 CI 一次性 MySQL 8.4 容器的 `cinewise_agent_it` 运行 Agent 集成测试和重复初始化验证。
 4. 发布时先部署兼容表结构，再部署 B 应用代码；本 Change 不读取或修改其他模块表。
 5. 回退应用时保留新增表，不回滚已执行迁移；后续结构修复只通过新的向前迁移完成。
 
 ## Open Questions
 
-- A：在 Change 和总体设计已进入可审查分支并复核后，请正式确认 V008；版本分配不等于 SQL 执行或共享库发布授权。
-- C：`CurrentUserAccessor` 的“未认证”异常与现有 `Result<T>` 映射是否可直接复用；本 Change 不新增 HTTP 接口，不阻塞数据层设计。
+- 无。C 已确认 `CurrentUserAccessor` 的未认证请求复用 `401 / 201006 / SESSION_INVALID`；本 Change 不新增 HTTP 接口。

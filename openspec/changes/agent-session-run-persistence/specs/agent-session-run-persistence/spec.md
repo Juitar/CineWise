@@ -27,7 +27,7 @@
 - **AND** 运行保持 `RUNNING`，系统不得把结果未知改写为失败或重新调用工具
 
 ### Requirement: 同一会话只能有一个活动运行且重复请求不得再次执行
-系统 SHALL 使用数据库条件更新和唯一约束保证同一会话同一时刻最多一个 `RUNNING` 运行。新请求必须在同一短事务内插入 `agent_run`、写入用户消息并执行 `active_run_id IS NULL` 的条件更新；条件更新失败时整笔事务 MUST 回滚并返回 `409 / 206008`。相同当前用户、会话和 `clientRequestId` 的重复提交 MUST 返回既有运行及已保存结果，不得再次调用 `MinimalReadOnlyAgentService` 或 D 的只读工具；相同 `clientRequestId` 但请求摘要不同 MUST 被拒绝。`agent_run` MUST 对 `user_id + session_id + client_request_id` 建唯一约束。会话已有其他活动运行时，系统 MUST 返回 Agent 活动运行冲突，不创建第二个运行。
+系统 SHALL 使用数据库条件更新和唯一约束保证同一会话同一时刻最多一个 `RUNNING` 运行。新请求必须在同一短事务内插入 `agent_run`、写入用户消息并执行 `active_run_id IS NULL` 的条件更新；条件更新失败时整笔事务 MUST 回滚并返回 `409 / 206008`。相同当前用户、会话和 `clientRequestId` 的重复提交 MUST 返回既有运行及已保存结果，不得再次调用 `MinimalReadOnlyAgentService` 或 D 的只读工具；相同 `clientRequestId` 但请求摘要不同 MUST 返回 `409 / 206009`。`agent_run` MUST 对 `user_id + session_id + client_request_id` 建唯一约束。会话已有其他活动运行时，系统 MUST 返回 Agent 活动运行冲突，不创建第二个运行。
 
 #### Scenario: 网络重试返回既有运行
 - **WHEN** 同一用户对同一会话以相同 `clientRequestId` 和相同请求摘要重复提交消息
@@ -58,20 +58,28 @@
 - **AND** 后续运行继续保持会话活动占用
 
 ### Requirement: Agent 表迁移必须经过 A 的版本分配和授权
-系统 SHALL 在本 Change 中记录四张 Agent 表的完整字段、正数和状态 CHECK、唯一键、查询索引、`expire_at` 索引、30 天清理顺序和兼容方案。V008 只是候选版本；在 Change 推送至可审查分支、总体设计同步且 A 正式分配版本并授权前，B MUST NOT 创建可执行 Flyway 脚本、启用迁移或修改共享数据库。获授权后迁移 MUST 使用 B 自有的 `agent_session`、`agent_run`、`agent_message` 和 `agent_run_step` 表，不建立物理外键，并使用全局 ID、`DATETIME(3)`、必要索引和 30 天清理字段。本 Change MUST NOT 创建 `agent_event`、`agent_action`、`agent_feedback` 或 `agent_tool_call`。
+系统 SHALL 在本 Change 中记录四张 Agent 表的完整字段、正数和状态 CHECK、唯一键、查询索引、`expire_at` 索引、30 天清理顺序和兼容方案。A 已正式分配 V008 并完成 SQL 静态审查；迁移只使用 B 自有的 `agent_session`、`agent_run`、`agent_message` 和 `agent_run_step` 表，不建立物理外键，并使用全局 ID、`DATETIME(3)`、必要索引和 30 天清理字段。本 Change MUST NOT 创建 `agent_event`、`agent_action`、`agent_feedback` 或 `agent_tool_call`。B 不得修改共享数据库或已审查的 V008 SQL。
 
-#### Scenario: 未获得 A 授权时停止迁移实现
-- **WHEN** Change 规划已完成但 A 尚未分配迁移版本或授权执行
-- **THEN** B 可以保留数据模型、Repository 接口和测试设计
-- **AND** 不创建或执行 Flyway 脚本，不连接共享数据库
-
-#### Scenario: A 授权后生成受控迁移
-- **WHEN** A 已确认表字段、索引、生命周期并分配迁移版本
-- **THEN** B 使用该版本创建仅包含 Agent 表的迁移脚本和空 MySQL 验证
+#### Scenario: 已分配迁移保持受控
+- **WHEN** B 在本 Change 中开发或验证 Agent 持久化代码
+- **THEN** B 保持已静态审查的 V008 SQL 内容不变，且不连接或修改共享数据库
 - **AND** 迁移不修改 A、C 或 D 拥有的表
 
+### Requirement: Agent MySQL 集成测试必须使用 CI 一次性临时库
+系统 SHALL 在 GitHub Actions 的一次性 MySQL 8.4 服务中，为 Agent 集成测试额外创建 `cinewise_agent_it` 并只授权临时账号 `cinewise_ci`。`AgentPersistenceMySqlIntegrationTest` MUST 仅在 `CINEWISE_MYSQL_AGENT_PERSISTENCE_IT=true`、JDBC 数据库名为 `cinewise_agent_it`、用户名为 `cinewise_ci` 时执行。CI MUST 先在空库启动 Flyway 并运行测试，再以相同库重复启动一次以验证 Flyway 不重复执行历史迁移。该测试 MUST NOT 连接云端 `cinewise_migration_check`、读取云端凭据或使用共享 `cinewise` 数据库。
+
+#### Scenario: CI 在空库验证并重复初始化
+- **WHEN** 满足 CI Agent MySQL 集成测试的工作流触发条件
+- **THEN** 工作流在 `cinewise_agent_it` 执行 Agent 持久化测试，确认 V008 成功写入 `flyway_schema_history`
+- **AND** 第二次启动在相同临时库完成，不重复执行历史迁移
+
+#### Scenario: 非 CI 数据源拒绝执行
+- **WHEN** Agent MySQL 集成测试的数据源不是 `cinewise_agent_it / cinewise_ci`
+- **THEN** 测试上下文在执行业务断言前失败
+- **AND** 不会向其他数据库写入测试数据
+
 ### Requirement: 最小四表字段表必须是唯一迁移依据
-系统 SHALL 以 Agent 详细设计第 5.2 节的最小四表候选迁移字段表作为本 Change 的唯一字段、类型、长度、可空性、默认值、CHECK、唯一键和索引依据。该表冻结 `agent_session`、`agent_run`、`agent_message`、`agent_run_step` 的状态、角色、消息类型、终态时间和组合关系。详细设计的未来完整模型 MUST 标明不适用于本次迁移；A 正式分配 V008 时不得改变该字段表。
+系统 SHALL 以 Agent 详细设计第 5.2 节的最小四表候选迁移字段表作为本 Change 的唯一字段、类型、长度、可空性、默认值、CHECK、唯一键和索引依据。该表冻结 `agent_session`、`agent_run`、`agent_message`、`agent_run_step` 的状态、角色、消息类型、终态时间和组合关系。详细设计的未来完整模型 MUST 标明不适用于本次迁移；A 分配 V008 时未改变该字段表。
 
 #### Scenario: 迁移实现只采用最小四表字段表
 - **WHEN** A 已正式分配本 Change 的迁移版本并授权实现
