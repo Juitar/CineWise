@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: frontend-verify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -18,33 +22,60 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect frontend changes
+        id: changes
+        shell: bash
+        working-directory: .
+        env:
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          CI_EVENT_NAME: ${{ github.event_name }}
+        run: >-
+          bash .github/scripts/detect-ci-changes.sh
+          frontend/
+          .github/workflows/frontend-verify.yml
+          .github/scripts/detect-ci-changes.sh
       - name: Set up pnpm 10.34.5
+        if: steps.changes.outputs.run == 'true'
         uses: pnpm/action-setup@v4
         with:
           version: 10.34.5
       - name: Set up Node 24.18.0
+        if: steps.changes.outputs.run == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 24.18.0
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - name: Install dependencies
+        if: steps.changes.outputs.run == 'true'
         run: pnpm install --frozen-lockfile
       - name: Check formatting
+        if: steps.changes.outputs.run == 'true'
         run: pnpm format:check
       - name: Lint source
+        if: steps.changes.outputs.run == 'true'
         run: pnpm lint
       - name: Check TypeScript
+        if: steps.changes.outputs.run == 'true'
         run: pnpm typecheck
       - name: Run unit and component tests
+        if: steps.changes.outputs.run == 'true'
         run: pnpm test
       - name: Build frontend
+        if: steps.changes.outputs.run == 'true'
         run: pnpm build:verify
       - name: Install Chromium
+        if: steps.changes.outputs.run == 'true'
         run: pnpm exec playwright install --with-deps chromium
       - name: Run production browser flow tests
+        if: steps.changes.outputs.run == 'true'
         run: pnpm e2e:production
       - name: Run browser flow tests
+        if: steps.changes.outputs.run == 'true'
         run: pnpm e2e
       - name: Run production Nginx smoke
+        if: steps.changes.outputs.run == 'true'
         run: pnpm e2e:production-nginx
