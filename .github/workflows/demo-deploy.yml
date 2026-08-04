@@ -111,6 +111,8 @@ jobs:
             -p "$deploy_port" \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=10 \
             "$DEPLOY_USER@$DEPLOY_HOST" \
             "DEPLOY_PATH_BASE64='$deploy_path_base64' DEPLOY_SHA='$DEPLOY_SHA' bash -se" <<'REMOTE'
           set -Eeuo pipefail
@@ -144,7 +146,8 @@ jobs:
           git checkout --detach "$DEPLOY_SHA"
 
           if docker compose config --quiet \
-            && docker compose up -d --build --remove-orphans --wait --wait-timeout 240; then
+            && docker compose --progress=plain build \
+            && docker compose up -d --remove-orphans --wait --wait-timeout 240; then
             docker compose ps
             echo "Deployed $DEPLOY_SHA successfully."
             exit 0
@@ -153,7 +156,8 @@ jobs:
           echo "Deployment failed; restoring $previous_sha." >&2
           git checkout --detach "$previous_sha"
           docker compose config --quiet
-          docker compose up -d --build --remove-orphans --wait --wait-timeout 240
+          docker compose --progress=plain build
+          docker compose up -d --remove-orphans --wait --wait-timeout 240
           docker compose ps
           echo "Rollback completed; the failed deployment remains reported as failed." >&2
           exit 1
