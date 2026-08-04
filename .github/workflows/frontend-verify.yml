@@ -42,9 +42,9 @@ jobs:
         run: pnpm build:verify
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
-      - name: Run browser flow tests
-        run: pnpm e2e
       - name: Run production browser flow tests
         run: pnpm e2e:production
+      - name: Run browser flow tests
+        run: pnpm e2e
       - name: Run production Nginx smoke
         run: pnpm e2e:production-nginx
