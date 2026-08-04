@@ -2,7 +2,10 @@ package com.miaoyu.ticket.content.application;
 
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
+import com.miaoyu.ticket.content.domain.CinemaContent;
+import com.miaoyu.ticket.content.domain.ContentItem;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
+import com.miaoyu.ticket.content.domain.MovieContent;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -58,8 +61,10 @@ public class ContentSyncService {
             if (content.result().source().type() != ContentSourceType.LIVE) {
                 continue;
             }
-            snapshots.save(content.query(), content.result());
-            cache.save(content.query(), content.result());
+            ContentResult<List<? extends ContentItem>> contentWithBusinessIds =
+                    assignBusinessIds(content.result());
+            snapshots.save(content.query(), contentWithBusinessIds);
+            cache.save(content.query(), contentWithBusinessIds);
             synchronizedCount++;
         }
         // 审计只保存统计值和固定状态，不保存 Provider 原始 JSON、关键词或任何用户数据。
@@ -70,6 +75,41 @@ public class ContentSyncService {
                 batch.errorCode(), batch.attemptedCount(), synchronizedCount, failureCount, startedAt, finishedAt,
                 auditSummary(batch, contents, synchronizedCount, failureCount, startedAt, finishedAt)));
         return synchronizedCount;
+    }
+
+    /**
+     * 将已验证的 Provider 内容关联到本库业务 ID，避免来源 ID 进入公开 REST 契约。
+     *
+     * <p>影片和影院表以来源和来源 ID 作为并发下的幂等最终防线。即使同一批次被重复触发，持久化端口也会
+     * 查回既有业务 ID；快照和缓存因此始终可被 Controller 作为公开业务资源返回。</p>
+     */
+    private ContentResult<List<? extends ContentItem>> assignBusinessIds(
+            ContentResult<List<? extends ContentItem>> result) {
+        List<ContentItem> identifiedItems = result.data().stream()
+                .map(item -> assignBusinessId(item, result))
+                .toList();
+        return new ContentResult<>(identifiedItems, result.source(), result.dataTime(), result.expiresAt(),
+                result.expired(), result.degraded(), result.fallbackType());
+    }
+
+    private ContentItem assignBusinessId(ContentItem item, ContentResult<?> result) {
+        if (item instanceof MovieContent movie) {
+            long movieId = persistence.ensureMovie(new ContentPersistencePort.MovieRow(
+                    idGenerator.nextId(), movie.sourceMovieId(), movie.title(), movie.genresJson(),
+                    movie.durationMinutes(), movie.rating(), result.source().type(), result.source().name(),
+                    result.dataTime(), result.expiresAt()));
+            return new MovieContent(movieId, movie.sourceMovieId(), movie.title(), movie.genresJson(),
+                    movie.durationMinutes(), movie.rating());
+        }
+        if (item instanceof CinemaContent cinema) {
+            long cinemaId = persistence.ensureCinema(new ContentPersistencePort.CinemaRow(
+                    idGenerator.nextId(), cinema.sourceCinemaId(), cinema.name(), cinema.cityCode(), cinema.area(),
+                    cinema.address(), cinema.longitude(), cinema.latitude(), result.source().type(),
+                    result.source().name(), result.dataTime(), result.expiresAt()));
+            return new CinemaContent(cinemaId, cinema.sourceCinemaId(), cinema.name(), cinema.cityCode(),
+                    cinema.area(), cinema.address(), cinema.longitude(), cinema.latitude());
+        }
+        throw new IllegalArgumentException("Unsupported live content item: " + item.getClass().getName());
     }
 
     /** 数据库现有四种状态已足够表达本轮结果，无须为了审计摘要新增字段或枚举值。 */

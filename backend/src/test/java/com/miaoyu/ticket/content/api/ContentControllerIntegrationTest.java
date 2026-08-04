@@ -4,9 +4,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.miaoyu.ticket.content.application.ContentCachePort;
+import com.miaoyu.ticket.content.application.ContentQuery;
+import com.miaoyu.ticket.content.application.ContentResult;
+import com.miaoyu.ticket.content.domain.ContentItem;
+import com.miaoyu.ticket.content.domain.ContentResourceType;
+import com.miaoyu.ticket.content.domain.ContentSource;
+import com.miaoyu.ticket.content.domain.ContentSourceType;
+import com.miaoyu.ticket.content.domain.MovieContent;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -30,6 +41,9 @@ class ContentControllerIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ContentCachePort contentCachePort;
 
     /**
      * 公共内容页面不应依赖登录；列表同时校验 C 要求的分页、Demo 标识和 ISO 偏移时间。
@@ -76,6 +90,25 @@ class ContentControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.sourceType").value("MOCK"))
                 .andExpect(jsonPath("$.data.degraded").value(true))
                 .andExpect(jsonPath("$.data.fallbackType").value("MOCK"));
+    }
+
+    /** 同步后的 LIVE 内容必须带本库业务 ID，公开列表不能把来源 ID 或空 ID 当成详情资源。 */
+    @Test
+    void shouldExposeSynchronizedLiveMovieUsingItsInternalBusinessId() throws Exception {
+        ContentQuery query = new ContentQuery(ContentResourceType.MOVIE, null, null, "同步验证影片");
+        ContentResult<List<? extends ContentItem>> synchronizedMovie = new ContentResult<>(List.of(
+                new MovieContent(2_001L, "netstart-movie-1", "同步验证影片", "[\"剧情\"]", 90,
+                        new BigDecimal("8.0"))),
+                new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE),
+                LocalDateTime.of(2026, 8, 3, 8, 0), LocalDateTime.of(2026, 8, 3, 14, 0), false, false, null);
+        contentCachePort.save(query, synchronizedMovie);
+
+        mockMvc.perform(get("/api/v1/movies").param("keyword", "同步验证影片"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records.length()").value(1))
+                .andExpect(jsonPath("$.data.records[0].movieId").value("2001"))
+                .andExpect(jsonPath("$.data.source").value("NETSTART_MAOYAN"))
+                .andExpect(jsonPath("$.data.sourceType").value("LIVE"));
     }
 
     /** 详情必须保留来源信息，但不能把内部坐标、距离字段泄漏给前端。 */
