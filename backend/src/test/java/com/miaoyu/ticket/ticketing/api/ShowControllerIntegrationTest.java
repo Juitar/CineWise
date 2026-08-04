@@ -8,7 +8,6 @@ import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -119,8 +118,7 @@ class ShowControllerIntegrationTest {
 
         mockMvc.perform(get("/api/v1/shows/available-dates")
                         .param("movieId", show.get("MOVIE_ID").toString())
-                        .param("cinemaId", show.get("CINEMA_ID").toString())
-                        .with(user("available-date-test")))
+                        .param("cinemaId", show.get("CINEMA_ID").toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.dates").isArray())
@@ -133,22 +131,31 @@ class ShowControllerIntegrationTest {
     void givenMissingInvalidOrUnknownIds_whenQueryAvailableDates_thenReturnBadRequestOrEmptyDates() throws Exception {
         String cinemaId = jdbcTemplate.queryForObject("SELECT MIN(id) FROM cinema", String.class);
         mockMvc.perform(get("/api/v1/shows/available-dates")
-                        .param("cinemaId", cinemaId)
-                        .with(user("available-date-test")))
+                        .param("cinemaId", cinemaId))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(100001));
 
         mockMvc.perform(get("/api/v1/shows/available-dates")
                         .param("movieId", "not-a-number")
-                        .param("cinemaId", cinemaId)
-                        .with(user("available-date-test")))
+                        .param("cinemaId", cinemaId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(100001));
+
+        mockMvc.perform(get("/api/v1/shows/available-dates")
+                        .param("movieId", "0")
+                        .param("cinemaId", cinemaId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(100001));
+
+        mockMvc.perform(get("/api/v1/shows/available-dates")
+                        .param("movieId", "-1")
+                        .param("cinemaId", cinemaId))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(100001));
 
         mockMvc.perform(get("/api/v1/shows/available-dates")
                         .param("movieId", Long.toString(Long.MAX_VALUE))
-                        .param("cinemaId", Long.toString(Long.MAX_VALUE))
-                        .with(user("available-date-test")))
+                        .param("cinemaId", Long.toString(Long.MAX_VALUE)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.dates").isEmpty());
     }
