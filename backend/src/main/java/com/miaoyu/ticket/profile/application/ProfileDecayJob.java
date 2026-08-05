@@ -33,12 +33,15 @@ public class ProfileDecayJob {
     LocalDateTime nowUtc = LocalDateTime.ofInstant(now, ZoneOffset.UTC);
     int changed = 0;
     for (ProfileTagRepository.Snapshot tag : findDueTags()) {
-      Instant lastUpdatedAt = tag.updatedAt().toInstant(ZoneOffset.UTC);
-      boolean expired = BehaviorTagDecay.isExpired(lastUpdatedAt, now);
+      Instant lastDecayAt = tag.updatedAt().toInstant(ZoneOffset.UTC);
+      // expiresAt 是最后行为时间确定的固定终止时间，不能被任务自身 update_time 覆盖。
+      boolean expired =
+          tag.expiresAt() == null
+              || BehaviorTagDecay.isExpiredAt(tag.expiresAt().toInstant(ZoneOffset.UTC), now);
       if (tagRepository.updateBehaviorState(
           tag.id(),
           tag.version(),
-          expired ? tag.weight() : BehaviorTagDecay.decay(tag.weight(), lastUpdatedAt, now),
+          expired ? tag.weight() : BehaviorTagDecay.decay(tag.weight(), lastDecayAt, now),
           expired ? ProfileTagStatus.EXPIRED : ProfileTagStatus.ACTIVE,
           tag.expiresAt(),
           nowUtc)) {

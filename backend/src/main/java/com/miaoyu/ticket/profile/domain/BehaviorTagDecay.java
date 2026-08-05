@@ -21,8 +21,11 @@ public final class BehaviorTagDecay {
     return result.setScale(3, RoundingMode.HALF_UP);
   }
 
-  /** 第 90 天开始不再作为画像输入。 */
-  public static boolean isExpired(Instant lastUpdatedAt, Instant now) {
-    return !now.isBefore(lastUpdatedAt.plus(Duration.ofDays(90)));
+  /**
+   * 行为标签的 expiresAt 由新行为创建或聚合时确定，衰减任务不能改它。
+   * 因此任务更新 update_time 后，也不会把 90 天终态推迟。
+   */
+  public static boolean isExpiredAt(Instant expiresAt, Instant now) {
+    return !expiresAt.isAfter(now);
   }
 }

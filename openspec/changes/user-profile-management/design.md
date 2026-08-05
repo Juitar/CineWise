@@ -26,7 +26,7 @@
 
 `user_preference` 每用户一行，保存 `personalization_enabled` 和乐观锁版本；`user_profile_tag` 保存可解释的长期偏好；`user_behavior_event` 保存最小化、可去重的行为证据。用户 ID 仅复用 C 从认证上下文提供的 `sys_user.id`，D 不生成也不接收请求体中的 userId。
 
-标签来源为 `MANUAL`、`CONVERSATION`、`BEHAVIOR`。冲突时采用最新 `MANUAL`、最新 `CONVERSATION`、聚合 `BEHAVIOR` 的顺序；相同来源取较新的 `updatedAt`。显式标签权重范围为 0.10 到 1.00，不自动衰减；行为标签最高 0.80，30 天乘以 0.85，90 天无新事件转为 `EXPIRED`。
+标签来源为 `MANUAL`、`CONVERSATION`、`BEHAVIOR`。冲突时采用最新 `MANUAL`、最新 `CONVERSATION`、聚合 `BEHAVIOR` 的顺序；相同来源取较新的 `updatedAt`。显式标签权重范围为 0.10 到 1.00，不自动衰减；行为标签最高 0.80，30 天乘以 0.85，90 天无新事件转为 `EXPIRED`。行为标签创建或新行为聚合时把最后行为时间加 90 天写入 `expires_at`；衰减任务只更新权重和 `update_time`，绝不改 `expires_at`，以免将终态延后。
 
 本 change 统一采用 `MOVIE_GENRE`、`TIME`、`CINEMA`、`HALL`、`PRICE`、`SEAT` 六种 `tag_type`；旧文档和夹具中的 `GENRE` 一律视为 `MOVIE_GENRE`，不得两者并存。`polarity` 只允许 `LIKE`、`DISLIKE`；`source` 只允许 `MANUAL`、`CONVERSATION`、`BEHAVIOR`，旧 `DIALOG` 映射为 `CONVERSATION`，旧 `ORDER` 不再作为标签来源，支付行为产生的标签统一为 `BEHAVIOR`。`status` 只允许 `ACTIVE`、`DISABLED`、`EXPIRED`、`DELETED`；只有 `DELETED` 必须有 `deleted_at`，其他状态必须没有 `deleted_at`。
 

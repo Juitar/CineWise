@@ -21,7 +21,7 @@ class ProfileDecayJobTest {
 
   @Test
   void shouldDecayThirtyDayOldBehaviorTagWithVersionCondition() {
-    RecordingRepository repository = new RecordingRepository(snapshot(31, "0.800"));
+    RecordingRepository repository = new RecordingRepository(snapshot(31, 59, "0.800"));
     ProfileDecayJob job = new ProfileDecayJob(repository, Clock.fixed(NOW, ZoneOffset.UTC));
 
     assertThat(job.executeOnce()).isEqualTo(1);
@@ -31,15 +31,17 @@ class ProfileDecayJobTest {
   }
 
   @Test
-  void shouldExpireNinetyDayOldBehaviorTag() {
-    RecordingRepository repository = new RecordingRepository(snapshot(90, "0.680"));
+  void shouldExpireAtOriginalBehaviorDeadlineAfterPriorDecayUpdatedTime() {
+    // 已在第 60 天衰减过，所以 update_time 只有 30 天；仍必须在原行为的第 90 天过期。
+    RecordingRepository repository = new RecordingRepository(snapshot(30, 0, "0.680"));
     ProfileDecayJob job = new ProfileDecayJob(repository, Clock.fixed(NOW, ZoneOffset.UTC));
 
     assertThat(job.executeOnce()).isEqualTo(1);
     assertThat(repository.updatedStatus).isEqualTo(ProfileTagStatus.EXPIRED);
   }
 
-  private static ProfileTagRepository.Snapshot snapshot(int daysOld, String weight) {
+  private static ProfileTagRepository.Snapshot snapshot(
+      int daysSinceLastDecay, int daysUntilExpiry, String weight) {
     return new ProfileTagRepository.Snapshot(
         11L,
         12L,
@@ -50,9 +52,9 @@ class ProfileDecayJobTest {
         ProfileTagSource.BEHAVIOR,
         new BigDecimal("0.800"),
         ProfileTagStatus.ACTIVE,
-        LocalDateTime.ofInstant(NOW.plusSeconds(86400), ZoneOffset.UTC),
+        LocalDateTime.ofInstant(NOW.plusSeconds(daysUntilExpiry * 86400L), ZoneOffset.UTC),
         7L,
-        LocalDateTime.ofInstant(NOW.minusSeconds(daysOld * 86400L), ZoneOffset.UTC));
+        LocalDateTime.ofInstant(NOW.minusSeconds(daysSinceLastDecay * 86400L), ZoneOffset.UTC));
   }
 
   private static final class RecordingRepository implements ProfileTagRepository {
