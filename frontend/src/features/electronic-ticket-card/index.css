@@ -1,0 +1,177 @@
+/* 电子票（票根容器）样式 */
+.ticket-card-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  background-color: var(--color-bg-container, #fff);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 10%);
+  overflow: hidden;
+  position: relative;
+}
+
+.ticket-card-container.status-refunded {
+  opacity: 0.75;
+  filter: grayscale(60%);
+}
+
+.ticket-offline-alert {
+  margin: 12px 16px 0;
+}
+
+/* 主卡部 */
+.ticket-card-main {
+  padding: 20px 24px 16px;
+  position: relative;
+}
+
+.ticket-main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.ticket-movie-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #262626;
+  margin: 0;
+}
+
+.ticket-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ticket-info-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ticket-info-label {
+  color: #8c8c8c;
+}
+
+.ticket-info-value {
+  color: #262626;
+  font-weight: 500;
+}
+
+.seats-highlight {
+  color: #1677ff;
+  font-weight: 600;
+}
+
+/* 已退票红色水印浮层 */
+.ticket-refunded-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-18deg);
+  border: 3px solid #ff4d4f;
+  border-radius: 8px;
+  padding: 8px 24px;
+  color: #ff4d4f;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  pointer-events: none;
+  background-color: rgba(255, 255, 255, 90%);
+  z-index: 2;
+}
+
+/* 票根视觉切口与虚线分隔（唯一创新处） */
+.ticket-stub-divider {
+  position: relative;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  background-color: transparent;
+}
+
+.ticket-dashed-line {
+  flex: 1;
+  border-top: 2px dashed #d9d9d9;
+  margin: 0 16px;
+}
+
+.ticket-cutout {
+  width: 24px;
+  height: 24px;
+  background-color: #f0f2f5;
+  border-radius: 50%;
+  position: absolute;
+  top: 0;
+}
+
+.ticket-cutout.left {
+  left: -12px;
+}
+
+.ticket-cutout.right {
+  right: -12px;
+}
+
+/* 副卡部（二维码及票号展示） */
+.ticket-card-footer {
+  padding: 16px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  background-color: #fafafa;
+}
+
+.ticket-qr-placeholder {
+  width: 180px;
+  height: 180px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+.ticket-qr-box {
+  width: 100%;
+  height: 100%;
+  border: 2px dashed #8c8c8c;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 8px;
+}
+
+.ticket-qr-tip {
+  font-size: 12px;
+  color: #595959;
+  line-height: 1.4;
+}
+
+.ticket-code-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+
+.ticket-code-label {
+  color: #595959;
+}
+
+.ticket-code-value {
+  color: #262626;
+  font-weight: 700;
+  letter-spacing: 2px;
+}

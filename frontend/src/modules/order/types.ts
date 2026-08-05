@@ -19,8 +19,88 @@ export interface OrderResponse {
   ticketCount: number;
   unitPrice: string;
   totalAmount: string;
-  status: 'PENDING_PAYMENT' | 'PAID' | 'CANCELLED' | 'REFUNDING' | 'REFUNDED' | 'EXPIRED';
+  status: OrderStatus;
   expireTime: string;
+  stateVersion: number;
+  updatedAt: string;
+}
+
+export type OrderStatus =
+  'PENDING_PAYMENT' | 'PAYING' | 'PAID' | 'CANCELLED' | 'EXPIRED' | 'REFUNDING' | 'REFUNDED';
+
+export interface OrderPageResponse {
+  total: number;
+  page: number;
+  size: number;
+  records: OrderResponse[];
+}
+
+export interface OrderQuery {
+  orderNo?: string;
+  status?: OrderStatus;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  size?: number;
+}
+
+export type PaymentStatus = 'INITIALIZED' | 'PROCESSING' | 'SUCCESS';
+
+export interface PaymentResponse {
+  orderId: string;
+  orderNo: string;
+  paymentNo: string;
+  orderStatus: OrderStatus;
+  paymentStatus: PaymentStatus;
+  ticketId: string | null;
+  stateVersion: number;
+  updatedAt: string;
+}
+
+export type ElectronicTicketStatus = 'VALID' | 'REFUNDED' | 'INVALIDATED';
+
+export interface ElectronicTicketResponse {
+  ticketId: string;
+  ticketCode: string;
+  orderId: string;
+  orderNo: string;
+  showId: string;
+  seatIds: string[];
+  status: ElectronicTicketStatus;
+  qrPayload: string;
+  issuedAt: string;
+  stateVersion: number;
+  updatedAt: string;
+}
+
+export interface RefundImpactResponse {
+  orderId: string;
+  orderNo: string;
+  refundAmount: string;
+  orderStatus: OrderStatus;
+  ticketStatus: ElectronicTicketStatus;
+  showStartTime: string;
+  orderVersion: number;
+  ticketVersion: number;
+  impactText: string;
+}
+
+export type RefundStatus = 'REQUESTED' | 'PROCESSING' | 'SUCCESS';
+
+export interface CreateRefundRequest {
+  refundReason?: string;
+  clientRequestId: string;
+}
+
+export interface RefundResponse {
+  refundId: string;
+  refundNo: string;
+  orderId: string;
+  orderNo: string;
+  refundStatus: RefundStatus;
+  refundAmount: string;
+  orderStatus: OrderStatus;
+  ticketStatus: ElectronicTicketStatus;
   stateVersion: number;
   updatedAt: string;
 }
@@ -37,4 +117,9 @@ export interface AlternativeShow {
   basePrice: string;
   status: 'ON_SALE' | 'OFF_SALE' | 'SOLD_OUT';
   availableSeatCount: number;
+}
+
+export interface AlternativeShowsResponse {
+  orderNo: string;
+  shows: AlternativeShow[];
 }

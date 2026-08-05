@@ -43,6 +43,36 @@ export default defineConfig({
           wrappers: ['@/shared/auth/RequireAuth'],
         },
         {
+          path: '/orders',
+          component: '@/pages/orders',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
+          path: '/orders/:orderNo/refund',
+          component: '@/pages/orders/refund',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
+          path: '/orders/:orderNo',
+          component: '@/pages/orders/detail',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
+          path: '/payments/:orderNo/result',
+          component: '@/pages/payments/result',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
+          path: '/payments/:orderNo',
+          component: '@/pages/payments',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
+          path: '/tickets/:ticketId',
+          component: '@/pages/tickets',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
           path: '/profile',
           component: '@/pages/profile',
           wrappers: ['@/shared/auth/RequireAuth'],

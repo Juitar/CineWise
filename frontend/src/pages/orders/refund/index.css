@@ -1,0 +1,16 @@
+.refund-page-wrapper {
+  padding: 24px 16px;
+  min-height: calc(100vh - 120px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background-color: #f5f5f5;
+}
+
+.refund-page-content {
+  width: 100%;
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}

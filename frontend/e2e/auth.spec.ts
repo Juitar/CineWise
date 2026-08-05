@@ -82,6 +82,35 @@ async function submitLogin(page: Page, email: string) {
   await page.getByRole('button', { name: /登\s*录/ }).click();
 }
 
+const protectedTransactionRoutes = [
+  { label: '订单列表', path: '/orders' },
+  { label: '订单详情', path: '/orders/CW2084194500000000001' },
+  { label: '模拟支付', path: '/payments/CW2084194500000000001' },
+  { label: '支付结果', path: '/payments/CW2084194500000000001/result' },
+  { label: '电子票', path: '/tickets/2084194700000000001' },
+  { label: '退票与替代场次', path: '/orders/CW2084194500000000001/refund' },
+] as const;
+
+for (const transactionRoute of protectedTransactionRoutes) {
+  test(`${transactionRoute.label}路由要求登录并在登录后返回原页面`, async ({ page }) => {
+    await installAuthApi(page);
+    await page.route('**/api/v1/orders**', async (route) => {
+      await respond(route, 404, apiResult(null, 205001, '订单不存在'));
+    });
+    await page.route('**/api/v1/tickets/**', async (route) => {
+      await respond(route, 404, apiResult(null, 205002, '电子票不存在'));
+    });
+
+    await page.goto(transactionRoute.path);
+    await expect(page).toHaveURL(
+      new RegExp(`/login\\?returnUrl=${encodeURIComponent(transactionRoute.path)}$`),
+    );
+
+    await submitLogin(page, 'user@cinewise.test');
+    await expect(page).toHaveURL(transactionRoute.path);
+  });
+}
+
 test('用户登录后恢复目标页，刷新仍保持登录，普通用户不能进入管理端', async ({ page }) => {
   await installAuthApi(page);
   await page.goto('/profile');
