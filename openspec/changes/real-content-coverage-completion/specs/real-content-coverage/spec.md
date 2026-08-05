@@ -249,7 +249,7 @@ POST 响应和按请求查询统一返回 `syncId/clientRequestId/cityName/statu
 
 A 已正式分配 V014。迁移 SHALL 仅新增 `movie` 的可空资料字段、`content_identity_mapping`、`cinema.city_name/provider_city_id` 和 `data_sync_log.city_name/provider_city_id/failure_category/lease_owner/lease_until`，不得修改 V001～V012、不得建立物理外键、不得写入演示种子或按地址、名称、区域、坐标猜测历史城市/身份。V014 SQL 草案必须先由 A 静态复核，本次不得执行。
 
-`content_identity_mapping` 必须以 `provider/resource_type/external_id` 唯一标识外部身份，以生成的 ACTIVE 内部内容 ID 约束同一 Provider、资源类型和内部内容最多一个 ACTIVE 外部 ID；`ACTIVE` 映射不得有失效字段，`INVALID` 映射必须有固定失效分类和失效时间。`movie.release_status` 只能为 `NOW_SHOWING`、`COMING_SOON` 或 `NULL`。`data_sync_log` 必须支持 `PENDING/RUNNING/SUCCESS/PARTIAL/FAILED`、`lease_owner` 和 `lease_until`：PENDING 三个计数为 0，错误字段、完成时间、持有者和租约均为空；RUNNING 的持有者和租约均非空且错误字段、完成时间为空；终态持有者和租约均为空，PARTIAL/FAILED 的失败数、错误码和固定失败分类均非空。RUNNING 租约为 90 秒，存活持有者每 20 秒按持有者续租，续租及资料/终态写入均须命中当前未到期持有者；真正过期的 RUNNING 才可转为 `FAILED + INTERNAL`，且不重调 Provider。公开接口不得返回 Provider 城市 ID 或持有者。
+`content_identity_mapping` 必须以 `provider/resource_type/external_id` 唯一标识外部身份，以生成的 ACTIVE 内部内容 ID 约束同一 Provider、资源类型和内部内容最多一个 ACTIVE 外部 ID；`ACTIVE` 映射不得有失效字段，`INVALID` 映射必须有固定失效分类和失效时间。`movie.release_status` 只能为 `NOW_SHOWING`、`COMING_SOON` 或 `NULL`。`data_sync_log` 必须保留 V004 的计数约束：三个计数非负，且 `success_count+failure_count<=total_count`；并支持 `PENDING/RUNNING/SUCCESS/PARTIAL/FAILED`、`lease_owner` 和 `lease_until`：PENDING 三个计数为 0，错误字段、完成时间、持有者和租约均为空；RUNNING 的持有者和租约均非空且计数仍不超过总数；SUCCESS 必须 `success_count=total_count/failure_count=0` 且错误字段为空；FAILED 必须 `success_count=0/failure_count=total_count>0` 且错误码、固定失败分类非空；PARTIAL 必须成功、失败计数均大于 0 且之和等于总数，并有错误码、固定失败分类；终态持有者和租约均为空。RUNNING 租约为 90 秒，存活持有者每 20 秒按持有者续租，续租及资料/终态写入均须命中当前未到期持有者；真正过期的 RUNNING 才可转为 `FAILED + INTERNAL`，且不重调 Provider。公开接口不得返回 Provider 城市 ID 或持有者。
 
 #### Scenario: 迁移后读取 V001 历史内容
 
@@ -292,6 +292,13 @@ A 已正式分配 V014。迁移 SHALL 仅新增 `movie` 的可空资料字段、
 - **WHEN** 恢复任务扫描该记录
 - **THEN** 恢复任务条件更新为 `FAILED`、`failure_category=INTERNAL`，写入固定 `303004`、终态时间并清空持有者和租约
 - **AND** 不再次调用 Provider；同一 `clientRequestId` 的查询只能返回该终态，管理员需要新请求标识才能发起新同步
+
+#### Scenario: 五种状态拒绝统计不一致的记录
+
+- **GIVEN** V014 迁移替换 V004 的同步状态计数 CHECK
+- **WHEN** 尝试写入 SUCCESS 的 `success_count<total_count`、FAILED 的 `success_count>0`、PARTIAL 的成功失败之和不等于总数，或 RUNNING 的成功失败之和大于总数
+- **THEN** 数据库必须拒绝这些记录
+- **AND** PENDING 只允许三个计数均为 0；合法的 SUCCESS、FAILED、PARTIAL 和未完成 RUNNING 记录仍可写入
 
 ### Requirement: 页面必须展示 API 内容且不得伪造票务事实
 
