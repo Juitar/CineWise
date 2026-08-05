@@ -28,6 +28,8 @@ cinewise:
     expiry-job-enabled: false
     paid-travel-reconciliation:
       enabled: false
+    refunded-travel-reconciliation:
+      enabled: false
 
 springdoc:
   api-docs:
