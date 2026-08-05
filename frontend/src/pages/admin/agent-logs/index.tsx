@@ -1,263 +1,352 @@
-import React, { useState } from 'react';
+import {
+  Alert,
+  Button,
+  Descriptions,
+  Drawer,
+  Empty,
+  Input,
+  Pagination,
+  Select,
+  Skeleton,
+  Table,
+  Tag,
+} from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'umi';
+
+import {
+  buildAdminAgentRunSearchParams,
+  parseAdminAgentRunQuery,
+} from '../../../modules/admin-agent/query';
+import {
+  resolveAdminAgentErrorState,
+  type AdminAgentErrorState,
+} from '../../../modules/admin-agent/errors';
+import { useAdminAgentRunDetail, useAdminAgentRuns } from '../../../modules/admin-agent/hooks';
+import type {
+  AdminAgentRunListQuery,
+  AdminAgentRunNode,
+  AdminAgentRunStatus,
+  AdminAgentRunSummary,
+} from '../../../modules/admin-agent/types';
 import './index.css';
 
-export default function AgentLogsPage() {
-  const [selectedLog, setSelectedLog] = useState('AG202505220015');
+const STATUS_OPTIONS: Array<{ label: string; value: AdminAgentRunStatus }> = [
+  { label: '运行中', value: 'RUNNING' },
+  { label: '已完成', value: 'COMPLETED' },
+  { label: '失败', value: 'FAILED' },
+  { label: '已取消', value: 'CANCELLED' },
+];
 
-  const logs = [
-    { id: 'AG202505220015', time: '2025-05-22 14:35:21', duration: '8.42s', status: '成功' },
-    { id: 'AG202505220014', time: '2025-05-22 14:28:07', duration: '3.21s', status: '处理中' },
-    { id: 'AG202505220013', time: '2025-05-22 14:18:44', duration: '6.17s', status: '成功' },
-    { id: 'AG202505220012', time: '2025-05-22 14:10:09', duration: '2.73s', status: '失败' },
-    { id: 'AG202505220011', time: '2025-05-22 14:02:31', duration: '5.94s', status: '成功' },
-  ];
+function statusLabel(status: string): string {
+  return STATUS_OPTIONS.find((option) => option.value === status)?.label ?? '未知状态';
+}
 
-  const renderStatus = (status: string) => {
-    switch (status) {
-      case '成功':
-        return <span className="log-status-tag status-green">成功</span>;
-      case '处理中':
-        return <span className="log-status-tag status-blue">处理中</span>;
-      case '失败':
-        return <span className="log-status-tag status-red">失败</span>;
-      default:
-        return null;
-    }
+function statusColor(status: string): string {
+  switch (status) {
+    case 'RUNNING':
+      return 'processing';
+    case 'COMPLETED':
+      return 'success';
+    case 'FAILED':
+      return 'error';
+    case 'CANCELLED':
+      return 'warning';
+    default:
+      return 'default';
+  }
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '时间待更新' : date.toLocaleString('zh-CN');
+}
+
+function formatDuration(durationMs: number | null): string {
+  if (durationMs === null) return '—';
+  return durationMs >= 1000 ? `${(durationMs / 1000).toFixed(2)} 秒` : `${durationMs} 毫秒`;
+}
+
+function errorMessage(state: AdminAgentErrorState): string {
+  return state === 'FORBIDDEN'
+    ? '当前账号没有查看 Agent 轨迹的权限'
+    : state === 'NOT_FOUND'
+      ? '请求的 Agent 运行记录不存在'
+      : 'Agent 轨迹暂时无法加载';
+}
+
+function RunStatus({ status }: { status: string }) {
+  return <Tag color={statusColor(status)}>{statusLabel(status)}</Tag>;
+}
+
+const runColumns: ColumnsType<AdminAgentRunSummary> = [
+  { dataIndex: 'runId', ellipsis: true, title: '运行 ID' },
+  { dataIndex: 'userDisplay', ellipsis: true, title: '用户' },
+  { dataIndex: 'status', render: (status: string) => <RunStatus status={status} />, title: '状态' },
+  { dataIndex: 'planId', ellipsis: true, title: '计划 ID' },
+  { dataIndex: 'planVersion', title: '计划版本' },
+  {
+    dataIndex: 'nodeCount',
+    render: (_value: number, run) =>
+      `${run.completedNodeCount}/${run.nodeCount}，失败 ${run.failedNodeCount}`,
+    title: '节点完成度',
+  },
+  { dataIndex: 'startedAt', render: formatDateTime, title: '开始时间' },
+  { dataIndex: 'durationMs', render: formatDuration, title: '耗时' },
+  {
+    dataIndex: 'errorSummary',
+    render: (value: string | null, run) =>
+      value ? `${run.errorCode ? `${run.errorCode} ` : ''}${value}` : '—',
+    title: '错误摘要',
+  },
+];
+
+const nodeColumns: ColumnsType<AdminAgentRunNode> = [
+  { dataIndex: 'nodeId', ellipsis: true, title: '节点 ID' },
+  { dataIndex: 'nodeType', title: '节点类型' },
+  { dataIndex: 'targetName', ellipsis: true, title: '目标' },
+  { dataIndex: 'status', render: (status: string) => <RunStatus status={status} />, title: '状态' },
+  { dataIndex: 'attemptCount', title: '尝试次数' },
+  { dataIndex: 'toolStatus', render: (value: string | null) => value ?? '—', title: '工具状态' },
+  { dataIndex: 'durationMs', render: formatDuration, title: '耗时' },
+  { dataIndex: 'errorSummary', render: (value: string | null) => value ?? '—', title: '错误摘要' },
+  {
+    dataIndex: 'recoveryHint',
+    render: (value: string | null) => value ?? '—',
+    title: '恢复建议',
+  },
+];
+
+/** 管理员 Agent 脱敏轨迹页；页面只组合 admin-agent 模块，不直接发送网络请求。 */
+export default function AdminAgentRunsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchParamsKey = searchParams.toString();
+  const query = useMemo(
+    () => parseAdminAgentRunQuery(new URLSearchParams(searchParamsKey)),
+    [searchParamsKey],
+  );
+  const { data, error, isLoading, isRefreshing, retry } = useAdminAgentRuns(query);
+  const [keywordDraft, setKeywordDraft] = useState(query.userKeyword ?? '');
+  const [startedFromDraft, setStartedFromDraft] = useState(query.startedFrom ?? '');
+  const [startedToDraft, setStartedToDraft] = useState(query.startedTo ?? '');
+  const [filterError, setFilterError] = useState<string | null>(null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const detailQuery = useAdminAgentRunDetail(selectedRunId);
+
+  useEffect(() => {
+    setKeywordDraft(query.userKeyword ?? '');
+    setStartedFromDraft(query.startedFrom ?? '');
+    setStartedToDraft(query.startedTo ?? '');
+  }, [query.startedFrom, query.startedTo, query.userKeyword]);
+
+  const updateQuery = (patch: Partial<AdminAgentRunListQuery>) => {
+    setSearchParams(buildAdminAgentRunSearchParams({ ...query, ...patch }));
   };
 
+  const handleSearch = () => {
+    const startedFrom = startedFromDraft.trim();
+    const startedTo = startedToDraft.trim();
+    if (
+      (startedFrom && Number.isNaN(Date.parse(startedFrom))) ||
+      (startedTo && Number.isNaN(Date.parse(startedTo)))
+    ) {
+      setFilterError('开始时间和结束时间必须使用 ISO 8601 格式');
+      return;
+    }
+    if (startedFrom && startedTo && Date.parse(startedTo) < Date.parse(startedFrom)) {
+      setFilterError('结束时间不得早于开始时间');
+      return;
+    }
+    setFilterError(null);
+    updateQuery({
+      page: 1,
+      startedFrom: startedFrom || undefined,
+      startedTo: startedTo || undefined,
+      userKeyword: keywordDraft.trim() || undefined,
+    });
+  };
+
+  const handleReset = () => {
+    setKeywordDraft('');
+    setStartedFromDraft('');
+    setStartedToDraft('');
+    setFilterError(null);
+    setSearchParams(buildAdminAgentRunSearchParams({ page: 1, size: query.size }));
+  };
+
+  const listErrorState = error ? resolveAdminAgentErrorState(error) : null;
+
   return (
-    <div className="agent-logs-page">
+    <div className="agent-runs-page">
       <nav className="admin-breadcrumb" aria-label="面包屑">
         <span>管理端</span>
         <span aria-hidden="true">&gt;</span>
-        <span className="current">Agent轨迹</span>
+        <span className="current">Agent 轨迹</span>
       </nav>
-      <h1 className="page-title">Agent轨迹</h1>
-
-      <div className="agent-logs-layout">
-        {/* Left Column: Log List */}
-        <div className="logs-sidebar">
-          <div className="logs-sidebar-title">最近运行记录</div>
-          <div className="logs-list">
-            {logs.map((log) => (
-              <button
-                type="button"
-                key={log.id}
-                className={`log-item ${selectedLog === log.id ? 'active' : ''}`}
-                onClick={() => setSelectedLog(log.id)}
-              >
-                <div className="log-item-header">
-                  <span className="log-id">{log.id}</span>
-                  {renderStatus(log.status)}
-                </div>
-                <div className="log-item-meta">
-                  <div className="meta-line">
-                    <span className="meta-icon">🕒</span> {log.time}
-                  </div>
-                  <div className="meta-line">
-                    <span className="meta-icon">⏱️</span> 总耗时 {log.duration}
-                  </div>
-                </div>
-                <div className="log-arrow">&gt;</div>
-              </button>
-            ))}
-          </div>
-          <div className="logs-load-more">查看更多 v</div>
+      <header className="agent-runs-heading">
+        <div>
+          <h1 className="page-title">Agent 轨迹</h1>
+          <p>仅展示后端返回的脱敏运行摘要，不展示思维过程和原始工具参数。</p>
         </div>
+      </header>
 
-        {/* Right Column: Log Details */}
-        <div className="logs-content">
-          {/* Run Details */}
-          <div className="log-detail-card">
-            <div className="card-title">运行详情</div>
-            <div className="run-details-grid">
-              <div className="run-detail-item">
-                <div className="detail-label">Run ID</div>
-                <div className="detail-value">
-                  {selectedLog} <span className="copy-icon">📋</span>
-                </div>
-              </div>
-              <div className="run-detail-item">
-                <div className="detail-label">状态</div>
-                <div className="detail-value">{renderStatus('成功')}</div>
-              </div>
-              <div className="run-detail-item">
-                <div className="detail-label">
-                  <span className="meta-icon">🕒</span> 开始时间
-                </div>
-                <div className="detail-value text-gray">2025-05-22 14:35:21</div>
-              </div>
-              <div className="run-detail-item">
-                <div className="detail-label">
-                  <span className="meta-icon">🕒</span> 结束时间
-                </div>
-                <div className="detail-value text-gray">2025-05-22 14:35:29</div>
-              </div>
-              <div className="run-detail-item">
-                <div className="detail-label">
-                  <span className="meta-icon">⏱️</span> 总耗时
-                </div>
-                <div className="detail-value font-medium">8.42s</div>
-              </div>
-            </div>
-            <div className="run-meta-row">
-              <div className="meta-pill">
-                <span className="pill-icon">📦</span> Agent版本 v2.3.1
-              </div>
-              <div className="meta-pill">
-                <span className="pill-icon">💻</span> 触发来源 Web
-              </div>
-              <div className="meta-pill">
-                <span className="pill-icon">🔄</span> 运行类型 推荐购票流程
-              </div>
-            </div>
-          </div>
-
-          {/* Timeline */}
-          <div className="log-detail-card">
-            <div className="card-title">执行步骤时间线</div>
-            <div className="timeline-container">
-              <div className="timeline-track"></div>
-
-              <div className="timeline-step">
-                <div className="step-icon-wrapper">
-                  <div className="step-icon">📤</div>
-                  <div className="step-number">1</div>
-                </div>
-                <div className="step-title">接收请求</div>
-                <div className="step-status status-text-green">✓ 成功</div>
-                <div className="step-duration">512ms</div>
-              </div>
-
-              <div className="timeline-step">
-                <div className="step-icon-wrapper">
-                  <div className="step-icon">🧠</div>
-                  <div className="step-number">2</div>
-                </div>
-                <div className="step-title">意图识别</div>
-                <div className="step-status status-text-green">✓ 成功</div>
-                <div className="step-duration">721ms</div>
-              </div>
-
-              <div className="timeline-step">
-                <div className="step-icon-wrapper">
-                  <div className="step-icon">🛡️</div>
-                  <div className="step-number">3</div>
-                </div>
-                <div className="step-title">参数校验</div>
-                <div className="step-status status-text-green">✓ 成功</div>
-                <div className="step-duration">436ms</div>
-              </div>
-
-              <div className="timeline-step">
-                <div className="step-icon-wrapper">
-                  <div className="step-icon">🔍</div>
-                  <div className="step-number">4</div>
-                </div>
-                <div className="step-title">查询影片与影院</div>
-                <div className="step-status status-text-green">✓ 成功</div>
-                <div className="step-duration">2.63s</div>
-              </div>
-
-              <div className="timeline-step">
-                <div className="step-icon-wrapper">
-                  <div className="step-icon">⭐</div>
-                  <div className="step-number">5</div>
-                </div>
-                <div className="step-title">推荐方案生成</div>
-                <div className="step-status status-text-green">✓ 成功</div>
-                <div className="step-duration">2.74s</div>
-              </div>
-
-              <div className="timeline-step">
-                <div className="step-icon-wrapper">
-                  <div className="step-icon">🚀</div>
-                  <div className="step-number">6</div>
-                </div>
-                <div className="step-title">返回结果</div>
-                <div className="step-status status-text-green">✓ 成功</div>
-                <div className="step-duration">1.38s</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="logs-bottom-row">
-            {/* Tool Calls */}
-            <div className="log-detail-card tools-card">
-              <div className="card-title">工具调用记录</div>
-              <table className="logs-table">
-                <thead>
-                  <tr>
-                    <th>工具名称</th>
-                    <th>状态</th>
-                    <th>开始时间</th>
-                    <th>耗时</th>
-                    <th>输出摘要</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>search_movies</td>
-                    <td>
-                      <span className="status-text-green">✓ 成功</span>
-                    </td>
-                    <td>14:35:21.742</td>
-                    <td>1.21s</td>
-                    <td>返回 12 条影片</td>
-                  </tr>
-                  <tr>
-                    <td>search_cinemas</td>
-                    <td>
-                      <span className="status-text-green">✓ 成功</span>
-                    </td>
-                    <td>14:35:22.972</td>
-                    <td>1.08s</td>
-                    <td>返回 8 家影院</td>
-                  </tr>
-                  <tr>
-                    <td>search_showtimes</td>
-                    <td>
-                      <span className="status-text-green">✓ 成功</span>
-                    </td>
-                    <td>14:35:24.051</td>
-                    <td>1.46s</td>
-                    <td>返回 8 个场次</td>
-                  </tr>
-                  <tr>
-                    <td>recommend_seats</td>
-                    <td>
-                      <span className="status-text-green">✓ 成功</span>
-                    </td>
-                    <td>14:35:25.511</td>
-                    <td>1.19s</td>
-                    <td>生成 3 个方案</td>
-                  </tr>
-                  <tr>
-                    <td>build_response</td>
-                    <td>
-                      <span className="status-text-green">✓ 成功</span>
-                    </td>
-                    <td>14:35:26.704</td>
-                    <td>0.84s</td>
-                    <td>返回响应结构</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* Summary */}
-            <div className="log-detail-card summary-card">
-              <div className="card-title">结果摘要</div>
-              <div className="summary-content">
-                <div className="trophy-icon">🏆</div>
-                <div className="summary-text">
-                  本次运行成功完成，共执行 6 个步骤，调用 5 个工具，生成 3 个推荐方案。
-                </div>
-              </div>
-            </div>
-          </div>
+      <section className="agent-runs-filters" aria-label="Agent 轨迹筛选">
+        <Input
+          aria-label="用户关键词"
+          maxLength={100}
+          onChange={(event) => setKeywordDraft(event.target.value)}
+          placeholder="脱敏用户标识"
+          value={keywordDraft}
+        />
+        <Select
+          allowClear
+          aria-label="运行状态"
+          onChange={(status: AdminAgentRunStatus | undefined) => updateQuery({ page: 1, status })}
+          options={STATUS_OPTIONS}
+          placeholder="全部状态"
+          value={query.status}
+        />
+        <Input
+          aria-label="开始时间"
+          onChange={(event) => setStartedFromDraft(event.target.value)}
+          placeholder="开始时间 ISO 8601"
+          value={startedFromDraft}
+        />
+        <Input
+          aria-label="结束时间"
+          onChange={(event) => setStartedToDraft(event.target.value)}
+          placeholder="结束时间 ISO 8601"
+          value={startedToDraft}
+        />
+        <div className="agent-runs-filter-actions">
+          <Button onClick={handleReset}>重置</Button>
+          <Button onClick={handleSearch} type="primary">
+            查询
+          </Button>
         </div>
-      </div>
+      </section>
+
+      {filterError ? (
+        <Alert className="agent-runs-status" message={filterError} showIcon type="warning" />
+      ) : null}
+
+      {error ? (
+        <Alert
+          action={
+            listErrorState === 'FORBIDDEN' ? undefined : (
+              <Button onClick={retry} size="small">
+                重试
+              </Button>
+            )
+          }
+          className="agent-runs-status"
+          description={error.traceId ? `问题编号：${error.traceId}` : undefined}
+          message={listErrorState ? errorMessage(listErrorState) : 'Agent 轨迹加载失败'}
+          showIcon
+          type="error"
+        />
+      ) : null}
+
+      {isRefreshing ? <div className="agent-runs-refreshing">正在更新运行记录…</div> : null}
+
+      {isLoading ? (
+        <div aria-label="Agent 轨迹加载中" className="agent-runs-loading">
+          <Skeleton active paragraph={{ rows: 5 }} />
+        </div>
+      ) : data && data.records.length > 0 ? (
+        <section aria-label="Agent 运行列表" className="agent-runs-table-wrapper">
+          <Table
+            columns={[
+              ...runColumns,
+              {
+                key: 'detail',
+                render: (_value: unknown, run: AdminAgentRunSummary) => (
+                  <Button onClick={() => setSelectedRunId(run.runId)} type="link">
+                    查看详情
+                  </Button>
+                ),
+                title: '操作',
+              },
+            ]}
+            dataSource={data.records}
+            pagination={false}
+            rowKey="runId"
+            scroll={{ x: 1300 }}
+          />
+          <Pagination
+            current={data.page}
+            onChange={(page, size) => updateQuery({ page, size })}
+            pageSize={data.size}
+            showSizeChanger
+            total={data.total}
+          />
+        </section>
+      ) : (
+        <Empty description={error ? '暂无可展示的运行记录' : '暂无 Agent 运行记录'} />
+      )}
+
+      <Drawer
+        destroyOnClose
+        onClose={() => setSelectedRunId(null)}
+        open={selectedRunId !== null}
+        title="Agent 运行详情"
+        width={820}
+      >
+        {detailQuery.isLoading ? <Skeleton active paragraph={{ rows: 8 }} /> : null}
+        {detailQuery.error ? (
+          <Alert
+            action={
+              detailQuery.error.status === 404 ? undefined : (
+                <Button onClick={detailQuery.retry}>重试</Button>
+              )
+            }
+            message={
+              resolveAdminAgentErrorState(detailQuery.error) === 'NOT_FOUND'
+                ? '运行记录不存在'
+                : '运行详情加载失败'
+            }
+            showIcon
+            type="error"
+          />
+        ) : null}
+        {detailQuery.data ? (
+          <div className="agent-run-detail">
+            <Descriptions bordered column={2} size="small">
+              <Descriptions.Item label="运行 ID">{detailQuery.data.runId}</Descriptions.Item>
+              <Descriptions.Item label="用户">{detailQuery.data.userDisplay}</Descriptions.Item>
+              <Descriptions.Item label="状态">
+                <RunStatus status={detailQuery.data.status} />
+              </Descriptions.Item>
+              <Descriptions.Item label="计划">
+                {detailQuery.data.planId} / v{detailQuery.data.planVersion}
+              </Descriptions.Item>
+              <Descriptions.Item label="开始时间">
+                {formatDateTime(detailQuery.data.startedAt)}
+              </Descriptions.Item>
+              <Descriptions.Item label="结束时间">
+                {formatDateTime(detailQuery.data.finishedAt)}
+              </Descriptions.Item>
+              <Descriptions.Item label="耗时">
+                {formatDuration(detailQuery.data.durationMs)}
+              </Descriptions.Item>
+              <Descriptions.Item label="错误摘要">
+                {detailQuery.data.errorSummary ?? '—'}
+              </Descriptions.Item>
+            </Descriptions>
+            <h2>节点轨迹</h2>
+            <Table
+              columns={nodeColumns}
+              dataSource={detailQuery.data.nodes}
+              pagination={false}
+              rowKey="nodeId"
+              scroll={{ x: 1100 }}
+              size="small"
+            />
+          </div>
+        ) : null}
+      </Drawer>
     </div>
   );
 }

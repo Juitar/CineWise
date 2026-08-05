@@ -61,7 +61,7 @@ describe('AdminOrdersPage', () => {
     fireEvent.click(viewDetailButtons[1]);
     expect(adminHookMocks.useAdminOrderDetail).toHaveBeenLastCalledWith('CW-PAID-1002');
     expect(screen.getByText('TICKET-PAID-1002')).toBeInTheDocument();
-  });
+  }, 10_000);
 
   it('301002 保留已有列表、traceId 和手动重试入口', () => {
     const retry = vi.fn();

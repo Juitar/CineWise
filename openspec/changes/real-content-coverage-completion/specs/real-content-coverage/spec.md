@@ -18,16 +18,64 @@
 - **THEN** 系统不保存该地址，REST 返回 `posterUrl=null`
 - **AND** 其他已通过校验的影片基础字段仍可按规则保存和展示
 
-### Requirement: 影院查询必须使用系统城市代码并保留可用静态坐标
+### Requirement: 地点字符串必须经本地城市目录解析为 Provider 城市标识
 
-系统 SHALL 将 Provider 的城市标识转换为系统使用的行政区划城市代码。Provider 的 `ci` 只可作为外部请求参数，不能直接作为 `/api/v1/cinemas?location=` 的业务语义。Provider 返回合法经纬度时，系统必须映射为影院静态坐标；缺失时保持 `null`，不得伪造坐标。
+系统 SHALL 将 NetStart `cities.json` 的经核验最小城市目录作为版本化本地 JSON 随应用发布。应用启动时必须校验每条城市名和 Provider `ci` 非空且唯一，并构建只读索引；地点解析、页面查询和同步不得在用户请求中访问 NetStart 城市列表。C 使用 `POST /api/v1/content/cities/resolve` 提交 `{locationText:string}`，响应固定为 `{status:"RESOLVED"|"UNRECOGNIZED"|"SELECTION_REQUIRED", cityName:string|null}`；只有 `RESOLVED` 返回 `cityName`。D 只能在唯一城市名匹配时得到 Provider `ci`。公开结果不返回候选地点、`providerCityId` 或 `ci`，地点原文不能持久化。
 
-#### Scenario: 使用行政区划代码查询同步的真实影院
+#### Scenario: 地点字符串解析为长沙
 
-- **GIVEN** D 已为一个受支持城市配置 Provider 城市标识与行政区划代码的对应关系
-- **WHEN** 同步完成后用户以该行政区划代码查询影院
-- **THEN** 查询能取得该城市的真实影院资料
-- **AND** 返回的 `cityCode` 是行政区划代码，不是 Provider `ci`
+- **GIVEN** 本地城市目录包含 `长沙 -> 70`
+- **WHEN** C 向城市解析接口或 B 向 D 的受控调用提交 `湖南省长沙市岳麓区` 作为 `locationText`
+- **THEN** D 返回 `RESOLVED + cityName=长沙`，并仅在内部使用 `ci=70` 查询或同步影院
+- **AND** 不访问 NetStart 城市列表，不保存该地点原文
+
+#### Scenario: 地点无法解析或存在多个城市候选
+
+- **GIVEN** 地点字符串未包含目录中的唯一城市名，或同时包含多个城市名
+- **WHEN** C 或 B 请求城市解析
+- **THEN** D 返回明确的不可用或需选择结果
+- **AND** 不调用影院 Provider，不以相近名称、地址或坐标猜测城市
+
+#### Scenario: 用户查询已同步城市的真实影院
+
+- **GIVEN** D 已同步城市名为 `杭州`、Provider `ci=50` 的影院资料
+- **WHEN** 页面按城市名查询影院
+- **THEN** 查询能取得杭州真实影院资料，返回城市名 `杭州`
+- **AND** Provider `ci` 不出现在公开 DTO、缓存键、URL 或页面状态中
+
+#### Scenario: Agent 对话地点文本不会进入长期数据
+
+- **GIVEN** 用户在 Agent 对话正文中提供地点文本
+- **WHEN** B 将它用于一次 D 城市解析调用
+- **THEN** 调用结束后原始地点文本被丢弃，并在保存用户消息、事件、槽位快照、长期上下文、日志和缓存前被剔除或替换
+- **AND** 可以保存 D 返回的城市名或标准 `cityCode`，但不能保存地点原文、精确位置、经纬度或 NetStart 内部城市 ID
+
+### Requirement: D 必须提供批量影院摘要供 A 聚合可售影院
+
+系统 SHALL 提供同进程 Java Application API `ContentSummaryQueryPort`。A 输入一组本地 `cinemaIds` 后，D 必须批量返回每个有效影院的 `cinemaId`、`name`、`address`、`source`、`dataTime`、`expiresAt`、`isExpired`，不得暴露 D 的 Entity、Mapper、Repository、数据库表、缓存键、Provider 原始 ID、坐标或地点原文。
+
+批量结果 MUST 同时包含有效摘要与 `missingCinemaIds`。空输入、部分 ID 无结果或全部 ID 无结果都是正常结果；`missingCinemaIds` 表示不存在、逻辑删除或尚未同步的本地影院，A 必须只聚合有效摘要。内容摘要存储整体不可用时，D 必须返回 `303004`，不得把整体故障表示为空结果。
+
+#### Scenario: A 批量取得可售影院的展示资料
+
+- **GIVEN** A 已通过自己的公开只读场次 API 得到多个本地影院 ID
+- **WHEN** A 调用 `ContentSummaryQueryPort` 批量查询
+- **THEN** D 一次返回每个有效影院的名称、地址、来源和最近成功同步时间
+- **AND** A 不访问 D 的 Entity、Mapper、Repository、数据库表或缓存
+
+#### Scenario: 批量中部分影院没有内容资料
+
+- **GIVEN** A 查询的影院 ID 中一部分已逻辑删除、尚未同步或不存在
+- **WHEN** D 批量查询影院摘要
+- **THEN** 有效影院继续返回，缺失 ID 出现在 `missingCinemaIds`
+- **AND** D 不因单个缺失 ID 使整批失败，不以同名影院替代
+
+#### Scenario: 内容摘要整体不可用
+
+- **GIVEN** 内容摘要存储不可读，无法安全构造批量结果
+- **WHEN** A 查询影院摘要
+- **THEN** D 返回 `303004`
+- **AND** A 将其与正常空结果区分，不展示为“暂无可售影院”
 
 #### Scenario: Provider 未给出坐标
 
@@ -36,27 +84,27 @@
 - **THEN** 经纬度保持 `null`
 - **AND** 页面只显示名称和地址，不显示伪造距离或路线
 
-### Requirement: 影院浏览必须支持手动选择城市且不得伪造距离
+### Requirement: 影院浏览必须支持城市选择和地点解析且不得伪造距离
 
-系统 SHALL 在首页和影院页提供手动城市选择。本期影院浏览 MUST NOT 请求浏览器定位、接收精确坐标、计算距离或提供“距离优先”排序；页面不得以“附近”或距离文案暗示未实现的定位结果。基础路线的用户主动定位不属于本 change。
+系统 SHALL 在首页和影院页提供手动城市选择，并支持使用 C/B 已得到的临时地点字符串解析当前城市。本期影院浏览 MUST NOT 计算距离或提供“距离优先”排序；页面不得以“附近”或距离文案暗示未实现的定位结果。基础路线的用户主动定位不属于本 change。
 
 #### Scenario: 用户手动选择长沙
 
 - **GIVEN** 用户在首页或影院页选择长沙
 - **WHEN** 页面查询影院资料
-- **THEN** 页面以长沙行政区划代码查询并展示长沙影院，不展示杭州影院
-- **AND** 页面不请求浏览器定位，也不显示距离或“附近”
+- **THEN** 页面以城市名长沙查询并展示长沙影院，不展示杭州影院
+- **AND** 页面不显示距离或“附近”
 
 ### Requirement: 未选择城市时必须使用长沙作为演示默认城市
 
-系统 SHALL 在用户没有主动定位、没有手动选择城市且当前未提供常用城市功能时，使用配置的默认城市长沙，行政区划代码为 `430100`。默认值只属于当前页面会话和演示初始状态，用户手动切换或定位成功后覆盖它；系统不得将默认值、用户选择或定位结果保存为用户偏好。
+系统 SHALL 在用户没有地点输入、没有手动选择城市且当前未提供常用城市功能时，使用配置的默认城市长沙。默认值只属于当前页面会话和演示初始状态，用户手动切换或地点解析成功后覆盖它；系统不得将默认值、用户选择或地点原文保存为用户偏好。
 
 #### Scenario: 首次打开影院页且未定位
 
-- **GIVEN** 用户首次打开首页或影院页，未主动定位且未手动选择城市
+- **GIVEN** 用户首次打开首页或影院页，未提供地点且未手动选择城市
 - **WHEN** 页面加载影院资料
-- **THEN** 页面以 `location=430100` 查询长沙影院并明确显示当前城市为长沙
-- **AND** 页面不请求浏览器定位，不把长沙写入用户画像、账户资料或服务端持久化存储
+- **THEN** 页面以城市名长沙查询影院并明确显示当前城市为长沙
+- **AND** 不把长沙或地点原文写入用户画像、账户资料或服务端持久化存储
 
 ### Requirement: 首次回填近一年目录并按日增量更新
 
@@ -129,13 +177,24 @@
 
 ### Requirement: 内容来源状态和手动同步必须受权限保护
 
-系统 SHALL 提供管理员读取的内容来源状态，至少包含 Provider、资源类型、最近一次结果、开始/结束时间、成功/失败数量和脱敏失败分类。管理员发起手动同步时必须使用稳定请求标识并遵守现有 Provider 开关、限流、超时、身份隔离和事务规则；普通用户不得访问这些接口。
+系统 SHALL 提供 `GET /api/v1/admin/content/sources`、`POST /api/v1/admin/content/sync` 和 `GET /api/v1/admin/content/sync/by-request/{clientRequestId}`。三个接口都要求管理员 Cookie；两个 GET 不要求 CSRF，POST 必须携带 `X-XSRF-TOKEN`。未登录返回 `401/201006`，非管理员返回 `403/201007`，CSRF 无效返回 `403/201009`，参数缺失、空城市或目录不支持的城市返回 `400/100001`，服务整体不可用返回 `503/303004`。
+
+管理员发起同步时，POST 请求只能提交 `{clientRequestId, cityName}`；D 必须先由本地城市目录解析 `ci`，先创建 `RUNNING` 审计记录，再调用 Provider。同一 `clientRequestId + cityName` 必须返回原任务且不再次同步；同一 `clientRequestId` 携带不同城市名返回 `409/100409`。请求不存在时，按请求查询返回 `404/100404`。
+
+POST 响应和按请求查询统一返回 `syncId/clientRequestId/cityName/status/startedAt/finishedAt/successCount/failureCount/failureCategory`；`status` 只允许 `PENDING/RUNNING/SUCCESS/PARTIAL/FAILED`，未完成时 `finishedAt=null`，无失败时 `failureCategory=null`。Provider 在任务受理后超时或失败时，查询结果返回 `PARTIAL` 或 `FAILED`，不改写 POST 的 HTTP 返回。来源状态每条返回 `provider/resourceType/cityName/status/startedAt/finishedAt/lastSuccessAt/successCount/failureCount/failureCategory/dataTime/expiresAt/isExpired/licenseNotice`。公开响应不得返回 `providerCityId`、`ci`、Provider URL、原始异常或原始响应。
 
 #### Scenario: 管理员查看同步状态
 
 - **GIVEN** 已存在真实内容同步记录
 - **WHEN** 管理员查询内容来源状态
 - **THEN** 返回最近同步结果和时效信息，不返回 Key 或完整原始响应
+
+#### Scenario: 管理员同步结果未知
+
+- **GIVEN** 管理员已带稳定 `clientRequestId` 提交同步，但页面收到超时或断网
+- **WHEN** 页面进入 `RESULT_UNKNOWN`
+- **THEN** 页面禁用再次同步，只能调用按请求查询接口查询原 `clientRequestId`
+- **AND** 不生成新的请求标识、不重新 POST，也不以来源状态接口的最近结果替代原任务
 
 #### Scenario: 普通用户尝试手动同步
 

@@ -18,21 +18,14 @@ public class MybatisShowQueryRepository implements ShowQueryRepository {
     @Override
     public List<ShowSnapshot> findSaleableShows(QueryCriteria criteria) {
         return mapper.findSaleableShows(criteria).stream()
-                .map(row -> new ShowSnapshot(
-                        row.showId(),
-                        row.movieId(),
-                        row.cinemaId(),
-                        row.auditoriumId(),
-                        row.auditoriumName(),
-                        row.startTime(),
-                        row.endTime(),
-                        row.languageVersion(),
-                        row.basePrice(),
-                        row.availableSeatCount(),
-                        row.status(),
-                        row.dataType(),
-                        row.version(),
-                        row.updatedAt()))
+                .map(this::toSnapshot)
+                .toList();
+    }
+
+    @Override
+    public List<ShowSnapshot> findSaleableShowsByCinemaIds(BatchQueryCriteria criteria) {
+        return mapper.findSaleableShowsByCinemaIds(criteria).stream()
+                .map(this::toSnapshot)
                 .toList();
     }
 
@@ -75,5 +68,23 @@ public class MybatisShowQueryRepository implements ShowQueryRepository {
                         row.status(),
                         row.version()))
                 .toList();
+    }
+
+    private ShowSnapshot toSnapshot(ShowQueryRow row) {
+        return new ShowSnapshot(
+                row.showId(),
+                row.movieId(),
+                row.cinemaId(),
+                row.auditoriumId(),
+                row.auditoriumName(),
+                row.startTime(),
+                row.endTime(),
+                row.languageVersion(),
+                row.basePrice(),
+                row.availableSeatCount(),
+                row.status(),
+                row.dataType(),
+                row.version(),
+                row.updatedAt());
     }
 }

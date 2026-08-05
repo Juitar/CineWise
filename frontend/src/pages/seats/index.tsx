@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { history, useParams, useSearchParams } from 'umi';
 import { Button, Spin, Alert, message } from 'antd';
+import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
 import { useSeatMap } from '../../modules/ticketing/hooks';
 import { SeatMap } from '../../features/seat-map/SeatMap';
+import { SeatSelectionSummary } from '../../features/seat-selection-summary/SeatSelectionSummary';
+import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 
 /**
@@ -15,6 +18,7 @@ export default function SeatsPage() {
   const [searchParams] = useSearchParams();
   const movieId = searchParams.get('movieId') || '';
   const cinemaId = searchParams.get('cinemaId') || '';
+  const isMobile = useMediaQuery('(max-width: 1023px)');
 
   const { loading, seatMap, error, refetch } = useSeatMap(showId);
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
@@ -48,19 +52,25 @@ export default function SeatsPage() {
     history.push(`/orders/confirm?${query.toString()}`);
   };
 
+  const selectedSeats = useMemo(
+    () =>
+      seatMap?.seats
+        .filter((seat) => selectedSeatIds.includes(seat.seatId))
+        .map((seat) => ({ id: seat.seatId, label: seat.seatLabel })) ?? [],
+    [seatMap, selectedSeatIds],
+  );
+
   if (!showId) {
     return (
       <div className="seats-page-container">
-        <Alert type="error" showIcon message="缺少场次 ID 参数" />
+        {isMobile ? (
+          <ErrorBlock status="default" description="缺少场次 ID 参数" />
+        ) : (
+          <Alert type="error" showIcon message="缺少场次 ID 参数" />
+        )}
       </div>
     );
   }
-
-  const selectedLabels =
-    seatMap?.seats
-      ?.filter((seat) => selectedSeatIds.includes(seat.seatId))
-      .map((seat) => seat.seatLabel)
-      .join('，') || '暂未选择座位';
 
   return (
     <div className="seats-page-container">
@@ -71,28 +81,46 @@ export default function SeatsPage() {
             {seatMap ? `共有可用座位 ${seatMap.availableSeatCount} 个` : ''}
           </span>
         </div>
-        <Button onClick={() => history.back()}>返回场次</Button>
+        {isMobile ? (
+          <MobileButton onClick={() => history.back()} className="seats-back-button">
+            返回场次
+          </MobileButton>
+        ) : (
+          <Button onClick={() => history.back()}>返回场次</Button>
+        )}
       </div>
 
-      {error && (
-        <Alert
-          type="error"
-          showIcon
-          message="加载座位图发生异常"
-          description={error.message || '请检查登录状态或网络配置后重试'}
-          action={
-            <Button size="small" onClick={refetch}>
-              重试
-            </Button>
-          }
-          className="seats-error-alert"
-        />
-      )}
+      {error &&
+        (isMobile ? (
+          <div className="seats-error-mobile">
+            <ErrorBlock
+              status="default"
+              title="加载座位图失败"
+              description={error.message || '请检查登录状态或网络配置后重试'}
+            />
+            <MobileButton color="primary" onClick={refetch} className="seats-retry-button">
+              重新加载
+            </MobileButton>
+          </div>
+        ) : (
+          <Alert
+            type="error"
+            showIcon
+            message="加载座位图发生异常"
+            description={error.message || '请检查登录状态或网络配置后重试'}
+            action={
+              <Button size="small" onClick={refetch}>
+                重试
+              </Button>
+            }
+            className="seats-error-alert"
+          />
+        ))}
 
       <div className="seats-main-area">
         {loading ? (
           <div className="seats-loading">
-            <Spin tip="拉取最新可用座位..." />
+            {isMobile ? <SpinLoading color="primary" /> : <Spin tip="拉取最新可用座位..." />}
           </div>
         ) : (
           <SeatMap
@@ -105,23 +133,13 @@ export default function SeatsPage() {
         )}
       </div>
 
-      <div className="seats-bottom-bar">
-        <div className="selected-seats-info">
-          <span className="selected-seats-labels">{selectedLabels}</span>
-          <span className="selected-seats-count">
-            已选 {selectedSeatIds.length} 个座位（最大可选 6 座）
-          </span>
-        </div>
-
-        <Button
-          type="primary"
-          size="large"
-          disabled={selectedSeatIds.length === 0 || loading}
-          onClick={handleConfirmSeats}
-        >
-          确认选座
-        </Button>
-      </div>
+      <SeatSelectionSummary
+        selectedSeats={selectedSeats}
+        selectedCount={selectedSeatIds.length}
+        maxSelectCount={6}
+        disabled={loading || selectedSeats.length !== selectedSeatIds.length}
+        onConfirm={handleConfirmSeats}
+      />
     </div>
   );
 }

@@ -1,66 +1,85 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { OrderCreateSuccess } from './OrderCreateSuccess';
-import { setupTestEnvironment, setMobileView } from '../test-utils';
+import { setMobileView } from '../test-utils';
 
-setupTestEnvironment();
+afterEach(() => cleanup());
+
+const defaultProps = {
+  orderNo: '202608050002',
+  totalAmount: '45.00',
+  expireTimeText: '14分59秒',
+};
 
 describe('OrderCreateSuccess 组件', () => {
-  const defaultProps = {
-    orderNo: '202608050002',
-    totalAmount: '45.00',
-    expireTimeText: '14分59秒',
-  };
-
   it('建单成功组件显示订单号、金额、截止时间', () => {
-    render(<OrderCreateSuccess {...defaultProps} />);
+    setMobileView(false);
+    render(<OrderCreateSuccess {...defaultProps} onPay={vi.fn()} onViewOrder={vi.fn()} />);
 
     expect(screen.getByText('订单创建成功')).toBeInTheDocument();
     expect(screen.getByText('202608050002')).toBeInTheDocument();
     expect(screen.getByText('45.00')).toBeInTheDocument();
     expect(screen.getByText('14分59秒')).toBeInTheDocument();
+
+    const payBtn = screen.getByRole('button', { name: /去支付/i });
+    const viewBtn = screen.getByRole('button', { name: /查看订单/i });
+
+    expect(payBtn).toBeInTheDocument();
+    expect(viewBtn).toBeInTheDocument();
   });
 
-  it('通过回调上报去支付与查看订单操作', () => {
-    const handlePay = vi.fn();
-    const handleViewOrder = vi.fn();
+  it('点击“去支付”触发 onPay', () => {
+    setMobileView(false);
+    const onPay = vi.fn();
+    render(<OrderCreateSuccess {...defaultProps} onPay={onPay} onViewOrder={vi.fn()} />);
+
+    const payBtn = screen.getByRole('button', { name: /去支付/i });
+    fireEvent.click(payBtn);
+
+    expect(onPay).toHaveBeenCalledTimes(1);
+  });
+
+  it('点击“查看订单”触发 onViewOrder', () => {
+    setMobileView(false);
+    const onViewOrder = vi.fn();
+    render(<OrderCreateSuccess {...defaultProps} onPay={vi.fn()} onViewOrder={onViewOrder} />);
+
+    const viewBtn = screen.getByRole('button', { name: /查看订单/i });
+    fireEvent.click(viewBtn);
+
+    expect(onViewOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('Loading 时按钮禁用', () => {
+    setMobileView(false);
     render(
-      <OrderCreateSuccess {...defaultProps} onPay={handlePay} onViewOrder={handleViewOrder} />,
+      <OrderCreateSuccess {...defaultProps} loading={true} onPay={vi.fn()} onViewOrder={vi.fn()} />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '去支付' }));
-    fireEvent.click(screen.getByRole('button', { name: '查看订单' }));
+    const payBtn = screen.getByRole('button', { name: /去支付/i });
+    const viewBtn = screen.getByRole('button', { name: /查看订单/i });
 
-    expect(handlePay).toHaveBeenCalledTimes(1);
-    expect(handleViewOrder).toHaveBeenCalledTimes(1);
+    expect(payBtn).toBeDisabled();
+    expect(viewBtn).toBeDisabled();
   });
 
-  it('没有回调或处于加载状态时按钮不可用', () => {
-    const { rerender } = render(<OrderCreateSuccess {...defaultProps} />);
+  it('未提供回调时按钮应禁用', () => {
+    setMobileView(false);
+    render(<OrderCreateSuccess {...defaultProps} />);
 
-    const loadingPayButton = screen.getByText('去支付').closest('button');
-    const loadingViewOrderButton = screen.getByText('查看订单').closest('button');
+    const payBtn = screen.getByRole('button', { name: /去支付/i });
+    const viewBtn = screen.getByRole('button', { name: /查看订单/i });
 
-    expect(loadingPayButton).toBeDisabled();
-    expect(loadingViewOrderButton).toBeDisabled();
-
-    rerender(
-      <OrderCreateSuccess {...defaultProps} onPay={vi.fn()} onViewOrder={vi.fn()} loading />,
-    );
-
-    const submittingPayButton = screen.getByText('去支付').closest('button');
-    const submittingViewOrderButton = screen.getByText('查看订单').closest('button');
-
-    expect(submittingPayButton).toBeDisabled();
-    expect(submittingViewOrderButton).toBeDisabled();
+    expect(payBtn).toBeDisabled();
+    expect(viewBtn).toBeDisabled();
   });
 
-  it('移动端也提供两个交易出口', () => {
+  it('移动端下也能正常渲染按钮', () => {
     setMobileView(true);
     render(<OrderCreateSuccess {...defaultProps} onPay={vi.fn()} onViewOrder={vi.fn()} />);
 
-    expect(screen.getByRole('button', { name: '去支付' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '查看订单' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /去支付/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /查看订单/i })).toBeInTheDocument();
   });
 });
