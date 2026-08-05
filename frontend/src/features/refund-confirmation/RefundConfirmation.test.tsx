@@ -10,8 +10,8 @@ describe('RefundConfirmation 组件', () => {
   const defaultProps = {
     orderNo: '202608050001',
     refundAmount: '78.00',
-    orderStatus: 'PAID',
-    ticketStatus: 'VALID',
+    orderStatus: 'PAID' as const,
+    ticketStatus: 'VALID' as const,
     showStartTime: '2026-08-10T14:30:00+08:00',
     impactText: '退票申请通过后座次将被释放。',
   };
@@ -28,6 +28,15 @@ describe('RefundConfirmation 组件', () => {
 
     fireEvent.click(btn);
     expect(handleConfirm).toHaveBeenCalledWith(undefined);
+  });
+
+  it('订单和电子票状态使用统一中文映射，不展示后端枚举值', () => {
+    render(<RefundConfirmation {...defaultProps} />);
+
+    expect(screen.getByText('已出票')).toBeInTheDocument();
+    expect(screen.getByText('有效')).toBeInTheDocument();
+    expect(screen.queryByText('PAID')).not.toBeInTheDocument();
+    expect(screen.queryByText('VALID')).not.toBeInTheDocument();
   });
 
   it('在 RESULT_UNKNOWN 状态下只提供查询结果按钮，无再次退票或返回按钮', () => {
@@ -53,7 +62,7 @@ describe('RefundConfirmation 组件', () => {
 
   it('在 REQUESTED 状态下显示申请已提交提示', () => {
     render(<RefundConfirmation {...defaultProps} status="REQUESTED" />);
-    expect(screen.getByText('退款申请已提交...')).toBeInTheDocument();
+    expect(screen.getByText('退款已申请...')).toBeInTheDocument();
   });
 
   it('在移动端 REQUESTED 状态下渲染 SpinLoading', () => {

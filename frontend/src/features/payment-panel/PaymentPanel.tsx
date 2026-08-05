@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button, Alert, Input, Spin } from 'antd';
 import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
+import { PAYMENT_STATUS_LABELS } from '../../modules/order/status-presentation';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 
@@ -177,7 +178,12 @@ export const PaymentPanel: React.FC<PaymentPanelProps> = ({
         </div>
       ) : status === 'SUCCESS' ? (
         <div className="payment-success-container">
-          <Alert type="success" showIcon message="支付成功" description="模拟支付已成功完成！" />
+          <Alert
+            type="success"
+            showIcon
+            message={PAYMENT_STATUS_LABELS.SUCCESS}
+            description="模拟支付已成功完成！"
+          />
         </div>
       ) : (
         <div className="payment-password-section">

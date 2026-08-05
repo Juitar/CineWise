@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button, Alert, Spin } from 'antd';
 import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
+import { PAYMENT_STATUS_LABELS } from '../../modules/order/status-presentation';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 
@@ -89,7 +90,7 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
       case 'SUCCESS':
         return (
           <div className="payment-result-state">
-            <div className="payment-result-badge success">支付成功</div>
+            <div className="payment-result-badge success">{PAYMENT_STATUS_LABELS.SUCCESS}</div>
             <p className="payment-result-desc">
               订单已完成支付，金额 ¥ {amount}，您的电子票已生成。
             </p>
@@ -110,7 +111,7 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
               <Spin size="large" />
             )}
             <div className="payment-result-badge processing">
-              {status === 'PROCESSING' ? '支付处理中' : '结果确认中'}
+              {status === 'PROCESSING' ? `支付${PAYMENT_STATUS_LABELS.PROCESSING}` : '结果确认中'}
             </div>
             <p className="payment-result-desc">银行或支付网关正在处理中，请勿重复发起支付。</p>
             <div className="payment-result-actions">

@@ -1,8 +1,10 @@
 import React from 'react';
 import { Alert, QRCode, Spin, Tag } from 'antd';
+import { ELECTRONIC_TICKET_STATUS_LABELS } from '../../modules/order/status-presentation';
+import type { ElectronicTicketStatus } from '../../modules/order/types';
 import './index.css';
 
-export type ElectronicTicketStatus = 'VALID' | 'REFUNDED' | 'INVALIDATED';
+export type { ElectronicTicketStatus } from '../../modules/order/types';
 
 export interface ElectronicTicketCardProps {
   ticketCode: string;
@@ -59,12 +61,11 @@ export const ElectronicTicketCard: React.FC<ElectronicTicketCardProps> = ({
   const renderStatusBadge = () => {
     switch (status) {
       case 'REFUNDED':
-        return <Tag color="error">已退票 (不可用)</Tag>;
+        return <Tag color="error">{ELECTRONIC_TICKET_STATUS_LABELS.REFUNDED} (不可用)</Tag>;
       case 'INVALIDATED':
-        return <Tag color="default">已失效</Tag>;
+        return <Tag color="default">{ELECTRONIC_TICKET_STATUS_LABELS.INVALIDATED}</Tag>;
       case 'VALID':
-      default:
-        return <Tag color="success">有效票可入场</Tag>;
+        return <Tag color="success">{ELECTRONIC_TICKET_STATUS_LABELS.VALID}票可入场</Tag>;
     }
   };
 

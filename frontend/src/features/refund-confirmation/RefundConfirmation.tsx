@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { Button, Alert, Spin, Input, Checkbox } from 'antd';
 import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
+import {
+  ELECTRONIC_TICKET_STATUS_LABELS,
+  ORDER_STATUS_LABELS,
+  REFUND_STATUS_LABELS,
+} from '../../modules/order/status-presentation';
+import type { ElectronicTicketStatus, OrderStatus } from '../../modules/order/types';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 
@@ -10,8 +16,8 @@ export type RefundVisualStatus =
 export interface RefundConfirmationProps {
   orderNo: string;
   refundAmount: string;
-  orderStatus: string;
-  ticketStatus: string;
+  orderStatus: OrderStatus;
+  ticketStatus: ElectronicTicketStatus;
   showStartTime: string;
   impactText: string;
   status?: RefundVisualStatus;
@@ -106,11 +112,13 @@ export const RefundConfirmation: React.FC<RefundConfirmationProps> = ({
         </div>
         <div className="refund-summary-row">
           <span className="refund-summary-label">当前订单状态</span>
-          <span className="refund-summary-value">{orderStatus}</span>
+          <span className="refund-summary-value">{ORDER_STATUS_LABELS[orderStatus]}</span>
         </div>
         <div className="refund-summary-row">
           <span className="refund-summary-label">电子票状态</span>
-          <span className="refund-summary-value">{ticketStatus}</span>
+          <span className="refund-summary-value">
+            {ELECTRONIC_TICKET_STATUS_LABELS[ticketStatus]}
+          </span>
         </div>
         <div className="refund-summary-row">
           <span className="refund-summary-label">放映开场时间</span>
@@ -159,7 +167,9 @@ export const RefundConfirmation: React.FC<RefundConfirmationProps> = ({
             <Spin size="large" />
           )}
           <p className="refund-processing-tip">
-            {status === 'REQUESTED' ? '退款申请已提交...' : '退款申请处理中...'}
+            {status === 'REQUESTED'
+              ? `退款${REFUND_STATUS_LABELS.REQUESTED}...`
+              : `退款${REFUND_STATUS_LABELS.PROCESSING}...`}
           </p>
         </div>
       ) : status === 'SUCCESS' ? (
@@ -167,7 +177,7 @@ export const RefundConfirmation: React.FC<RefundConfirmationProps> = ({
           <Alert
             type="success"
             showIcon
-            message="退票申请成功"
+            message={`退款${REFUND_STATUS_LABELS.SUCCESS}`}
             description={`退款 ¥ ${refundAmount} 申请成功。`}
           />
         </div>
