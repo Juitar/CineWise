@@ -46,6 +46,9 @@ class OrderLifecycleMySqlIntegrationTest {
     private OrderCancellationService orderCancellationService;
 
     @Autowired
+    private OrderQueryService orderQueryService;
+
+    @Autowired
     private OrderExpiryTransaction orderExpiryTransaction;
 
     @Autowired
@@ -89,6 +92,12 @@ class OrderLifecycleMySqlIntegrationTest {
                 List.of(fixture.seatIds().get(0)),
                 "mysql-lifecycle-cancel-request",
                 "mysql-lifecycle-cancel-create-key");
+        OrderQueryView orderDetail = orderQueryService.queryOrder(cancellable.orderNo());
+        assertThat(orderDetail.movieId()).isEqualTo(fixture.movieId());
+        assertThat(orderDetail.cinemaId()).isEqualTo(fixture.cinemaId());
+        assertThat(orderDetail.showStartTime()).isEqualTo(fixture.showStartTime());
+        assertThat(orderQueryService.queryOrders(new OrderListQuery(null, null, null, null, 1, 10))
+                .records().getFirst().showStartTime()).isEqualTo(fixture.showStartTime());
         OrderView cancelled = orderCancellationService.cancelOrder(
                 cancellable.orderNo(),
                 "mysql-lifecycle-cancel-key");
@@ -128,14 +137,21 @@ class OrderLifecycleMySqlIntegrationTest {
     }
 
     private ShowSeats findFutureShowSeats(int seatCount) {
-        long showId = jdbcTemplate.queryForObject("""
-                SELECT id
+        ShowContext show = jdbcTemplate.queryForObject("""
+                SELECT id,
+                       movie_id,
+                       cinema_id,
+                       start_time
                   FROM movie_show
                  WHERE status = 'ON_SALE'
                    AND start_time > CURRENT_TIMESTAMP(3)
                  ORDER BY start_time, id
                  LIMIT 1
-                """, Long.class);
+                """, (resultSet, rowNumber) -> new ShowContext(
+                resultSet.getLong("id"),
+                resultSet.getLong("movie_id"),
+                resultSet.getLong("cinema_id"),
+                resultSet.getTimestamp("start_time").toLocalDateTime()));
         List<Long> seatIds = jdbcTemplate.queryForList("""
                 SELECT id
                   FROM show_seat
@@ -143,8 +159,13 @@ class OrderLifecycleMySqlIntegrationTest {
                    AND status = 'AVAILABLE'
                  ORDER BY id
                  LIMIT ?
-                """, Long.class, showId, seatCount);
-        return new ShowSeats(showId, seatIds);
+                """, Long.class, show.showId(), seatCount);
+        return new ShowSeats(
+                show.showId(),
+                show.movieId(),
+                show.cinemaId(),
+                show.showStartTime(),
+                seatIds);
     }
 
     private String orderStatus(long orderId) {
@@ -184,7 +205,19 @@ class OrderLifecycleMySqlIntegrationTest {
                 """);
     }
 
-    private record ShowSeats(long showId, List<Long> seatIds) {
+    private record ShowSeats(
+            long showId,
+            long movieId,
+            long cinemaId,
+            LocalDateTime showStartTime,
+            List<Long> seatIds) {
+    }
+
+    private record ShowContext(
+            long showId,
+            long movieId,
+            long cinemaId,
+            LocalDateTime showStartTime) {
     }
 
     @TestConfiguration(proxyBeanMethods = false)

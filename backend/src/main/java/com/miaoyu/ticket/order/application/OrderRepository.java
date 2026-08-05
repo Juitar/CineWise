@@ -27,7 +27,11 @@ public interface OrderRepository {
 
     long countOrders(OrderListCriteria criteria);
 
-    List<OrderSnapshot> findOrderPage(OrderListCriteria criteria);
+    /** 个人订单列表使用的只读场次投影，不参与交易锁定。 */
+    List<OrderQuerySnapshot> findOrderQueryPage(OrderListCriteria criteria);
+
+    /** 按本人订单号读取订单与场次上下文，不替代交易状态查询。 */
+    Optional<OrderQuerySnapshot> findOrderQueryByOrderNo(long userId, String orderNo);
 
     /** 按主键查询订单座位快照，并按座位ID升序返回。 */
     List<Long> findSeatIds(long orderId);
@@ -137,6 +141,29 @@ public interface OrderRepository {
             LocalDateTime expireTime,
             String clientRequestId,
             String idempotencyKey,
+            int version,
+            LocalDateTime updatedAt) {
+    }
+
+    /**
+     * 个人订单页面使用的只读投影。
+     *
+     * <p>影片、影院和开场时间均来自A拥有的movie_show；该投影不包含幂等键，
+     * 也不会用于建单、支付、取消或退款的行锁与状态迁移。</p>
+     */
+    record OrderQuerySnapshot(
+            long orderId,
+            String orderNo,
+            long userId,
+            long showId,
+            long movieId,
+            long cinemaId,
+            LocalDateTime showStartTime,
+            int ticketCount,
+            BigDecimal unitPrice,
+            BigDecimal totalAmount,
+            OrderStatus status,
+            LocalDateTime expireTime,
             int version,
             LocalDateTime updatedAt) {
     }

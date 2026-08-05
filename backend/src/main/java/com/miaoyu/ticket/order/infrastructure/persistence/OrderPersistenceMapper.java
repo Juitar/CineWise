@@ -154,19 +154,20 @@ public interface OrderPersistenceMapper {
     @Select("""
             <script>
             SELECT COUNT(*)
-              FROM ticket_order
-             WHERE user_id = #{criteria.userId}
+              FROM ticket_order orders
+              INNER JOIN movie_show shows ON shows.id = orders.show_id
+             WHERE orders.user_id = #{criteria.userId}
             <if test="criteria.orderNo != null">
-               AND order_no = #{criteria.orderNo}
+               AND orders.order_no = #{criteria.orderNo}
             </if>
             <if test="criteria.status != null">
-               AND status = #{criteria.status}
+               AND orders.status = #{criteria.status}
             </if>
             <if test="criteria.createdAtOrAfter != null">
-               AND create_time &gt;= #{criteria.createdAtOrAfter}
+               AND orders.create_time &gt;= #{criteria.createdAtOrAfter}
             </if>
             <if test="criteria.createdBefore != null">
-               AND create_time &lt; #{criteria.createdBefore}
+               AND orders.create_time &lt; #{criteria.createdBefore}
             </if>
             </script>
             """)
@@ -174,38 +175,66 @@ public interface OrderPersistenceMapper {
 
     @Select("""
             <script>
-            SELECT id AS order_id,
-                   order_no,
-                   user_id,
-                   show_id,
-                   ticket_count,
-                   unit_price,
-                   total_amount,
-                   status,
-                   expire_time,
-                   client_request_id,
-                   idempotency_key,
-                   version,
-                   update_time AS updated_at
-              FROM ticket_order
-             WHERE user_id = #{criteria.userId}
+            SELECT orders.id AS order_id,
+                   orders.order_no,
+                   orders.user_id,
+                   orders.show_id,
+                   shows.movie_id,
+                   shows.cinema_id,
+                   shows.start_time AS show_start_time,
+                   orders.ticket_count,
+                   orders.unit_price,
+                   orders.total_amount,
+                   orders.status,
+                   orders.expire_time,
+                   orders.version,
+                   orders.update_time AS updated_at
+              FROM ticket_order orders
+              INNER JOIN movie_show shows ON shows.id = orders.show_id
+             WHERE orders.user_id = #{criteria.userId}
             <if test="criteria.orderNo != null">
-               AND order_no = #{criteria.orderNo}
+               AND orders.order_no = #{criteria.orderNo}
             </if>
             <if test="criteria.status != null">
-               AND status = #{criteria.status}
+               AND orders.status = #{criteria.status}
             </if>
             <if test="criteria.createdAtOrAfter != null">
-               AND create_time &gt;= #{criteria.createdAtOrAfter}
+               AND orders.create_time &gt;= #{criteria.createdAtOrAfter}
             </if>
             <if test="criteria.createdBefore != null">
-               AND create_time &lt; #{criteria.createdBefore}
+               AND orders.create_time &lt; #{criteria.createdBefore}
             </if>
-             ORDER BY create_time DESC, id DESC
+             ORDER BY orders.create_time DESC, orders.id DESC
              LIMIT #{criteria.limit} OFFSET #{criteria.offset}
             </script>
             """)
-    List<OrderSnapshotRow> findOrderPage(@Param("criteria") OrderRepository.OrderListCriteria criteria);
+    List<OrderQuerySnapshotRow> findOrderQueryPage(
+            @Param("criteria") OrderRepository.OrderListCriteria criteria);
+
+    /** 详情只读投影连接场次事实；交易用的findByOrderNo和FOR UPDATE查询保持独立。 */
+    @Select("""
+            SELECT orders.id AS order_id,
+                   orders.order_no,
+                   orders.user_id,
+                   orders.show_id,
+                   shows.movie_id,
+                   shows.cinema_id,
+                   shows.start_time AS show_start_time,
+                   orders.ticket_count,
+                   orders.unit_price,
+                   orders.total_amount,
+                   orders.status,
+                   orders.expire_time,
+                   orders.version,
+                   orders.update_time AS updated_at
+              FROM ticket_order orders
+              INNER JOIN movie_show shows ON shows.id = orders.show_id
+             WHERE orders.user_id = #{userId}
+               AND orders.order_no = #{orderNo}
+            """)
+    OrderQuerySnapshotRow findOrderQueryByOrderNo(
+            @Param("userId") long userId,
+            @Param("orderNo") String orderNo);
 
     @Select("""
             SELECT show_seat_id

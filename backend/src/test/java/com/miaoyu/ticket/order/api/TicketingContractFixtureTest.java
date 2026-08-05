@@ -98,6 +98,21 @@ class TicketingContractFixtureTest {
             "expireTime",
             "stateVersion",
             "updatedAt");
+    private static final Set<String> ORDER_QUERY_FIELDS = Set.of(
+            "orderId",
+            "orderNo",
+            "showId",
+            "movieId",
+            "cinemaId",
+            "showStartTime",
+            "seatIds",
+            "ticketCount",
+            "unitPrice",
+            "totalAmount",
+            "status",
+            "expireTime",
+            "stateVersion",
+            "updatedAt");
     private static final Set<String> ALTERNATIVE_SHOWS_FIELDS = Set.of("orderNo", "shows");
     private static final Set<String> ALTERNATIVE_SHOW_FIELDS = Set.of(
             "showId", "movieId", "cinemaId", "startTime", "basePrice", "status", "availableSeatCount");
@@ -107,6 +122,7 @@ class TicketingContractFixtureTest {
             "c/seat-map-success.json",
             "c/create-order-success.json",
             "c/order-page-success.json",
+            "c/order-detail-success.json",
             "c/payment-success.json",
             "c/electronic-ticket-success.json",
             "c/refund-impact-success.json",
@@ -221,8 +237,8 @@ class TicketingContractFixtureTest {
             assertThat(seat.required("status").asText()).isIn("AVAILABLE", "LOCKED", "SOLD", "UNAVAILABLE");
         }
 
-        PageResult<OrderResponse> orderPageResponse =
-                readSuccessPage("c/order-page-success.json", OrderResponse.class);
+        PageResult<OrderQueryResponse> orderPageResponse =
+                readSuccessPage("c/order-page-success.json", OrderQueryResponse.class);
         JsonNode orderPageData = readFixture("c/order-page-success.json").required("data");
         assertExactFields(orderPageData, "C order-page data", PAGE_FIELDS);
         assertExactRecordFields(orderPageData, PageResult.class);
@@ -232,9 +248,16 @@ class TicketingContractFixtureTest {
         assertThat(orderRecords.size()).isEqualTo(orderPageData.required("total").asInt());
         assertThat(orderPageResponse.records()).hasSize(orderRecords.size());
         for (JsonNode orderRecord : orderRecords) {
-            assertOrderFields(orderRecord, "C order-page record");
-            assertExactRecordFields(orderRecord, OrderResponse.class);
+            assertOrderQueryFields(orderRecord, "C order-page record");
+            assertExactRecordFields(orderRecord, OrderQueryResponse.class);
         }
+
+        OrderQueryResponse orderDetail = readSuccessData(
+                "c/order-detail-success.json", OrderQueryResponse.class);
+        assertThat(orderDetail.orderNo()).isNotBlank();
+        JsonNode orderDetailData = readFixture("c/order-detail-success.json").required("data");
+        assertOrderQueryFields(orderDetailData, "C order-detail data");
+        assertExactRecordFields(orderDetailData, OrderQueryResponse.class);
 
         AlternativeShowsResponse alternativeShowsResponse = readSuccessData(
                 "c/alternative-shows-success.json", AlternativeShowsResponse.class);
@@ -328,6 +351,9 @@ class TicketingContractFixtureTest {
         assertSchemaProperty(openApi, "ShowSummaryResponse", "basePrice", "string");
         assertSchemaProperty(openApi, "OrderResponse", "orderId", "string");
         assertSchemaProperty(openApi, "OrderResponse", "totalAmount", "string");
+        assertSchemaProperty(openApi, "OrderQueryResponse", "movieId", "string");
+        assertSchemaProperty(openApi, "OrderQueryResponse", "cinemaId", "string");
+        assertSchemaProperty(openApi, "OrderQueryResponse", "showStartTime", "string");
         assertSchemaProperty(openApi, "PaymentResponse", "ticketId", "string");
         assertSchemaProperty(openApi, "ElectronicTicketResponse", "ticketId", "string");
         assertSchemaProperty(openApi, "RefundResponse", "refundAmount", "string");
@@ -389,6 +415,18 @@ class TicketingContractFixtureTest {
 
     private void assertOrderFields(JsonNode order, String fixtureName) {
         assertExactFields(order, fixtureName, ORDER_FIELDS);
+        assertOrderFieldValues(order);
+    }
+
+    private void assertOrderQueryFields(JsonNode order, String fixtureName) {
+        assertExactFields(order, fixtureName, ORDER_QUERY_FIELDS);
+        assertOrderFieldValues(order);
+        assertTextId(order, "movieId");
+        assertTextId(order, "cinemaId");
+        OffsetDateTime.parse(order.required("showStartTime").asText());
+    }
+
+    private void assertOrderFieldValues(JsonNode order) {
         assertTextId(order, "orderId");
         assertTextId(order, "showId");
         assertAmount(order, "unitPrice");

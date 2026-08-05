@@ -20,17 +20,14 @@ public class OrderQueryService {
     private static final int MAXIMUM_ORDER_NUMBER_LENGTH = 32;
 
     private final OrderRepository repository;
-    private final OrderViewFactory viewFactory;
     private final CurrentUserAccessor currentUserAccessor;
     private final ApiProperties apiProperties;
 
     public OrderQueryService(
             OrderRepository repository,
-            OrderViewFactory viewFactory,
             CurrentUserAccessor currentUserAccessor,
             ApiProperties apiProperties) {
         this.repository = repository;
-        this.viewFactory = viewFactory;
         this.currentUserAccessor = currentUserAccessor;
         this.apiProperties = apiProperties;
     }
@@ -44,10 +41,10 @@ public class OrderQueryService {
         if (total == 0) {
             return new OrderPageView(0, resolvePage(query), resolveSize(query), List.of());
         }
-        List<OrderRepository.OrderSnapshot> orders = repository.findOrderPage(criteria);
+        List<OrderRepository.OrderQuerySnapshot> orders = repository.findOrderQueryPage(criteria);
         Map<Long, List<Long>> seatIdsByOrder = groupSeatIds(orders);
-        List<OrderView> records = orders.stream()
-                .map(order -> viewFactory.create(
+        List<OrderQueryView> records = orders.stream()
+                .map(order -> toView(
                         order,
                         seatIdsByOrder.getOrDefault(order.orderId(), List.of())))
                 .toList();
@@ -56,12 +53,12 @@ public class OrderQueryService {
 
     /** 先按当前用户过滤再查订单号，跨用户查询与不存在统一返回404。 */
     @Transactional(readOnly = true)
-    public OrderView queryOrder(String orderNo) {
+    public OrderQueryView queryOrder(String orderNo) {
         validateOrderNo(orderNo);
         long currentUserId = currentUserAccessor.requireCurrentUserId();
-        OrderRepository.OrderSnapshot order = repository.findByOrderNo(currentUserId, orderNo)
+        OrderRepository.OrderQuerySnapshot order = repository.findOrderQueryByOrderNo(currentUserId, orderNo)
                 .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
-        return viewFactory.create(order);
+        return toView(order, repository.findSeatIds(order.orderId()));
     }
 
     private OrderRepository.OrderListCriteria toCriteria(long userId, OrderListQuery query) {
@@ -97,9 +94,9 @@ public class OrderQueryService {
                 size);
     }
 
-    private Map<Long, List<Long>> groupSeatIds(List<OrderRepository.OrderSnapshot> orders) {
+    private Map<Long, List<Long>> groupSeatIds(List<OrderRepository.OrderQuerySnapshot> orders) {
         List<Long> orderIds = orders.stream()
-                .map(OrderRepository.OrderSnapshot::orderId)
+                .map(OrderRepository.OrderQuerySnapshot::orderId)
                 .toList();
         Map<Long, List<Long>> grouped = new HashMap<>();
         for (OrderRepository.OrderSeatReference seat : repository.findSeatIdsByOrderIds(orderIds)) {
@@ -107,6 +104,27 @@ public class OrderQueryService {
                     .add(seat.seatId());
         }
         return grouped;
+    }
+
+    /** 只组装查询字段，不把展示投影转换成可用于交易状态迁移的OrderSnapshot。 */
+    private OrderQueryView toView(
+            OrderRepository.OrderQuerySnapshot order,
+            List<Long> seatIds) {
+        return new OrderQueryView(
+                order.orderId(),
+                order.orderNo(),
+                order.showId(),
+                order.movieId(),
+                order.cinemaId(),
+                order.showStartTime(),
+                seatIds,
+                order.ticketCount(),
+                order.unitPrice(),
+                order.totalAmount(),
+                order.status(),
+                order.expireTime(),
+                order.version(),
+                order.updatedAt());
     }
 
     private String normalizeOptionalOrderNo(String orderNo) {
