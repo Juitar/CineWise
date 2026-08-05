@@ -24,7 +24,7 @@
 
 - [ ] 4.1 B/A：先生成 `V012__create_agent_action_table.sql` 草稿并通过 A 静态审查；仅在 A 明确授权后实现 `agent_action` 迁移、MyBatis 映射、查询索引、唯一约束和 CAS SQL；验证：A 静态审查和空 MySQL 8.4 Flyway。
 - [ ] 4.2 B：在持久化实现可用后实现 `POST /api/v1/agent/actions/{actionId}/confirm`，只接受 `{confirmed}` 且经 `CurrentUserAccessor` 校验；验证：Controller/Service 成功、拒绝、越权、缺失、过期、206003、206004、206006、运行结束和版本变化测试。
-- [ ] 4.3 B/A：在 A 正式 Tool/API 确认后实现并注册生产 `CreateOrderToolAdapter`；验证：只经 A 公开 API 的契约测试、原键结果查询和无本机 HTTP/私有持久化访问扫描。
+- [ ] 4.3 A/B：A 在独立 change 落地 `com.miaoyu.ticket.order.api.CreateOrderTool`、`CreateOrderForAgentCommand`、`AgentOrderResult` 和原请求查询入口后，B 实现并注册生产 `CreateOrderToolAdapter`；验证：只经 A 公开 API 的契约测试、原键结果查询和无本机 HTTP/私有持久化访问扫描。
 
 ## 5. SSE、恢复与并发
 

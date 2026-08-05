@@ -10,7 +10,7 @@
 - 新增 `POST /api/v1/agent/actions/{actionId}/confirm`。请求体只接受 `confirmed`，不接收用户、金额、订单、座位、工具参数、参数摘要或确认凭证。
 - 规定确认拒绝、过期、参数变化、计划版本变化、重复确认、运行结束、越权和业务数据失效时不得调用写工具。
 - 规定确认竞争、结果未知和断线恢复：同一 action 只能产生一个稳定幂等标识；超时、网络或 SSE 中断只按原标识查询，不自动重发建单。
-- A 已确认提供 `CreateOrderTool.execute(ToolContext, CreateOrderForAgentCommand)`；B 只经该类型化 Tool 调用，并提供公开 `AgentActionAuthorizationPort` 供 A 校验 action。A 的 Agent Tool 授权失败统一映射 `205004`。
+- A 已确认目标公开入口为 `CreateOrderTool.execute(ToolContext, CreateOrderForAgentCommand)`；底层原子建单和按当前用户加 `clientRequestId` 的恢复查询已在 `OrderApplicationService`，但 B 不得直接依赖。A 将在独立 change 提供 `com.miaoyu.ticket.order.api` 的 Tool、Command、`AgentOrderResult` 和原请求查询入口；B 只经该类型化 Tool 调用，并提供公开 `AgentActionAuthorizationPort` 供 A 校验 action。A 的 Agent Tool 授权失败统一映射 `205004`。
 - A 已确认 V011 已发布；原计划分配给邀请码种子的 V012 已取消，并正式将 V012 分配给 `agent_action`。B 现在只提交 `V012__create_agent_action_table.sql` 草稿给 A 静态审查；A 审查和明确授权前不得执行、合入共享 `dev` 或连接任何数据库。
 
 ## Capabilities
