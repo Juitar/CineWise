@@ -2,8 +2,13 @@ package com.miaoyu.ticket.auth.api;
 
 import com.miaoyu.ticket.auth.application.AuthApplicationService;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
+import com.miaoyu.ticket.auth.application.EmailCodeApplicationService;
+import com.miaoyu.ticket.auth.application.EmailCodeLoginCommand;
 import com.miaoyu.ticket.auth.application.LoginCommand;
 import com.miaoyu.ticket.auth.application.LoginResult;
+import com.miaoyu.ticket.auth.application.RegistrationApplicationService;
+import com.miaoyu.ticket.auth.application.RegistrationCommand;
+import com.miaoyu.ticket.auth.application.SendEmailCodeCommand;
 import com.miaoyu.ticket.auth.domain.LoginType;
 import com.miaoyu.ticket.auth.infrastructure.config.AuthProperties;
 import com.miaoyu.ticket.auth.infrastructure.security.AuthCookieManager;
@@ -32,6 +37,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthApplicationService authService;
+    private final EmailCodeApplicationService emailCodeService;
+    private final RegistrationApplicationService registrationService;
     private final CurrentUserAccessor currentUserAccessor;
     private final AuthCookieManager cookieManager;
     private final CsrfTokenRepository csrfTokenRepository;
@@ -39,11 +46,15 @@ public class AuthController {
 
     public AuthController(
             AuthApplicationService authService,
+            EmailCodeApplicationService emailCodeService,
+            RegistrationApplicationService registrationService,
             CurrentUserAccessor currentUserAccessor,
             AuthCookieManager cookieManager,
             CsrfTokenRepository csrfTokenRepository,
             AuthProperties properties) {
         this.authService = authService;
+        this.emailCodeService = emailCodeService;
+        this.registrationService = registrationService;
         this.currentUserAccessor = currentUserAccessor;
         this.cookieManager = cookieManager;
         this.csrfTokenRepository = csrfTokenRepository;
@@ -68,6 +79,77 @@ public class AuthController {
             HttpServletRequest servletRequest,
             HttpServletResponse servletResponse) {
         return login(request, LoginType.PASSWORD, servletRequest, servletResponse);
+    }
+
+    @PostMapping("/auth/email-codes")
+    @SecurityRequirement(name = "csrfToken")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "返回冷却和有效期，不暴露账号是否存在"),
+        @ApiResponse(responseCode = "400", description = "101001 请求参数或验证码用途不合法"),
+        @ApiResponse(responseCode = "429", description = "101002 IP 发送过于频繁"),
+        @ApiResponse(responseCode = "503", description = "301001 限流或邮件服务不可用")
+    })
+    public Result<SendEmailCodeResponse> sendEmailCode(
+            @Valid @RequestBody SendEmailCodeRequest request, HttpServletRequest servletRequest) {
+        return Result.success(SendEmailCodeResponse.from(emailCodeService.send(new SendEmailCodeCommand(
+                request.email(),
+                request.purpose(),
+                servletRequest.getRemoteAddr(),
+                TraceIdHolder.currentTraceId()))));
+    }
+
+    @PostMapping("/auth/login/email")
+    @SecurityRequirement(name = "csrfToken")
+    @ApiResponses({
+        @ApiResponse(
+                responseCode = "200",
+                description = "验证码登录成功并写入 JWT HttpOnly Cookie",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(ref = "#/components/schemas/ResultCurrentUserResponse"))),
+        @ApiResponse(responseCode = "400", description = "101001 请求参数不合法"),
+        @ApiResponse(responseCode = "422", description = "201002 验证码无效、过期或已使用"),
+        @ApiResponse(responseCode = "403", description = "201005 账号不可用；201009 CSRF Token 缺失或无效")
+    })
+    public Result<CurrentUserResponse> loginWithEmailCode(
+            @Valid @RequestBody EmailCodeLoginRequest request,
+            HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse) {
+        LoginResult result = authService.loginWithEmailCode(new EmailCodeLoginCommand(
+                request.clientRequestId(),
+                request.email(),
+                request.code(),
+                servletRequest.getRemoteAddr(),
+                servletRequest.getHeader("User-Agent"),
+                TraceIdHolder.currentTraceId()));
+        writeLoginResult(result, servletRequest, servletResponse);
+        return Result.success(CurrentUserResponse.from(result.currentUser()));
+    }
+
+    @PostMapping("/auth/register")
+    @SecurityRequirement(name = "csrfToken")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "注册成功、写入 JWT HttpOnly Cookie 并返回当前用户"),
+        @ApiResponse(responseCode = "400", description = "101001 请求参数不合法或重放参数不一致"),
+        @ApiResponse(responseCode = "409", description = "201003 邮箱已注册"),
+        @ApiResponse(responseCode = "422", description = "201002 验证码无效；201004 邀请码不可用；201008 隐私政策无效"),
+        @ApiResponse(responseCode = "403", description = "201009 CSRF Token 缺失或无效")
+    })
+    public Result<CurrentUserResponse> register(
+            @Valid @RequestBody RegisterRequest request,
+            HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse) {
+        LoginResult result = registrationService.register(new RegistrationCommand(
+                request.clientRequestId(),
+                request.email(),
+                request.code(),
+                request.inviteCode(),
+                request.password(),
+                request.nickname(),
+                request.privacyPolicyVersion(),
+                Boolean.TRUE.equals(request.privacyAccepted())));
+        writeLoginResult(result, servletRequest, servletResponse);
+        return Result.success(CurrentUserResponse.from(result.currentUser()));
     }
 
     @PostMapping("/admin/auth/login")
@@ -144,8 +226,13 @@ public class AuthController {
                 servletRequest.getRemoteAddr(),
                 servletRequest.getHeader("User-Agent"),
                 TraceIdHolder.currentTraceId()));
+        writeLoginResult(result, servletRequest, servletResponse);
+        return Result.success(CurrentUserResponse.from(result.currentUser()));
+    }
+
+    private void writeLoginResult(
+            LoginResult result, HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
         cookieManager.writeAccessToken(servletResponse, result.accessToken());
         csrfTokenRepository.saveToken(null, servletRequest, servletResponse);
-        return Result.success(CurrentUserResponse.from(result.currentUser()));
     }
 }

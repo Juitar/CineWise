@@ -63,7 +63,13 @@ public class SecuritySkeletonConfiguration {
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf")
                         .permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/login/password", "/api/v1/admin/auth/login")
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/auth/email-codes",
+                                "/api/v1/auth/register",
+                                "/api/v1/auth/login/email",
+                                "/api/v1/auth/login/password",
+                                "/api/v1/admin/auth/login")
                         .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout")
                         .permitAll()

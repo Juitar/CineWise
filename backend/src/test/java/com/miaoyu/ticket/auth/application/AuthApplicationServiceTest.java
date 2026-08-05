@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.miaoyu.ticket.auth.domain.AccountStatus;
 import com.miaoyu.ticket.auth.domain.AuthUser;
 import com.miaoyu.ticket.auth.domain.LoginType;
+import com.miaoyu.ticket.auth.domain.VerificationPurpose;
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import java.time.Clock;
@@ -29,13 +30,21 @@ class AuthApplicationServiceTest {
     private final PasswordVerifier passwordVerifier = mock(PasswordVerifier.class);
     private final AccessTokenService tokenService = mock(AccessTokenService.class);
     private final LoginAuditSanitizer sanitizer = mock(LoginAuditSanitizer.class);
+    private final VerificationCodeVerifier verificationCodeVerifier = mock(VerificationCodeVerifier.class);
     private final BusinessIdGenerator idGenerator = () -> 9001L;
     private AuthApplicationService service;
 
     @BeforeEach
     void setUp() {
         service = new AuthApplicationService(
-                userRepository, auditRepository, passwordVerifier, tokenService, sanitizer, idGenerator, CLOCK);
+                userRepository,
+                auditRepository,
+                passwordVerifier,
+                tokenService,
+                sanitizer,
+                verificationCodeVerifier,
+                idGenerator,
+                CLOCK);
     }
 
     @Test
@@ -88,6 +97,33 @@ class AuthApplicationServiceTest {
         assertThat(service.login(command(LoginType.PASSWORD)).accessToken()).isEqualTo("signed-token");
     }
 
+    @Test
+    void shouldLoginNormalUserWithEmailCode() {
+        AuthUser user = user(RoleCode.USER, AccountStatus.NORMAL);
+        when(userRepository.findByEmail("user@cinewise.test")).thenReturn(Optional.of(user));
+        when(tokenService.issue(user)).thenReturn("email-code-token");
+
+        LoginResult result = service.loginWithEmailCode(emailCodeCommand());
+
+        assertThat(result.accessToken()).isEqualTo("email-code-token");
+        verify(verificationCodeVerifier)
+                .verifyAndConsume("user@cinewise.test", VerificationPurpose.LOGIN, "123456");
+        verify(auditRepository).append(any(LoginAuditRepository.LoginAuditRecord.class));
+    }
+
+    @Test
+    void shouldRejectAdminFromEmailCodeLoginWithoutConsumingCode() {
+        AuthUser admin = user(RoleCode.ADMIN, AccountStatus.NORMAL);
+        when(userRepository.findByEmail("user@cinewise.test")).thenReturn(Optional.of(admin));
+
+        assertThatThrownBy(() -> service.loginWithEmailCode(emailCodeCommand()))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.VERIFICATION_CODE_INVALID));
+
+        verify(verificationCodeVerifier, org.mockito.Mockito.never())
+                .verifyAndConsume(any(), any(), any());
+    }
+
     private LoginCommand command(LoginType type) {
         return new LoginCommand(
                 "request-1", " User@CineWise.Test ", "Password1", type, "127.0.0.1", "JUnit", "trace-1");
@@ -105,5 +141,10 @@ class AuthApplicationServiceTest {
                 3L,
                 "2026-08-03",
                 LocalDateTime.of(2026, 8, 3, 8, 0));
+    }
+
+    private EmailCodeLoginCommand emailCodeCommand() {
+        return new EmailCodeLoginCommand(
+                "request-email-1", " User@CineWise.Test ", "123456", "127.0.0.1", "JUnit", "trace-email-1");
     }
 }

@@ -24,6 +24,19 @@ cinewise:
   auth:
     jwt-secret: test-jwt-secret-at-least-32-bytes-long
     audit-hash-secret: test-audit-secret-at-least-32-bytes-long
+    registration:
+      invite-hash-secret: test-invite-secret-at-least-32-bytes-long
+      current-privacy-policy-version: 2026-08-03
+      initial-invite:
+        enabled: false
+        code: ""
+        max-uses: 0
+        valid-from: ""
+        expire-time: ""
+    verification:
+      hash-secret: test-verification-secret-at-least-32-bytes-long
+      mail:
+        smtp-enabled: false
     cookie-secure: false
     login-log-cleanup-delay-milliseconds: 86400000
   transaction:
