@@ -53,6 +53,17 @@ public interface OrderRepository {
             long afterOrderId,
             int limit);
 
+    /**
+     * 按退款完成时间和订单ID稳定分页，只返回冻结窗口内仍为REFUNDED的候选。
+     * 候选不替代权威状态，调用D前仍须按订单主键重读状态与版本。
+     */
+    List<RefundedTravelReconciliationCandidate> findRefundedTravelReconciliationCandidates(
+            LocalDateTime refundedAtOrAfter,
+            LocalDateTime refundedAtOrBefore,
+            LocalDateTime afterRefundedAt,
+            long afterOrderId,
+            int limit);
+
     void insertOrder(NewOrder order);
 
     void insertOrderSeat(NewOrderSeat orderSeat);
@@ -109,6 +120,22 @@ public interface OrderRepository {
                 throw new IllegalArgumentException("PAID出行补偿候选包含非法业务标识或版本");
             }
             Objects.requireNonNull(paidAt, "PAID出行补偿候选的paidAt不能为空");
+        }
+    }
+
+    /** REFUNDED取消补偿所需的最小投影，不携带金额、座位、票或个人敏感信息。 */
+    record RefundedTravelReconciliationCandidate(
+            long orderId,
+            long userId,
+            long showId,
+            int orderVersion,
+            LocalDateTime refundedAt) {
+
+        public RefundedTravelReconciliationCandidate {
+            if (orderId <= 0 || userId <= 0 || showId <= 0 || orderVersion < 0) {
+                throw new IllegalArgumentException("REFUNDED出行补偿候选包含非法业务标识或版本");
+            }
+            Objects.requireNonNull(refundedAt, "REFUNDED出行补偿候选的refundedAt不能为空");
         }
     }
 

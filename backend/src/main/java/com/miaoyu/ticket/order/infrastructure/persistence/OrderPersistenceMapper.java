@@ -151,6 +151,33 @@ public interface OrderPersistenceMapper {
             @Param("afterOrderId") long afterOrderId,
             @Param("limit") int limit);
 
+    /**
+     * refunded_time与id共同组成游标，保证相同毫秒退款不会跨页重复或遗漏。
+     * SQL只做候选过滤，跨模块取消前仍由应用层重读订单权威状态。
+     */
+    @Select("""
+            SELECT id AS order_id,
+                   user_id,
+                   show_id,
+                   version AS order_version,
+                   refunded_time AS refunded_at
+              FROM ticket_order
+             WHERE status = 'REFUNDED'
+               AND refunded_time IS NOT NULL
+               AND refunded_time >= #{refundedAtOrAfter}
+               AND refunded_time <= #{refundedAtOrBefore}
+               AND (refunded_time > #{afterRefundedAt}
+                    OR (refunded_time = #{afterRefundedAt} AND id > #{afterOrderId}))
+             ORDER BY refunded_time, id
+             LIMIT #{limit}
+            """)
+    List<RefundedTravelReconciliationCandidateRow> findRefundedTravelReconciliationCandidates(
+            @Param("refundedAtOrAfter") LocalDateTime refundedAtOrAfter,
+            @Param("refundedAtOrBefore") LocalDateTime refundedAtOrBefore,
+            @Param("afterRefundedAt") LocalDateTime afterRefundedAt,
+            @Param("afterOrderId") long afterOrderId,
+            @Param("limit") int limit);
+
     @Select("""
             <script>
             SELECT COUNT(*)

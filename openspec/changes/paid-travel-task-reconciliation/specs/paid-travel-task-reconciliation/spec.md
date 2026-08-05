@@ -4,14 +4,14 @@
 
 ### Requirement: 系统必须有界扫描最近已支付订单
 
-在 D 已交付并验证 `ensureTaskCancelled(OrderInvalidated)` 前，系统 MUST NOT 默认注册或执行 PAID 出行任务补偿 Job。满足该前置条件后，运维显式开启配置时，系统 SHALL 每五分钟扫描最近二十四小时内 `status=PAID` 且 `paid_time` 非空的订单。扫描 SHALL 使用一次任务启动时冻结的业务时间作为窗口上界，并按 `paid_time ASC, id ASC` 进行稳定键集分页；每个数据库批次 MUST NOT 超过一百条。
+在 D 已交付并验证 `ensureTaskCancelled(OrderInvalidated)`，且 A 的 REFUNDED 补偿与退款竞态联调通过后，系统 SHALL 默认注册 PAID 出行任务补偿 Job。系统 SHALL 每五分钟扫描最近二十四小时内 `status=PAID` 且 `paid_time` 非空的订单。扫描 SHALL 使用一次任务启动时冻结的业务时间作为窗口上界，并按 `paid_time ASC, id ASC` 进行稳定键集分页；每个数据库批次 MUST NOT 超过一百条。
 
-#### Scenario: 未显式开启补偿
+#### Scenario: 使用默认生产配置启动
 
-- **GIVEN** 未设置 `PAID_TRAVEL_RECONCILIATION_ENABLED=true`
+- **GIVEN** 未覆盖 `PAID_TRAVEL_RECONCILIATION_ENABLED`
 - **WHEN** 应用启动
-- **THEN** 系统不注册或执行 PAID 出行任务补偿 Job
-- **AND** 不调用 D 的 `ensureTask`
+- **THEN** 系统注册 PAID 出行任务补偿 Job
+- **AND** 测试配置仍显式关闭自动调度
 
 #### Scenario: 多批次扫描
 
