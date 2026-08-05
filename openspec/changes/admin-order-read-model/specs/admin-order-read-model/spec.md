@@ -41,8 +41,23 @@
 #### Scenario: 普通用户访问管理订单
 
 - GIVEN 当前身份角色为USER
-- WHEN 访问任一管理订单接口
-- THEN 返回HTTP 403和`100403`
+- WHEN 通过真实HTTP安全链访问任一管理订单接口
+- THEN 返回HTTP 403和`201007`
+- AND 不执行管理订单Repository查询
+
+#### Scenario: 匿名用户访问管理订单
+
+- GIVEN 当前请求没有有效登录会话
+- WHEN 通过真实HTTP安全链访问任一管理订单接口
+- THEN 返回HTTP 401和`201006`
+- AND 不执行管理订单Repository查询
+
+#### Scenario: 应用层拒绝非管理员调用
+
+- GIVEN 调用方绕过HTTP入口直接调用管理订单Application Service
+- AND 当前身份不是ADMIN
+- WHEN 查询管理订单列表或详情
+- THEN 抛出`100403`
 - AND 不执行管理订单Repository查询
 
 ### Requirement: 管理订单列表使用白名单筛选

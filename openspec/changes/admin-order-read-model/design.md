@@ -31,7 +31,7 @@ public interface UserAdminQueryPort {
 
 ## 权限边界
 
-Application Service每次查询都从`CurrentUserAccessor.requireCurrentUser()`取得身份并要求`role=ADMIN`，否则抛出`CommonErrorCode.FORBIDDEN`。该检查不替代C的安全链；C仍需把`/api/v1/admin/**`配置为ADMIN。测试使用替换的`CurrentUserAccessor`覆盖ADMIN、USER和未认证目标语义，不实现JWT。
+Application Service每次查询都从`CurrentUserAccessor.requireCurrentUser()`取得身份并要求`role=ADMIN`，否则抛出`CommonErrorCode.FORBIDDEN`（`100403`）。该检查是绕过HTTP入口调用时的纵深防御，不替代C的安全链；C仍需把`/api/v1/admin/**`配置为ADMIN。真实HTTP请求先经过C的唯一安全链，普通用户返回`403/201007`，匿名用户返回`401/201006`。A的应用层测试使用替换的`CurrentUserAccessor`验证纵深防御，不实现JWT或冒充C的真实Cookie验收。
 
 ## 查询模型
 
@@ -64,7 +64,9 @@ Application Service每次查询都从`CurrentUserAccessor.requireCurrentUser()`�
 
 ## 错误与空结果
 
-- 非ADMIN：HTTP 403 / `100403`；
+- 普通用户经真实HTTP安全链访问：HTTP 403 / `201007`；
+- 匿名用户经真实HTTP安全链访问：HTTP 401 / `201006`；
+- 绕过HTTP入口直接调用A应用服务的非ADMIN身份：`100403`；
 - 非法参数：HTTP 400 / `100001`；
 - 认证用户查询参数非法：HTTP 400 / `101001`；
 - 用户关键字匹配超过100人：HTTP 400 / `201010`；
