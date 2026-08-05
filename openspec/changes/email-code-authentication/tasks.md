@@ -17,6 +17,7 @@
 - [x] 3.2 C 实现 MyBatis Mapper/Repository；验证：H2 前向结构夹具验证条件消费和无明文存储；正式迁移仍等待 A。
 - [x] 3.3 C 实现 Redis 冷却/频率限制 Adapter；验证：4 项单元测试覆盖原子计数、冷却 TTL、IP 拒绝和精确释放；真实 Redis 留在 4.3。
 - [x] 3.4 C 实现配置化 SMTP Adapter 和未配置失败关闭 Adapter；验证：3 项单元测试覆盖成功、明确失败和结果未知；真实收信留在 4.3。
+- [x] 3.5 C 增加 465 SSL、STARTTLS required 和启动连接检查环境变量；验证：真实 `application.yml` 环境绑定测试。
 
 ## 4. 迁移和真实环境
 
