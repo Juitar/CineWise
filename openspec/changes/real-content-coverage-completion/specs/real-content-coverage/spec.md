@@ -179,7 +179,7 @@
 
 系统 SHALL 提供 `GET /api/v1/admin/content/sources`、`POST /api/v1/admin/content/sync` 和 `GET /api/v1/admin/content/sync/by-request/{clientRequestId}`。三个接口都要求管理员 Cookie；两个 GET 不要求 CSRF，POST 必须携带 `X-XSRF-TOKEN`。未登录返回 `401/201006`，非管理员返回 `403/201007`，CSRF 无效返回 `403/201009`，参数缺失、空城市或目录不支持的城市返回 `400/100001`，服务整体不可用返回 `503/303004`。
 
-管理员发起同步时，POST 请求只能提交 `{clientRequestId, cityName}`；D 必须先由本地城市目录解析 `ci`，先创建 `RUNNING` 审计记录，再调用 Provider。同一 `clientRequestId + cityName` 必须返回原任务且不再次同步；同一 `clientRequestId` 携带不同城市名返回 `409/100409`。请求不存在时，按请求查询返回 `404/100404`。
+管理员发起同步时，POST 请求只能提交 `{clientRequestId, cityName}`；D 必须先由本地城市目录解析 `ci`，先创建 `PENDING` 审计记录；只有条件取得 `RUNNING` 租约的实例才调用 Provider。同一 `clientRequestId + cityName` 必须返回原任务且不再次同步；同一 `clientRequestId` 携带不同城市名返回 `409/100409`。请求不存在时，按请求查询返回 `404/100404`。
 
 POST 响应和按请求查询统一返回 `syncId/clientRequestId/cityName/status/startedAt/finishedAt/successCount/failureCount/failureCategory`；`status` 只允许 `PENDING/RUNNING/SUCCESS/PARTIAL/FAILED`，未完成时 `finishedAt=null`，无失败时 `failureCategory=null`。Provider 在任务受理后超时或失败时，查询结果返回 `PARTIAL` 或 `FAILED`，不改写 POST 的 HTTP 返回。来源状态每条返回 `provider/resourceType/cityName/status/startedAt/finishedAt/lastSuccessAt/successCount/failureCount/failureCategory/dataTime/expiresAt/isExpired/licenseNotice`。公开响应不得返回 `providerCityId`、`ci`、Provider URL、原始异常或原始响应。
 
@@ -249,7 +249,7 @@ POST 响应和按请求查询统一返回 `syncId/clientRequestId/cityName/statu
 
 A 已正式分配 V014。迁移 SHALL 仅新增 `movie` 的可空资料字段、`content_identity_mapping`、`cinema.city_name/provider_city_id` 和 `data_sync_log.city_name/provider_city_id/failure_category`，不得修改 V001～V012、不得建立物理外键、不得写入演示种子或按地址、名称、区域、坐标猜测历史城市/身份。V014 SQL 草案必须先由 A 静态复核，本次不得执行。
 
-`content_identity_mapping` 必须以 `provider/resource_type/external_id` 唯一标识外部身份，以生成的 ACTIVE 内部内容 ID 约束同一 Provider、资源类型和内部内容最多一个 ACTIVE 外部 ID；`ACTIVE` 映射不得有失效字段，`INVALID` 映射必须有固定失效分类和失效时间。`movie.release_status` 只能为 `NOW_SHOWING`、`COMING_SOON` 或 `NULL`。`data_sync_log` 必须支持 `PENDING/RUNNING/SUCCESS/PARTIAL/FAILED`，只保存固定失败分类，且公开接口不得返回 Provider 城市 ID。
+`content_identity_mapping` 必须以 `provider/resource_type/external_id` 唯一标识外部身份，以生成的 ACTIVE 内部内容 ID 约束同一 Provider、资源类型和内部内容最多一个 ACTIVE 外部 ID；`ACTIVE` 映射不得有失效字段，`INVALID` 映射必须有固定失效分类和失效时间。`movie.release_status` 只能为 `NOW_SHOWING`、`COMING_SOON` 或 `NULL`。`data_sync_log` 必须支持 `PENDING/RUNNING/SUCCESS/PARTIAL/FAILED` 和 `lease_until`：PENDING 三个计数为 0，错误字段、完成时间和租约均为空；RUNNING 租约非空且错误字段、完成时间为空；终态租约为空，PARTIAL/FAILED 的失败数、错误码和固定失败分类均非空。公开接口不得返回 Provider 城市 ID。
 
 #### Scenario: 迁移后读取 V001 历史内容
 
@@ -271,6 +271,20 @@ A 已正式分配 V014。迁移 SHALL 仅新增 `movie` 的可空资料字段、
 - **WHEN** D 创建或更新同步审计记录
 - **THEN** 记录规范化城市名、内部 Provider 城市 ID、状态和固定失败分类
 - **AND** 管理端只收到城市名和脱敏状态字段，不收到 Provider 城市 ID、地点原文或原始异常
+
+#### Scenario: PENDING 请求取得唯一执行租约
+
+- **GIVEN** 管理员已登记 PENDING 同步请求，三个计数为 0，错误字段、完成时间和租约均为空
+- **WHEN** 多个实例同时尝试执行该请求
+- **THEN** 只有一个实例条件更新为 RUNNING 并写入非空 `lease_until`
+- **AND** 只有取得租约的实例调用 Provider，其他实例只返回原请求状态
+
+#### Scenario: RUNNING 租约因进程中断而到期
+
+- **GIVEN** 同步已处于 RUNNING，Provider 调用期间实例退出且 `lease_until` 到期
+- **WHEN** 恢复任务扫描该记录
+- **THEN** 恢复任务条件更新为 `FAILED`、`failure_category=INTERNAL`，写入固定 `303004`、终态时间并清空租约
+- **AND** 不再次调用 Provider；同一 `clientRequestId` 的查询只能返回该终态，管理员需要新请求标识才能发起新同步
 
 ### Requirement: 页面必须展示 API 内容且不得伪造票务事实
 
