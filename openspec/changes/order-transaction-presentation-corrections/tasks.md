@@ -16,4 +16,4 @@
 
 - [x] 3.1 更新模块、组件和页面测试，覆盖合法、缺失、非法、截止和服务端状态优先场景。（Owner: A）
 - [x] 3.2 执行 `pnpm check`、必要 E2E、OpenSpec strict 和 `git diff --check`。（Owner: A）
-- [ ] 3.3 完成与前端展示分支的最终接线审查后提交独立 PR。（Owner: A）
+- [x] 3.3 已完成与前端展示分支的最终接线审查，并提交独立 PR #70。（Owner: A）
