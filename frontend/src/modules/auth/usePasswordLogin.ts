@@ -12,8 +12,21 @@ interface LoginSubmissionResult {
   user: CurrentUser | null;
 }
 
+let fallbackRequestSequence = 0;
+
 function createClientRequestId(): string {
-  return crypto.randomUUID();
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+
+  fallbackRequestSequence = (fallbackRequestSequence + 1) % Number.MAX_SAFE_INTEGER;
+  const timestamp = Date.now().toString(36);
+  const sequence = fallbackRequestSequence.toString(36);
+  const randomPart = Math.random().toString(36).slice(2, 14).padEnd(12, '0');
+
+  // HTTP IP 不属于安全上下文，浏览器可能不提供 randomUUID。
+  // 该值只用于登录请求追踪和幂等，不可作为密码、Token 或其他安全随机值。
+  return `login-${timestamp}-${sequence}-${randomPart}`;
 }
 
 function getLoginErrorMessage(error: unknown): string {
