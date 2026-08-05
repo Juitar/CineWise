@@ -4,6 +4,7 @@ import { Button, Spin, Alert, message } from 'antd';
 import { useShows, useSeatMap } from '../../../modules/ticketing/hooks';
 import { useCreateOrder } from '../../../modules/order/hooks';
 import { buildOrderDetailPath, buildPaymentPath } from '../../../modules/order/routes';
+import { formatOrderTime } from '../../../modules/order/formatters';
 import { OrderCreateSuccess } from '../../../features/order-create-success/OrderCreateSuccess';
 import { ApiError } from '../../../shared/api/ApiError';
 import './index.css';
@@ -368,11 +369,7 @@ export default function OrderConfirmPage() {
         <OrderCreateSuccess
           orderNo={order.orderNo}
           totalAmount={order.totalAmount}
-          expireTimeText={new Date(order.expireTime).toLocaleTimeString('zh-CN', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-          })}
+          expireTimeText={formatOrderTime(order.expireTime)}
           onPay={order.status === 'PENDING_PAYMENT' ? handlePayOrder : undefined}
           onViewOrder={handleViewOrder}
           loading={orderLoading || isRecovering}
