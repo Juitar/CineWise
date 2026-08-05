@@ -1,0 +1,8 @@
+{
+  "status": "SUCCESS",
+  "data": { "orderReference": "order-90001" },
+  "errorCode": null,
+  "retryable": false,
+  "replanSuggested": false,
+  "suggestedNextAction": "RENDER_RESULT"
+}
