@@ -23,6 +23,7 @@ import type {
   ElectronicTicketResponse,
   OrderPageResponse,
   OrderQuery,
+  OrderQueryResponse,
   OrderResponse,
   PaymentResponse,
   RefundImpactResponse,
@@ -84,12 +85,12 @@ export function useOrders(query: OrderQuery): QueryState<OrderPageResponse> {
 }
 
 /** 查询当前用户拥有的订单详情。 */
-export function useOrder(orderNo: string): QueryState<OrderResponse> {
-  const [data, setData] = useState<OrderResponse | null>(null);
+export function useOrder(orderNo: string): QueryState<OrderQueryResponse> {
+  const [data, setData] = useState<OrderQueryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
 
-  const refresh = useCallback(async (): Promise<OrderResponse | null> => {
+  const refresh = useCallback(async (): Promise<OrderQueryResponse | null> => {
     if (!orderNo) {
       setLoading(false);
       return null;
@@ -120,7 +121,7 @@ export interface CancelOrderState {
   resultUnknown: boolean;
   error: ApiError | null;
   submit: () => Promise<OrderResponse | null>;
-  recover: () => Promise<OrderResponse | null>;
+  recover: () => Promise<OrderQueryResponse | null>;
 }
 
 /**
@@ -135,7 +136,7 @@ export function useCancelOrder(orderNo: string): CancelOrderState {
     () => getWriteOperationSession('cancel', orderNo).resultUnknown,
   );
 
-  const recover = useCallback(async (): Promise<OrderResponse | null> => {
+  const recover = useCallback(async (): Promise<OrderQueryResponse | null> => {
     setError(null);
     try {
       const order = await getOrder(orderNo);

@@ -1,8 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearCsrfToken } from '../../shared/api/client';
-import { createRefund, getAlternativeShows, getElectronicTicket, getOrders, payOrder } from './api';
+import {
+  createRefund,
+  getAlternativeShows,
+  getElectronicTicket,
+  getOrder,
+  getOrders,
+  payOrder,
+} from './api';
 import alternativeShowsPayload from '../../../../backend/src/test/resources/fixtures/ticketing/c/alternative-shows-success.json';
 import electronicTicketPayload from '../../../../backend/src/test/resources/fixtures/ticketing/c/electronic-ticket-success.json';
+import orderDetailPayload from '../../../../backend/src/test/resources/fixtures/ticketing/c/order-detail-success.json';
 import orderPagePayload from '../../../../backend/src/test/resources/fixtures/ticketing/c/order-page-success.json';
 import paymentPayload from '../../../../backend/src/test/resources/fixtures/ticketing/c/payment-success.json';
 import refundPayload from '../../../../backend/src/test/resources/fixtures/ticketing/c/refund-success.json';
@@ -43,8 +51,25 @@ describe('订单第二批 REST 契约', () => {
     const alternatives = await getAlternativeShows('CW2084194500000000001');
 
     expect(orders.records[0].orderId).toBe('2084194500000000001');
+    expect(orders.records[0]).toMatchObject({
+      cinemaId: '2084194399128586242',
+      movieId: '2084194398004512769',
+      showStartTime: '2026-08-03T20:00:00+08:00',
+    });
     expect(ticket.status).toBe('VALID');
     expect(alternatives.shows[0].movieId).toBe('2084194398004512769');
+  });
+
+  it('订单详情查询解析服务端权威场次上下文', async () => {
+    fetchMock.mockResolvedValueOnce(response(orderDetailPayload));
+
+    const order = await getOrder('CW2084194500000000001');
+
+    expect(order).toMatchObject({
+      cinemaId: '2084194399128586242',
+      movieId: '2084194398004512769',
+    });
+    expect(order.showStartTime).toBe('2026-08-03T20:00:00+08:00');
   });
 
   it('支付请求不包含密码或业务请求体，只发送稳定幂等键', async () => {

@@ -9,6 +9,7 @@ export const orderListMockNormal: OrderListMockData = {
     {
       orderId: '10001',
       orderNo: '202608050001',
+      showId: '1001',
       showTitle: '流浪地球3',
       showTime: '2026-08-10T14:30:00+08:00',
       ticketCount: 2,
@@ -19,6 +20,7 @@ export const orderListMockNormal: OrderListMockData = {
     {
       orderId: '10002',
       orderNo: '202608050002',
+      showId: '1002',
       showTitle: '封神第二部',
       showTime: '2026-08-11T19:00:00+08:00',
       ticketCount: 1,
@@ -29,6 +31,7 @@ export const orderListMockNormal: OrderListMockData = {
     {
       orderId: '10003',
       orderNo: '202608050003',
+      showId: '1003',
       showTitle: '哪吒之魔童闹海',
       showTime: '2026-08-01T10:00:00+08:00',
       ticketCount: 2,

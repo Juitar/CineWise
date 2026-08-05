@@ -10,7 +10,7 @@ export interface CreateOrderRequest {
   clientRequestId: string;
 }
 
-/** 订单响应类型（对应建单、查询及详情结果） */
+/** 订单写操作响应类型；查询接口的场次上下文由 OrderQueryResponse 扩展。 */
 export interface OrderResponse {
   orderId: string;
   orderNo: string;
@@ -25,6 +25,13 @@ export interface OrderResponse {
   updatedAt: string;
 }
 
+/** 个人订单列表与详情查询返回的权威场次上下文。 */
+export interface OrderQueryResponse extends OrderResponse {
+  movieId: string;
+  cinemaId: string;
+  showStartTime: string;
+}
+
 export type OrderStatus =
   'PENDING_PAYMENT' | 'PAYING' | 'PAID' | 'CANCELLED' | 'EXPIRED' | 'REFUNDING' | 'REFUNDED';
 
@@ -32,7 +39,7 @@ export interface OrderPageResponse {
   total: number;
   page: number;
   size: number;
-  records: OrderResponse[];
+  records: OrderQueryResponse[];
 }
 
 export interface OrderQuery {

@@ -8,6 +8,7 @@ export interface ElectronicTicketCardProps {
   ticketCode: string;
   orderNo: string;
   showTitle?: string;
+  showId?: string;
   showTime?: string;
   cinemaName?: string;
   seatLabels?: string[];
@@ -28,6 +29,7 @@ export const ElectronicTicketCard: React.FC<ElectronicTicketCardProps> = ({
   ticketCode,
   orderNo,
   showTitle = '未知影片',
+  showId,
   showTime = '时间待定',
   cinemaName = '未知影院',
   seatLabels = [],
@@ -86,6 +88,12 @@ export const ElectronicTicketCard: React.FC<ElectronicTicketCardProps> = ({
         </div>
 
         <div className="ticket-info-list">
+          {showId && (
+            <div className="ticket-info-item">
+              <span className="ticket-info-label">场次编号：</span>
+              <span className="ticket-info-value">{showId}</span>
+            </div>
+          )}
           <div className="ticket-info-item">
             <span className="ticket-info-label">影院：</span>
             <span className="ticket-info-value">{cinemaName}</span>

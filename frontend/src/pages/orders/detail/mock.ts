@@ -4,6 +4,9 @@ export interface OrderDetailMockData {
   orderId: string;
   orderNo: string;
   showId: string;
+  movieId: string;
+  cinemaId: string;
+  showStartTime: string;
   seatIds: string[];
   ticketCount: number;
   unitPrice: string;
@@ -22,6 +25,9 @@ export const orderDetailMockPaid: OrderDetailMockData = {
   orderId: '10001',
   orderNo: '202608050001',
   showId: '1001',
+  movieId: '2001',
+  cinemaId: '3001',
+  showStartTime: '2026-08-10T14:30:00+08:00',
   seatIds: ['101', '102'],
   ticketCount: 2,
   unitPrice: '39.00',

@@ -7,6 +7,7 @@ import {
   useOrder,
   usePaymentQuery,
 } from '../../../modules/order/transaction-hooks';
+import { formatOrderDateTime } from '../../../modules/order/formatters';
 import './index.css';
 
 /**
@@ -52,8 +53,9 @@ export default function OrderDetailPage() {
       <OrderDetail
         orderNo={order?.orderNo ?? orderNo}
         status={order?.status ?? 'PENDING_PAYMENT'}
-        showTitle={order ? `场次 ${order.showId}` : undefined}
-        showTime="场次时间请在场次信息中确认"
+        showTitle={order ? '影片信息暂不可用' : undefined}
+        showId={order?.showId}
+        showTime={formatOrderDateTime(order?.showStartTime)}
         seatLabels={order?.seatIds}
         ticketCount={order?.ticketCount ?? 0}
         unitPrice={order?.unitPrice ?? '0.00'}

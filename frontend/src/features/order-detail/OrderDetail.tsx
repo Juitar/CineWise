@@ -7,6 +7,7 @@ export interface OrderDetailProps {
   orderNo: string;
   status: OrderStatus;
   showTitle?: string;
+  showId?: string;
   showTime?: string;
   cinemaName?: string;
   seatLabels?: string[];
@@ -36,6 +37,7 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
   orderNo,
   status,
   showTitle = '未知影片',
+  showId,
   showTime = '待定',
   cinemaName = '未知影院',
   seatLabels = [],
@@ -204,6 +206,7 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
         <div className="order-movie-card">
           <div className="order-movie-name">{showTitle}</div>
           <div className="order-movie-meta">
+            {showId && <div>场次编号：{showId}</div>}
             <div>影院：{cinemaName}</div>
             <div>开场时间：{showTime}</div>
             <div>

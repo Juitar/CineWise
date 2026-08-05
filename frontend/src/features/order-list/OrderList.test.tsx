@@ -12,6 +12,7 @@ describe('OrderList 组件', () => {
       orderId: '10001',
       orderNo: '202608050001',
       showTitle: '流浪地球3',
+      showId: '1001',
       showTime: '2026-08-10T14:30:00+08:00',
       ticketCount: 2,
       totalAmount: '78.00',
@@ -33,7 +34,9 @@ describe('OrderList 组件', () => {
     expect(screen.getByText('我的订单')).toBeInTheDocument();
     expect(screen.getByText('订单号：202608050001')).toBeInTheDocument();
     expect(screen.getByText('流浪地球3')).toBeInTheDocument();
+    expect(screen.getByText('场次编号：1001')).toBeInTheDocument();
     expect(screen.getByText('实付款 ¥ 78.00')).toBeInTheDocument();
+    expect(screen.getByLabelText('按下单日期筛选订单')).toBeInTheDocument();
     expect(screen.getAllByText('已出票').length).toBeGreaterThanOrEqual(1);
   });
 
