@@ -7,6 +7,9 @@ import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.auth.application.RoleCode;
 import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.order.api.CreateOrderPrecheckCommand;
+import com.miaoyu.ticket.order.api.CreateOrderTool;
+import com.miaoyu.ticket.order.api.OrderPrecheckResult;
 import com.miaoyu.ticket.order.domain.OrderStatus;
 import com.miaoyu.ticket.ticketing.application.TicketingErrorCode;
 import java.time.Clock;
@@ -43,6 +46,9 @@ class OrderApplicationServiceIntegrationTest {
 
     @Autowired
     private OrderApplicationService orderApplicationService;
+
+    @Autowired
+    private CreateOrderTool createOrderTool;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -103,6 +109,22 @@ class OrderApplicationServiceIntegrationTest {
         assertThatThrownBy(() -> orderApplicationService.queryByClientRequestId(command.clientRequestId()))
                 .isInstanceOfSatisfying(BusinessException.class, exception -> assertThat(exception.getErrorCode())
                         .isEqualTo(OrderErrorCode.ORDER_NOT_FOUND));
+    }
+
+    @Test
+    void givenPrecheckSelection_whenValidateRuns_thenReadOnlyResultDoesNotCreateOrderOrLockSeat() {
+        ShowSeats fixture = findFutureShowSeats(1);
+        long seatId = fixture.seatIds().getFirst();
+
+        OrderPrecheckResult result = createOrderTool.validate(new CreateOrderPrecheckCommand(
+                Long.toString(fixture.showId()),
+                List.of(Long.toString(seatId))));
+
+        assertThat(result.executable()).isTrue();
+        assertThat(result.errorCode()).isNull();
+        assertThat(seatStatus(seatId)).isEqualTo("AVAILABLE");
+        assertThat(count("ticket_order")).isZero();
+        assertThat(count("ticket_order_seat")).isZero();
     }
 
     @Test

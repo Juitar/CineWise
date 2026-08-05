@@ -4,6 +4,7 @@ import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.ticketing.application.TicketingErrorCode;
+import com.miaoyu.ticket.ticketing.application.SeatLockService;
 import java.util.List;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -18,14 +19,17 @@ public class OrderApplicationService {
     private final CurrentUserAccessor currentUserAccessor;
     private final OrderCreationTransaction creationTransaction;
     private final OrderIdempotencyService idempotencyService;
+    private final SeatLockService seatLockService;
 
     public OrderApplicationService(
             CurrentUserAccessor currentUserAccessor,
             OrderCreationTransaction creationTransaction,
-            OrderIdempotencyService idempotencyService) {
+            OrderIdempotencyService idempotencyService,
+            SeatLockService seatLockService) {
         this.currentUserAccessor = currentUserAccessor;
         this.creationTransaction = creationTransaction;
         this.idempotencyService = idempotencyService;
+        this.seatLockService = seatLockService;
     }
 
     /**
@@ -53,6 +57,11 @@ public class OrderApplicationService {
         long currentUserId = currentUserAccessor.requireCurrentUserId();
         return idempotencyService.findByClientRequestId(currentUserId, clientRequestId)
                 .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+    }
+
+    /** 供 A 的公开预检适配器复用票务读取；不读取当前用户，也不产生建单副作用。 */
+    public void validateOrderSelection(long showId, List<Long> seatIds) {
+        seatLockService.precheckSeats(showId, seatIds);
     }
 
     private OrderView recoverAfterCompetingWrite(

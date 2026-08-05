@@ -42,4 +42,13 @@ class ModuleArchitectureTest {
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage("..ticketing.api..", "..ticketing.infrastructure..");
+
+    /** B 只能依赖 A 的公开 Tool/DTO，不能绕过适配器调用订单应用或持久化实现。 */
+    @ArchTest
+    static final ArchRule AGENT_MUST_NOT_DEPEND_ON_ORDER_INTERNALS = noClasses()
+            .that()
+            .resideInAPackage("..agent..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("..order.application..", "..order.infrastructure..");
 }
