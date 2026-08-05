@@ -21,4 +21,8 @@ public interface AgentRunRepository {
 
     /** 按运行版本和 RUNNING 前置状态完成一次恢复或终态落库。 */
     boolean updateTerminalWithCas(AgentRun run, long expectedVersion);
+
+    boolean deleteTerminalExpiredById(long runId, LocalDateTime now);
+
+    boolean hasRuns(long sessionId);
 }

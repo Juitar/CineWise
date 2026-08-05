@@ -47,4 +47,14 @@ public class MybatisAgentRunRepository implements AgentRunRepository {
     public boolean updateTerminalWithCas(AgentRun run, long expectedVersion) {
         return mapper.updateRunTerminalWithCas(AgentPersistenceMappings.toEntity(run), expectedVersion) == 1;
     }
+
+    @Override
+    public boolean deleteTerminalExpiredById(long runId, LocalDateTime now) {
+        return mapper.deleteTerminalExpiredRunById(runId, now) == 1;
+    }
+
+    @Override
+    public boolean hasRuns(long sessionId) {
+        return mapper.countRunsBySessionId(sessionId) > 0;
+    }
 }

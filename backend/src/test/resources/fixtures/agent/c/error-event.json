@@ -1,0 +1,13 @@
+{
+  "eventId": "42",
+  "sessionId": "session-example-1",
+  "runId": "run-example-1",
+  "planVersion": 1,
+  "nodeId": null,
+  "eventType": "message.error",
+  "displayText": "本次请求未完成",
+  "payload": {
+    "reason": "RUN_FAILED"
+  },
+  "occurredAt": "2026-08-05T10:00:01+08:00"
+}

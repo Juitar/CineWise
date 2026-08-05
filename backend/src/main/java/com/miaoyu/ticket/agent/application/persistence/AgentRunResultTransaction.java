@@ -1,11 +1,14 @@
 package com.miaoyu.ticket.agent.application.persistence;
 
 import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentResult;
+import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
+import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessageRole;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessageStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessageType;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
+import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStep;
 import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
@@ -13,11 +16,15 @@ import com.miaoyu.ticket.agent.domain.plan.ExecutionPlanNode;
 import com.miaoyu.ticket.agent.domain.plan.PlanNodeStatus;
 import com.miaoyu.ticket.agent.domain.run.ExecutionNodeState;
 import com.miaoyu.ticket.agent.domain.run.ExecutionRunState;
+import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +40,7 @@ public class AgentRunResultTransaction {
     private final AgentMessageRepository messageRepository;
     private final AgentSessionRepository sessionRepository;
     private final AgentPersistenceJsonFactory jsonFactory;
+    private final AgentRuntimeEventService runtimeEventService;
     private final BusinessIdGenerator idGenerator;
     private final Clock clock;
 
@@ -42,6 +50,7 @@ public class AgentRunResultTransaction {
             AgentMessageRepository messageRepository,
             AgentSessionRepository sessionRepository,
             AgentPersistenceJsonFactory jsonFactory,
+            AgentRuntimeEventService runtimeEventService,
             BusinessIdGenerator idGenerator,
             Clock clock) {
         this.runRepository = runRepository;
@@ -49,6 +58,7 @@ public class AgentRunResultTransaction {
         this.messageRepository = messageRepository;
         this.sessionRepository = sessionRepository;
         this.jsonFactory = jsonFactory;
+        this.runtimeEventService = runtimeEventService;
         this.idGenerator = idGenerator;
         this.clock = clock;
     }
@@ -74,6 +84,7 @@ public class AgentRunResultTransaction {
                     .toList());
         }
         messageRepository.insert(assistantMessage(run, result, now));
+        recordVisibleEvents(sessionFor(run), nextRun, result, now);
         if (nextStatus.isTerminal()) {
             sessionRepository.releaseActiveRun(run.sessionId(), run.id());
         }
@@ -93,6 +104,10 @@ public class AgentRunResultTransaction {
                 idGenerator.nextId(), UUID.randomUUID().toString(), run.sessionId(), run.id(), run.userId(),
                 AgentMessageRole.ASSISTANT, AgentMessageType.ERROR, SAFE_FAILURE_TEXT, SAFE_FAILURE_PAYLOAD,
                 AgentMessageStatus.COMPLETED, now, now, run.expireAt()));
+        runtimeEventService.append(sessionFor(run),
+                failed, AgentEventType.MESSAGE_ERROR, SAFE_FAILURE_PAYLOAD);
+        runtimeEventService.append(sessionFor(run),
+                failed, AgentEventType.RUN_COMPLETE, new AgentStoredJson("{\"status\":\"FAILED\"}"));
         sessionRepository.releaseActiveRun(run.sessionId(), run.id());
     }
 
@@ -107,6 +122,76 @@ public class AgentRunResultTransaction {
                 nodeState.attemptCount(), nodeState.retryCount(), status == PlanNodeStatus.RUNNING,
                 nodeState.autoSkipped(), nodeState.skipReason(), nodeState.skipSourceNodeId(),
                 jsonFactory.slotSnapshot(node), startedAt, finishedAt, 0L, now, now, run.expireAt());
+    }
+
+    private void recordVisibleEvents(
+            AgentSession session, AgentRun run, MinimalReadOnlyAgentResult result, LocalDateTime now) {
+        ExecutionRunState state = result.state();
+        if (state != null) {
+            runtimeEventService.append(session, run, AgentEventType.PLAN_CREATED,
+                    jsonFactory.eventPayload(Map.of("planVersion", state.plan().version())));
+            List<ExecutionPlanNode> toolNodes = new ArrayList<>();
+            state.plan().nodes().forEach(node -> {
+                PlanNodeStatus status = state.nodeState(node.nodeId()).status();
+                if (node.type() == com.miaoyu.ticket.agent.domain.plan.PlanNodeType.CALL_TOOL
+                        && status != PlanNodeStatus.PENDING) {
+                    toolNodes.add(node);
+                    runtimeEventService.append(session, run, AgentEventType.STEP_START,
+                            jsonFactory.eventPayload(Map.of("nodeId", node.nodeId())));
+                    runtimeEventService.append(session, run, AgentEventType.TOOL_START,
+                            jsonFactory.eventPayload(Map.of("nodeId", node.nodeId(), "targetName", node.targetName())));
+                } else {
+                    recordNodeEvent(session, run, status, node.nodeId());
+                }
+            });
+            recordToolEvents(session, run, result, toolNodes, state);
+        } else {
+            recordToolEvents(session, run, result, List.of(), null);
+        }
+        AgentReplyMessageType replyType = result.reply().messageType();
+        runtimeEventService.append(session, run,
+                replyType == AgentReplyMessageType.MOVIE_CARD || replyType == AgentReplyMessageType.PLAN_CARD
+                        ? AgentEventType.CARD : replyType == AgentReplyMessageType.ERROR
+                                ? AgentEventType.MESSAGE_ERROR : AgentEventType.MESSAGE_COMPLETE,
+                jsonFactory.eventPayload(Map.of("messageType", replyType.name())));
+        if (run.status().isTerminal()) {
+            runtimeEventService.append(session, run, AgentEventType.RUN_COMPLETE,
+                    jsonFactory.eventPayload(Map.of("status", run.status().name())));
+        }
+    }
+
+    private void recordToolEvents(AgentSession session, AgentRun run, MinimalReadOnlyAgentResult result,
+            List<ExecutionPlanNode> toolNodes, ExecutionRunState state) {
+        for (int index = 0; index < result.toolResults().size(); index++) {
+            String nodeId = index < toolNodes.size() ? toolNodes.get(index).nodeId() : null;
+            Map<String, String> payload = nodeId == null
+                    ? Map.of("status", result.toolResults().get(index).status().name())
+                    : Map.of("nodeId", nodeId, "status", result.toolResults().get(index).status().name());
+            runtimeEventService.append(session, run, AgentEventType.TOOL_RESULT, jsonFactory.eventPayload(payload));
+            if (nodeId != null && state != null) {
+                recordTerminalToolNodeEvent(session, run, state.nodeState(nodeId).status(), nodeId);
+            }
+        }
+    }
+
+    private void recordTerminalToolNodeEvent(AgentSession session, AgentRun run, PlanNodeStatus status, String nodeId) {
+        if (status == PlanNodeStatus.SUCCESS || status == PlanNodeStatus.SKIPPED || status == PlanNodeStatus.FAILED) {
+            recordNodeEvent(session, run, status, nodeId);
+        }
+    }
+
+    private void recordNodeEvent(AgentSession session, AgentRun run, PlanNodeStatus status, String nodeId) {
+        AgentEventType type = switch (status) {
+            case SUCCESS, SKIPPED -> AgentEventType.STEP_COMPLETE;
+            case FAILED -> AgentEventType.STEP_FAILED;
+            case RUNNING -> AgentEventType.STEP_START;
+            case PENDING -> null;
+            default -> null;
+        };
+        if (type != null) {
+            runtimeEventService.append(session, run, type,
+                    jsonFactory.eventPayload(Map.of("nodeId", nodeId)));
+        }
     }
 
     private AgentMessage assistantMessage(AgentRun run, MinimalReadOnlyAgentResult result, LocalDateTime now) {
@@ -153,5 +238,10 @@ public class AgentRunResultTransaction {
 
     private LocalDateTime now() {
         return LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
+    }
+
+    private AgentSession sessionFor(AgentRun run) {
+        return sessionRepository.findByIdAndUserId(run.sessionId(), run.userId())
+                .orElseThrow(() -> new IllegalStateException("运行所属会话不存在"));
     }
 }

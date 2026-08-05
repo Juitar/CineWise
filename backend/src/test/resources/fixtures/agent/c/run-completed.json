@@ -1,0 +1,15 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "runId": "run-example-1",
+    "sessionId": "session-example-1",
+    "status": "COMPLETED",
+    "planId": "plan-example-1",
+    "planVersion": 1,
+    "lastEventId": "42",
+    "messages": [],
+    "steps": [],
+    "events": []
+  }
+}

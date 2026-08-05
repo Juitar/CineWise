@@ -1,6 +1,10 @@
 package com.miaoyu.ticket.agent.infrastructure.persistence;
 
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
+import com.miaoyu.ticket.agent.domain.persistence.AgentEventStreamCursor;
+import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
+import com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEvent;
+import com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEventDraft;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessageRole;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessageStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessageType;
@@ -91,5 +95,28 @@ final class AgentPersistenceMappings {
                 step.skipSourceNodeId(), step.slotSnapshot().value(), step.startedAt(), step.finishedAt(),
                 step.version(),
                 step.createTime(), step.updateTime(), step.expireAt());
+    }
+
+    static AgentEventStreamCursor toDomain(AgentEventStreamCursorEntity entity) {
+        return new AgentEventStreamCursor(entity.sessionId(), entity.lastCommittedEventId(),
+                entity.firstRetainedEventId(), entity.version(), entity.expireAt(), entity.createTime(),
+                entity.updateTime());
+    }
+
+    static AgentEventStreamCursorEntity toEntity(AgentEventStreamCursor cursor) {
+        return new AgentEventStreamCursorEntity(cursor.sessionId(), cursor.lastCommittedEventId(),
+                cursor.firstRetainedEventId(), cursor.version(), cursor.expireAt(), cursor.createTime(),
+                cursor.updateTime());
+    }
+
+    static AgentRuntimeEvent toDomain(AgentRuntimeEventEntity entity) {
+        return new AgentRuntimeEvent(entity.eventId(), entity.sessionId(), entity.runId(),
+                AgentEventType.valueOf(entity.eventType().replace('.', '_').toUpperCase()),
+                new AgentStoredJson(entity.payloadJson()), entity.expireAt(), entity.createTime());
+    }
+
+    static AgentRuntimeEventEntity toEntity(long eventId, AgentRuntimeEventDraft draft) {
+        return new AgentRuntimeEventEntity(eventId, draft.sessionId(), draft.runId(), draft.type().wireValue(),
+                draft.payload().value(), draft.expireAt(), draft.createTime());
     }
 }

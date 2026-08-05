@@ -1,0 +1,13 @@
+{
+  "eventId": "42",
+  "sessionId": "session-example-1",
+  "runId": "run-example-1",
+  "planVersion": 1,
+  "nodeId": "rank-movie",
+  "eventType": "step.start",
+  "displayText": "步骤执行中",
+  "payload": {
+    "status": "running"
+  },
+  "occurredAt": "2026-08-05T10:00:00+08:00"
+}

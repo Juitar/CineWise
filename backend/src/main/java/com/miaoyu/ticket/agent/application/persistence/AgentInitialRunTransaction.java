@@ -9,6 +9,8 @@ import com.miaoyu.ticket.agent.domain.persistence.AgentRequestHash;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
+import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
+import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
@@ -29,6 +31,7 @@ public class AgentInitialRunTransaction {
     private final AgentRunRepository runRepository;
     private final AgentMessageRepository messageRepository;
     private final AgentRequestHashFactory requestHashFactory;
+    private final AgentRuntimeEventService runtimeEventService;
     private final BusinessIdGenerator idGenerator;
     private final Clock clock;
 
@@ -37,12 +40,14 @@ public class AgentInitialRunTransaction {
             AgentRunRepository runRepository,
             AgentMessageRepository messageRepository,
             AgentRequestHashFactory requestHashFactory,
+            AgentRuntimeEventService runtimeEventService,
             BusinessIdGenerator idGenerator,
             Clock clock) {
         this.sessionRepository = sessionRepository;
         this.runRepository = runRepository;
         this.messageRepository = messageRepository;
         this.requestHashFactory = requestHashFactory;
+        this.runtimeEventService = runtimeEventService;
         this.idGenerator = idGenerator;
         this.clock = clock;
     }
@@ -85,6 +90,8 @@ public class AgentInitialRunTransaction {
         if (!sessionRepository.claimActiveRun(session.id(), userId, runId, expireAt)) {
             throw new BusinessException(AgentErrorCode.ACTIVE_RUN_CONFLICT);
         }
+        runtimeEventService.append(session, run, AgentEventType.MESSAGE_START,
+                new AgentStoredJson("{\"phase\":\"accepted\"}"));
         return new AgentInitialRunResult(run, false);
     }
 }
