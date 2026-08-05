@@ -2,7 +2,7 @@
 
 - [x] 1.1 C 对照 PRD、认证设计、后端总系分、现有密码登录实现确认发送与验证码登录范围。
 - [x] 1.2 C 建立 `email-code-authentication` proposal、spec、design、tasks 和迁移申请；验证：OpenSpec 严格校验。
-- [ ] 1.3 迁移版本已确定为 V011/V012；A 继续完成 T02/T03/T04、登录日志 CHECK、索引、约束和兼容性静态审查。
+- [ ] 1.3 结构迁移版本已确定为 V011；A 继续完成 T02/T03/T04、登录日志 CHECK、索引、约束和兼容性静态审查，不创建邀请码种子迁移。
 
 ## 2. 验证码领域和应用服务
 
@@ -20,7 +20,7 @@
 
 ## 4. 迁移和真实环境
 
-- [ ] 4.1 A 创建或审核 `V011__create_auth_email_code_and_registration_tables.sql` 和 `V012__seed_training_registration_invite.sql`；C 不执行迁移。
+- [ ] 4.1 A 创建或审核 `V011__create_auth_email_code_and_registration_tables.sql`；V011 只包含结构和前向 CHECK，C 不执行迁移。
 - [ ] 4.2 A 授权后在空 MySQL 8.4 验证首次/重复迁移、结构、索引、CHECK 和并发消费。
 - [ ] 4.3 C/A 在真实 Redis 和真实测试邮箱验证一次投递、冷却、登录、结果未知与敏感信息检查。
 
@@ -30,8 +30,9 @@
 - [x] 5.2 C 实现邀请码 Repository、条件扣减和使用记录；验证：无效、未生效、过期、禁用、耗尽和版本竞争。
 - [x] 5.3 C 实现注册事务和重复 `clientRequestId` 安全恢复；验证：验证码、邀请码、账号和使用记录同事务回滚，重放参数不一致被拒绝。
 - [x] 5.4 C 接入 `POST /api/v1/auth/register`、Cookie、CSRF、错误码和 OpenAPI；验证：Controller 集成测试。
+- [ ] 5.5 C 实现默认关闭的首个邀请码受控 Initializer 和 Git 忽略环境配置；验证：首次插入、配置失败关闭、重复启动不新增且不重置次数、敏感信息不输出。
 
 ## 6. 提交前验证
 
-- [x] 6.1 C 重新执行后端完整 Maven verify，记录注册加入后的通过、失败和跳过数。
-- [x] 6.2 C 重新执行 OpenSpec 严格校验、`git diff --check`、状态和变更范围核对。
+- [ ] 6.1 C 完成首个邀请码 Initializer 后重新执行后端完整 Maven verify，记录通过、失败和跳过数。
+- [ ] 6.2 C 完成首个邀请码 Initializer 后重新执行 OpenSpec 严格校验、`git diff --check`、状态和变更范围核对。

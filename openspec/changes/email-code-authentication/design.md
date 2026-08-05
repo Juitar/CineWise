@@ -1,6 +1,6 @@
 ## Context
 
-现有 `password-login-and-session` 已提供账号查询、JWT Cookie、CSRF、当前用户和登录审计，但明确排除了验证码和注册。认证设计已经确定验证码、邀请码、邀请码使用记录的表字段，以及注册接口、事务和错误码；迁移版本已确定为 V011/V012，当前仍缺少 A 审查后的正式 SQL、空 MySQL 验证和正式 SMTP 环境配置。
+现有 `password-login-and-session` 已提供账号查询、JWT Cookie、CSRF、当前用户和登录审计，但明确排除了验证码和注册。认证设计已经确定验证码、邀请码、邀请码使用记录的表字段，以及注册接口、事务和错误码；结构迁移版本已确定为 V011，当前仍缺少 A 审查后的正式 SQL、空 MySQL 验证、首个邀请码受控初始化和正式 SMTP 环境配置。
 
 ## Goals / Non-Goals
 
@@ -42,9 +42,9 @@
 
 邮件端口返回 `SENT/FAILED/UNKNOWN`。SMTP Adapter 使用 Spring Boot Mail 的 `JavaMailSender` 发送纯文本认证模板，主题和正文固定，不接受前端模板；地址、认证和超时由 `spring.mail.*` 环境配置提供。未启用 SMTP 时使用失败关闭 Adapter，接口返回 `301001`。代码和测试不打印验证码。
 
-### 7. 数据迁移使用已确认的 V011/V012
+### 7. V011 只负责结构和前向 CHECK
 
-`sys_email_verify_code` 使用设计已确认的 11 个字段，补充 `status` 仅允许 `UNUSED/USED/INVALID`、`attempt_count` 在 0～5、摘要为 64 位小写十六进制、使用时间与状态一致的 CHECK。索引为 `idx_verify_lookup(email,purpose,status,expire_time)` 和用于短生命周期清理的 `idx_verify_expire(expire_time)`。V006 的 `chk_sys_login_log_type` 当前只允许 `PASSWORD/ADMIN_PASSWORD`，`V011__create_auth_email_code_and_registration_tables.sql` 必须在同一条 `ALTER TABLE` 中删除并重建该约束，加入 `EMAIL_CODE`；不得修改 V006。C 提交字段与约束申请；A 生成或审核 V011/V012 的正式 SQL，并决定是否授权空 MySQL 8.4 验证。
+`sys_email_verify_code` 使用设计已确认的 11 个字段，补充正数雪花 ID、`status` 仅允许 `UNUSED/USED/INVALID`、`attempt_count` 在 0～5、摘要为 64 位小写十六进制、`USED` 的 `used_time` 位于 `send_time` 至 `expire_time` 区间且其他状态为空的 CHECK。索引为 `idx_verify_lookup(email,purpose,status,expire_time)` 和用于短生命周期清理的 `idx_verify_expire(expire_time)`。邀请码表主键以及使用记录的 `id/invite_id/user_id` 同样必须为正数。V006 的 `chk_sys_login_log_type` 当前只允许 `PASSWORD/ADMIN_PASSWORD`，`V011__create_auth_email_code_and_registration_tables.sql` 必须在同一条 `ALTER TABLE` 中删除并重建该约束，加入 `EMAIL_CODE`；不得修改 V006。V011 不包含邀请码种子或其他业务初始化状态；A 审核正式 SQL，并决定是否授权空 MySQL 8.4 验证。
 
 ### 8. 注册事务同时消费验证码和邀请码
 
@@ -56,13 +56,14 @@
 
 新增 `cinewise.auth.registration.current-privacy-policy-version`，请求必须显式传 `privacyAccepted=true` 且版本完全相等，否则返回 `201008`。昵称可空；有值时去除首尾空白且不超过 64 字符，空值使用 `用户` 加用户 ID 末 6 位生成，不从邮箱推导昵称。
 
-### 10. 邀请码使用独立 HMAC 密钥
+### 10. 邀请码使用独立 HMAC 密钥和受控初始化
 
-邀请码不保存明文，使用必填 `AUTH_INVITE_HASH_SECRET` 计算 HMAC-SHA-256 后按唯一索引查询。摘要同样使用 `CHAR(64) CHARACTER SET ascii COLLATE ascii_bin` 和小写十六进制 CHECK。首个培训邀请码由 A 在结构迁移后的独立数据迁移写入预计算摘要、有效期和次数；正式数据迁移使用“摘要不存在才插入”，不得用会重置 `used_count` 的 `ON DUPLICATE KEY UPDATE`。代码、OpenSpec、日志和 Git 不保存邀请码明文或摘要密钥。
+邀请码不保存明文，使用必填 `AUTH_INVITE_HASH_SECRET` 计算 HMAC-SHA-256 后按唯一索引查询。摘要同样使用 `CHAR(64) CHARACTER SET ascii COLLATE ascii_bin` 和小写十六进制 CHECK。首个培训邀请码不进入 Flyway：首次初始化前由 C 在 Git 忽略的环境配置中提供开关、明文邀请码、次数和有效期，Initializer 使用 `BusinessIdGenerator` 生成雪花 ID、计算摘要并按摘要不存在条件插入。初始化默认关闭；配置缺失或非法时拒绝执行；重复启动发现相同摘要时不新增、不修改、不重置 `used_count`。日志、Git 和普通响应不保存或输出邀请码明文、摘要密钥或完整摘要。
 
 ## Risks / Trade-offs
 
 - [迁移未发布] → 代码不能部署到会调用验证码或注册接口的环境；先完成不依赖真实表的单元、Controller Mock 和静态检查，真实 MySQL 测试保持未完成。
+- [首个邀请码未初始化] → 注册接口不会有可用邀请码；V011 验证并发布后，在首次开放注册前使用 Git 忽略的环境配置执行一次受控初始化，成功后关闭初始化开关。
 - [SMTP 未配置] → 默认失败关闭并返回 `301001`；真实收信只在 C/A 配置测试域名、发件人和密钥后验证。
 - [外部发送后进程中断] → 结果按未知处理，保留验证码和冷却，不自动重发；用户可检查邮箱并在窗口结束后主动请求。
 - [固定窗口 IP 限流误伤共享出口] → 上限配置保守，指标只记录摘要和计数；达到上限返回 `101002`，不泄露具体邮箱。
@@ -73,15 +74,15 @@
 - 领域 Owner：C
 - 涉及表：新增 `sys_email_verify_code`、`sys_registration_invite`、`sys_registration_invite_use`；向前修改 `sys_login_log` 的 `chk_sys_login_log_type`
 - 结构迁移：`V011__create_auth_email_code_and_registration_tables.sql`
-- 邀请码数据迁移：`V012__seed_training_registration_invite.sql`
+- 数据迁移：无；邀请码不得通过 Flyway 种子迁移初始化
 - 验证码字段：`id,email,purpose,code_hash,status,send_time,expire_time,used_time,attempt_count,create_time,update_time`
 - 邀请码字段：`id,code_hash,status,max_uses,used_count,valid_from,expire_time,version,create_time,update_time`
 - 使用记录字段：`id,invite_id,user_id,client_request_id,used_at,create_time`
 - 摘要列：验证码和邀请码的 `code_hash` 均为 `CHAR(64) CHARACTER SET ascii COLLATE ascii_bin`，CHECK 只允许 64 位小写十六进制
 - 索引：按认证总系分 T02、T03、T04；补充 `idx_verify_expire(expire_time)`；邮箱、邀请码摘要、用户和 clientRequestId 的唯一/查询规则不得删减
-- CHECK：用途白名单、状态白名单、尝试次数 0～5、摘要格式、`USED` 必须有 `used_time` 且其他状态为空
+- CHECK：主键和逻辑关联 ID 为正数、用途白名单、状态白名单、尝试次数 0～5、摘要格式、`USED` 的 `used_time` 位于发送至过期区间且其他状态为空
 - 兼容修改：`chk_sys_login_log_type` 从 `PASSWORD/ADMIN_PASSWORD` 增加 `EMAIL_CODE`，在同一条 `ALTER TABLE` 中 DROP 和 ADD，不得修改 V006
-- 数据迁移：`V012__seed_training_registration_invite.sql` 在 V011 之后执行，只保存预计算摘要，不保存明文；使用“摘要不存在才插入”，不得重置既有使用次数
+- 首次初始化：V011 发布后通过 Git 忽略的环境配置受控执行；按摘要不存在才插入，使用 `BusinessIdGenerator` 生成 ID，不得重置既有使用次数
 - 验证：冷却重复发送、错误尝试上限、过期、一次性消费、邮箱唯一竞争、邀请码最后一次竞争、注册回滚、字符集和重复 migrate
 
 ## Verification
