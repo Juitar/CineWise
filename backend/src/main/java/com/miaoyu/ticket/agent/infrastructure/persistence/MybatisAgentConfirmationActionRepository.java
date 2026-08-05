@@ -26,6 +26,11 @@ public class MybatisAgentConfirmationActionRepository implements AgentConfirmati
     }
 
     @Override
+    public Optional<AgentConfirmationAction> findByActionIdForUpdate(String actionId) {
+        return Optional.ofNullable(mapper.findActionByActionIdForUpdate(actionId)).map(this::toDomain);
+    }
+
+    @Override
     public Optional<AgentConfirmationAction> findByCreationKey(
             long userId,
             long agentRunId,

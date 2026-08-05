@@ -272,6 +272,11 @@ class AgentConfirmationServiceTest {
         }
 
         @Override
+        public Optional<AgentConfirmationAction> findByActionIdForUpdate(String actionId) {
+            return findByActionId(actionId);
+        }
+
+        @Override
         public Optional<AgentConfirmationAction> findByCreationKey(
                 long userId,
                 long agentRunId,
@@ -356,6 +361,11 @@ class AgentConfirmationServiceTest {
                 loserReadWinner.countDown();
                 return Optional.of(stored);
             }
+        }
+
+        @Override
+        public Optional<AgentConfirmationAction> findByActionIdForUpdate(String actionId) {
+            return findByActionId(actionId);
         }
 
         @Override

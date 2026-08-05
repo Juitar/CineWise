@@ -17,7 +17,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 确认动作的应用用例。
@@ -33,8 +37,23 @@ public final class AgentConfirmationService {
     private final AgentConfirmationEventPublisher eventPublisher;
     private final CurrentUserAccessor currentUserAccessor;
     private final Clock clock;
+    private final ConfirmationTransactionRunner transactionRunner;
     private final AgentConfirmationActionValidator validator = new AgentConfirmationActionValidator();
 
+    @Autowired
+    public AgentConfirmationService(
+            AgentConfirmationActionRepository repository,
+            AgentConfirmationFactsProvider factsProvider,
+            CreateOrderToolAdapter createOrderToolAdapter,
+            AgentConfirmationEventPublisher eventPublisher,
+            CurrentUserAccessor currentUserAccessor,
+            Clock clock,
+            PlatformTransactionManager transactionManager) {
+        this(repository, factsProvider, createOrderToolAdapter, eventPublisher, currentUserAccessor, clock,
+                transactionRunner(transactionManager));
+    }
+
+    /** 单元测试不需要真实数据库事务；生产 Bean 始终使用上方构造器传入的 TransactionTemplate。 */
     public AgentConfirmationService(
             AgentConfirmationActionRepository repository,
             AgentConfirmationFactsProvider factsProvider,
@@ -42,38 +61,41 @@ public final class AgentConfirmationService {
             AgentConfirmationEventPublisher eventPublisher,
             CurrentUserAccessor currentUserAccessor,
             Clock clock) {
+        this(repository, factsProvider, createOrderToolAdapter, eventPublisher, currentUserAccessor, clock,
+                directTransactionRunner());
+    }
+
+    private AgentConfirmationService(
+            AgentConfirmationActionRepository repository,
+            AgentConfirmationFactsProvider factsProvider,
+            CreateOrderToolAdapter createOrderToolAdapter,
+            AgentConfirmationEventPublisher eventPublisher,
+            CurrentUserAccessor currentUserAccessor,
+            Clock clock,
+            ConfirmationTransactionRunner transactionRunner) {
         this.repository = Objects.requireNonNull(repository, "repository 不能为空");
         this.factsProvider = Objects.requireNonNull(factsProvider, "factsProvider 不能为空");
         this.createOrderToolAdapter = Objects.requireNonNull(createOrderToolAdapter, "createOrderToolAdapter 不能为空");
         this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher 不能为空");
         this.currentUserAccessor = Objects.requireNonNull(currentUserAccessor, "currentUserAccessor 不能为空");
         this.clock = Objects.requireNonNull(clock, "clock 不能为空");
+        this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner 不能为空");
     }
 
     /** 确认 body 只有布尔值；其余值均由服务端受控上下文生成。 */
     public AgentConfirmationResult confirm(String actionId, boolean confirmed, String traceId) {
         long currentUserId = currentUserAccessor.requireCurrentUserId();
-        AgentConfirmationAction action = findAction(actionId);
-        AgentConfirmationValidationContext facts = factsProvider.load(action, currentUserId);
-        AgentConfirmationValidationFailure failure = validator.validate(action, facts).orElse(null);
-        if (failure != null) {
-            return failValidation(action, failure, facts.now());
+        ClaimResult claimResult = transactionRunner.execute(() -> claim(actionId, confirmed, currentUserId));
+        if (!claimResult.shouldExecute()) {
+            return claimResult.result();
         }
-        if (!confirmed) {
-            AgentConfirmationAction rejected = action.reject(facts.now());
-            return new AgentConfirmationResult(updateOrReadWinner(action, rejected).action(), null, false);
-        }
-        AgentConfirmationAction claimed = action.claim(
-                AgentActionWriteIdentifiers.forAction(action.actionId()), facts.now());
-        CasUpdateResult claimResult = updateOrReadWinner(action, claimed);
-        if (!claimResult.applied()) {
-            return new AgentConfirmationResult(claimResult.action(), null, false);
-        }
-        AgentConfirmationAction winner = claimResult.action();
+        AgentConfirmationAction winner = claimResult.result().action();
         ToolResult<CreateOrderToolResult> toolResult =
                 createOrderToolAdapter.execute(winner.actionId(), toolContext(winner, traceId), winner.command());
         AgentConfirmationAction completed = resultAction(winner, toolResult, now());
-        return new AgentConfirmationResult(updateOrReadWinner(winner, completed).action(), null, true);
+        AgentConfirmationAction result = transactionRunner.execute(
+                () -> updateOrReadWinner(winner, completed).action());
+        return new AgentConfirmationResult(result, null, true);
     }
 
     /** 仅对结果未知动作使用原 action 写标识查询；本方法绝不调用 execute。 */
@@ -92,12 +114,36 @@ public final class AgentConfirmationService {
             return new AgentConfirmationResult(action, null, false);
         }
         AgentConfirmationAction completed = resultAction(action, queryResult, now());
-        return new AgentConfirmationResult(updateOrReadWinner(action, completed).action(), null, false);
+        AgentConfirmationAction result = transactionRunner.execute(
+                () -> updateOrReadWinner(action, completed).action());
+        return new AgentConfirmationResult(result, null, false);
     }
 
     /** SSE 回放和运行查询只刷新本人的 action 事实，绝不进入写工具。 */
     public Optional<AgentConfirmationAction> refreshForCurrentUser(String actionId) {
         long currentUserId = currentUserAccessor.requireCurrentUserId();
+        return transactionRunner.execute(() -> refresh(actionId, currentUserId));
+    }
+
+    private ClaimResult claim(String actionId, boolean confirmed, long currentUserId) {
+        AgentConfirmationAction action = findAction(actionId);
+        AgentConfirmationValidationContext facts = factsProvider.load(action, currentUserId);
+        AgentConfirmationValidationFailure failure = validator.validate(action, facts).orElse(null);
+        if (failure != null) {
+            return new ClaimResult(failValidation(action, failure, facts.now()), false);
+        }
+        if (!confirmed) {
+            AgentConfirmationAction rejected = action.reject(facts.now());
+            return new ClaimResult(new AgentConfirmationResult(
+                    updateOrReadWinner(action, rejected).action(), null, false), false);
+        }
+        AgentConfirmationAction claimed = action.claim(
+                AgentActionWriteIdentifiers.forAction(action.actionId()), facts.now());
+        CasUpdateResult winner = updateOrReadWinner(action, claimed);
+        return new ClaimResult(new AgentConfirmationResult(winner.action(), null, false), winner.applied());
+    }
+
+    private Optional<AgentConfirmationAction> refresh(String actionId, long currentUserId) {
         AgentConfirmationAction action = repository.findByActionId(actionId).orElse(null);
         if (action == null || action.userId() != currentUserId
                 || action.status() != AgentConfirmationActionStatus.PENDING_CONFIRMATION) {
@@ -143,7 +189,7 @@ public final class AgentConfirmationService {
             eventPublisher.publish(next);
             return new CasUpdateResult(next, true);
         }
-        AgentConfirmationAction winner = repository.findByActionId(current.actionId()).orElseThrow(
+        AgentConfirmationAction winner = repository.findByActionIdForUpdate(current.actionId()).orElseThrow(
                 () -> new IllegalStateException("确认动作在并发更新后不存在"));
         return new CasUpdateResult(winner, false);
     }
@@ -177,6 +223,34 @@ public final class AgentConfirmationService {
         return traceId;
     }
 
+    private static ConfirmationTransactionRunner transactionRunner(PlatformTransactionManager transactionManager) {
+        TransactionTemplate transactionTemplate = new TransactionTemplate(
+                Objects.requireNonNull(transactionManager, "transactionManager 不能为空"));
+        return new ConfirmationTransactionRunner() {
+            @Override
+            public <T> T execute(Supplier<T> callback) {
+                return transactionTemplate.execute(status -> callback.get());
+            }
+        };
+    }
+
+    private static ConfirmationTransactionRunner directTransactionRunner() {
+        return new ConfirmationTransactionRunner() {
+            @Override
+            public <T> T execute(Supplier<T> callback) {
+                return callback.get();
+            }
+        };
+    }
+
     private record CasUpdateResult(AgentConfirmationAction action, boolean applied) {
+    }
+
+    private record ClaimResult(AgentConfirmationResult result, boolean shouldExecute) {
+    }
+
+    @FunctionalInterface
+    private interface ConfirmationTransactionRunner {
+        <T> T execute(Supplier<T> callback);
     }
 }

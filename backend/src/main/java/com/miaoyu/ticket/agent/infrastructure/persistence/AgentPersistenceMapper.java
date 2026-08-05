@@ -350,6 +350,9 @@ public interface AgentPersistenceMapper {
     @Select("SELECT " + ACTION_COLUMNS + " FROM agent_action WHERE action_id = #{actionId} LIMIT 1")
     AgentConfirmationActionEntity findActionByActionId(@Param("actionId") String actionId);
 
+    @Select("SELECT " + ACTION_COLUMNS + " FROM agent_action WHERE action_id = #{actionId} LIMIT 1 FOR UPDATE")
+    AgentConfirmationActionEntity findActionByActionIdForUpdate(@Param("actionId") String actionId);
+
     @Select("SELECT " + ACTION_COLUMNS + " FROM agent_action"
             + " WHERE user_id = #{userId} AND agent_run_id = #{agentRunId} AND plan_id = #{planId}"
             + " AND plan_version = #{planVersion} AND node_id = #{nodeId} AND tool_name = #{toolName}"

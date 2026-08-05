@@ -8,6 +8,11 @@ import java.util.Optional;
 public interface AgentConfirmationActionRepository {
     Optional<AgentConfirmationAction> findByActionId(String actionId);
 
+    /**
+     * CAS 失败后使用当前读取得提交胜者，避免事务内的普通快照读到旧状态并再次执行写工具。
+     */
+    Optional<AgentConfirmationAction> findByActionIdForUpdate(String actionId);
+
     Optional<AgentConfirmationAction> findByCreationKey(
             long userId,
             long agentRunId,
