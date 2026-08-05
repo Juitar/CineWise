@@ -30,7 +30,7 @@
 ## 5. SSE、恢复与并发
 
 - [ ] 5.1 B：在持久化事件可用后发布安全确认卡和结果事件，先保存事实后回放；验证：payload 白名单、旧卡失效、重复事件和断线重连测试。
-- [x] 5.2 B：实现结果未知恢复器，只按原键查询 A；验证：`AgentConfirmationServiceTest` 覆盖原键查询和不重发，`AgentInteractionRuntimeServiceTest` 覆盖 SSE 重放 `RESULT_UNKNOWN` 后只恢复查询并投影明确结果；超时、断线和查询无结论保持 `RESULT_UNKNOWN`。
+- [ ] 5.2 B：实现结果未知恢复器，只按原键查询 A；本地 `AgentConfirmationServiceTest` 覆盖原键查询和不重发，`AgentInteractionRuntimeServiceTest` 覆盖 SSE 重放 `RESULT_UNKNOWN` 后只恢复查询并投影明确结果；因该路径会持久化恢复结果，仍待当前提交的 MySQL CI 验证后再勾选。
 - [x] 5.3 B：用真实持久化验证同 action 并发确认、CAS 冲突、胜者读取、终态不可重入和事务回滚不留半成品；验证：GitHub Actions MySQL 8.4 `AgentPersistenceMySqlIntegrationTest`，运行 `31025050412`（第 151 次）通过。
 
 ## 6. MySQL CI 与交付检查
