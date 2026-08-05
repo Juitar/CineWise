@@ -117,28 +117,6 @@
   gap: 24px;
 }
 
-.admin-notification {
-  position: relative;
-  cursor: pointer;
-}
-
-.bell-icon {
-  font-size: 20px;
-}
-
-.notification-badge {
-  position: absolute;
-  top: -4px;
-  right: -6px;
-  background: #ff4d4f;
-  color: white;
-  font-size: 10px;
-  line-height: 14px;
-  padding: 0 4px;
-  border-radius: 7px;
-  border: 1px solid white;
-}
-
 .admin-user-profile {
   display: flex;
   align-items: center;

@@ -34,10 +34,6 @@ export function AdminTopBar() {
     <header className="admin-top-bar">
       <div className="admin-top-bar-left"></div>
       <div className="admin-top-bar-right">
-        <div className="admin-notification">
-          <span className="bell-icon">🔔</span>
-          <span className="notification-badge">3</span>
-        </div>
         <Dropdown
           menu={{ items: menuItems, onClick: handleMenuClick }}
           placement="bottomRight"
