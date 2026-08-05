@@ -127,6 +127,36 @@ class AgentConfirmationServiceTest {
     }
 
     @Test
+    void shouldNotTreatTheCasLoserAsWinnerWhenItReadsTheSameExecutingVersion() throws Exception {
+        StaleReadRaceRepository repository = new StaleReadRaceRepository(action());
+        CountingTool tool = new CountingTool(success("order-1"));
+        tool.executionStarted = new CountDownLatch(1);
+        tool.allowExecutionToFinish = new CountDownLatch(1);
+        AgentConfirmationService service = service(repository, tool, true);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> service.confirm("action-1", true, "trace-1"));
+            var second = executor.submit(() -> service.confirm("action-1", true, "trace-2"));
+
+            assertTrue(tool.executionStarted.await(3, TimeUnit.SECONDS));
+            assertEquals(1, tool.executeCalls);
+            tool.allowExecutionToFinish.countDown();
+
+            List<AgentConfirmationResult> results = List.of(
+                    first.get(3, TimeUnit.SECONDS), second.get(3, TimeUnit.SECONDS));
+            assertEquals(1, results.stream().filter(AgentConfirmationResult::writeToolInvoked).count());
+            assertEquals(1, results.stream().filter(result -> result.action().status()
+                    == AgentConfirmationActionStatus.SUCCEEDED).count());
+            assertEquals(1, results.stream().filter(result -> result.action().status()
+                    == AgentConfirmationActionStatus.EXECUTING).count());
+            assertEquals(1, tool.executeCalls);
+        } finally {
+            tool.allowExecutionToFinish.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     void shouldKeepCreateOrderFixturesFreeOfSensitiveOrWriteKeyFields() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
         for (String name : List.of("success", "failed", "result-unknown")) {
@@ -195,7 +225,7 @@ class AgentConfirmationServiceTest {
     }
 
     private static AgentConfirmationService service(
-            InMemoryRepository repository,
+            AgentConfirmationActionRepository repository,
             CountingTool tool,
             boolean businessDataValid) {
         AgentConfirmationFactsProvider facts = (action, userId) -> new AgentConfirmationValidationContext(
@@ -290,6 +320,81 @@ class AgentConfirmationServiceTest {
                 return next;
             });
             return updated.get();
+        }
+    }
+
+    /** 模拟两个请求都在 CAS 前读到 PENDING，而失败者随后读到胜者 EXECUTING(v+1) 的 MySQL 场景。 */
+    private static final class StaleReadRaceRepository implements AgentConfirmationActionRepository {
+        private final AgentConfirmationAction initial;
+        private final CountDownLatch initialReads = new CountDownLatch(2);
+        private final java.util.concurrent.atomic.AtomicInteger readCount =
+                new java.util.concurrent.atomic.AtomicInteger();
+        private AgentConfirmationAction stored;
+
+        private StaleReadRaceRepository(AgentConfirmationAction initial) {
+            this.initial = initial;
+            this.stored = initial;
+        }
+
+        @Override
+        public Optional<AgentConfirmationAction> findByActionId(String actionId) {
+            if (readCount.getAndIncrement() < 2) {
+                initialReads.countDown();
+                try {
+                    if (!initialReads.await(3, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("并发初始读取未同时到达");
+                    }
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("并发读取测试线程被中断", exception);
+                }
+                return Optional.of(initial);
+            }
+            synchronized (this) {
+                return Optional.of(stored);
+            }
+        }
+
+        @Override
+        public Optional<AgentConfirmationAction> findByCreationKey(
+                long userId,
+                long agentRunId,
+                String planId,
+                int planVersion,
+                String nodeId,
+                String toolName,
+                String parameterHash) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<AgentConfirmationAction> findByCreationKeyForUpdate(
+                long userId,
+                long agentRunId,
+                String planId,
+                int planVersion,
+                String nodeId,
+                String toolName,
+                String parameterHash) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void insert(AgentConfirmationAction action) {
+            throw new UnsupportedOperationException("本测试不创建 action");
+        }
+
+        @Override
+        public synchronized boolean compareAndSet(
+                String actionId,
+                long expectedVersion,
+                AgentConfirmationActionStatus expectedStatus,
+                AgentConfirmationAction next) {
+            if (stored.version() != expectedVersion || stored.status() != expectedStatus) {
+                return false;
+            }
+            stored = next;
+            return true;
         }
     }
 

@@ -61,18 +61,19 @@ public final class AgentConfirmationService {
         }
         if (!confirmed) {
             AgentConfirmationAction rejected = action.reject(facts.now());
-            return new AgentConfirmationResult(updateOrReadWinner(action, rejected), null, false);
+            return new AgentConfirmationResult(updateOrReadWinner(action, rejected).action(), null, false);
         }
         AgentConfirmationAction claimed = action.claim(
                 AgentActionWriteIdentifiers.forAction(action.actionId()), facts.now());
-        AgentConfirmationAction winner = updateOrReadWinner(action, claimed);
-        if (winner.status() != AgentConfirmationActionStatus.EXECUTING || winner.version() != claimed.version()) {
-            return new AgentConfirmationResult(winner, null, false);
+        CasUpdateResult claimResult = updateOrReadWinner(action, claimed);
+        if (!claimResult.applied()) {
+            return new AgentConfirmationResult(claimResult.action(), null, false);
         }
+        AgentConfirmationAction winner = claimResult.action();
         ToolResult<CreateOrderToolResult> toolResult =
                 createOrderToolAdapter.execute(winner.actionId(), toolContext(winner, traceId), winner.command());
         AgentConfirmationAction completed = resultAction(winner, toolResult, now());
-        return new AgentConfirmationResult(updateOrReadWinner(winner, completed), null, true);
+        return new AgentConfirmationResult(updateOrReadWinner(winner, completed).action(), null, true);
     }
 
     /** 仅对结果未知动作使用原 action 写标识查询；本方法绝不调用 execute。 */
@@ -91,7 +92,7 @@ public final class AgentConfirmationService {
             return new AgentConfirmationResult(action, null, false);
         }
         AgentConfirmationAction completed = resultAction(action, queryResult, now());
-        return new AgentConfirmationResult(updateOrReadWinner(action, completed), null, false);
+        return new AgentConfirmationResult(updateOrReadWinner(action, completed).action(), null, false);
     }
 
     /** SSE 回放和运行查询只刷新本人的 action 事实，绝不进入写工具。 */
@@ -116,7 +117,7 @@ public final class AgentConfirmationService {
             case NOT_OWNER, ACTION_NOT_CONFIRMABLE -> action;
             default -> action.invalidate("确认条件已变化", now);
         };
-        AgentConfirmationAction returned = next == action ? action : updateOrReadWinner(action, next);
+        AgentConfirmationAction returned = next == action ? action : updateOrReadWinner(action, next).action();
         return new AgentConfirmationResult(returned, failure, false);
     }
 
@@ -131,15 +132,20 @@ public final class AgentConfirmationService {
         };
     }
 
-    private AgentConfirmationAction updateOrReadWinner(
+    /**
+     * 返回本请求是否实际写入。不能根据读取到的 status/version 判断胜者：两个请求从同一版本生成
+     * EXECUTING 后，失败者也可能读取到与自己候选对象相同的版本号。
+     */
+    private CasUpdateResult updateOrReadWinner(
             AgentConfirmationAction current,
             AgentConfirmationAction next) {
         if (repository.compareAndSet(current.actionId(), current.version(), current.status(), next)) {
             eventPublisher.publish(next);
-            return next;
+            return new CasUpdateResult(next, true);
         }
-        return repository.findByActionId(current.actionId()).orElseThrow(
+        AgentConfirmationAction winner = repository.findByActionId(current.actionId()).orElseThrow(
                 () -> new IllegalStateException("确认动作在并发更新后不存在"));
+        return new CasUpdateResult(winner, false);
     }
 
     private AgentConfirmationAction findAction(String actionId) {
@@ -169,5 +175,8 @@ public final class AgentConfirmationService {
             throw new IllegalArgumentException("traceId 不能为空");
         }
         return traceId;
+    }
+
+    private record CasUpdateResult(AgentConfirmationAction action, boolean applied) {
     }
 }
