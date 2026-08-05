@@ -29,13 +29,16 @@ class ContentQueryServiceTest {
 
     @Test
     void givenValidCache_whenQuery_thenItWinsOverSnapshotAndDemo() {
-        ContentResult<List<? extends ContentItem>> cache = result(NOW.plusHours(1), false,
-                ContentFallbackType.CACHE, ContentSourceType.LIVE);
+        ContentResult<List<? extends ContentItem>> cache = result(NOW.plusHours(1), false, null,
+                ContentSourceType.LIVE);
         ContentQueryService service = service(Optional.of(cache), Optional.of(result(NOW.plusHours(1), false,
                 ContentFallbackType.SNAPSHOT, ContentSourceType.LIVE)), Optional.of(result(NOW.plusHours(1), false,
                 ContentFallbackType.MOCK)));
 
-        assertThat(service.query(QUERY).fallbackType()).isEqualTo(ContentFallbackType.CACHE);
+        ContentResult<List<? extends ContentItem>> result = service.query(QUERY);
+        assertThat(result.source().type()).isEqualTo(ContentSourceType.LIVE);
+        assertThat(result.degraded()).isFalse();
+        assertThat(result.fallbackType()).isNull();
     }
 
     @Test
@@ -71,8 +74,8 @@ class ContentQueryServiceTest {
         // 过期快照可供页面标注时间展示，但 3.6 要求其 expired=true，推荐不能把它当作可购事实。
         ContentResult<List<? extends ContentItem>> result = service.query(QUERY);
         assertThat(result.expired()).isTrue();
-        assertThat(result.degraded()).isFalse();
-        assertThat(result.fallbackType()).isNull();
+        assertThat(result.degraded()).isTrue();
+        assertThat(result.fallbackType()).isEqualTo(ContentFallbackType.SNAPSHOT);
     }
 
     @Test
@@ -186,6 +189,6 @@ class ContentQueryServiceTest {
         LocalDateTime dataTime = expiresAt.isBefore(NOW) ? expiresAt.minusHours(6) : NOW;
         return new ContentResult<>(List.of(new MovieContent("test-movie", "测试影片", "[\"剧情\"]", 100,
                 new BigDecimal("8.0"))), new ContentSource("TEST", sourceType), dataTime, expiresAt,
-                expired, true, fallbackType);
+                expired, fallbackType != null, fallbackType);
     }
 }

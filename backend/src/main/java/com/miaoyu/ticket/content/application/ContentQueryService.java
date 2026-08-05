@@ -101,7 +101,8 @@ public class ContentQueryService {
     private ContentResult<List<? extends ContentItem>> withExpiration(
             ContentResult<List<? extends ContentItem>> result, boolean expired) {
         return new ContentResult<>(result.data(), result.source(), result.dataTime(), result.expiresAt(), expired,
-                false, null);
+                // 当前版本即使来自快照也不是降级；只有退回到已过期的上一版真实资料才提示 SNAPSHOT。
+                expired, expired ? ContentFallbackType.SNAPSHOT : null);
     }
 
     /** 内容模块的不可用错误码，表示缓存、快照和 Demo 都不能提供数据。 */

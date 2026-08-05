@@ -124,7 +124,8 @@ class ContentSyncServiceTest {
         ContentQuery providerMovieQuery = new ContentQuery(ContentResourceType.MOVIE, 7001L, null, null);
         ContentQuery providerCinemaQuery = new ContentQuery(ContentResourceType.CINEMA, null, "70", "影");
         ContentResult<List<? extends ContentItem>> movieResult = new ContentResult<>(List.of(
-                new MovieContent("7001", "真实影片", "[\"剧情\"]", 100, new BigDecimal("8.1"))),
+                new MovieContent(null, "7001", "真实影片", "[\"剧情\"]", 100, new BigDecimal("8.1"),
+                        "https://example.test/real-poster.jpg", "真实简介", "2026-08-01", "NOW_SHOWING")),
                 new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), LocalDateTime.of(2026, 8, 4, 9, 0),
                 LocalDateTime.of(2026, 8, 4, 15, 0), false, false, null);
         ContentResult<List<? extends ContentItem>> cinemaResult = new ContentResult<>(List.of(
@@ -147,6 +148,13 @@ class ContentSyncServiceTest {
                 new ContentQuery(ContentResourceType.CINEMA, 99L, null, null),
                 new ContentQuery(ContentResourceType.CINEMA, null, "70", null));
         assertThat(snapshots).doesNotContainKeys(providerMovieQuery, providerCinemaQuery);
+        // Provider 已规范化的展示资料要随内部 ID 一起写入公开列表、详情快照和后续 Redis 缓存。
+        MovieContent publicMovie = (MovieContent) snapshots.get(
+                new ContentQuery(ContentResourceType.MOVIE, null, null, null)).data().getFirst();
+        assertThat(publicMovie.posterUrl()).isEqualTo("https://example.test/real-poster.jpg");
+        assertThat(publicMovie.summary()).isEqualTo("真实简介");
+        assertThat(publicMovie.releaseDate()).isEqualTo("2026-08-01");
+        assertThat(publicMovie.releaseStatus()).isEqualTo("NOW_SHOWING");
     }
 
     @Test

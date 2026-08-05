@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.miaoyu.ticket.content.application.ContentCachePort;
 import com.miaoyu.ticket.content.application.ContentQuery;
 import com.miaoyu.ticket.content.application.ContentResult;
-import com.miaoyu.ticket.content.domain.ContentFallbackType;
 import com.miaoyu.ticket.content.domain.ContentItem;
 import com.miaoyu.ticket.content.domain.ContentResourceType;
 import com.miaoyu.ticket.content.domain.ContentSource;
@@ -41,18 +40,20 @@ class RedisContentCacheAdapterIntegrationTest {
     }
 
     @Test
-    void givenRunningRedis_whenSavingNormalizedContent_thenItCanBeReadBackAsCacheFallback() {
+    void givenRunningRedis_whenSavingCurrentLiveContent_thenItDoesNotBecomeDegraded() {
         LocalDateTime dataTime = LocalDateTime.of(2027, 8, 3, 9, 0);
         ContentResult<List<? extends ContentItem>> content = new ContentResult<>(List.of(new MovieContent(
                 "cache-movie", "缓存验证影片", "[\"剧情\"]", 100, new BigDecimal("8.0"))),
-                new ContentSource("TEST", ContentSourceType.MOCK), dataTime, dataTime.plusHours(6), false,
-                true, ContentFallbackType.MOCK);
+                new ContentSource("TEST", ContentSourceType.LIVE), dataTime, dataTime.plusHours(6), false,
+                false, null);
 
         contentCachePort.save(QUERY, content);
 
-        // 真 Redis 读回后必须仍是标准内容，并明确说明数据来自缓存回退层。
+        // Redis 只是当前真实资料的读取位置，不能把同一版本误报成 CACHE 降级。
         ContentResult<List<? extends ContentItem>> cached = contentCachePort.find(QUERY).orElseThrow();
-        assertThat(cached.fallbackType()).isEqualTo(ContentFallbackType.CACHE);
+        assertThat(cached.degraded()).isFalse();
+        assertThat(cached.fallbackType()).isNull();
+        assertThat(cached.source().type()).isEqualTo(ContentSourceType.LIVE);
         assertThat(cached.data()).hasSize(1);
         assertThat(cached.source().name()).isEqualTo("TEST");
     }

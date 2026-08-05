@@ -210,8 +210,11 @@ public class ContentSyncService {
             long movieId = persistence.ensureMovie(new ContentPersistencePort.MovieRow(idGenerator.nextId(),
                     movie.sourceMovieId(), movie.title(), movie.genresJson(), movie.durationMinutes(), movie.rating(),
                     result.source().type(), result.source().name(), result.dataTime(), result.expiresAt()));
+            // 这四项属于 Provider 已校验过的可选展示资料，业务 ID 回填后仍要进入快照和 Redis。
+            // 不能只保留落库的旧基础列，否则同步成功后前端会读到没有海报和简介的影片。
             return new MovieContent(movieId, movie.sourceMovieId(), movie.title(), movie.genresJson(),
-                    movie.durationMinutes(), movie.rating());
+                    movie.durationMinutes(), movie.rating(), movie.posterUrl(), movie.summary(), movie.releaseDate(),
+                    movie.releaseStatus());
         }
         CinemaContent cinema = (CinemaContent) item;
         long cinemaId = persistence.ensureCinema(new ContentPersistencePort.CinemaRow(idGenerator.nextId(),
