@@ -63,7 +63,7 @@ public final class AgentConfirmationService {
             return new AgentConfirmationResult(winner, null, false);
         }
         ToolResult<CreateOrderToolResult> toolResult =
-                createOrderToolAdapter.execute(toolContext(winner, traceId), winner.command());
+                createOrderToolAdapter.execute(winner.actionId(), toolContext(winner, traceId), winner.command());
         AgentConfirmationAction completed = resultAction(winner, toolResult, now());
         return new AgentConfirmationResult(updateOrReadWinner(winner, completed), null, true);
     }
