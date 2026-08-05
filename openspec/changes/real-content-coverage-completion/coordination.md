@@ -31,13 +31,13 @@
 
 ### 3. A 的迁移与票务边界输入
 
-- 影片拟新增可空字段：`poster_url`、`summary`、`release_status`、`release_date`；内容身份映射需要独立保存 `provider`、`resource_type`、`external_id`、内部内容 ID、`status`（`ACTIVE`/`INVALID`）和最小失效原因。
-- A 已允许进入本 change 的迁移准备阶段；A 仍需分配最终 Flyway 版本、审查 SQL，并在空 MySQL 验证。D 不修改既有迁移，也不自行执行 Flyway。
+- 已形成迁移申请设计：`movie` 新增可空 `poster_url/summary/release_status/release_date`；`content_identity_mapping` 保存外部身份、内部内容 ID、ACTIVE/INVALID 状态、固定失效分类和生成 ACTIVE 唯一键；`cinema` 新增 `city_name/provider_city_id`；`data_sync_log` 新增城市字段和固定 `failure_category`，完整字段、索引、CHECK、180 天清理和兼容规则见 `design.md`。
+- 当前已发布迁移最高为 V012。A 已正式分配本 change 使用 V014；D 先补齐并同步完整 OpenSpec，再提交 V014 SQL 草案给 A 静态复核。复核通过前 D 不创建或执行 SQL，不修改既有迁移，也不自行执行 Flyway。
 - 迁移还需为 `cinema` 与 `data_sync_log` 增加 `city_name`、`provider_city_id`，使按城市同步、状态展示和按原请求恢复可追溯；地点原文不落库。
 - 真实影片/影院仅展示基础资料。没有 A 公开可售结果时，C 显示“暂无可售场次”，不显示价格、余座或购票入口。
 - A 未来只能经 D 的公开 Application API，用 `provider + resourceType + externalId` 解析内部 ID；不得读取 D 的 Entity、Mapper、Repository、缓存或内容表。
 - A 已确认：城市信息由 D 解析为本地 `cinemaIds`，A 不处理城市信息；A 将在自己的 OpenSpec 中新增按业务日期和 `cinemaIds` 查询可售场次的公开只读 Application API。D 只调用该 API，不访问票务持久层。
-- `recommendation_record` 暂不进入本次迁移申请；推荐历史范围和表设计完整后再决定是否申请 V013。
+- `recommendation_record` 暂不进入本次迁移申请；推荐历史范围和表设计完整后另行决定是否申请新的迁移版本。
 
 ### 4. 已定义的批量身份解析规则
 
@@ -54,9 +54,9 @@
 
 | Owner | 需要明确回复 | 未回复前的处理 |
 | --- | --- | --- |
-| C | 城市解析/影院查询新 DTO、手动选城和临时地点输入、管理员按城市同步接口格式 | 不修改公开 REST DTO 和前端类型 |
-| A | 影片字段、身份映射、影院/同步日志城市列的最终列和索引、Flyway 版本和空 MySQL 验证窗口 | 不创建或执行迁移 |
-| B | 书面确认地点字符串仅临时传给 D、不得进入 Agent 轨迹或长期上下文 | 不修改 B 的 Tool Schema 或 Agent 代码 |
+| C | 已确认城市解析、影院查询和管理员同步接口 | 实现前同步 OpenAPI、Mock 和前端类型 |
+| A | 静态复核已补齐的字段、索引、状态 CHECK、清理和兼容设计，以及后续 V014 SQL 草案 | 不创建或执行 SQL；静态复核通过后由 A 明确授权空 MySQL 验证 |
+| B | 已确认地点原文持久化前剔除规则 | 等 B 完成 1.5a 的实现与测试 |
 
 ## 2026-08-05 B、C 确认结论
 
@@ -82,5 +82,5 @@ B 同时确认：`locationText` 只作为本次 D 城市解析调用的内存参
 
 - NetStart `https://apis.netstart.cn/maoyan/cities.json` 实测返回 1151 条 `id/nm/py`；长沙为 `70`，杭州为 `50`，当前返回城市名无重复。D 将目录作为版本化本地 JSON 随应用发布，用户请求不访问该接口。
 - C/B 提供地点字符串、D 解析城市名并查本地目录；该方案不以中国行政区划代码作为 NetStart 转换前置条件。
-- 用户转述 A 已允许进入迁移准备。该记录不替代 A 对最终版本、字段、索引和空 MySQL 验证窗口的书面确认。
+- A 已确认 #76 的城市解析、`cinemaIds -> A` 批量场次 API 边界及暂不做推荐历史表；并正式分配 V014。先更新 OpenSpec 的四类结构设计和过期版本描述，再提交 V014 SQL 草案给 A 静态复核；静态复核通过后，A 再明确授权使用 `cinewise_migration_check + cinewise_migrator` 验证。
 - A 已确认不在本 change 申请推荐历史表；现阶段优先补 D 的批量影院摘要端口与城市到 `cinemaIds` 的规则，等待 A 提供可售场次 API OpenSpec 后再联调。
