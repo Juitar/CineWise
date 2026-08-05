@@ -3,7 +3,6 @@ package com.miaoyu.ticket.content.application;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.error.ErrorCode;
-import com.miaoyu.ticket.content.domain.ContentFallbackType;
 import com.miaoyu.ticket.content.domain.ContentItem;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
 import java.time.Clock;
@@ -22,7 +21,7 @@ import org.springframework.stereotype.Service;
  * 回退顺序。这样外部网络波动不会改变页面和推荐对“数据来自哪里”的判断。</p>
  *
  * <p>缓存命中也必须重新检查内容有效期，因为 Redis 的 TTL 是加速手段，不是内容真实性的判断依据。
- * 快照过期后只有处于最大陈旧期内才可返回，且返回值必须明确标记为过期。</p>
+ * 单版本快照过期仍保留为最近成功的真实资料；是否回退到上一版本由后续两版本快照实现决定。</p>
  *
  * <p>Demo 是最后一层，而不是实时数据的替代品。它只能提供版本化影片和影院资料，不能让用户误以为
  * 系统获得了新的排期或余票。没有任何可用内容时，调用方得到固定的 303004 错误。</p>
@@ -50,36 +49,31 @@ public class ContentQueryService {
     }
 
     /**
-     * 依次读取有效缓存、快照、允许的旧快照和 Demo；全部缺失时返回 303004。
+     * 依次读取当前真实缓存、当前真实快照和 Demo；全部缺失时返回 303004。
      *
      * <p>参数校验由 ContentQuery 构造时完成，因此进入此方法后不会对缓存、数据库或 Demo 产生无效访问。</p>
      */
     public ContentResult<List<? extends ContentItem>> query(ContentQuery query) {
-        return cachePort.find(query).filter(this::isVerifiedLiveContent).orElseGet(() -> findFromSnapshot(query)
+        return cachePort.find(query).filter(this::isVerifiedLiveContent).map(this::asCurrentVersion)
+                .orElseGet(() -> findFromSnapshot(query)
                 // Demo 是离线最后回退层，绝不能写回 Redis 后被下一次查询伪装成真实缓存。
                 .orElseGet(() -> demoProvider.query(query)
                         .orElseThrow(() -> new BusinessException(ContentErrorCode.DATA_UNAVAILABLE))));
     }
 
     private java.util.Optional<ContentResult<List<? extends ContentItem>>> findFromSnapshot(ContentQuery query) {
-        // 有效快照重新写入缓存，减少下一次相同查询的数据库读取。
-        // 超过最大陈旧期的快照不返回，避免历史内容长期停留在用户页面。
-        // 允许陈旧的边界采用闭区间，刚好到期的快照仍按只读信息处理。
+        // 当前快照即使过期也仍是最近成功的真实资料，不能因为拉取失败而被 Demo 覆盖。
+        // 两版本迁移完成前这里只有“当前版本”；不能伪造上一版本并标为 SNAPSHOT。
         return snapshotPort.findLatest(query).flatMap(result -> {
             // 历史版本可能在本规则前保存了 Demo 快照。它只能由最后一层直接读取，不能升级成真实资料。
             if (!isVerifiedLiveContent(result)) {
                 return java.util.Optional.empty();
             }
-            LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
-            if (!result.expiresAt().isBefore(now)) {
-                ContentResult<List<? extends ContentItem>> usable = withExpiration(result, false);
+            ContentResult<List<? extends ContentItem>> usable = asCurrentVersion(result);
+            if (!usable.expired()) {
                 cachePort.save(query, usable);
-                return java.util.Optional.of(usable);
             }
-            if (!result.expiresAt().plus(properties.maxStale()).isBefore(now)) {
-                return java.util.Optional.of(withExpiration(result, true));
-            }
-            return java.util.Optional.empty();
+            return java.util.Optional.of(usable);
         });
     }
 
@@ -94,15 +88,17 @@ public class ContentQueryService {
     }
 
     /**
-     * 过期快照仅改为只读标识，保留其原始来源和时间，供推荐模块明确排除。
+     * 当前真实版本按业务时钟重新计算时效，保留来源和同步时间。
      *
      * <p>这里不延长 expiresAt，也不将 source 改成实时来源，避免数据在展示层丢失其陈旧性。</p>
      */
-    private ContentResult<List<? extends ContentItem>> withExpiration(
-            ContentResult<List<? extends ContentItem>> result, boolean expired) {
+    private ContentResult<List<? extends ContentItem>> asCurrentVersion(
+            ContentResult<List<? extends ContentItem>> result) {
+        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
+        boolean expired = result.expiresAt().isBefore(now);
         return new ContentResult<>(result.data(), result.source(), result.dataTime(), result.expiresAt(), expired,
-                // 当前版本即使来自快照也不是降级；只有退回到已过期的上一版真实资料才提示 SNAPSHOT。
-                expired, expired ? ContentFallbackType.SNAPSHOT : null);
+                // isExpired 只提示资料时间；当前版本不因过期自动变成 SNAPSHOT 降级。
+                false, null);
     }
 
     /** 内容模块的不可用错误码，表示缓存、快照和 Demo 都不能提供数据。 */

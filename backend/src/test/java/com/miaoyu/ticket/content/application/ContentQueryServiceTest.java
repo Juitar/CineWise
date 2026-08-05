@@ -66,16 +66,16 @@ class ContentQueryServiceTest {
     }
 
     @Test
-    void givenAllowedExpiredSnapshot_whenQuery_thenItIsExplicitlyReadonlyAndDemoIsNotUsed() {
+    void givenExpiredCurrentSnapshot_whenQuery_thenItKeepsLiveDataAndOnlyMarksExpiration() {
         ContentResult<List<? extends ContentItem>> snapshot = result(
                 NOW.minusHours(1), false, ContentFallbackType.SNAPSHOT, ContentSourceType.LIVE);
         ContentQueryService service = service(Optional.empty(), Optional.of(snapshot), Optional.empty());
 
-        // 过期快照可供页面标注时间展示，但 3.6 要求其 expired=true，推荐不能把它当作可购事实。
+        // 单版本存储下它仍是当前真实版本；isExpired 只提示时效，不能把它伪装为上一版本 SNAPSHOT。
         ContentResult<List<? extends ContentItem>> result = service.query(QUERY);
         assertThat(result.expired()).isTrue();
-        assertThat(result.degraded()).isTrue();
-        assertThat(result.fallbackType()).isEqualTo(ContentFallbackType.SNAPSHOT);
+        assertThat(result.degraded()).isFalse();
+        assertThat(result.fallbackType()).isNull();
     }
 
     @Test
@@ -92,16 +92,18 @@ class ContentQueryServiceTest {
     }
 
     @Test
-    void givenSnapshotOlderThanMaximumStale_whenQuery_thenItFallsBackToDemo() {
+    void givenVeryOldCurrentSnapshot_whenQuery_thenItStillWinsOverDemo() {
         ContentQueryService service = service(Optional.empty(), Optional.of(result(NOW.minusDays(8), false,
                 ContentFallbackType.SNAPSHOT, ContentSourceType.LIVE)), Optional.of(result(NOW.plusHours(1), false,
                 ContentFallbackType.MOCK)));
 
         ContentResult<List<? extends ContentItem>> result = service.query(QUERY);
 
-        // 超过七天陈旧窗口的快照不能继续展示，必须进入唯一的 Demo 回退层。
-        assertThat(result.fallbackType()).isEqualTo(ContentFallbackType.MOCK);
-        assertThat(result.expired()).isFalse();
+        // 真实资料无论多旧都比 Demo 更有意义；两版本功能完成前不能用最大陈旧期强制丢弃它。
+        assertThat(result.source().type()).isEqualTo(ContentSourceType.LIVE);
+        assertThat(result.expired()).isTrue();
+        assertThat(result.degraded()).isFalse();
+        assertThat(result.fallbackType()).isNull();
     }
 
     @Test

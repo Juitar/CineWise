@@ -2,6 +2,8 @@ package com.miaoyu.ticket.content.domain;
 
 import java.math.BigDecimal;
 import java.net.URI;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Objects;
 
 /**
@@ -58,8 +60,8 @@ public record MovieContent(
         rating = Objects.requireNonNull(rating, "rating must not be null");
         posterUrl = normalizeHttpsUrl(posterUrl);
         summary = normalizeOptionalText(summary);
-        releaseDate = normalizeOptionalText(releaseDate);
-        releaseStatus = normalizeOptionalText(releaseStatus);
+        releaseDate = normalizeReleaseDate(releaseDate);
+        releaseStatus = normalizeReleaseStatus(releaseStatus);
     }
 
     /** 影片模型只对应影片资源类型，供统一查询和缓存端口选择正确处理分支。 */
@@ -103,5 +105,24 @@ public record MovieContent(
         }
         String normalized = value.trim();
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    /** 上游日期只在符合 C 约定的完整日期格式时保留，异常值不能进入快照和公开接口。 */
+    private static String normalizeReleaseDate(String value) {
+        String normalized = normalizeOptionalText(value);
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(normalized).toString();
+        } catch (DateTimeParseException exception) {
+            return null;
+        }
+    }
+
+    /** 状态是公开 DTO 枚举，不得把 Provider 任意文本透传给缓存、快照或前端。 */
+    private static String normalizeReleaseStatus(String value) {
+        String normalized = normalizeOptionalText(value);
+        return "NOW_SHOWING".equals(normalized) || "COMING_SOON".equals(normalized) ? normalized : null;
     }
 }

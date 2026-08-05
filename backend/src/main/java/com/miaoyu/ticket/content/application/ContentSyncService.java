@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -171,13 +172,27 @@ public class ContentSyncService {
         }
     }
 
-    /** 同步完成后把全部合格影片写成公开列表快照，列表请求不应依赖某一条详情的外部 ID。 */
+    /** 同步完成后合并公开影片目录，局部 Provider 批次绝不能删掉已经同步的其余影片。 */
     private void saveMovieListAfterSync(List<MovieContent> synchronizedMovies, ContentResult<?> envelope) {
         if (synchronizedMovies.isEmpty() || envelope == null) {
             return;
         }
-        saveLiveResult(new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
-                null, null, null), contentResult(synchronizedMovies, envelope));
+        ContentQuery listQuery = new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
+                null, null, null);
+        saveLiveResult(listQuery, contentResult(mergeMovieDirectory(listQuery, synchronizedMovies), envelope));
+    }
+
+    /**
+     * NetStart 当前只能受限地返回一小批详情；按外部影片身份增量覆盖本批资料，同时保留旧目录。
+     * 真正的近一年全量回填和两版本快照仍由未完成任务实现，本方法不把小批结果伪装成完整目录。
+     */
+    private List<MovieContent> mergeMovieDirectory(ContentQuery listQuery, List<MovieContent> incoming) {
+        LinkedHashMap<String, MovieContent> merged = new LinkedHashMap<>();
+        snapshots.findLatest(listQuery).filter(existing -> existing.source().type() == ContentSourceType.LIVE)
+                .ifPresent(existing -> existing.data().stream().map(item -> (MovieContent) item)
+                        .forEach(movie -> merged.put(movie.sourceMovieId(), movie)));
+        incoming.forEach(movie -> merged.put(movie.sourceMovieId(), movie));
+        return List.copyOf(merged.values());
     }
 
     /** 把同一批已校验的内容换成公开查询使用的键，来源、时间和降级标记保持不变。 */

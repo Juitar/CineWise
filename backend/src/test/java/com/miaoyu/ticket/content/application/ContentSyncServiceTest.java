@@ -158,6 +158,31 @@ class ContentSyncServiceTest {
     }
 
     @Test
+    void givenExistingMovieDirectory_whenSynchronizingLimitedBatch_thenItKeepsUnseenMovies() {
+        ContentQuery listQuery = new ContentQuery(ContentResourceType.MOVIE, null, null, null);
+        ContentResult<List<? extends ContentItem>> existing = new ContentResult<>(List.of(
+                new MovieContent(10L, "old-1", "已有影片", "[\"剧情\"]", 100, new BigDecimal("8.0"))),
+                new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), LocalDateTime.of(2026, 8, 3, 9, 0),
+                LocalDateTime.of(2026, 8, 3, 15, 0), false, false, null);
+        ContentResult<List<? extends ContentItem>> incoming = new ContentResult<>(List.of(
+                new MovieContent("new-1", "新增影片", "[\"喜剧\"]", 90, new BigDecimal("8.5"))),
+                new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), LocalDateTime.of(2026, 8, 4, 9, 0),
+                LocalDateTime.of(2026, 8, 4, 15, 0), false, false, null);
+        Map<ContentQuery, ContentResult<List<? extends ContentItem>>> snapshots = new LinkedHashMap<>();
+        snapshots.put(listQuery, existing);
+        ContentSyncService service = new ContentSyncService(
+                () -> batch(List.of(new LiveContentSyncPort.SynchronizedContent(
+                        new ContentQuery(ContentResourceType.MOVIE, 1L, null, null), incoming)), 1,
+                        LiveContentSyncPort.Outcome.SUCCESS, null), captureSnapshots(snapshots),
+                cachePort(new AtomicInteger()), persistence(new AtomicInteger(), new AtomicReference<>()), () -> 99L,
+                Clock.fixed(Instant.parse("2026-08-04T01:00:00Z"), ZoneId.of("Asia/Shanghai")));
+
+        assertThat(service.synchronizeDailyContent()).isEqualTo(1);
+        assertThat(snapshots.get(listQuery).data()).extracting(item -> ((MovieContent) item).sourceMovieId())
+                .containsExactly("old-1", "new-1");
+    }
+
+    @Test
     void givenTransactionRollsBack_whenSynchronize_thenItDoesNotPublishLiveCache() {
         ContentQuery query = new ContentQuery(ContentResourceType.MOVIE, 1L, null, null);
         ContentResult<List<? extends ContentItem>> result = new ContentResult<>(List.of(
@@ -210,7 +235,7 @@ class ContentSyncServiceTest {
     private ContentSnapshotPort captureSnapshots(Map<ContentQuery, ContentResult<List<? extends ContentItem>>> saved) {
         return new ContentSnapshotPort() {
             @Override public Optional<ContentResult<List<? extends ContentItem>>> findLatest(ContentQuery query) {
-                return Optional.empty();
+                return Optional.ofNullable(saved.get(query));
             }
             @Override public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) {
                 saved.put(query, result);

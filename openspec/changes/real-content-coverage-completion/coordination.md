@@ -18,15 +18,15 @@
 | 影院身份 | `id` | `sourceCinemaId`、内容身份映射 `externalId` | 否 | D | 同步、A 身份解析 |
 | 影院名称/地址 | `info.name`、`info.address` | `name`、`address`、`area` | 否 | D | C 影院页；不以地址推断坐标 |
 | 城市 | Provider `ci` 仅作请求参数 | `cityCode` | 否 | D | 系统行政区划代码；首个默认城市长沙 `430100` |
-| 坐标 | 需 Provider 实际提供 | `longitude`、`latitude` | 是 | D | C 仅在用户主动距离排序时使用；无坐标不显示距离 |
+| 坐标 | 需 Provider 实际提供 | `longitude`、`latitude` | 是 | D | 本期影院浏览不消费坐标；未来用户主动路线可在页面内存使用，无坐标不显示距离 |
 
 不保存：影评正文、评论、排期、价格、库存、座位、订单、用户位置、Provider 原始响应和密钥。
 
 ### 2. C 的接口与页面输入
 
 - 现有前端共享类型已包含可空 `posterUrl`、`summary`，影片页已做 HTTPS/同源二次校验和空海报占位；本次后端可复用该字段名和可空类型。
-- 新增的 `releaseDate`、`releaseStatus`、资料版本、回退原因，以及是否保留/废弃 `expiresAt`、`isExpired`，仍须由 C 明确确认后修改公开 DTO、OpenAPI、Mock 和前端类型。
-- 定位只在用户点击“使用当前位置”后请求；位置和距离只保留页面内存。首次无选择时使用长沙 `430100`，拒绝授权后必须可手动选城。
+- `releaseDate`、`releaseStatus` 已由 C 确认纳入影片列表和详情 DTO：前者只接受可空 `YYYY-MM-DD`，后者只允许 `NOW_SHOWING`、`COMING_SOON` 或 `null`。保留 `expiresAt/isExpired` 及既有来源字段，后端 DTO、OpenAPI、Mock 和组合测试必须同步采用同一规则。
+- 影院浏览页本期不请求定位、不计算或展示距离；首次无选择时使用长沙 `430100`，允许手动选城。用户主动路线不属于本次内容浏览范围，位置只在路线页面内存使用。
 - 管理员同步接口需复用现有 Cookie + CSRF 规则，后端 `/api/v1/admin/**` 已由安全配置限制 `ADMIN`；具体路径、请求标识和结果查询格式待 C 确认。
 
 ### 3. A 的迁移与票务边界输入
@@ -65,6 +65,7 @@ B 已确认本次无需修改 B 侧代码和 Tool Schema。`RankMoviePlanTool` �
 
 - `releaseDate` 为可空 `YYYY-MM-DD` 字符串；`releaseStatus` 只允许 `NOW_SHOWING`、`COMING_SOON` 或 `null`，两个字段同时进入影片列表和详情，不新增上映状态筛选参数。
 - 保留 `source`、`sourceType`、`dataTime`、`expiresAt`、`isExpired`、`degraded`、`fallbackType`；不得删除或改变 `dataTime` 的现有含义。
-- C 要求 Redis 缓存继续返回 `degraded=true`、`fallbackType=CACHE`；旧真实快照为 `SNAPSHOT`。这与用户提出“缓存中的最新真实资料不应展示为降级”的要求冲突，未据此修改实现，等待用户决定。
+- 当前真实版本无论直接读取、Redis 命中还是读取当前快照，均返回 `sourceType=LIVE`、`degraded=false`、`fallbackType=null`；`dataTime` 始终是成功同步时间。`isExpired=true` 只提示资料已过期，不自动表示降级。
+- 只有两版本快照实现后，无法读取最新版本而回退到上一份真实版本时才返回 `degraded=true`、`fallbackType=SNAPSHOT`。`CACHE` 仅为兼容保留，不能用于普通 Redis 命中。
 - 管理同步接口固定为：`GET /api/v1/admin/content/sources`、`POST /api/v1/admin/content/sync`、`GET /api/v1/admin/content/sync/by-request/{clientRequestId}`。同步请求包含 `clientRequestId/provider/cityCode/resourceType`；状态只允许 `PENDING/RUNNING/SUCCESS/PARTIAL/FAILED`。
 - 本期影院浏览只做默认长沙 `430100` 和手动选城；不申请定位、不实现距离优先。基础路线仍由用户主动触发定位，位置不传给内容接口且不持久化。
