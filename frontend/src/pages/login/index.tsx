@@ -202,6 +202,10 @@ export default function LoginPage() {
                 </Button>
               )}
 
+              <div className="login-register-row">
+                没有账号？ <Link to="/register">立即注册</Link>
+              </div>
+
               <div className="login-policy-row">
                 登录不会更新隐私同意记录 · <Link to="/privacy">查看隐私政策</Link>
               </div>

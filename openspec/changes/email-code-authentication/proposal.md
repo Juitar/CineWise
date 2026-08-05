@@ -14,6 +14,7 @@
 - 邮件发送通过认证模块公开端口；SMTP 地址、账号、密码和发件人只从部署环境读取，代码和日志不包含真实密钥或验证码。
 - 增加 `sys_email_verify_code`、`sys_registration_invite`、`sys_registration_invite_use` 持久化端口和事务规则；V011 由 A 审查和执行，邀请码不使用 Flyway 种子迁移。
 - 首个培训邀请码在首次初始化前通过 Git 忽略的环境配置受控创建，默认关闭；重复初始化不得创建第二条记录或重置 `used_count`。
+- 接通前端 `/register` 页面：登录页提供注册链接，注册页发送 `REGISTER` 验证码并提交邀请制注册；成功后恢复全局会话，结果未知时只查询 `/auth/me`。
 - 不实现密码重置、邀请码管理页面/API 和 D 的观影提醒邮件。
 
 ## Capabilities
@@ -29,6 +30,7 @@
 ## Impact
 
 - 后端：`auth/api`、`auth/application`、`auth/domain`、`auth/infrastructure/persistence`、`auth/infrastructure/rate`、`auth/infrastructure/mail` 和认证配置。
+- 前端：`modules/auth`、`pages/login`、`pages/register` 及对应测试。
 - 接口：新增 `/api/v1/auth/email-codes`、`/api/v1/auth/login/email` 和 `/api/v1/auth/register`；复用现有 `CurrentUserResponse`、Cookie 和 CSRF Header。
 - 数据库：`V011__create_auth_email_code_and_registration_tables.sql` 只新增 `sys_email_verify_code`、`sys_registration_invite`、`sys_registration_invite_use`，并以向前迁移把 `sys_login_log.login_type` 的 CHECK 增加 `EMAIL_CODE`；不包含邀请码种子或其他业务初始化状态。A 审查 SQL 并决定空 MySQL 8.4 验证授权。
 - 配置：新增验证码摘要密钥、邀请码摘要密钥、当前隐私政策版本、受控首个邀请码初始化开关与参数、SMTP Provider 开关、发件人和超时环境变量；正式环境不得使用 Demo 验证码。

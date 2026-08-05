@@ -4,16 +4,15 @@
 
 .register-tabs {
   display: flex;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   border-bottom: 1px solid #f0f2f5;
 }
 
 .register-tab {
-  padding: 8px 16px;
-  font-size: 14px;
-  color: #646a73;
-  cursor: pointer;
   position: relative;
+  padding: 8px 16px;
+  color: #646a73;
+  font-size: 14px;
 }
 
 .register-tab.active {
@@ -79,14 +78,45 @@
   text-decoration: none;
 }
 
-.register-preview-notice {
-  margin: -8px 0 16px;
-  color: #8f5a00;
-  font-size: 13px;
-  text-align: center;
+.register-page-container .login-card {
+  max-width: 1040px;
+}
+
+.register-page-container .login-form-section {
+  justify-content: flex-start;
+  padding: 28px 40px;
+  overflow-y: auto;
+}
+
+.register-form {
+  gap: 12px;
+}
+
+.register-form .login-input-antd {
+  height: 44px;
+}
+
+.register-password-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.register-form .ant-alert {
+  padding: 7px 12px;
 }
 
 .send-code-btn:disabled {
   cursor: not-allowed;
   opacity: 0.65;
+}
+
+@media (max-width: 1023px) {
+  .register-page-container .login-form-section {
+    padding: 28px 24px 40px;
+  }
+
+  .register-password-row {
+    grid-template-columns: 1fr;
+  }
 }
