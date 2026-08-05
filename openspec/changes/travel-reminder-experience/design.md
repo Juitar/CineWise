@@ -24,6 +24,12 @@ D 以 `eventId` 记录已处理事件，以 `travel_task.order_id` 建唯一约�
 
 选择双重保护，是因为单靠事件去重不能覆盖首次消费失败后的补偿；单靠订单唯一不能保留事件处理审计。监听失败不得回滚支付，补偿也不得直接读写 D 的任务表。A 在交易事务内登记事件，D 只在 `AFTER_COMMIT` 消费；`OrderInvalidated` 使用支付事件全部字段并增加固定值 `invalidReason=REFUNDED`，其 `orderVersion` 取退款完成后的版本。退款事件先到时，D 必须写入 `CANCELLED` 墓碑任务或保留等价的最高订单版本；`ensureTask` 对 `CANCELLED`、`COMPLETED` 只返回原任务摘要，绝不重新打开任务。
 
+### 1a. 待 A 确认的影院标识与 V013 兼容方案
+
+待 A 正式确认后，`PaymentSucceededEvent`、`OrderInvalidated` 均增加 `String cinemaId`。D 对支付事件只接受可解析为正 `BIGINT` 的十进制字符串：合法值写入新任务的 `cinema_id`；缺失、空白、非数字、溢出、`0` 或负数时跳过创建、只输出 `eventId` 错误，并由 A 的后续 PAID 补偿携带合法值恢复。该错误不回滚支付。
+
+退款事件的首要目标是保留取消事实：已有任务仅取消并保留既有 `cinema_id`；退款先到时，合法 `cinemaId` 写入 `CANCELLED` 墓碑，非法值仍创建或保留墓碑并写入 `cinema_id=NULL`，防止迟到支付事件重开任务。该错误不回滚退款。历史任务和此类 NULL 墓碑均不能规划路线。
+
 ### 2. 任务、建议与通知分表，任务状态不代表邮件状态
 
 `travel_task` 保存订单关联、触发时间、任务状态和版本；`travel_advice_snapshot` 按任务版本保存不含精确位置的建议摘要；`travel_notification_log` 用 `deliveryKey` 保存 EMAIL 投递状态。任务使用 `PENDING → GENERATING → READY → NOTIFIED → COMPLETED`，订单失效可进入 `CANCELLED`；邮件失败或 `UNKNOWN` 不把已生成建议改为失败。
@@ -59,6 +65,8 @@ D 以 `eventId` 记录已处理事件，以 `travel_task.order_id` 建唯一约�
 | `travel_notification_log` | `id BIGINT NOT NULL`；`travel_task_id BIGINT NOT NULL`，指向 `travel_task.id`；`trigger_type VARCHAR(32) NOT NULL`；`task_version BIGINT NOT NULL`；`channel VARCHAR(16) NOT NULL DEFAULT 'EMAIL'`；`template_code VARCHAR(32) NOT NULL DEFAULT 'VIEWING_REMINDER'`；`delivery_key VARCHAR(160) NOT NULL`；`status VARCHAR(16) NOT NULL DEFAULT 'PENDING'`；`attempt_count INT NOT NULL DEFAULT 0`；`next_retry_at/lease_until/sent_at/resolved_at DATETIME(3) NULL`；`provider_message_id VARCHAR(128) NULL`；`error_code INT NULL`；`scheduled_at/create_time/update_time DATETIME(3) NOT NULL` | PK(`id`)；UNIQUE(`delivery_key`)；INDEX(`status`,`next_retry_at`)；INDEX(`travel_task_id`,`create_time`)；INDEX(`resolved_at`)；CHECK(`task_version >= 0`)；CHECK(`attempt_count >= 0`)；`status` 仅允许 `PENDING/SENDING/SENT/FAILED/UNKNOWN`，`channel` 仅允许 `EMAIL`，`template_code` 仅允许 `VIEWING_REMINDER`；CHECK：`SENT`、`FAILED` 必须有 `resolved_at`，`PENDING`、`SENDING`、`UNKNOWN` 必须为 `resolved_at IS NULL`。从 `resolved_at` 起保留 90 天后硬删除；`UNKNOWN` 未经查询恢复不得清理或重发。任务在 30 天后硬删除时，尚在 90 天保留期内的通知日志允许成为逻辑孤儿，只能按 `delivery_key` 或内部 `travel_task_id` 审计查询，不参与用户任务查询或任务关联写入。 |
 
 其中 `travel_task.task_id` 与子表的 `travel_task_id` 不是同一字段：前者是对外字符串，后者是内部 `BIGINT` 逻辑关联，避免关联语义和字段类型混淆。三表不使用软删除；任务与快照按 30 天硬删除，通知日志按 90 天硬删除，保留期差异产生的逻辑孤儿是受控审计数据而不是可恢复任务。
+
+待 A 静态复核的 V013 仅追加 `travel_task.cinema_id BIGINT NULL`，位于 `show_id` 后，不建物理外键、索引、默认值或回填；新增 CHECK 仅允许 `NULL` 或正数。该结构尚未获准创建、执行或进入 Flyway 目录。
 
 ## Risks / Trade-offs
 

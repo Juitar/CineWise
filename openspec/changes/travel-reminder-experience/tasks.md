@@ -5,6 +5,7 @@
 - [x] 1.3 C 确认 `EmailDeliveryPort` 的 `deliveryKey` 发送/查询语义、Mock Provider 和已验证邮箱解析边界；验证：D 仅传 `recipientUserId`，重复键可查回原结果。
 - [x] 1.4 A 已正式分配 V007，并确认 `travel_task`、`travel_advice_snapshot`、`travel_notification_log` 的字段、索引、保留期、非负计数和终态时间 CHECK 及兼容方案；验证：记录 Owner 确认，未修改已发布迁移。
 - [x] 1.5 B、C、D 确认只读出行工具和卡片边界；验证：B 对话读取不创建任务、刷新快照、发送邮件或请求位置，C 只在用户主动操作时发起路线和餐饮请求。
+- [ ] 1.6 待 A 在本 PR 正式确认 `PaymentSucceededEvent`、`OrderInvalidated` 的 `String cinemaId` 字段、V013 的 `travel_task.cinema_id BIGINT NULL` 及 `NULL 或正数` CHECK；验证：A 的审查结论记录在 PR，字段不含用户位置、坐标或路线数据。
 
 ## 2. 任务、事件与数据基础
 
@@ -13,6 +14,7 @@
 - [x] 2.3 D 实现 `PaymentSucceededEvent` 的 AFTER_COMMIT 消费、`eventId` 去重、`orderId` 唯一任务创建及 A 补偿共用的 `ensureTask`；验证：`TravelTaskApplicationServiceTest`、`TravelTaskPaymentEventIntegrationTest` 覆盖重复事件、首次消费失败后的补偿、并发创建、提交后消费和回滚不创建，均通过。
 - [x] 2.4 D 实现 `OrderInvalidated` 的版本比较、任务取消和建议过期处理；验证：`TravelTaskApplicationServiceTest`、`TravelTaskPaymentEventIntegrationTest` 覆盖退款提交后取消、退款先到的 CANCELLED 墓碑、支付事件随后到达不重开任务、低版本退款后较高版本退款推进墓碑审计字段及两版本并发到达时保留较高版本，均通过。
 - [x] 2.5 D 提供本人任务查询、提醒时间更新与只读建议摘要 Application/API 边界；验证：`TravelTaskQueryServiceTest` 覆盖跨用户隐藏、取消任务返回 `207002`、五分钟内刷新返回 `107001`，均通过。
+- [ ] 2.6 A、D 在 A 的事件代码合入后实现并验证 `cinemaId` 处理；验证：合法支付任务、非法支付后的 PAID 补偿、退款先到合法/非法影院 ID、已有任务退款保留原值、迟到支付不重开、历史 `cinema_id=NULL` 路线不可用，以及 V013 对 `0`/负数的 CHECK 均通过。
 
 ## 3. 天气建议、快照与提醒投递
 
