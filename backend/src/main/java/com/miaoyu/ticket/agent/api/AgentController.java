@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.agent.api;
 
 import com.miaoyu.ticket.agent.application.AgentInteractionRuntimeService;
+import com.miaoyu.ticket.agent.application.AgentFailurePersistedException;
 import com.miaoyu.ticket.common.api.Result;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -76,9 +77,13 @@ public class AgentController {
         }
         try {
             new DelegatingSecurityContextExecutor(applicationTaskExecutor).execute(() -> {
-                var submission = runtimeService.submitAndReplay(sessionId, request.clientRequestId(), request.content(),
-                        request.context().entry(), cursor);
-                writeEvents(emitter, submission);
+                try {
+                    var submission = runtimeService.submitAndReplay(
+                            sessionId, request.clientRequestId(), request.content(), request.context().entry(), cursor);
+                    writeEvents(emitter, submission);
+                } catch (AgentFailurePersistedException exception) {
+                    writeEvents(emitter, runtimeService.replayPersistedEvents(sessionId, cursor));
+                }
             });
         } catch (RuntimeException exception) {
             cancelHeartbeat.run();

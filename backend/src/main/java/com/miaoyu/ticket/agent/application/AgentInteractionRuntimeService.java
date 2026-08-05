@@ -42,6 +42,14 @@ public class AgentInteractionRuntimeService {
                 replay.events().stream().map(event -> event(event, submitted.snapshot().run().planVersion())).toList());
     }
 
+    /** 仅重放已经提交的事件，供当前 POST SSE 的安全失败分支使用。 */
+    public StreamView replayPersistedEvents(String sessionId, long cursor) {
+        var replay = replayService.replay(sessionId, cursor);
+        String runId = replay.events().isEmpty() ? null : replay.events().get(replay.events().size() - 1).runId();
+        return new StreamView(sessionId, runId, replay.reset(), replay.watermark(),
+                replay.events().stream().map(event -> event(event, null)).toList());
+    }
+
     public RunView queryMyRun(String runId) {
         var view = queryService.queryMyRun(runId);
         return new RunView(view.run().runId(), view.session().sessionId(), view.run().status().name(),

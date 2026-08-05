@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.agent.api.AgentController;
+import com.miaoyu.ticket.agent.application.AgentFailurePersistedException;
 import com.miaoyu.ticket.agent.application.AgentInteractionRuntimeService;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -103,5 +104,38 @@ class AgentControllerTest {
                 .contains("\"nodeId\":\"rank-\\\"movie\"");
         verify(runtimeService).submitAndReplay("session-1", "4fc7ae0d-1c05-4bc1-9ad8-c84b1c706925", "推荐电影",
                 "workspace", 0L);
+    }
+
+    @Test
+    void shouldReplaySafeFailureEventsWhenSubmissionFailureWasPersisted() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        when(runtimeService.submitAndReplay("session-1", "4fc7ae0d-1c05-4bc1-9ad8-c84b1c706925", "推荐电影",
+                "workspace", 0L)).thenThrow(new AgentFailurePersistedException());
+        var failedReplay = new AgentInteractionRuntimeService.StreamView("session-1", "run-1", false, 9L, List.of(
+                        new AgentInteractionRuntimeService.EventView("8", "session-1", "run-1", null, null,
+                                "message.error", "本次请求未完成", objectMapper.readTree("{\"reason\":\"RUN_FAILED\"}"),
+                                OffsetDateTime.parse("2026-08-05T10:00:01+08:00")),
+                        new AgentInteractionRuntimeService.EventView("9", "session-1", "run-1", null, null,
+                                "run.complete", "运行已结束", objectMapper.readTree("{\"status\":\"FAILED\"}"),
+                                OffsetDateTime.parse("2026-08-05T10:00:02+08:00"))));
+        when(runtimeService.replayPersistedEvents("session-1", 0L)).thenReturn(failedReplay);
+
+        MvcResult result = mockMvc.perform(post("/api/v1/agent/sessions/session-1/messages/stream")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"clientRequestId":"4fc7ae0d-1c05-4bc1-9ad8-c84b1c706925",
+                         "content":"推荐电影","context":{"entry":"workspace"}}
+                        """))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+        result.getAsyncResult();
+
+        org.assertj.core.api.Assertions.assertThat(result.getResponse().getContentAsString())
+                .contains("id:8")
+                .contains("event:message.error")
+                .contains("id:9")
+                .contains("event:run.complete")
+                .doesNotContain("数据库故障详情");
+        verify(runtimeService).replayPersistedEvents("session-1", 0L);
     }
 }
