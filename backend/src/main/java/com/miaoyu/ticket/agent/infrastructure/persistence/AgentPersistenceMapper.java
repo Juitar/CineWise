@@ -350,6 +350,32 @@ public interface AgentPersistenceMapper {
     @Select("SELECT " + ACTION_COLUMNS + " FROM agent_action WHERE action_id = #{actionId} LIMIT 1")
     AgentConfirmationActionEntity findActionByActionId(@Param("actionId") String actionId);
 
+    @Select("SELECT " + ACTION_COLUMNS + " FROM agent_action"
+            + " WHERE user_id = #{userId} AND agent_run_id = #{agentRunId} AND plan_id = #{planId}"
+            + " AND plan_version = #{planVersion} AND node_id = #{nodeId} AND tool_name = #{toolName}"
+            + " AND parameter_hash = #{parameterHash} LIMIT 1")
+    AgentConfirmationActionEntity findActionByCreationKey(
+            @Param("userId") long userId,
+            @Param("agentRunId") long agentRunId,
+            @Param("planId") String planId,
+            @Param("planVersion") int planVersion,
+            @Param("nodeId") String nodeId,
+            @Param("toolName") String toolName,
+            @Param("parameterHash") String parameterHash);
+
+    @Select("SELECT " + ACTION_COLUMNS + " FROM agent_action"
+            + " WHERE user_id = #{userId} AND agent_run_id = #{agentRunId} AND plan_id = #{planId}"
+            + " AND plan_version = #{planVersion} AND node_id = #{nodeId} AND tool_name = #{toolName}"
+            + " AND parameter_hash = #{parameterHash} LIMIT 1 FOR UPDATE")
+    AgentConfirmationActionEntity findActionByCreationKeyForUpdate(
+            @Param("userId") long userId,
+            @Param("agentRunId") long agentRunId,
+            @Param("planId") String planId,
+            @Param("planVersion") int planVersion,
+            @Param("nodeId") String nodeId,
+            @Param("toolName") String toolName,
+            @Param("parameterHash") String parameterHash);
+
     @Insert("""
             INSERT INTO agent_action (
                 id, action_id, user_id, agent_session_id, agent_run_id, run_id, plan_id, plan_version,

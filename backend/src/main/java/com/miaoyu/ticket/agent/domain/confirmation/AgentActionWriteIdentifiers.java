@@ -8,10 +8,12 @@ import java.util.HexFormat;
 /** 一个 action 仅有一组稳定写标识，结果未知时必须原样复用。 */
 public record AgentActionWriteIdentifiers(String clientRequestId, String idempotencyKey) {
     private static final int KEY_HASH_LENGTH = 48;
+    private static final int MAX_CLIENT_REQUEST_ID_LENGTH = 64;
+    private static final int MAX_IDEMPOTENCY_KEY_LENGTH = 128;
 
     public AgentActionWriteIdentifiers {
-        requireKey(clientRequestId, "clientRequestId");
-        requireKey(idempotencyKey, "idempotencyKey");
+        requireKey(clientRequestId, "clientRequestId", MAX_CLIENT_REQUEST_ID_LENGTH);
+        requireKey(idempotencyKey, "idempotencyKey", MAX_IDEMPOTENCY_KEY_LENGTH);
     }
 
     public static AgentActionWriteIdentifiers forAction(String actionId) {
@@ -33,9 +35,9 @@ public record AgentActionWriteIdentifiers(String clientRequestId, String idempot
         }
     }
 
-    private static void requireKey(String value, String fieldName) {
-        if (value == null || value.isBlank() || value.length() > 64) {
-            throw new IllegalArgumentException(fieldName + " 必须为 1 至 64 个字符");
+    private static void requireKey(String value, String fieldName, int maxLength) {
+        if (value == null || value.isBlank() || value.length() > maxLength) {
+            throw new IllegalArgumentException(fieldName + " 长度不合法");
         }
     }
 }

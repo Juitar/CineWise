@@ -209,7 +209,7 @@ class AgentConfirmationServiceTest {
                 NOW.plusSeconds(1));
         CurrentUserAccessor userAccessor = () -> new CurrentUser(9L, RoleCode.USER, 1L);
         Clock clock = Clock.fixed(Instant.parse("2026-08-05T02:00:02Z"), ZoneId.of("Asia/Shanghai"));
-        return new AgentConfirmationService(repository, facts, tool, userAccessor, clock);
+        return new AgentConfirmationService(repository, facts, tool, action -> { }, userAccessor, clock);
     }
 
     private static AgentConfirmationAction action() {
@@ -238,6 +238,36 @@ class AgentConfirmationServiceTest {
         @Override
         public Optional<AgentConfirmationAction> findByActionId(String actionId) {
             return Optional.ofNullable(actions.get(actionId));
+        }
+
+        @Override
+        public Optional<AgentConfirmationAction> findByCreationKey(
+                long userId,
+                long agentRunId,
+                String planId,
+                int planVersion,
+                String nodeId,
+                String toolName,
+                String parameterHash) {
+            return actions.values().stream().filter(action -> action.userId() == userId
+                    && action.agentRunId() == agentRunId
+                    && action.planId().equals(planId)
+                    && action.planVersion() == planVersion
+                    && action.nodeId().equals(nodeId)
+                    && action.command().toolName().equals(toolName)
+                    && action.parameterHash().value().equals(parameterHash)).findFirst();
+        }
+
+        @Override
+        public Optional<AgentConfirmationAction> findByCreationKeyForUpdate(
+                long userId,
+                long agentRunId,
+                String planId,
+                int planVersion,
+                String nodeId,
+                String toolName,
+                String parameterHash) {
+            return findByCreationKey(userId, agentRunId, planId, planVersion, nodeId, toolName, parameterHash);
         }
 
         @Override

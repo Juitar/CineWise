@@ -11,7 +11,7 @@
 - 规定确认拒绝、过期、参数变化、计划版本变化、重复确认、运行结束、越权和业务数据失效时不得调用写工具。
 - 规定确认竞争、结果未知和断线恢复：同一 action 只能产生一个稳定幂等标识；超时、网络或 SSE 中断只按原标识查询，不自动重发建单。
 - A 已确认目标公开入口为 `CreateOrderTool.execute(ToolContext, CreateOrderForAgentCommand)`；底层原子建单和按当前用户加 `clientRequestId` 的恢复查询已在 `OrderApplicationService`，但 B 不得直接依赖。A 将在独立 change 提供 `com.miaoyu.ticket.order.api` 的 Tool、Command、`AgentOrderResult` 和原请求查询入口；B 只经该类型化 Tool 调用，并提供公开 `AgentActionAuthorizationPort` 供 A 校验 action。A 的 Agent Tool 授权失败统一映射 `205004`。
-- A 已确认 V011 已发布；原计划分配给邀请码种子的 V012 已取消，并正式将 V012 分配给 `agent_action`。B 现在只提交 `V012__create_agent_action_table.sql` 草稿给 A 静态审查；A 审查和明确授权前不得执行、合入共享 `dev` 或连接任何数据库。
+- A 已完成 V012 静态审查和 MySQL 8.4 迁移验证，并已将冻结的 `agent_action` 迁移合入 `dev`（`ddd4fcf`）；B 不修改已发布迁移，只补齐对该表的应用代码和 CI 用例。
 
 ## Capabilities
 
@@ -28,6 +28,6 @@
 ## Impact
 
 - B：`agent` 的 domain、application、api、persistence 端口、SSE 事件、Mock/夹具和测试。
-- A：已确认建单 Tool、DTO、调用身份、稳定键、结果查询、结果未知语义和 V012 分配；待 A 静态审查 SQL 并安排共享数据库验证。
+- A：已提供建单 Tool、DTO、预检、稳定键和原键查询，并已发布 V012；仍需在 `CreateOrderTool.execute` 内调用 B 的 `AgentActionAuthorizationPort`，再进入 A 的订单应用服务。
 - C：已确认确认卡和结果事件的前端展示、CSRF 请求行为与断线恢复消费；本 change 不实现前端。
-- 数据库：计划新增 B 拥有的 `agent_action`，V012 草稿仅供 A 静态审查，未经 A 明确授权不得执行。涉及该表、CAS、唯一约束、并发确认和恢复时，必须在 GitHub Actions 的一次性 MySQL 8.4 `cinewise_agent_it` 中验证，H2 不替代该验证。
+- 数据库：B 拥有 `agent_action` 的应用模型，V012 已由 A 发布。涉及该表、CAS、唯一约束、并发确认和恢复时，仍必须在 GitHub Actions 的一次性 MySQL 8.4 `cinewise_agent_it` 中验证，H2 不替代该验证。

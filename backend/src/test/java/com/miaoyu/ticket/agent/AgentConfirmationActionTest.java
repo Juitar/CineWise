@@ -66,7 +66,11 @@ class AgentConfirmationActionTest {
         assertEquals(first, repeated);
         assertNotEquals(first, another);
         assertTrue(first.clientRequestId().length() <= 64);
-        assertTrue(first.idempotencyKey().length() <= 64);
+        assertTrue(first.idempotencyKey().length() <= 128);
+        assertEquals(128, new AgentActionWriteIdentifiers("c".repeat(64), "i".repeat(128))
+                .idempotencyKey().length());
+        assertThrows(IllegalArgumentException.class,
+                () -> new AgentActionWriteIdentifiers("c".repeat(64), "i".repeat(129)));
     }
 
     @Test

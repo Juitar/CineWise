@@ -3,6 +3,8 @@ package com.miaoyu.ticket.agent.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationService;
 import com.miaoyu.ticket.agent.application.persistence.AgentEventReplayService;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionCommand;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionService;
@@ -32,19 +34,23 @@ public class AgentInteractionRuntimeService {
     private final AgentSessionCreationService sessionCreationService;
     private final AgentSessionManagementService sessionManagementService;
     private final AgentRunCancellationService runCancellationService;
+    private final AgentConfirmationService confirmationService;
     private final ObjectMapper objectMapper;
 
     public AgentInteractionRuntimeService(AgentMessageSubmissionService submissionService,
             AgentEventReplayService replayService, AgentRuntimeQueryService queryService,
             AgentSessionCreationService sessionCreationService,
             AgentSessionManagementService sessionManagementService,
-            AgentRunCancellationService runCancellationService, ObjectMapper objectMapper) {
+            AgentRunCancellationService runCancellationService,
+            AgentConfirmationService confirmationService,
+            ObjectMapper objectMapper) {
         this.submissionService = submissionService;
         this.replayService = replayService;
         this.queryService = queryService;
         this.sessionCreationService = sessionCreationService;
         this.sessionManagementService = sessionManagementService;
         this.runCancellationService = runCancellationService;
+        this.confirmationService = confirmationService;
         this.objectMapper = objectMapper;
     }
 
@@ -116,10 +122,27 @@ public class AgentInteractionRuntimeService {
     }
 
     private EventView event(com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEvent event, Integer planVersion) {
-        JsonNode payload = payload(event.payload().value());
+        JsonNode payload = refreshConfirmationCard(event.type(), payload(event.payload().value()));
         return new EventView(Long.toString(event.eventId()), event.sessionId(), event.runId(), planVersion,
                 nodeId(payload), event.type().wireValue(), displayText(event.type().wireValue()), payload,
                 time(event.createTime()));
+    }
+
+    private JsonNode refreshConfirmationCard(
+            com.miaoyu.ticket.agent.domain.persistence.AgentEventType eventType, JsonNode payload) {
+        if (eventType != com.miaoyu.ticket.agent.domain.persistence.AgentEventType.CARD
+                || !payload.path("actionId").isTextual()) {
+            return payload;
+        }
+        return confirmationService.refreshForCurrentUser(payload.path("actionId").asText())
+                .<JsonNode>map(action -> {
+                    ObjectNode refreshed = (ObjectNode) payload.deepCopy();
+                    refreshed.put("status", com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationCardStatus
+                            .fromActionStatus(action.status()).name());
+                    refreshed.put("expireAt", time(action.expireAt()).toString());
+                    return refreshed;
+                })
+                .orElse(payload);
     }
 
     private static String nodeId(JsonNode payload) {
