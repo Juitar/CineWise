@@ -2,6 +2,7 @@ import { ApiError } from '../../shared/api/ApiError';
 import { apiRequest, clearCsrfToken } from '../../shared/api/client';
 import type {
   CurrentUser,
+  EmailCodeLoginRequest,
   LogoutResult,
   PasswordLoginRequest,
   RegisterRequest,
@@ -13,6 +14,23 @@ import type {
 export async function submitPasswordLogin(request: PasswordLoginRequest): Promise<CurrentUser> {
   try {
     const currentUser = await apiRequest<CurrentUser>('/api/v1/auth/login/password', {
+      body: request,
+      method: 'POST',
+    });
+    clearCsrfToken();
+    return currentUser;
+  } catch (error) {
+    if (error instanceof ApiError && error.isResultUnknown) {
+      clearCsrfToken();
+    }
+    throw error;
+  }
+}
+
+/** 调用用户邮箱验证码登录；成功和结果未知时清除匿名阶段 CSRF Token。 */
+export async function submitEmailCodeLogin(request: EmailCodeLoginRequest): Promise<CurrentUser> {
+  try {
+    const currentUser = await apiRequest<CurrentUser>('/api/v1/auth/login/email', {
       body: request,
       method: 'POST',
     });

@@ -4,6 +4,8 @@ type Role = 'ADMIN' | 'USER';
 
 interface AuthState {
   authenticated: boolean;
+  lastEmailCodeLogin?: { clientRequestId?: string; code?: string; email?: string };
+  lastEmailCodePurpose?: string;
   role: Role;
 }
 
@@ -60,6 +62,25 @@ async function installAuthApi(page: Page, initialRole: Role = 'USER'): Promise<A
       state.authenticated = true;
       const request = route.request().postDataJSON() as { email?: string };
       state.role = request.email?.startsWith('admin@') ? 'ADMIN' : 'USER';
+      await respond(route, 200, apiResult({ loggedIn: true }));
+      return;
+    }
+
+    if (url.pathname === '/api/v1/auth/email-codes') {
+      const request = route.request().postDataJSON() as { purpose?: string };
+      state.lastEmailCodePurpose = request.purpose;
+      await respond(route, 200, apiResult({ cooldownSeconds: 60, expiresInSeconds: 300 }));
+      return;
+    }
+
+    if (url.pathname === '/api/v1/auth/login/email') {
+      state.authenticated = true;
+      state.role = 'USER';
+      state.lastEmailCodeLogin = route.request().postDataJSON() as {
+        clientRequestId?: string;
+        code?: string;
+        email?: string;
+      };
       await respond(route, 200, apiResult({ loggedIn: true }));
       return;
     }
@@ -142,6 +163,26 @@ test('管理员从统一入口登录后进入管理工作台', async ({ page }) 
   await adminMenuButton.focus();
   await page.keyboard.press('Space');
   await expect(page.getByText('退出登录')).toBeVisible();
+});
+
+test('桌面端和移动端使用邮箱验证码登录并恢复目标页', async ({ page }) => {
+  const state = await installAuthApi(page);
+  await page.goto('/login?returnUrl=%2Fprofile');
+
+  await page.getByRole('tab', { name: '验证码登录' }).click();
+  await page.getByRole('textbox', { name: '邮箱', exact: true }).fill('user@cinewise.test');
+  await page.getByRole('button', { name: '获取验证码' }).click();
+  await expect(page.getByText('验证码已发送，5 分钟内有效')).toBeVisible();
+  await page.getByRole('textbox', { name: '邮箱验证码' }).fill('123456');
+  await page.getByRole('button', { name: '验证码登录' }).click();
+
+  await expect(page).toHaveURL('/profile');
+  expect(state.lastEmailCodePurpose).toBe('LOGIN');
+  expect(state.lastEmailCodeLogin).toMatchObject({
+    code: '123456',
+    email: 'user@cinewise.test',
+  });
+  expect(state.lastEmailCodeLogin?.clientRequestId).toBeTruthy();
 });
 
 test('桌面端和移动端从个人中心退出后不能再访问个人中心', async ({ page }) => {

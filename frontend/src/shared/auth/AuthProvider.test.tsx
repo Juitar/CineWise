@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './AuthProvider';
 
 const authApiMocks = vi.hoisted(() => ({
   fetchCurrentUser: vi.fn(),
+  submitEmailCodeLogin: vi.fn(),
   submitLogout: vi.fn(),
   submitPasswordLogin: vi.fn(),
 }));
@@ -31,6 +32,7 @@ function wrapper({ children }: PropsWithChildren) {
 describe('AuthProvider', () => {
   beforeEach(() => {
     authApiMocks.fetchCurrentUser.mockReset();
+    authApiMocks.submitEmailCodeLogin.mockReset();
     authApiMocks.submitLogout.mockReset();
     authApiMocks.submitPasswordLogin.mockReset();
   });
@@ -73,6 +75,29 @@ describe('AuthProvider', () => {
     });
 
     expect(authApiMocks.submitPasswordLogin).toHaveBeenCalledOnce();
+    expect(authApiMocks.fetchCurrentUser).toHaveBeenCalledTimes(2);
+    expect(result.current.currentUser).toEqual(user);
+  });
+
+  it('邮箱验证码登录响应后再次查询 /auth/me，再更新全局身份', async () => {
+    authApiMocks.fetchCurrentUser
+      .mockRejectedValueOnce(
+        new ApiError('session invalid', { kind: 'HTTP', status: 401, code: 201006 }),
+      )
+      .mockResolvedValueOnce(user);
+    authApiMocks.submitEmailCodeLogin.mockResolvedValue(user);
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe('anonymous'));
+
+    await act(async () => {
+      await result.current.loginWithEmailCode({
+        clientRequestId: 'email-request-1',
+        code: '123456',
+        email: 'user@cinewise.test',
+      });
+    });
+
+    expect(authApiMocks.submitEmailCodeLogin).toHaveBeenCalledOnce();
     expect(authApiMocks.fetchCurrentUser).toHaveBeenCalledTimes(2);
     expect(result.current.currentUser).toEqual(user);
   });
