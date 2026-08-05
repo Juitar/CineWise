@@ -47,9 +47,12 @@ public class AgentRuntimeEventService {
                 .findBySessionIdAndUserIdForUpdate(sourceSession.sessionId(), run.userId())
                 .orElseThrow(() -> new BusinessException(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND));
         LocalDateTime now = run.updateTime();
+        LocalDateTime cursorExpireAt = session.expireAt().isAfter(run.expireAt())
+                ? session.expireAt()
+                : run.expireAt();
         AgentEventStreamCursor cursor = eventRepository.findCursorForUpdate(session.sessionId()).orElseGet(() -> {
             AgentEventStreamCursor created = new AgentEventStreamCursor(session.sessionId(), 0L, null, 0L,
-                    session.expireAt(), now, now);
+                    cursorExpireAt, now, now);
             eventRepository.insertCursor(created);
             return eventRepository.findCursorForUpdate(session.sessionId()).orElseThrow();
         });
@@ -57,7 +60,7 @@ public class AgentRuntimeEventService {
                 type, payload, run.expireAt(), now));
         Long firstRetained = cursor.firstRetainedEventId() == null ? event.eventId() : cursor.firstRetainedEventId();
         AgentEventStreamCursor next = new AgentEventStreamCursor(session.sessionId(), event.eventId(), firstRetained,
-                cursor.version() + 1, session.expireAt(), cursor.createTime(), now);
+                cursor.version() + 1, cursorExpireAt, cursor.createTime(), now);
         if (!eventRepository.updateCursor(next, cursor.version())) {
             throw new IllegalStateException("Agent 事件游标已由其他事务更新");
         }
