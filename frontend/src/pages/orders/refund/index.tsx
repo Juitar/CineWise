@@ -3,6 +3,7 @@ import { history, useParams } from 'umi';
 import { RefundConfirmation } from '../../../features/refund-confirmation/RefundConfirmation';
 import { AlternativeShowList } from '../../../features/alternative-show-list/AlternativeShowList';
 import { useRefundPage } from '../../../modules/order/transaction-hooks';
+import { buildAlternativeShowSeatPath } from '../../../modules/order/routes';
 import './index.css';
 
 /**
@@ -45,11 +46,7 @@ export default function RefundPage() {
           shows={state.alternatives?.shows ?? []}
           loading={state.loading}
           error={state.alternativeError?.message}
-          onSelectShow={(show) =>
-            history.push(
-              `/shows/${encodeURIComponent(show.showId)}/seats?movieId=${encodeURIComponent(show.movieId)}&cinemaId=${encodeURIComponent(show.cinemaId)}`,
-            )
-          }
+          onSelectShow={(show) => history.push(buildAlternativeShowSeatPath(show))}
         />
       </div>
     </div>

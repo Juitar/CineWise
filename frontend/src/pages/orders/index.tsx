@@ -3,6 +3,7 @@ import { history } from 'umi';
 import { OrderList } from '../../features/order-list/OrderList';
 import type { OrderSummaryItem } from '../../features/order-list/OrderList';
 import { useOrders } from '../../modules/order/transaction-hooks';
+import { formatOrderDateTime } from '../../modules/order/formatters';
 import type { OrderStatus } from '../../modules/order/types';
 import './index.css';
 
@@ -28,8 +29,9 @@ export default function OrdersPage() {
   const orders: OrderSummaryItem[] = (ordersQuery.data?.records ?? []).map((order) => ({
     orderId: order.orderId,
     orderNo: order.orderNo,
-    showTitle: `场次 ${order.showId}`,
-    showTime: '场次时间请在场次信息中确认',
+    showTitle: '影片信息暂不可用',
+    showId: order.showId,
+    showTime: formatOrderDateTime(order.showStartTime),
     ticketCount: order.ticketCount,
     totalAmount: order.totalAmount,
     status: order.status,

@@ -9,6 +9,7 @@ export interface PaymentPanelProps {
   orderNo: string;
   ticketCount: number;
   totalAmount: string;
+  showTime?: string;
   countdownText?: string;
   status?: PaymentPanelStatus;
   error?: string;
@@ -26,6 +27,7 @@ export const PaymentPanel: React.FC<PaymentPanelProps> = ({
   orderNo,
   ticketCount,
   totalAmount,
+  showTime,
   countdownText = '15分00秒',
   status = 'NORMAL',
   error,
@@ -88,6 +90,12 @@ export const PaymentPanel: React.FC<PaymentPanelProps> = ({
           <span className="payment-summary-label">票数</span>
           <span className="payment-summary-value">{ticketCount} 张</span>
         </div>
+        {showTime && (
+          <div className="payment-summary-row">
+            <span className="payment-summary-label">开场时间</span>
+            <span className="payment-summary-value">{showTime}</span>
+          </div>
+        )}
         <div className="payment-summary-row">
           <span className="payment-summary-label">应付金额</span>
           <span className="payment-summary-amount">¥ {totalAmount}</span>

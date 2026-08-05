@@ -9,6 +9,7 @@ export interface PaymentMockData {
   updatedAt: string;
   ticketCount: number;
   totalAmount: string;
+  showStartTime: string;
   countdownText: string;
 }
 
@@ -29,6 +30,7 @@ export const paymentMockNormal: PaymentMockData = {
   updatedAt: '2026-08-05T12:00:00+08:00',
   ticketCount: 2,
   totalAmount: '78.00',
+  showStartTime: '2026-08-10T14:30:00+08:00',
   countdownText: '14分59秒',
 };
 

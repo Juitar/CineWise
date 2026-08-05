@@ -2,6 +2,7 @@ import React from 'react';
 import { history, useParams } from 'umi';
 import { PaymentPanel } from '../../features/payment-panel/PaymentPanel';
 import { useOrder, usePaymentAction } from '../../modules/order/transaction-hooks';
+import { formatOrderDateTime } from '../../modules/order/formatters';
 import './index.css';
 
 /**
@@ -49,6 +50,7 @@ export default function PaymentPage() {
         orderNo={orderQuery.data?.orderNo ?? orderNo}
         ticketCount={orderQuery.data?.ticketCount ?? 0}
         totalAmount={orderQuery.data?.totalAmount ?? '0.00'}
+        showTime={formatOrderDateTime(orderQuery.data?.showStartTime)}
         status={status}
         error={
           paymentAction.error?.message ??

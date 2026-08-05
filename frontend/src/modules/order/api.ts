@@ -6,6 +6,7 @@ import type {
   ElectronicTicketResponse,
   OrderPageResponse,
   OrderQuery,
+  OrderQueryResponse,
   OrderResponse,
   PaymentResponse,
   RefundImpactResponse,
@@ -52,8 +53,8 @@ export async function getOrders(query: OrderQuery): Promise<OrderPageResponse> {
 }
 
 /** 查询当前用户拥有的订单详情。 */
-export async function getOrder(orderNo: string): Promise<OrderResponse> {
-  return apiRequest<OrderResponse>(`/api/v1/orders/${encodeURIComponent(orderNo)}`, {
+export async function getOrder(orderNo: string): Promise<OrderQueryResponse> {
+  return apiRequest<OrderQueryResponse>(`/api/v1/orders/${encodeURIComponent(orderNo)}`, {
     method: 'GET',
   });
 }

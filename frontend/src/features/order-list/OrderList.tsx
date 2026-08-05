@@ -9,6 +9,7 @@ export interface OrderSummaryItem {
   orderId: string;
   orderNo: string;
   showTitle: string;
+  showId?: string;
   showTime: string;
   ticketCount: number;
   totalAmount: string;
@@ -100,7 +101,7 @@ export const OrderList: React.FC<OrderListProps> = ({
         <h1 className="order-list-title">我的订单</h1>
         <div className="order-list-filters">
           <label htmlFor="order-date-filter" className="order-date-label">
-            日期筛选：
+            下单日期：
           </label>
           <Input
             id="order-date-filter"
@@ -108,7 +109,7 @@ export const OrderList: React.FC<OrderListProps> = ({
             className="order-date-input"
             value={selectedDate}
             onChange={handleDateChange}
-            aria-label="按开场日期筛选订单"
+            aria-label="按下单日期筛选订单"
           />
         </div>
       </div>
@@ -145,6 +146,7 @@ export const OrderList: React.FC<OrderListProps> = ({
               <div className="order-card-body">
                 <div className="order-card-movie">{item.showTitle}</div>
                 <div className="order-card-info">
+                  {item.showId && <span>场次编号：{item.showId}</span>}
                   <span>场次：{item.showTime}</span>
                   {item.cinemaName && <span>影院：{item.cinemaName}</span>}
                 </div>

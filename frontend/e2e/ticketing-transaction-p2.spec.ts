@@ -24,9 +24,12 @@ async function fulfillJson(route: Route, status: number, body: unknown): Promise
 
 function orderSnapshot(status: string = 'PENDING_PAYMENT') {
   return {
+    cinemaId: '2084194399128586242',
     orderId,
     orderNo,
+    movieId: '2084194398004512769',
     showId,
+    showStartTime: '2026-08-10T19:30:00+08:00',
     seatIds: ['2084194402305432067'],
     ticketCount: 1,
     unitPrice: '39.00',
@@ -190,9 +193,14 @@ test('电子票页面只读取服务端电子票并本地展示二维码', async
       }),
     );
   });
+  await page.route(`**/api/v1/orders/${orderNo}`, async (route) => {
+    await fulfillJson(route, 200, apiResult(orderSnapshot('PAID')));
+  });
 
   await page.goto(`/tickets/${ticketId}`);
   await expect(page.getByText('有效票可入场')).toBeVisible();
+  await expect(page.getByText('2026-08-10 19:30')).toBeVisible();
+  await expect(page.getByText('影片信息暂不可用')).toBeVisible();
   await expect(page.getByLabel('有效电子票二维码')).toBeVisible();
 });
 

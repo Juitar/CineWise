@@ -8,10 +8,18 @@ setupTestEnvironment();
 
 describe('PaymentPanel 组件', () => {
   it('正确渲染订单信息、金额和本地密码输入区域', () => {
-    render(<PaymentPanel orderNo="202608050001" ticketCount={2} totalAmount="78.00" />);
+    render(
+      <PaymentPanel
+        orderNo="202608050001"
+        ticketCount={2}
+        totalAmount="78.00"
+        showTime="2026-08-10 14:30"
+      />,
+    );
     expect(screen.getByText('202608050001')).toBeInTheDocument();
     expect(screen.getByText('2 张')).toBeInTheDocument();
     expect(screen.getByText('¥ 78.00')).toBeInTheDocument();
+    expect(screen.getByText('2026-08-10 14:30')).toBeInTheDocument();
     expect(screen.getByLabelText('六位模拟支付密码')).toBeInTheDocument();
   });
 
