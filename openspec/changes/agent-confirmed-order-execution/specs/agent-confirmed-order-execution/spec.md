@@ -1,12 +1,17 @@
 ## ADDED Requirements
 
 ### Requirement: 确认接口只接收确认结果
-系统 SHALL 提供 `POST /api/v1/agent/actions/{actionId}/confirm`，请求体 MUST 仅含布尔字段 `confirmed`。服务端 MUST 从 `CurrentUserAccessor` 获得用户，并在确认时重新校验 action、运行状态、节点、计划版本、参数摘要和业务数据；运行已结束、节点不允许确认或业务数据失效时不得调用 A。
+系统 SHALL 提供 `POST /api/v1/agent/actions/{actionId}/confirm`，请求体 MUST 仅含布尔字段 `confirmed`。成功响应 MUST 只返回 `actionId`、`runId`、`planVersion`、公开 action 状态和 `updatedAt`。服务端 MUST 从 `CurrentUserAccessor` 获得用户，并在确认时重新校验 action、运行状态、节点、计划版本、参数摘要和业务数据；运行已结束、节点不允许确认或业务数据失效时不得调用 A。
 
 #### Scenario: 合法用户确认
 - **WHEN** action 属于当前用户、仍有效、运行和计划版本匹配且 confirmed 为 true
 - **THEN** 系统先保存 action 的确认事实，再进入独立的写工具执行阶段
 - **AND** 请求体中的任何额外交易字段都不会参与建单
+
+#### Scenario: 拒绝确认结果必须由服务端确定
+- **WHEN** 用户提交 `confirmed=false` 后请求超时或断线
+- **THEN** 前端只能显示结果确认中，直到 REST 或 SSE 返回 `REJECTED`
+- **AND** 前端不得在点击瞬间把卡片改为已取消
 
 ### Requirement: A 建单调用只能使用公开类型化能力
 系统 SHALL 只经 A 已确认的 `CreateOrderTool.execute(ToolContext, CreateOrderForAgentCommand)` 调用建单。Command MUST 只含 `actionId`、`showId`、`seatIds`；`ticketCount` 由 A 按最终成功锁定座位计算。B MUST NOT 调用 A Controller、Entity、Mapper、Repository、数据库表或本机 HTTP，也不得自行校验或改写库存、金额、用户归属和订单状态。

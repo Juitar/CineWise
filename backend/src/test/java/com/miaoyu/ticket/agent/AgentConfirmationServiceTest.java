@@ -18,8 +18,10 @@ import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationResult;
 import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationService;
 import com.miaoyu.ticket.agent.application.confirmation.CreateOrderToolAdapter;
 import com.miaoyu.ticket.agent.application.confirmation.CreateOrderToolResult;
+import com.miaoyu.ticket.agent.api.AgentActionResponse;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationAction;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentActionWriteIdentifiers;
+import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationCardStatus;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationActionStatus;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationValidationContext;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationValidationFailure;
@@ -35,6 +37,7 @@ import com.miaoyu.ticket.auth.application.RoleCode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
@@ -139,6 +142,36 @@ class AgentConfirmationServiceTest {
     }
 
     @Test
+    void shouldKeepCConfirmedCardPayloadSafeAndKeepPlanVersionAtEventLevel() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        try (var input = getClass().getResourceAsStream("/fixtures/agent/c/order-confirm-card.json")) {
+            JsonNode event = objectMapper.readTree(input);
+            JsonNode payload = event.path("payload");
+
+            assertEquals(2, event.path("planVersion").asInt());
+            assertFalse(payload.has("planVersion"));
+            assertEquals("CREATE_ORDER", payload.path("actionType").asText());
+            assertFalse(payload.has("seatIds"));
+            assertFalse(payload.has("totalAmount"));
+            assertFalse(payload.has("idempotencyKey"));
+        }
+    }
+
+    @Test
+    void shouldExposeOnlyCConfirmedFieldsInActionResponse() {
+        AgentActionResponse response = new AgentActionResponse(
+                "action-1",
+                "run-1",
+                2,
+                AgentConfirmationCardStatus.EXECUTING,
+                OffsetDateTime.parse("2026-08-05T16:30:00+08:00"));
+
+        assertEquals("action-1", response.actionId());
+        assertEquals("EXECUTING", response.status().name());
+        assertEquals(5, AgentActionResponse.class.getRecordComponents().length);
+    }
+
+    @Test
     void shouldAuthorizeOnlyTheExecutingActionWithMatchingContextAndHash() {
         AgentConfirmationAction action = action().claim(
                 AgentActionWriteIdentifiers.forAction("action-1"), NOW.plusSeconds(1));
@@ -181,7 +214,7 @@ class AgentConfirmationServiceTest {
 
     private static AgentConfirmationAction action() {
         return AgentConfirmationAction.pending(
-                1L, "action-1", 9L, 10L, "run-1", "plan-1", 2, "confirm-order",
+                1L, "action-1", 9L, 10L, 11L, "run-1", "plan-1", 2, "confirm-order",
                 new ConfirmedOrderCommand("createOrder", "70001", List.of("2", "4")), NOW.plusMinutes(5), NOW);
     }
 

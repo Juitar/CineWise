@@ -10,8 +10,10 @@ import com.miaoyu.ticket.agent.domain.confirmation.AgentActionParameterHash;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentActionWriteIdentifiers;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationAction;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationActionStatus;
+import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationActionType;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationActionValidator;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationCardView;
+import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationCardStatus;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationValidationContext;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationValidationFailure;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
@@ -65,6 +67,15 @@ class AgentConfirmationActionTest {
         assertNotEquals(first, another);
         assertTrue(first.clientRequestId().length() <= 64);
         assertTrue(first.idempotencyKey().length() <= 64);
+    }
+
+    @Test
+    void shouldKeepInternalSessionRunIdsSeparateFromExternalRunId() {
+        AgentConfirmationAction action = pendingAction();
+
+        assertEquals(10L, action.agentSessionId());
+        assertEquals(11L, action.agentRunId());
+        assertEquals("run-1", action.runId());
     }
 
     @Test
@@ -147,12 +158,30 @@ class AgentConfirmationActionTest {
 
     @Test
     void shouldExposeOnlySafeConfirmationCardFields() {
-        AgentConfirmationCardView view = AgentConfirmationCardView.from(pendingAction(), "请确认电影票订单");
+        AgentConfirmationCardView view = AgentConfirmationCardView.from(
+                pendingAction(), "确认建单", List.of("影片：示例影片", "座位：A1、A2"));
 
         assertEquals("action-1", view.actionId());
-        assertEquals(2, view.planVersion());
-        assertEquals(AgentConfirmationActionStatus.PENDING_CONFIRMATION, view.status());
-        assertEquals(5, AgentConfirmationCardView.class.getRecordComponents().length);
+        assertEquals(AgentConfirmationActionType.CREATE_ORDER, view.actionType());
+        assertEquals(AgentConfirmationCardStatus.PENDING_CONFIRMATION, view.status());
+        assertEquals(6, AgentConfirmationCardView.class.getRecordComponents().length);
+        assertThrows(IllegalArgumentException.class, () -> new AgentConfirmationCardView(
+                "action-1",
+                AgentConfirmationActionType.CREATE_ORDER,
+                NOW.plusMinutes(5),
+                AgentConfirmationCardStatus.PENDING_CONFIRMATION,
+                "<b>确认</b>",
+                List.of()));
+    }
+
+    @Test
+    void shouldMapEveryInternalActionStatusToTheCConfirmedCardStatus() {
+        for (AgentConfirmationActionStatus status : AgentConfirmationActionStatus.values()) {
+            assertEquals(status.name(), AgentConfirmationCardStatus.fromActionStatus(status).name());
+        }
+        assertFalse(AgentConfirmationCardStatus.PENDING_CONFIRMATION.isReadOnly());
+        assertTrue(AgentConfirmationCardStatus.RESULT_UNKNOWN.isReadOnly());
+        assertTrue(AgentConfirmationCardStatus.REJECTED.isReadOnly());
     }
 
     @Test
@@ -180,6 +209,7 @@ class AgentConfirmationActionTest {
                 "action-1",
                 9L,
                 10L,
+                11L,
                 "run-1",
                 "plan-1",
                 2,
