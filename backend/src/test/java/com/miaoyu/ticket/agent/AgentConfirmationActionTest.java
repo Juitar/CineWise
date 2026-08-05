@@ -104,6 +104,7 @@ class AgentConfirmationActionTest {
         assertEquals(AgentConfirmationActionStatus.REJECTED, rejected.status());
         assertEquals(AgentConfirmationActionStatus.EXPIRED, expired.status());
         assertEquals(null, rejected.writeIdentifiers());
+        assertEquals(null, expired.recoveryHint());
         assertTrue(pendingAction().isExpiredAt(NOW.plusMinutes(5)));
         assertFalse(pendingAction().isExpiredAt(NOW.plusMinutes(4).plusSeconds(59)));
     }
@@ -199,8 +200,12 @@ class AgentConfirmationActionTest {
 
         assertEquals(claimed.writeIdentifiers(), unknown.writeIdentifiers());
         assertTrue(unknown.status().requiresResultRecovery());
+        assertEquals("网络响应未知", unknown.recoveryHint());
+        assertEquals(NOW.plusSeconds(2), unknown.resultUnknownAt());
+        assertEquals(NOW.plusDays(30).plusSeconds(2), unknown.recoveryUntil());
+        assertEquals(null, unknown.markFailed("创建订单失败", NOW.plusSeconds(3)).recoveryHint());
         assertThrows(IllegalStateException.class,
-                () -> unknown.claim(AgentActionWriteIdentifiers.forAction("new-action"), NOW.plusSeconds(3)));
+                () -> unknown.claim(AgentActionWriteIdentifiers.forAction("new-action"), NOW.plusSeconds(4)));
     }
 
     private static AgentConfirmationAction pendingAction() {

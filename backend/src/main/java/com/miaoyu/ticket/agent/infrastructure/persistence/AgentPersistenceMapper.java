@@ -47,6 +47,16 @@ public interface AgentPersistenceMapper {
             first_retained_event_id AS firstRetainedEventId, version, expire_at AS expireAt,
             create_time AS createTime, update_time AS updateTime
             """;
+    String ACTION_COLUMNS = """
+            id, action_id AS actionId, user_id AS userId, agent_session_id AS agentSessionId,
+            agent_run_id AS agentRunId, run_id AS runId, plan_id AS planId, plan_version AS planVersion,
+            node_id AS nodeId, tool_name AS toolName, command_snapshot AS commandSnapshot,
+            parameter_hash_version AS parameterHashVersion, parameter_hash AS parameterHash,
+            expire_at AS expireAt, status, client_request_id AS clientRequestId,
+            idempotency_key AS idempotencyKey, result_reference AS resultReference,
+            recovery_hint AS recoveryHint, result_unknown_at AS resultUnknownAt,
+            recovery_until AS recoveryUntil, version, create_time AS createTime, update_time AS updateTime
+            """;
 
     @Select("SELECT " + SESSION_COLUMNS + " FROM agent_session WHERE session_id = #{sessionId}"
             + " AND user_id = #{userId} LIMIT 1")
@@ -336,4 +346,39 @@ public interface AgentPersistenceMapper {
 
     @Delete("DELETE FROM agent_event_stream_cursor WHERE session_id = #{sessionId}")
     int deleteEventCursor(@Param("sessionId") String sessionId);
+
+    @Select("SELECT " + ACTION_COLUMNS + " FROM agent_action WHERE action_id = #{actionId} LIMIT 1")
+    AgentConfirmationActionEntity findActionByActionId(@Param("actionId") String actionId);
+
+    @Insert("""
+            INSERT INTO agent_action (
+                id, action_id, user_id, agent_session_id, agent_run_id, run_id, plan_id, plan_version,
+                node_id, tool_name, command_snapshot, parameter_hash_version, parameter_hash, expire_at, status,
+                client_request_id, idempotency_key, result_reference, recovery_hint, result_unknown_at,
+                recovery_until, version, create_time, update_time
+            ) VALUES (
+                #{action.id}, #{action.actionId}, #{action.userId}, #{action.agentSessionId},
+                #{action.agentRunId}, #{action.runId}, #{action.planId}, #{action.planVersion},
+                #{action.nodeId}, #{action.toolName}, #{action.commandSnapshot},
+                #{action.parameterHashVersion}, #{action.parameterHash}, #{action.expireAt}, #{action.status},
+                #{action.clientRequestId}, #{action.idempotencyKey}, #{action.resultReference},
+                #{action.recoveryHint}, #{action.resultUnknownAt}, #{action.recoveryUntil}, #{action.version},
+                #{action.createTime}, #{action.updateTime}
+            )
+            """)
+    int insertAction(@Param("action") AgentConfirmationActionEntity action);
+
+    @Update("""
+            UPDATE agent_action
+               SET status = #{action.status}, client_request_id = #{action.clientRequestId},
+                   idempotency_key = #{action.idempotencyKey}, result_reference = #{action.resultReference},
+                   recovery_hint = #{action.recoveryHint}, result_unknown_at = #{action.resultUnknownAt},
+                   recovery_until = #{action.recoveryUntil}, version = version + 1,
+                   update_time = #{action.updateTime}
+             WHERE action_id = #{action.actionId} AND version = #{expectedVersion} AND status = #{expectedStatus}
+            """)
+    int updateActionWithCas(
+            @Param("action") AgentConfirmationActionEntity action,
+            @Param("expectedVersion") long expectedVersion,
+            @Param("expectedStatus") String expectedStatus);
 }

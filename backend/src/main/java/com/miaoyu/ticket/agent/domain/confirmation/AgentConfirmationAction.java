@@ -21,6 +21,8 @@ public record AgentConfirmationAction(
         AgentActionWriteIdentifiers writeIdentifiers,
         String resultReference,
         String recoveryHint,
+        LocalDateTime resultUnknownAt,
+        LocalDateTime recoveryUntil,
         long version,
         LocalDateTime createTime,
         LocalDateTime updateTime) {
@@ -66,6 +68,15 @@ public record AgentConfirmationAction(
         if (status == AgentConfirmationActionStatus.SUCCEEDED && isBlank(resultReference)) {
             throw new IllegalArgumentException("成功 action 必须保存结果引用");
         }
+        if (status == AgentConfirmationActionStatus.RESULT_UNKNOWN
+                && (isBlank(recoveryHint) || resultUnknownAt == null || recoveryUntil == null
+                || !recoveryUntil.equals(resultUnknownAt.plusDays(30)))) {
+            throw new IllegalArgumentException("结果未知 action 必须保存 30 天恢复信息");
+        }
+        if (status != AgentConfirmationActionStatus.RESULT_UNKNOWN
+                && (recoveryHint != null || resultUnknownAt != null || recoveryUntil != null)) {
+            throw new IllegalArgumentException("恢复信息只能用于结果未知 action");
+        }
     }
 
     public static AgentConfirmationAction pending(
@@ -84,7 +95,7 @@ public record AgentConfirmationAction(
         return new AgentConfirmationAction(
                 id, actionId, userId, agentSessionId, agentRunId, runId, planId, planVersion, nodeId, command,
                 AgentActionParameterHash.from(command), expireAt, AgentConfirmationActionStatus.PENDING_CONFIRMATION,
-                null, null, null, 0L, now, now);
+                null, null, null, null, null, 0L, now, now);
     }
 
     public boolean isExpiredAt(LocalDateTime now) {
@@ -93,39 +104,45 @@ public record AgentConfirmationAction(
 
     public AgentConfirmationAction claim(AgentActionWriteIdentifiers identifiers, LocalDateTime now) {
         requireStatus(AgentConfirmationActionStatus.PENDING_CONFIRMATION);
-        return with(AgentConfirmationActionStatus.EXECUTING, Objects.requireNonNull(identifiers), null, null, now);
+        return with(
+                AgentConfirmationActionStatus.EXECUTING, Objects.requireNonNull(identifiers), null, null, null, null,
+                now);
     }
 
     public AgentConfirmationAction reject(LocalDateTime now) {
         requireStatus(AgentConfirmationActionStatus.PENDING_CONFIRMATION);
-        return with(AgentConfirmationActionStatus.REJECTED, null, null, null, now);
+        return with(AgentConfirmationActionStatus.REJECTED, null, null, null, null, null, now);
     }
 
     public AgentConfirmationAction expire(LocalDateTime now) {
         requireStatus(AgentConfirmationActionStatus.PENDING_CONFIRMATION);
-        return with(AgentConfirmationActionStatus.EXPIRED, null, null, "确认已过期", now);
+        return with(AgentConfirmationActionStatus.EXPIRED, null, null, null, null, null, now);
     }
 
     public AgentConfirmationAction invalidate(String hint, LocalDateTime now) {
         requireStatus(AgentConfirmationActionStatus.PENDING_CONFIRMATION);
-        return with(AgentConfirmationActionStatus.INVALIDATED, null, null, requireText(hint, "失效提示"), now);
+        requireText(hint, "失效提示");
+        return with(AgentConfirmationActionStatus.INVALIDATED, null, null, null, null, null, now);
     }
 
     public AgentConfirmationAction markSucceeded(String reference, LocalDateTime now) {
         requireResultKnownTransition();
         return with(
-                AgentConfirmationActionStatus.SUCCEEDED, writeIdentifiers, requireText(reference, "结果引用"), null, now);
+                AgentConfirmationActionStatus.SUCCEEDED, writeIdentifiers, requireText(reference, "结果引用"), null,
+                null, null, now);
     }
 
     public AgentConfirmationAction markFailed(String hint, LocalDateTime now) {
         requireResultKnownTransition();
-        return with(AgentConfirmationActionStatus.FAILED, writeIdentifiers, null, requireText(hint, "失败提示"), now);
+        requireText(hint, "失败提示");
+        return with(AgentConfirmationActionStatus.FAILED, writeIdentifiers, null, null, null, null, now);
     }
 
     public AgentConfirmationAction markResultUnknown(String hint, LocalDateTime now) {
         requireStatus(AgentConfirmationActionStatus.EXECUTING);
         return with(
-                AgentConfirmationActionStatus.RESULT_UNKNOWN, writeIdentifiers, null, requireText(hint, "恢复提示"), now);
+                AgentConfirmationActionStatus.RESULT_UNKNOWN, writeIdentifiers, null, requireText(hint, "恢复提示"), now,
+                now.plusDays(30), now);
     }
 
     private AgentConfirmationAction with(
@@ -133,6 +150,8 @@ public record AgentConfirmationAction(
             AgentActionWriteIdentifiers nextWriteIdentifiers,
             String nextResultReference,
             String nextRecoveryHint,
+            LocalDateTime nextResultUnknownAt,
+            LocalDateTime nextRecoveryUntil,
             LocalDateTime now) {
         LocalDateTime update = Objects.requireNonNull(now, "now 不能为空");
         if (update.isBefore(updateTime)) {
@@ -141,7 +160,8 @@ public record AgentConfirmationAction(
         return new AgentConfirmationAction(
                 id, actionId, userId, agentSessionId, agentRunId, runId, planId, planVersion, nodeId, command,
                 parameterHash,
-                expireAt, nextStatus, nextWriteIdentifiers, nextResultReference, nextRecoveryHint,
+                expireAt, nextStatus, nextWriteIdentifiers, nextResultReference, nextRecoveryHint, nextResultUnknownAt,
+                nextRecoveryUntil,
                 version + 1, createTime, update);
     }
 

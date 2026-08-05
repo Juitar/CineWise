@@ -8,6 +8,8 @@ import java.util.Optional;
 public interface AgentConfirmationActionRepository {
     Optional<AgentConfirmationAction> findByActionId(String actionId);
 
+    void insert(AgentConfirmationAction action);
+
     boolean compareAndSet(
             String actionId,
             long expectedVersion,
