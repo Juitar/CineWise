@@ -15,6 +15,20 @@ spring:
   threads:
     virtual:
       enabled: false
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SMTP_AUTH:true}
+          starttls:
+            enable: ${SMTP_STARTTLS_ENABLED:true}
+          connectiontimeout: ${SMTP_CONNECTION_TIMEOUT_MILLISECONDS:1500}
+          timeout: ${SMTP_READ_TIMEOUT_MILLISECONDS:1500}
+          writetimeout: ${SMTP_WRITE_TIMEOUT_MILLISECONDS:1500}
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
@@ -32,6 +46,9 @@ server:
   shutdown: graceful
 
 management:
+  health:
+    mail:
+      enabled: ${MAIL_HEALTH_ENABLED:${AUTH_VERIFICATION_SMTP_ENABLED:false}}
   endpoints:
     web:
       exposure:
@@ -116,6 +133,27 @@ cinewise:
     cookie-same-site: Lax
     login-log-retention-days: ${AUTH_LOGIN_LOG_RETENTION_DAYS:30}
     login-log-cleanup-delay-milliseconds: ${AUTH_LOGIN_LOG_CLEANUP_DELAY_MILLISECONDS:86400000}
+    registration:
+      invite-hash-secret: ${AUTH_INVITE_HASH_SECRET:}
+      current-privacy-policy-version: ${AUTH_CURRENT_PRIVACY_POLICY_VERSION:}
+      initial-invite:
+        enabled: ${AUTH_INITIAL_INVITE_ENABLED:false}
+        code: ${TRAINING_INVITE_CODE:}
+        max-uses: ${AUTH_INITIAL_INVITE_MAX_USES:0}
+        valid-from: ${AUTH_INITIAL_INVITE_VALID_FROM:}
+        expire-time: ${AUTH_INITIAL_INVITE_EXPIRE_TIME:}
+    verification:
+      hash-secret: ${AUTH_VERIFICATION_HASH_SECRET:}
+      digits: ${AUTH_VERIFICATION_DIGITS:6}
+      ttl: ${AUTH_VERIFICATION_TTL:5m}
+      cooldown: ${AUTH_VERIFICATION_COOLDOWN:60s}
+      maximum-attempts: ${AUTH_VERIFICATION_MAXIMUM_ATTEMPTS:5}
+      ip-window: ${AUTH_VERIFICATION_IP_WINDOW:5m}
+      maximum-ip-requests: ${AUTH_VERIFICATION_MAXIMUM_IP_REQUESTS:10}
+      mail:
+        smtp-enabled: ${AUTH_VERIFICATION_SMTP_ENABLED:false}
+        from: ${AUTH_VERIFICATION_MAIL_FROM:}
+        subject: ${AUTH_VERIFICATION_MAIL_SUBJECT:妙语购票邮箱验证码}
     demo-seed:
       enabled: ${AUTH_DEMO_SEED_ENABLED:false}
       user-email: ${AUTH_DEMO_USER_EMAIL:}
