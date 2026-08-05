@@ -278,7 +278,8 @@ class AgentConfirmationServiceTest {
         }
 
         @Override
-        public ToolResult<CreateOrderToolResult> execute(ToolContext context, ConfirmedOrderCommand command) {
+        public ToolResult<CreateOrderToolResult> execute(
+                String actionId, ToolContext context, ConfirmedOrderCommand command) {
             executeCalls++;
             firstContext = context;
             if (executionStarted != null) {
