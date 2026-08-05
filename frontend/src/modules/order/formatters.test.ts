@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatOrderDateTime, parseOrderDateTime } from './formatters';
+import { formatOrderDateTime, formatOrderTime, parseOrderDateTime } from './formatters';
 
 describe('订单业务时间格式化', () => {
   it('固定按 Asia/Shanghai 展示带偏移时间', () => {
@@ -22,5 +22,12 @@ describe('订单业务时间格式化', () => {
     expect(parseOrderDateTime('2026-08-10T14:30:00+08:00')?.toISOString()).toBe(
       '2026-08-10T06:30:00.000Z',
     );
+  });
+
+  it('固定按 Asia/Shanghai 展示支付期限时分并处理非法值', () => {
+    expect(formatOrderTime('2026-08-10T14:30:00')).toBe('14:30');
+    expect(formatOrderTime('2026-08-10T06:30:00Z')).toBe('14:30');
+    expect(formatOrderTime('2026-02-31T14:30:00')).toBe('支付期限以订单信息为准');
+    expect(formatOrderTime(undefined)).toBe('支付期限以订单信息为准');
   });
 });
