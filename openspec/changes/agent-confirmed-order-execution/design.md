@@ -104,7 +104,7 @@ SSE 复用 `card` 与 `tool.result` 等持久化事件类型：新增的确认�
 
 ## Risks / Trade-offs
 
-- [A 尚未确认 Agent 建单公开接口] → 只完成 B 的端口、Mock、参数摘要、状态机和测试；任务保持未完成，不写生产调用。
+- [A 的公开建单 Tool 尚未落地] → 底层 `OrderApplicationService` 不可被 B 直接依赖；只完成 B 的端口、Mock、参数摘要、状态机和测试，等待 A 独立 change 提供实际类型后再写生产调用。
 - [A 的 SQL 静态审查或执行授权未完成] → 只保留 V012 草稿，不连接共享数据库；记录待 A 处理，MySQL CI 不宣称通过。
 - [写结果丢失] → 固定原 action 的键并查询；查不到结论保持 `RESULT_UNKNOWN`，宁可提示处理中也不重复建单。
 - [并发确认] → CAS 和唯一约束作为最终保证，单机锁和 SSE 状态不作为正确性依据；在 CI MySQL 8.4 验证并发。
@@ -119,4 +119,4 @@ SSE 复用 `card` 与 `tool.result` 等持久化事件类型：新增的确认�
 
 ## Open Questions
 
-1. A：审查 `V012__create_agent_action_table.sql` 的字段、索引和 MySQL 8.4 CHECK；审查通过前不得执行迁移。`RESULT_UNKNOWN` 必须保留 30 天且仅允许原键查询恢复。
+1. A：提供独立 change 的提交号和包路径，落地 `com.miaoyu.ticket.order.api.CreateOrderTool`、`CreateOrderForAgentCommand`、`AgentOrderResult` 及按原请求查询入口；B 在该公开类型可用后接入生产适配器。
