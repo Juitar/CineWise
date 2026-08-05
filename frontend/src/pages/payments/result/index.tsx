@@ -1,8 +1,8 @@
 import React from 'react';
 import { history, useParams } from 'umi';
 import { PaymentResult } from '../../../features/payment-result/PaymentResult';
-import type { PaymentResultStatus } from '../../../features/payment-result/PaymentResult';
 import { useOrder, usePaymentResult } from '../../../modules/order/transaction-hooks';
+import { resolvePaymentResultStatus } from './payment-result-status';
 import './index.css';
 
 /**
@@ -13,21 +13,7 @@ export default function PaymentResultPage() {
   const { orderNo = '' } = useParams<{ orderNo: string }>();
   const orderQuery = useOrder(orderNo);
   const paymentAction = usePaymentResult(orderNo);
-  const payment = paymentAction.payment;
-  let status: PaymentResultStatus = paymentAction.error ? 'ERROR' : 'CONFIRMING';
-  if (payment?.paymentStatus === 'SUCCESS' && payment.orderStatus === 'PAID') {
-    status = 'SUCCESS';
-  } else if (payment?.orderStatus === 'PENDING_PAYMENT') {
-    status = 'PENDING_PAYMENT';
-  } else if (
-    payment?.orderStatus === 'CANCELLED' ||
-    payment?.orderStatus === 'EXPIRED' ||
-    payment?.orderStatus === 'REFUNDED'
-  ) {
-    status = 'EXPIRED';
-  } else if (payment?.paymentStatus === 'PROCESSING') {
-    status = 'PROCESSING';
-  }
+  const status = resolvePaymentResultStatus(paymentAction.payment, paymentAction.error !== null);
 
   return (
     <div className="payment-result-page-wrapper">

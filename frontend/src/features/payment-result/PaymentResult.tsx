@@ -8,7 +8,9 @@ export type PaymentResultStatus =
   | 'CONFIRMING'
   | 'SUCCESS'
   | 'PENDING_PAYMENT'
+  | 'CANCELLED'
   | 'EXPIRED'
+  | 'REFUNDED'
   | 'RESULT_UNKNOWN'
   | 'ERROR';
 
@@ -117,6 +119,32 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
             <div className="payment-result-actions">
               <Button type="primary" onClick={onBackToHome} className="payment-result-btn">
                 返回首页
+              </Button>
+            </div>
+          </div>
+        );
+
+      case 'CANCELLED':
+        return (
+          <div className="payment-result-state">
+            <div className="payment-result-badge expired">订单已取消</div>
+            <p className="payment-result-desc">该订单已取消，系统已释放原锁定座位。</p>
+            <div className="payment-result-actions">
+              <Button type="primary" onClick={onBackToHome} className="payment-result-btn">
+                返回首页
+              </Button>
+            </div>
+          </div>
+        );
+
+      case 'REFUNDED':
+        return (
+          <div className="payment-result-state">
+            <div className="payment-result-badge expired">订单已退款</div>
+            <p className="payment-result-desc">该订单已完成退票，关联电子票已失效。</p>
+            <div className="payment-result-actions">
+              <Button type="primary" onClick={onViewOrder} className="payment-result-btn">
+                查看订单
               </Button>
             </div>
           </div>

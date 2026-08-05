@@ -31,4 +31,16 @@ describe('PaymentResult 组件', () => {
     expect(screen.queryByRole('button', { name: '再次支付' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '重新查询订单结果' })).toBeInTheDocument();
   });
+
+  it('取消和退款订单分别展示真实终态原因，不伪装为订单过期', () => {
+    const { rerender } = render(
+      <PaymentResult orderNo="202608050001" amount="78.00" status="CANCELLED" />,
+    );
+    expect(screen.getByText('订单已取消')).toBeInTheDocument();
+    expect(screen.queryByText('订单已过期')).not.toBeInTheDocument();
+
+    rerender(<PaymentResult orderNo="202608050001" amount="78.00" status="REFUNDED" />);
+    expect(screen.getByText('订单已退款')).toBeInTheDocument();
+    expect(screen.getByText(/关联电子票已失效/)).toBeInTheDocument();
+  });
 });

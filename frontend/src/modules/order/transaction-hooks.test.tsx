@@ -2,7 +2,8 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../shared/api/ApiError';
 import { getPayment, payOrder } from './api';
-import { usePaymentAction, usePaymentResult } from './transaction-hooks';
+import { getOrders } from './api';
+import { useOrders, usePaymentAction, usePaymentResult } from './transaction-hooks';
 
 vi.mock('./api', () => ({
   cancelOrder: vi.fn(),
@@ -41,6 +42,7 @@ describe('订单交易 Hook 的结果未知恢复', () => {
     sessionStorage.clear();
     vi.mocked(payOrder).mockReset();
     vi.mocked(getPayment).mockReset();
+    vi.mocked(getOrders).mockReset();
     vi.stubGlobal('crypto', { randomUUID: () => 'stable-payment-key' });
   });
 
@@ -88,5 +90,43 @@ describe('订单交易 Hook 的结果未知恢复', () => {
     unmount();
     await vi.advanceTimersByTimeAsync(10_000);
     expect(getPayment).toHaveBeenCalledTimes(15);
+  });
+
+  it('快速切换订单筛选时，忽略旧筛选条件的迟到响应', async () => {
+    let resolvePendingOrders: (value: {
+      total: number;
+      page: number;
+      size: number;
+      records: [];
+    }) => void;
+    const pendingOrders = new Promise<{
+      total: number;
+      page: number;
+      size: number;
+      records: [];
+    }>((resolve) => {
+      resolvePendingOrders = resolve;
+    });
+    const paidOrders = { total: 0, page: 1, size: 10, records: [] };
+    vi.mocked(getOrders).mockReturnValueOnce(pendingOrders).mockResolvedValueOnce(paidOrders);
+
+    type OrderFilterProps = { status: 'PENDING_PAYMENT' | 'PAID' };
+    const initialFilter: OrderFilterProps = { status: 'PENDING_PAYMENT' };
+    const { result, rerender } = renderHook(
+      ({ status }: OrderFilterProps) => useOrders({ page: 1, size: 10, status }),
+      { initialProps: initialFilter },
+    );
+    rerender({ status: 'PAID' as const });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.data).toEqual(paidOrders);
+
+    await act(async () => {
+      resolvePendingOrders!({ total: 1, page: 1, size: 10, records: [] });
+      await pendingOrders;
+    });
+    expect(result.current.data).toEqual(paidOrders);
   });
 });

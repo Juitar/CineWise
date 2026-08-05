@@ -2,8 +2,11 @@ import React from 'react';
 import { history, useParams } from 'umi';
 import { message } from 'antd';
 import { OrderDetail } from '../../../features/order-detail/OrderDetail';
-import { getPayment } from '../../../modules/order/api';
-import { useCancelOrder, useOrder } from '../../../modules/order/transaction-hooks';
+import {
+  useCancelOrder,
+  useOrder,
+  usePaymentQuery,
+} from '../../../modules/order/transaction-hooks';
 import './index.css';
 
 /**
@@ -14,6 +17,7 @@ export default function OrderDetailPage() {
   const { orderNo = '' } = useParams<{ orderNo: string }>();
   const orderQuery = useOrder(orderNo);
   const cancellation = useCancelOrder(orderNo);
+  const paymentQuery = usePaymentQuery(orderNo);
   const order = orderQuery.data;
 
   const handleCancel = async () => {
@@ -33,12 +37,12 @@ export default function OrderDetailPage() {
   };
 
   const handleViewTicket = async () => {
-    try {
-      const payment = await getPayment(orderNo);
-      if (payment.ticketId) {
-        history.push(`/tickets/${encodeURIComponent(payment.ticketId)}`);
-      }
-    } catch {
+    const payment = await paymentQuery.query();
+    if (payment?.ticketId) {
+      history.push(`/tickets/${encodeURIComponent(payment.ticketId)}`);
+      return;
+    }
+    if (!paymentQuery.error) {
       message.error('暂时无法取得电子票信息，请稍后重试');
     }
   };
@@ -57,7 +61,9 @@ export default function OrderDetailPage() {
         expireTime={order?.expireTime}
         updatedAt={order?.updatedAt}
         loading={orderQuery.loading}
-        error={orderQuery.error?.message ?? cancellation.error?.message}
+        error={
+          orderQuery.error?.message ?? cancellation.error?.message ?? paymentQuery.error?.message
+        }
         onPay={() =>
           history.push(
             order?.status === 'PAYING'

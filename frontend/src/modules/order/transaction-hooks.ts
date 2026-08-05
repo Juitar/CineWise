@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../shared/api/ApiError';
 import {
   cancelOrder,
@@ -47,20 +47,30 @@ export function useOrders(query: OrderQuery): QueryState<OrderPageResponse> {
   const [data, setData] = useState<OrderPageResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
+  const latestRequestId = useRef(0);
   const queryKey = JSON.stringify(query);
 
   const refresh = useCallback(async (): Promise<OrderPageResponse | null> => {
+    const requestId = latestRequestId.current + 1;
+    latestRequestId.current = requestId;
     setLoading(true);
     setError(null);
     try {
       const result = await getOrders(query);
-      setData(result);
+      // 筛选条件快速变化时，旧请求后返回也不能覆盖最新订单列表。
+      if (requestId === latestRequestId.current) {
+        setData(result);
+      }
       return result;
     } catch (requestError: unknown) {
-      setError(toApiError(requestError));
+      if (requestId === latestRequestId.current) {
+        setError(toApiError(requestError));
+      }
       return null;
     } finally {
-      setLoading(false);
+      if (requestId === latestRequestId.current) {
+        setLoading(false);
+      }
     }
     // queryKey keeps the callback stable for equivalent filter objects.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -175,6 +185,41 @@ export interface PaymentActionState {
   error: ApiError | null;
   submit: () => Promise<PaymentResponse | null>;
   query: () => Promise<PaymentResponse | null>;
+}
+
+export interface PaymentQueryState {
+  payment: PaymentResponse | null;
+  querying: boolean;
+  error: ApiError | null;
+  query: () => Promise<PaymentResponse | null>;
+}
+
+/**
+ * 查询订单支付记录，用于订单详情跳转电子票等只读场景。
+ *
+ * 页面不可直接调用 API，避免把读取、错误分类和后续恢复规则分散到多个容器。
+ */
+export function usePaymentQuery(orderNo: string): PaymentQueryState {
+  const [payment, setPayment] = useState<PaymentResponse | null>(null);
+  const [querying, setQuerying] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+
+  const query = useCallback(async (): Promise<PaymentResponse | null> => {
+    setQuerying(true);
+    setError(null);
+    try {
+      const result = await getPayment(orderNo);
+      setPayment(result);
+      return result;
+    } catch (requestError: unknown) {
+      setError(toApiError(requestError));
+      return null;
+    } finally {
+      setQuerying(false);
+    }
+  }, [orderNo]);
+
+  return { payment, querying, error, query };
 }
 
 /** Mock 支付只发送订单号与稳定幂等键，响应未知后永久切换为只读查询。 */
