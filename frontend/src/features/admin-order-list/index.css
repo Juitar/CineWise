@@ -1,0 +1,100 @@
+.admin-order-list-container {
+  background: var(--color-bg-container, #fff);
+  border-radius: var(--border-radius-lg, 8px);
+  padding: 24px;
+  box-shadow:
+    0 1px 2px 0 rgba(0, 0, 0, 3%),
+    0 1px 6px -1px rgba(0, 0, 0, 2%),
+    0 2px 4px 0 rgba(0, 0, 0, 2%);
+}
+
+.admin-order-list-table {
+  display: block;
+}
+
+.admin-order-list-cards {
+  display: none;
+}
+
+.admin-order-card {
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--border-radius-md, 6px);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.admin-order-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-secondary, #f3f4f6);
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+
+.admin-order-card-no {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.admin-order-card-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.admin-order-card-label {
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.admin-order-card-value {
+  color: var(--color-text, #111827);
+  font-weight: 500;
+  text-align: right;
+}
+
+.admin-order-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-border-secondary, #f3f4f6);
+}
+
+.admin-order-card-actions button {
+  min-height: 44px;
+}
+
+.admin-order-pagination {
+  margin-top: 24px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.admin-order-list-empty {
+  text-align: center;
+  padding: 32px 0;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.admin-order-list-email-unavailable {
+  color: var(--color-error, #ef4444);
+}
+
+.admin-order-list-substatus-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 响应式：屏幕较小时隐藏表格，显示卡片列表 */
+@media (max-width: 1024px) {
+  .admin-order-list-table {
+    display: none;
+  }
+
+  .admin-order-list-cards {
+    display: block;
+  }
+}

@@ -1,0 +1,73 @@
+.admin-order-detail-section {
+  margin-bottom: 24px;
+}
+
+.admin-order-detail-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text, #111827);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border-secondary, #f3f4f6);
+}
+
+.admin-order-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px 24px;
+}
+
+.admin-order-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-order-detail-label {
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.admin-order-detail-value {
+  font-size: 14px;
+  color: var(--color-text, #111827);
+  word-break: break-all;
+}
+
+.admin-order-detail-seats {
+  margin-top: 16px;
+}
+
+.admin-order-detail-empty-text {
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 14px;
+}
+
+.admin-order-detail-error-empty {
+  text-align: center;
+  margin-top: 100px;
+}
+
+.admin-order-detail-trace {
+  margin-top: 12px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.admin-order-detail-retry {
+  margin-top: 16px;
+}
+
+.admin-order-detail-summary-section {
+  grid-column: 1 / -1;
+}
+
+.admin-order-detail-summary-section-mt {
+  grid-column: 1 / -1;
+  margin-top: 16px;
+}
+
+.admin-order-detail-summary-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+}

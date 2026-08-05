@@ -19,7 +19,7 @@ A已经拥有订单、支付、电子票和退款的权威交易数据，但管�
 - 不实现JWT、Cookie、CSRF、登录、SecurityContext解析或第二条安全过滤链。
 - 不访问C的Entity、Mapper、Repository或直接联表`sys_user`。
 - 不访问D的内容持久化；第一阶段只返回权威`movieId/cinemaId/showId`，不伪造影片或影院名称。
-- 不新增或修改Flyway迁移，不开发管理端前端页面。
+- 不新增或修改Flyway迁移。
 
 ## Owner与协作
 
