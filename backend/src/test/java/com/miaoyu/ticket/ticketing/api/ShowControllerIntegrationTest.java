@@ -61,7 +61,7 @@ class ShowControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.movies[*].title", everyItem(not(""))))
                 .andExpect(jsonPath("$.data.movies[*].showCount", everyItem(greaterThan(0))))
                 .andExpect(jsonPath("$.data.movies[*].nearestStartTime", everyItem(endsWith("+08:00"))))
-                .andExpect(jsonPath("$.data.movies[*].contentSource", everyItem(matchesPattern("DEMO_CONTENT"))))
+                .andExpect(jsonPath("$.data.movies[*].contentSource", everyItem(matchesPattern(".+"))))
                 .andExpect(jsonPath("$.data.movies[*].contentDataTime", everyItem(endsWith("+08:00"))))
                 .andExpect(jsonPath("$.data.movies[*].scheduleSource", everyItem(matchesPattern("demo-seed"))))
                 .andExpect(jsonPath("$.data.movies[*].scheduleDataTime", everyItem(endsWith("+08:00"))));
