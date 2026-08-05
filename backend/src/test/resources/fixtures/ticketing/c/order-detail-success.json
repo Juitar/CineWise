@@ -1,0 +1,24 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "orderId": "2084194500000000001",
+    "orderNo": "CW2084194500000000001",
+    "showId": "2084194401305432066",
+    "movieId": "2084194398004512769",
+    "cinemaId": "2084194399128586242",
+    "showStartTime": "2026-08-03T20:00:00+08:00",
+    "seatIds": [
+      "2084194402305432067",
+      "2084194402305432068"
+    ],
+    "ticketCount": 2,
+    "unitPrice": "39.00",
+    "totalAmount": "78.00",
+    "status": "PENDING_PAYMENT",
+    "expireTime": "2026-08-03T18:15:00+08:00",
+    "stateVersion": 0,
+    "updatedAt": "2026-08-03T18:00:00+08:00"
+  },
+  "traceId": "45454545454545454545454545454545"
+}

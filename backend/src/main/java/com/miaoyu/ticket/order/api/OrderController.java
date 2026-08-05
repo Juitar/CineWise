@@ -11,6 +11,7 @@ import com.miaoyu.ticket.order.application.OrderCancellationService;
 import com.miaoyu.ticket.order.application.OrderListQuery;
 import com.miaoyu.ticket.order.application.OrderPageView;
 import com.miaoyu.ticket.order.application.OrderQueryService;
+import com.miaoyu.ticket.order.application.OrderQueryView;
 import com.miaoyu.ticket.order.application.OrderView;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -91,7 +92,7 @@ public class OrderController {
     /** 列表只返回当前用户订单，状态和分页边界由应用服务统一校验。 */
     @GetMapping
     @Operation(summary = "分页查询本人订单")
-    public Result<PageResult<OrderResponse>> queryOrders(
+    public Result<PageResult<OrderQueryResponse>> queryOrders(
             @RequestParam(required = false) String orderNo,
             @RequestParam(required = false) String status,
             @RequestParam(required = false)
@@ -113,18 +114,18 @@ public class OrderController {
                 result.total(),
                 result.page(),
                 result.size(),
-                result.records().stream().map(this::toResponse).toList()));
+                result.records().stream().map(this::toQueryResponse).toList()));
     }
 
     /** 跨用户订单号与不存在统一映射为404，不暴露资源存在性。 */
     @GetMapping("/{orderNo}")
     @Operation(summary = "查询本人订单详情")
-    public Result<OrderResponse> queryOrder(
+    public Result<OrderQueryResponse> queryOrder(
             @PathVariable
             @NotBlank
             @Size(max = 32)
             String orderNo) {
-        return Result.success(toResponse(orderQueryService.queryOrder(orderNo)));
+        return Result.success(toQueryResponse(orderQueryService.queryOrder(orderNo)));
     }
 
     /** 取消只接收订单号和动作幂等键，身份始终来自认证上下文。 */
@@ -160,6 +161,25 @@ public class OrderController {
                 Long.toString(order.orderId()),
                 order.orderNo(),
                 Long.toString(order.showId()),
+                order.seatIds().stream().map(String::valueOf).toList(),
+                order.ticketCount(),
+                order.unitPrice().setScale(2, RoundingMode.UNNECESSARY).toPlainString(),
+                order.totalAmount().setScale(2, RoundingMode.UNNECESSARY).toPlainString(),
+                order.status().name(),
+                toOffsetDateTime(order.expireTime()),
+                order.stateVersion(),
+                toOffsetDateTime(order.updatedAt()));
+    }
+
+    /** 个人订单GET只暴露A的场次关联ID和时间，不复制D的内容字段。 */
+    private OrderQueryResponse toQueryResponse(OrderQueryView order) {
+        return new OrderQueryResponse(
+                Long.toString(order.orderId()),
+                order.orderNo(),
+                Long.toString(order.showId()),
+                Long.toString(order.movieId()),
+                Long.toString(order.cinemaId()),
+                toOffsetDateTime(order.showStartTime()),
                 order.seatIds().stream().map(String::valueOf).toList(),
                 order.ticketCount(),
                 order.unitPrice().setScale(2, RoundingMode.UNNECESSARY).toPlainString(),
