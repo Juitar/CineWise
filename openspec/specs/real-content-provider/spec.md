@@ -68,7 +68,7 @@
 - **AND** 系统记录不含 Key 和原始敏感载荷的质量异常，并等待人工复核
 
 ### Requirement: 查询必须保持既有回退顺序和离线演示
-页面查询 SHALL 按“真实缓存 → 有效真实快照 → 未超过最大陈旧时间的过期真实快照 → 唯一 `demo-content-v1` → `303004`”选择结果，且不得在页面请求中调用 NetStart。每天一次的同步 SHALL 按“NetStart → 标准化 → 更新真实快照 → 清掉旧缓存或写入新的真实缓存”执行。固定 Demo 不更新、不进入缓存；后续实现必须移除当前 `ContentQueryService` 从 Demo 得到结果后写缓存的行为。Provider 超时、限流、网络失败、可重试服务端失败或字段校验失败 MUST 不改变页面读取顺序；缓存、快照和 Demo 仍使用既有内容基线的 TTL、最大陈旧时间及来源封套规则。
+页面查询 SHALL 按“真实缓存 → 有效真实快照 → 未超过最大陈旧时间的过期真实快照 → 唯一 `demo-content-v1` → `303004`”选择结果，且不得在页面请求中调用 NetStart。每天一次的同步 SHALL 按“NetStart → 标准化 → 更新真实快照 → 清掉旧缓存或写入新的真实缓存”执行。固定 Demo 直接返回且不进入缓存。Provider 超时、限流、网络失败、可重试服务端失败或字段校验失败 MUST 不改变页面读取顺序；缓存、快照和 Demo 仍使用既有内容基线的 TTL、最大陈旧时间及来源封套规则。
 
 #### Scenario: Provider 调用超时
 - **GIVEN** 每日同步中的 NetStart 在规定连接或读取时限内未返回
@@ -118,4 +118,3 @@
 - **THEN** `sourceType=LIVE`、`isExpired=false`、`degraded=false` 时显示“来源：{source}”和更新时间；`isExpired=true` 时显示“数据已过期，仅供参考”
 - **AND** `degraded=true` 时显示“当前为降级数据”，并按 `fallbackType=MOCK|CACHE|SNAPSHOT` 分别显示“演示数据”“缓存数据”“历史快照”
 - **AND** `source` 缺失、无法识别或未通过运行时校验时显示“来源尚未验证”，且该状态与过期、降级状态分别判断并可同时展示
-
