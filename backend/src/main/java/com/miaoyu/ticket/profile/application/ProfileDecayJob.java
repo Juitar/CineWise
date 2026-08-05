@@ -12,10 +12,13 @@ import java.util.List;
 public class ProfileDecayJob {
   private static final int BATCH_SIZE = 100;
   private final ProfileTagRepository tagRepository;
+  private final ProfileSummaryCache summaryCache;
   private final Clock clock;
 
-  public ProfileDecayJob(ProfileTagRepository tagRepository, Clock clock) {
+  public ProfileDecayJob(
+      ProfileTagRepository tagRepository, ProfileSummaryCache summaryCache, Clock clock) {
     this.tagRepository = tagRepository;
+    this.summaryCache = summaryCache;
     this.clock = clock;
   }
 
@@ -45,6 +48,8 @@ public class ProfileDecayJob {
           expired ? ProfileTagStatus.EXPIRED : ProfileTagStatus.ACTIVE,
           tag.expiresAt(),
           nowUtc)) {
+        // 偏好版本不随衰减递增，必须主动删除该用户全部版本摘要，避免继续读到旧权重。
+        summaryCache.invalidateUser(tag.userId());
         changed++;
       }
     }

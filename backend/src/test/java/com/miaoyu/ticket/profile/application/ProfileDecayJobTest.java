@@ -22,22 +22,37 @@ class ProfileDecayJobTest {
   @Test
   void shouldDecayThirtyDayOldBehaviorTagWithVersionCondition() {
     RecordingRepository repository = new RecordingRepository(snapshot(31, 59, "0.800"));
-    ProfileDecayJob job = new ProfileDecayJob(repository, Clock.fixed(NOW, ZoneOffset.UTC));
+    RecordingCache cache = new RecordingCache();
+    ProfileDecayJob job = new ProfileDecayJob(repository, cache, Clock.fixed(NOW, ZoneOffset.UTC));
 
     assertThat(job.executeOnce()).isEqualTo(1);
     assertThat(repository.updatedWeight).isEqualByComparingTo("0.680");
     assertThat(repository.updatedStatus).isEqualTo(ProfileTagStatus.ACTIVE);
     assertThat(repository.expectedVersion).isEqualTo(7L);
+    assertThat(cache.invalidatedUserIds).containsExactly(12L);
   }
 
   @Test
   void shouldExpireAtOriginalBehaviorDeadlineAfterPriorDecayUpdatedTime() {
     // 已在第 60 天衰减过，所以 update_time 只有 30 天；仍必须在原行为的第 90 天过期。
     RecordingRepository repository = new RecordingRepository(snapshot(30, 0, "0.680"));
-    ProfileDecayJob job = new ProfileDecayJob(repository, Clock.fixed(NOW, ZoneOffset.UTC));
+    RecordingCache cache = new RecordingCache();
+    ProfileDecayJob job = new ProfileDecayJob(repository, cache, Clock.fixed(NOW, ZoneOffset.UTC));
 
     assertThat(job.executeOnce()).isEqualTo(1);
     assertThat(repository.updatedStatus).isEqualTo(ProfileTagStatus.EXPIRED);
+    assertThat(cache.invalidatedUserIds).containsExactly(12L);
+  }
+
+  @Test
+  void shouldKeepCacheWhenVersionConditionRejectsStaleDecayTask() {
+    RecordingRepository repository = new RecordingRepository(snapshot(31, 59, "0.800"));
+    repository.updateResult = false;
+    RecordingCache cache = new RecordingCache();
+    ProfileDecayJob job = new ProfileDecayJob(repository, cache, Clock.fixed(NOW, ZoneOffset.UTC));
+
+    assertThat(job.executeOnce()).isZero();
+    assertThat(cache.invalidatedUserIds).isEmpty();
   }
 
   private static ProfileTagRepository.Snapshot snapshot(
@@ -62,6 +77,7 @@ class ProfileDecayJobTest {
     private BigDecimal updatedWeight;
     private ProfileTagStatus updatedStatus;
     private long expectedVersion;
+    private boolean updateResult = true;
 
     private RecordingRepository(Snapshot dueTag) {
       this.dueTag = dueTag;
@@ -108,12 +124,31 @@ class ProfileDecayJobTest {
       updatedWeight = weight;
       updatedStatus = status;
       expectedVersion = expected;
-      return true;
+      return updateResult;
     }
 
     @Override
     public List<Snapshot> findBehaviorTagsDueBefore(LocalDateTime before, int limit) {
       return List.of(dueTag);
+    }
+  }
+
+  private static final class RecordingCache implements ProfileSummaryCache {
+    private final java.util.ArrayList<Long> invalidatedUserIds = new java.util.ArrayList<>();
+
+    @Override
+    public Optional<ProfileSummary> find(long userId, long version) {
+      return Optional.empty();
+    }
+
+    @Override
+    public void put(long userId, long version, ProfileSummary summary) {
+      // 本测试只验证衰减后的失效调用，不需要模拟缓存写入。
+    }
+
+    @Override
+    public void invalidateUser(long userId) {
+      invalidatedUserIds.add(userId);
     }
   }
 }
