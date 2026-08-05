@@ -1,0 +1,163 @@
+.order-confirm-loading,
+.order-confirm-error,
+.order-confirm-result-unknown {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 48px 16px;
+  min-height: 200px;
+}
+
+.order-confirm-error-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.order-confirm-btn {
+  min-width: 160px;
+}
+
+.order-confirm-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.order-confirm-card {
+  background: var(--color-bg-container, #fff);
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 4%);
+}
+
+.order-confirm-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-base, #1f2937);
+  margin-bottom: 24px;
+  margin-top: 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border-secondary, #f0f0f0);
+}
+
+.order-confirm-details {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.order-confirm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.order-confirm-label {
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 14px;
+  width: 80px;
+}
+
+.order-confirm-value {
+  color: var(--color-text-base, #1f2937);
+  font-size: 14px;
+  font-weight: 500;
+  flex: 1;
+  text-align: right;
+}
+
+.order-confirm-footer {
+  background: var(--color-bg-container, #fff);
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 4%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 24px;
+}
+
+.order-confirm-total {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.order-confirm-total-label {
+  font-size: 14px;
+  color: var(--color-text-base, #1f2937);
+}
+
+.order-confirm-total-amount {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--color-error, #ff4d4f);
+}
+
+.order-confirm-currency {
+  font-size: 16px;
+  margin-right: 4px;
+}
+
+.order-confirm-actions {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.order-confirm-cancel-btn {
+  min-width: 120px;
+}
+
+.order-confirm-submit-btn {
+  min-width: 160px;
+}
+
+/* 响应式：移动端适配 */
+@media (max-width: 1023px) {
+  .order-confirm-container {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .order-confirm-card {
+    padding: 16px;
+  }
+
+  .order-confirm-title {
+    font-size: 16px;
+    margin-bottom: 16px;
+  }
+
+  .order-confirm-footer {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .order-confirm-actions {
+    flex-direction: row;
+    width: 100%;
+  }
+
+  .order-confirm-cancel-btn {
+    flex: 1;
+    min-width: auto;
+    min-height: 44px;
+  }
+
+  .order-confirm-submit-btn {
+    flex: 2;
+    min-width: auto;
+    min-height: 44px;
+  }
+
+  .order-confirm-btn {
+    min-height: 44px;
+  }
+}
