@@ -50,6 +50,16 @@ MinIO 仍是可选能力。Compose 将四个 MinIO 变量透传给后端，为�
 
 PR 的 `Frontend Verify` 与合入 `dev` 后的部署质量门都额外构建并运行真实生产镜像，通过同网络的后端 stub 验证 `/api/**` 代理标记，并使用 Playwright 检查嵌套路由、缺失资源 404、入口资源 MIME 和浏览器启动。该测试与现有 `pnpm dev` E2E 并存，专门覆盖开发服务器无法暴露的生产 Nginx 行为。
 
+### 10. 一份 Compose 与两份无密钥环境模板
+
+本地与服务器均运行同一组应用服务：frontend 与 backend；MySQL、Redis 与可选 MinIO 都属于独立基础服务 ECS。因此不复制 Dockerfile、健康检查、网络或完整 Compose 服务定义，避免两份编排长期漂移。
+
+公共 `compose.yaml` 显式传递 backend 已使用且由部署环境决定的变量：共享基础服务连接、MinIO、认证 Cookie/演示种子、票务时限和内容同步开关。真实值仍只保存在 Git 忽略的 `.env`；Compose 不使用 `env_file` 无差别注入所有值，避免把未被 backend 使用的 root 或运维凭据扩大到容器内。
+
+`.env.local.example` 仅给出本机 Docker Desktop 经 SSH 隧道访问云端基础服务的端口与安全默认值；实际开发者复制为本机 `.env`。`.env.server.example` 仅给出应用 ECS 直连基础服务 ECS 的占位地址与发布安全默认值；部署人员复制为服务器 `/opt/cinewise/.env`。两份模板均不包含真实地址、密码、JWT、MinIO Key 或 SSH 私钥。
+
+HTTP IP 演示入口必须在服务器 `.env` 设置 `AUTH_COOKIE_SECURE=false`，否则浏览器不会保存 Secure Cookie；迁移到 HTTPS 域名后改为 `true`。本地浏览器统一访问 `http://localhost:8000`，避免与 `127.0.0.1` 形成不同 Origin。
+
 ## Risks / Trade-offs
 
 - 服务器构建依赖网络和 Docker 缓存：首次部署较慢；通过 Compose 构建缓存降低后续耗时。
