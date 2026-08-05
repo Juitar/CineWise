@@ -40,7 +40,7 @@
 
 ### 6. SMTP Adapter 只通过配置启用
 
-邮件端口返回 `SENT/FAILED/UNKNOWN`。SMTP Adapter 使用 Spring Boot Mail 的 `JavaMailSender` 发送纯文本认证模板，主题和正文固定，不接受前端模板；地址、认证和超时由 `spring.mail.*` 环境配置提供。未启用 SMTP 时使用失败关闭 Adapter，接口返回 `301001`。代码和测试不打印验证码。
+邮件端口返回 `SENT/FAILED/UNKNOWN`。SMTP Adapter 使用 Spring Boot Mail 的 `JavaMailSender` 发送纯文本认证模板，主题和正文固定，不接受前端模板；地址、认证、SSL/STARTTLS、启动连接检查和超时由 `spring.mail.*` 环境配置提供。465 SMTPS 使用 `SMTP_SSL_ENABLED=true` 并关闭 STARTTLS；587 STARTTLS 使用 `SMTP_STARTTLS_ENABLED=true`。未启用 SMTP 时使用失败关闭 Adapter，接口返回 `301001`。代码和测试不打印验证码。
 
 ### 7. V011 只负责结构和前向 CHECK
 

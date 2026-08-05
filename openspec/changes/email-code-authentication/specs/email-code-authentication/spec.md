@@ -99,6 +99,11 @@
 - **WHEN** 邮件提交超时或连接中断，无法判断 Provider 是否已受理
 - **THEN** 系统保留验证码和冷却窗口、返回 HTTP 503 和 `301001`，不自动重发
 
+#### Scenario: 使用 465 端口 SSL 邮件服务
+
+- **WHEN** 部署配置 `SMTP_SSL_ENABLED=true`、`SMTP_STARTTLS_ENABLED=false` 和 `SMTP_PORT=465`
+- **THEN** 后端把 SSL、STARTTLS 和启动连接检查变量绑定到 Spring Mail，不要求把真实邮箱账号或授权码写入代码
+
 ### Requirement: 注册请求必须通过服务端规则校验
 
 系统 SHALL 通过 `POST /api/v1/auth/register` 接收 `clientRequestId/email/code/inviteCode/password/privacyPolicyVersion/privacyAccepted` 和可选 `nickname`。密码 SHALL 为 8～20 位且同时包含字母和数字；`privacyAccepted` SHALL 显式为 `true`，隐私政策版本 SHALL 与服务端当前版本完全相等；昵称去除首尾空白后 SHALL 不超过 64 个字符。
