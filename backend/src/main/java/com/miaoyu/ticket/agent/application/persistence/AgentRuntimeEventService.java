@@ -56,11 +56,12 @@ public class AgentRuntimeEventService {
             eventRepository.insertCursor(created);
             return eventRepository.findCursorForUpdate(session.sessionId()).orElseThrow();
         });
+        LocalDateTime eventTime = now.isAfter(cursor.updateTime()) ? now : cursor.updateTime();
         AgentRuntimeEvent event = eventRepository.append(new AgentRuntimeEventDraft(session.sessionId(), run.runId(),
-                type, payload, run.expireAt(), now));
+                type, payload, run.expireAt(), eventTime));
         Long firstRetained = cursor.firstRetainedEventId() == null ? event.eventId() : cursor.firstRetainedEventId();
         AgentEventStreamCursor next = new AgentEventStreamCursor(session.sessionId(), event.eventId(), firstRetained,
-                cursor.version() + 1, cursorExpireAt, cursor.createTime(), now);
+                cursor.version() + 1, cursorExpireAt, cursor.createTime(), eventTime);
         if (!eventRepository.updateCursor(next, cursor.version())) {
             throw new IllegalStateException("Agent 事件游标已由其他事务更新");
         }

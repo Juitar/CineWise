@@ -1,6 +1,7 @@
 {
   "code": 0,
   "message": "success",
+  "traceId": "1234567890abcdef1234567890abcdef",
   "data": {
     "runId": "run-example-1",
     "sessionId": "session-example-1",
@@ -8,8 +9,39 @@
     "planId": "plan-example-1",
     "planVersion": 1,
     "lastEventId": "42",
-    "messages": [],
-    "steps": [],
-    "events": []
+    "messages": [
+      {
+        "messageId": "message-example-1",
+        "role": "ASSISTANT",
+        "type": "MOVIE_CARD",
+        "text": "已生成推荐卡片",
+        "completedAt": "2026-08-05T10:00:02+08:00"
+      }
+    ],
+    "steps": [
+      {
+        "nodeId": "rank-movie",
+        "nodeType": "CALL_TOOL",
+        "status": "SUCCESS",
+        "attemptCount": 1,
+        "autoSkipped": false,
+        "recoveryHint": null
+      }
+    ],
+    "events": [
+      {
+        "eventId": "42",
+        "sessionId": "session-example-1",
+        "runId": "run-example-1",
+        "planVersion": 1,
+        "nodeId": null,
+        "eventType": "card",
+        "displayText": "已生成推荐卡片",
+        "payload": {
+          "messageType": "MOVIE_CARD"
+        },
+        "occurredAt": "2026-08-05T10:00:02+08:00"
+      }
+    ]
   }
 }

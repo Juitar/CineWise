@@ -16,6 +16,7 @@ import com.miaoyu.ticket.agent.domain.persistence.AgentRequestHash;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEvent;
+import com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEventDraft;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSessionStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
@@ -78,5 +79,37 @@ class AgentRuntimeEventServiceTest {
         ArgumentCaptor<AgentEventStreamCursor> cursorCaptor = ArgumentCaptor.forClass(AgentEventStreamCursor.class);
         Mockito.verify(eventRepository).insertCursor(cursorCaptor.capture());
         assertThat(cursorCaptor.getValue().expireAt()).isEqualTo(run.expireAt());
+    }
+
+    @Test
+    void shouldNotMoveCursorTimeBackwardWhenConcurrentRequestOwnsAnEarlierRunTime() {
+        LocalDateTime runTime = LocalDateTime.of(2026, 8, 5, 10, 0);
+        LocalDateTime cursorTime = runTime.plusNanos(1_000_000);
+        AgentSessionRepository sessionRepository = Mockito.mock(AgentSessionRepository.class);
+        AgentRuntimeEventRepository eventRepository = Mockito.mock(AgentRuntimeEventRepository.class);
+        AgentRuntimeEventService service = new AgentRuntimeEventService(
+                sessionRepository, eventRepository, new ObjectMapper());
+        AgentSession session = new AgentSession(1L, "session-1", 9L, null, AgentSessionStatus.ACTIVE, 2L,
+                0L, runTime.minusDays(1), cursorTime, runTime.plusDays(30));
+        AgentRun run = new AgentRun(2L, "run-1", 1L, 9L, "request-1", new AgentRequestHash("v1",
+                "0".repeat(64)), null, null, AgentRunStatus.RUNNING, "trace", runTime, null, 0L,
+                runTime, runTime, runTime.plusDays(30));
+        AgentEventStreamCursor cursor = new AgentEventStreamCursor("session-1", 8L, 4L, 2L,
+                runTime.plusDays(30), runTime, cursorTime);
+        AgentRuntimeEvent event = new AgentRuntimeEvent(9L, "session-1", "run-1", AgentEventType.MESSAGE_START,
+                new AgentStoredJson("{\"phase\":\"accepted\"}"), runTime.plusDays(30), cursorTime);
+        when(sessionRepository.findBySessionIdAndUserIdForUpdate("session-1", 9L)).thenReturn(Optional.of(session));
+        when(eventRepository.findCursorForUpdate("session-1")).thenReturn(Optional.of(cursor));
+        when(eventRepository.append(any())).thenReturn(event);
+        when(eventRepository.updateCursor(any(), Mockito.eq(2L))).thenReturn(true);
+
+        service.append(session, run, AgentEventType.MESSAGE_START, new AgentStoredJson("{\"phase\":\"accepted\"}"));
+
+        ArgumentCaptor<AgentRuntimeEventDraft> draftCaptor = ArgumentCaptor.forClass(AgentRuntimeEventDraft.class);
+        ArgumentCaptor<AgentEventStreamCursor> cursorCaptor = ArgumentCaptor.forClass(AgentEventStreamCursor.class);
+        Mockito.verify(eventRepository).append(draftCaptor.capture());
+        Mockito.verify(eventRepository).updateCursor(cursorCaptor.capture(), Mockito.eq(2L));
+        assertThat(draftCaptor.getValue().createTime()).isEqualTo(cursorTime);
+        assertThat(cursorCaptor.getValue().updateTime()).isEqualTo(cursorTime);
     }
 }

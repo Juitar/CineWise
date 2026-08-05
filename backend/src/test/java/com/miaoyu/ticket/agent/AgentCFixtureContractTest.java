@@ -32,6 +32,19 @@ class AgentCFixtureContractTest {
         }
     }
 
+    @Test
+    void shouldKeepRunRecoveryFixtureCompatibleWithTheSharedResultEnvelope() throws Exception {
+        JsonNode fixture = fixture("run-completed.json");
+
+        assertThat(fixture.path("code").asInt()).isZero();
+        assertThat(fixture.path("message").isTextual()).isTrue();
+        assertThat(fixture.path("traceId").isTextual()).isTrue();
+        assertThat(fixture.path("data").path("lastEventId").isTextual()).isTrue();
+        assertThat(fixture.path("data").path("messages").isArray()).isTrue();
+        assertThat(fixture.path("data").path("steps").isArray()).isTrue();
+        assertThat(fixture.path("data").path("events").isArray()).isTrue();
+    }
+
     private JsonNode fixture(String fixtureName) throws Exception {
         try (InputStream input = getClass().getResourceAsStream("/fixtures/agent/c/" + fixtureName)) {
             assertThat(input).as("夹具必须存在: %s", fixtureName).isNotNull();

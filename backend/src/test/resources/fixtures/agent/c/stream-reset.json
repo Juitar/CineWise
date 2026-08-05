@@ -1,5 +1,5 @@
 {
-  "eventId": "42",
+  "eventId": "43",
   "sessionId": "session-example-1",
   "runId": "run-example-1",
   "planVersion": null,
@@ -7,7 +7,7 @@
   "eventType": "stream.reset",
   "displayText": "已清理的事件不可续传",
   "payload": {
-    "watermark": "42"
+    "watermark": "43"
   },
   "occurredAt": null
 }
