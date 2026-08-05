@@ -29,6 +29,7 @@ class NetStartEnvironmentBindingTest {
         // 测试上下文会加载仓库真实 application.yml；不手写 NetStart 或虚拟线程的 YAML 默认值。
         assertThat(properties.enabled()).isTrue();
         assertThat(properties.syncOnStartup()).isTrue();
+        assertThat(properties.baseUrl()).isEqualTo("http://203.0.113.1");
         // 若环境变量再次误放到 spring.threads.virtual，下列断言会直接失败。
         assertThat(environment.getProperty("spring.threads.virtual.enabled")).isEqualTo("false");
     }
@@ -41,7 +42,8 @@ class NetStartEnvironmentBindingTest {
             context.getEnvironment().getPropertySources().addFirst(
                     new SystemEnvironmentPropertySource("test-netstart-environment", Map.of(
                             "CINEWISE_CONTENT_NETSTART_ENABLED", "true",
-                            "CINEWISE_CONTENT_NETSTART_SYNC_ON_STARTUP", "true")));
+                            "CINEWISE_CONTENT_NETSTART_SYNC_ON_STARTUP", "true",
+                            "CINEWISE_CONTENT_NETSTART_BASE_URL", "http://203.0.113.1")));
         }
     }
 }

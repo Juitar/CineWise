@@ -46,11 +46,20 @@ final class NetStartContentMapper {
     }
 
     private Optional<ContentItem> mapMovie(JsonNode raw) {
-        // 影片详情接口把字段放在 detailMovie；测试夹具可直接传该对象，避免原始结构扩散到业务层。
-        JsonNode movie = raw.path("detailMovie").isObject() ? raw.path("detailMovie") : raw;
+        // 旧接口使用 detailMovie；当前页面详情接口使用 movie。两种响应都只取最低基础字段，
+        // 不能因包装层调整把本来合格的影片误判为字段缺失，也不能把整份页面响应向上透传。
+        JsonNode movie = movieNode(raw);
         return text(movie, "id").flatMap(id -> text(movie, "nm").flatMap(title -> text(movie, "cat")
                 .flatMap(genres -> positiveInt(movie, "dur").flatMap(duration -> decimal(movie, "sc")
                         .map(rating -> new MovieContent(id, title, genresJson(genres), duration, rating))))));
+    }
+
+    /** 详情字段不存在时保留直接对象兼容，方便受控夹具只描述影片本身而不复制页面外层结构。 */
+    private JsonNode movieNode(JsonNode raw) {
+        if (raw.path("detailMovie").isObject()) {
+            return raw.path("detailMovie");
+        }
+        return raw.path("movie").isObject() ? raw.path("movie") : raw;
     }
 
     private Optional<ContentItem> mapCinema(JsonNode raw, String cityCode) {

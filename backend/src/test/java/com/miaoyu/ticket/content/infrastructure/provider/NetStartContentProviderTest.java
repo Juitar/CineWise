@@ -46,6 +46,21 @@ class NetStartContentProviderTest {
     }
 
     @Test
+    void givenCurrentMovieWrapper_whenNormalize_thenItKeepsTheSameMovieFields() throws Exception {
+        NetStartContentProvider provider = provider(query -> json("""
+                {"movie":{"id":1525001,"nm":"测试影片","cat":"剧情,喜剧","dur":"118分钟","sc":"9.6",
+                "comments":{"content":"不应保存"},"showInfo":"不应保存"}}"""));
+
+        ContentResult<List<? extends ContentItem>> result = provider.query(movieDetail()).orElseThrow();
+
+        MovieContent movie = (MovieContent) result.data().getFirst();
+        // 当前页面详情把最低字段放入 movie；评论和场次说明仍不得进入内容模型。
+        assertThat(movie.sourceMovieId()).isEqualTo("1525001");
+        assertThat(movie.genresJson()).isEqualTo("[\"剧情\",\"喜剧\"]");
+        assertThat(movie.durationMinutes()).isEqualTo(118);
+    }
+
+    @Test
     void givenHotListWithoutGenresAndDuration_whenQuery_thenItIsRejectedInsteadOfPretendingToBeComplete()
             throws Exception {
         NetStartContentProvider provider = provider(query -> json("""
@@ -133,6 +148,21 @@ class NetStartContentProviderTest {
         assertThat(batch.attemptedCount()).isEqualTo(10);
         assertThat(batch.outcome())
                 .isEqualTo(com.miaoyu.ticket.content.application.LiveContentSyncPort.Outcome.SUCCESS);
+    }
+
+    @Test
+    void givenDailySyncHotListConnectionFailure_whenSynchronize_thenItCountsOneFailedContentItem() {
+        NetStartContentProvider provider = provider(query -> {
+            throw new ResourceAccessException("offline");
+        });
+
+        var batch = provider.fetchForDailySync();
+
+        // 目录请求失败也必须进入内容项统计，才能让 ContentSyncService 写出 V004 要求的 FAILED 状态。
+        assertThat(batch.contents()).isEmpty();
+        assertThat(batch.attemptedCount()).isEqualTo(1);
+        assertThat(batch.outcome())
+                .isEqualTo(com.miaoyu.ticket.content.application.LiveContentSyncPort.Outcome.CONNECTION_FAILED);
     }
 
     @Test
