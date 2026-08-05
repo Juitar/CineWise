@@ -241,6 +241,11 @@ class AgentConfirmationServiceTest {
         }
 
         @Override
+        public void insert(AgentConfirmationAction action) {
+            actions.put(action.actionId(), action);
+        }
+
+        @Override
         public boolean compareAndSet(
                 String actionId,
                 long expectedVersion,
