@@ -17,7 +17,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
@@ -150,6 +152,36 @@ class ContentQueryServiceTest {
     }
 
     @Test
+    void givenMultipleMovieIds_whenFindingSummaries_thenItReadsTheCatalogOnce() {
+        AtomicInteger cacheFindCount = new AtomicInteger();
+        ContentResult<List<? extends ContentItem>> catalog = new ContentResult<>(List.of(
+                new MovieContent(101L, "movie-101", "影片甲", "[\"剧情\"]", 100, new BigDecimal("8.0")),
+                new MovieContent(102L, "movie-102", "影片乙", "[\"动作\"]", 110, new BigDecimal("8.5"))),
+                new ContentSource("TEST", ContentSourceType.LIVE), NOW, NOW.plusHours(1), false, false, null);
+        ContentCachePort cache = new ContentCachePort() {
+            @Override
+            public Optional<ContentResult<List<? extends ContentItem>>> find(ContentQuery query) {
+                cacheFindCount.incrementAndGet();
+                assertThat(query.resourceType()).isEqualTo(ContentResourceType.MOVIE);
+                assertThat(query.contentId()).isNull();
+                return Optional.of(catalog);
+            }
+
+            @Override
+            public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) { }
+        };
+        ContentQueryService service = new ContentQueryService(cache, emptySnapshot(), query -> Optional.empty(),
+                new ContentProperties(Duration.ofHours(6), Duration.ofHours(6), Duration.ofDays(7)), CLOCK);
+
+        Map<Long, ContentPurchaseQueryPort.MovieSummary> summaries =
+                service.findMovieSummaries(Set.of(102L, 101L, 999L));
+
+        assertThat(cacheFindCount).hasValue(1);
+        assertThat(summaries).containsOnlyKeys(101L, 102L);
+        assertThat(summaries.get(101L).title()).isEqualTo("影片甲");
+    }
+
+    @Test
     void givenMissingOrInvalidLocator_whenCreatingQuery_thenItRejectsBeforeAnyProviderAccess() {
         // 无定位条件和非正业务 ID 都必须在 Application 边界失败，避免生成无意义的缓存或快照键。
         assertThatThrownBy(() -> new ContentQuery(ContentResourceType.CINEMA, null, " ", ""))
@@ -178,6 +210,18 @@ class ContentQueryServiceTest {
         ContentProvider demo = query -> demoResult;
         return new ContentQueryService(cache, snapshot, demo,
                 new ContentProperties(Duration.ofHours(6), Duration.ofHours(6), Duration.ofDays(7)), CLOCK);
+    }
+
+    private ContentSnapshotPort emptySnapshot() {
+        return new ContentSnapshotPort() {
+            @Override
+            public Optional<ContentResult<List<? extends ContentItem>>> findLatest(ContentQuery query) {
+                return Optional.empty();
+            }
+
+            @Override
+            public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) { }
+        };
     }
 
     private ContentResult<List<? extends ContentItem>> result(LocalDateTime expiresAt, boolean expired,

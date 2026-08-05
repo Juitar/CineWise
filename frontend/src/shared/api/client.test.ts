@@ -143,6 +143,48 @@ describe('apiRequest', () => {
     });
   });
 
+  it('连续写请求在收到响应后重新获取服务端更新的 CSRF Token', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        createApiResponse({
+          code: 0,
+          message: 'success',
+          data: { token: 'csrf-first', headerName: 'X-XSRF-TOKEN' },
+          traceId: 'trace-csrf-first',
+        }),
+      )
+      .mockResolvedValueOnce(
+        createApiResponse({ code: 0, message: 'success', data: {}, traceId: 'trace-write-first' }),
+      )
+      .mockResolvedValueOnce(
+        createApiResponse({
+          code: 0,
+          message: 'success',
+          data: { token: 'csrf-second', headerName: 'X-XSRF-TOKEN' },
+          traceId: 'trace-csrf-second',
+        }),
+      )
+      .mockResolvedValueOnce(
+        createApiResponse({ code: 0, message: 'success', data: {}, traceId: 'trace-write-second' }),
+      );
+
+    await apiRequest('/api/v1/orders', { method: 'POST' });
+    await apiRequest('/api/v1/orders/1/payments', { method: 'POST' });
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/v1/auth/csrf',
+      '/api/v1/orders',
+      '/api/v1/auth/csrf',
+      '/api/v1/orders/1/payments',
+    ]);
+    expect(new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get('X-XSRF-TOKEN')).toBe(
+      'csrf-first',
+    );
+    expect(new Headers(fetchMock.mock.calls[3]?.[1]?.headers).get('X-XSRF-TOKEN')).toBe(
+      'csrf-second',
+    );
+  });
+
   it('收到 201009 后换新 CSRF Token，但不自动重放原写请求', async () => {
     fetchMock
       .mockResolvedValueOnce(

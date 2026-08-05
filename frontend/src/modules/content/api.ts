@@ -1,11 +1,17 @@
 import { apiRequest } from '../../shared/api/client';
 import type {
   CinemaListQuery,
+  CinemaDetail,
   CinemaSummary,
   ContentPageResponse,
   MovieListQuery,
   MovieSummary,
 } from '../../shared/types/api';
+
+/** 查询公开影院详情；来源和更新时间由详情响应自身决定。 */
+export function queryCinemaDetail(cinemaId: string, signal?: AbortSignal): Promise<CinemaDetail> {
+  return apiRequest<CinemaDetail>(`/api/v1/cinemas/${encodeURIComponent(cinemaId)}`, { signal });
+}
 
 /**
  * 查询公开影院列表。

@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.ticketing.infrastructure.persistence;
 
 import com.miaoyu.ticket.ticketing.application.AvailableDateQueryRepository;
+import com.miaoyu.ticket.ticketing.application.AvailableMovieQueryRepository;
 import com.miaoyu.ticket.ticketing.application.ShowQueryRepository;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
@@ -10,6 +11,26 @@ import org.apache.ibatis.annotations.Select;
 /** 场次和座位快照的显式只读 SQL，查询范围与排序均在数据库侧固定。 */
 @Mapper
 public interface TicketingQueryMapper {
+
+    /**
+     * 按影院聚合未来可售影片。来源只描述排期；混合来源时固定返回 MIXED，避免把聚合结果误标为 Demo。
+     */
+    @Select("""
+            SELECT ms.movie_id,
+                   COUNT(*) AS show_count,
+                   MIN(ms.start_time) AS nearest_start_time,
+                   CASE WHEN COUNT(DISTINCT ms.source) = 1 THEN MIN(ms.source) ELSE 'MIXED' END AS data_source,
+                   MAX(ms.update_time) AS data_time
+              FROM movie_show ms
+             WHERE ms.cinema_id = #{criteria.cinemaId}
+               AND ms.status = 'ON_SALE'
+               AND ms.start_time > #{criteria.startsAfter}
+               AND ms.start_time < #{criteria.startsBefore}
+             GROUP BY ms.movie_id
+             ORDER BY nearest_start_time, ms.movie_id
+            """)
+    List<AvailableMovieQueryRow> findAvailableMovies(
+            @Param("criteria") AvailableMovieQueryRepository.QueryCriteria criteria);
 
     /**
      * 日期数量只按场次事实聚合，不连接座位表；售罄展示语义继续由具体场次查询负责。

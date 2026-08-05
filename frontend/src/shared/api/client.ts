@@ -213,6 +213,10 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
       method,
       signal: controller.signal,
     });
+    // 服务端会在写请求后更新 HttpOnly CSRF Cookie；内存中的旧 Token 不能用于下一次写请求。
+    if (isWriteRequest) {
+      clearCsrfToken();
+    }
     const result = await readApiResult(response);
 
     if (response.status === 401 && handleUnauthorized) {
@@ -248,6 +252,9 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
 
     return result.data as T;
   } catch (error) {
+    if (isWriteRequest && !(error instanceof ApiError)) {
+      clearCsrfToken();
+    }
     if (error instanceof ApiError) {
       throw error;
     }

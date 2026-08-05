@@ -1,6 +1,6 @@
 import { Alert, Button, Empty, Input, Pagination, Skeleton } from 'antd';
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'umi';
+import { Link, useSearchParams } from 'umi';
 
 import {
   buildCinemaListSearchParams,
@@ -20,28 +20,33 @@ function displayText(value: string | null, fallback: string): string {
   return normalized ? normalized : fallback;
 }
 
-/** 渲染后端影院摘要；详情页尚未实现，本期卡片不伪造可点击入口。 */
+/** 渲染后端影院摘要，并使用真实业务 ID 进入公开详情页。 */
 function CinemaCard({ cinema }: { cinema: CinemaSummary }) {
   const area = displayText(cinema.area, '区域待更新');
   const address = displayText(cinema.address, '地址待更新');
   const logoText = cinema.name.trim().slice(0, 1) || '影';
 
   return (
-    <article className="cinema-list-item" data-testid={`cinema-${cinema.cinemaId}`}>
-      <div className="cinema-list-logo" aria-hidden="true">
-        {logoText}
-      </div>
-      <div className="cinema-list-center">
-        <h2 className="cinema-list-title">{cinema.name}</h2>
-        <div className="cinema-list-meta">
-          <span className="cinema-list-area">{area}</span>
-          <span className="cinema-list-city">城市代码 {cinema.cityCode ?? '待更新'}</span>
+    <article data-testid={`cinema-${cinema.cinemaId}`}>
+      <Link className="cinema-list-item" to={`/cinemas/${encodeURIComponent(cinema.cinemaId)}`}>
+        <div className="cinema-list-logo" aria-hidden="true">
+          {logoText}
         </div>
-        <p className="cinema-list-address">
-          <span aria-hidden="true">📍</span>
-          {address}
-        </p>
-      </div>
+        <div className="cinema-list-center">
+          <h2 className="cinema-list-title">{cinema.name}</h2>
+          <div className="cinema-list-meta">
+            <span className="cinema-list-area">{area}</span>
+            <span className="cinema-list-city">城市代码 {cinema.cityCode ?? '待更新'}</span>
+          </div>
+          <p className="cinema-list-address">
+            <span aria-hidden="true">📍</span>
+            {address}
+          </p>
+        </div>
+        <span className="cinema-list-arrow" aria-hidden="true">
+          ›
+        </span>
+      </Link>
     </article>
   );
 }
