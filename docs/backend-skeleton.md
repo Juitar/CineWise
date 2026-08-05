@@ -75,6 +75,8 @@ docker compose up -d --build --wait
 
 `verify` 包含编译、单元/上下文测试、ArchUnit、Checkstyle、SpotBugs 和 JaCoCo 报告。本机 H2 测试只用于快速反馈；订单并发、MySQL 条件更新、Flyway 兼容、Redis 降级和容器冒烟必须在后续集成测试中使用真实组件。
 
+H2 `test` profile 的 Flyway 基线固定为 V009。V010 起允许使用 H2 不支持的 MySQL 8.4 DDL，但必须由 `Backend MySQL Integration` 在一次性空库中以 `latest` 执行首次 migrate、无 pending/失败历史检查和重复 migrate；画像及后续依赖 V010+ 表结构的 Repository/事务测试也必须进入 MySQL 集成集合。新增后续迁移时不得修改已执行 SQL，也不得逐版本复制 H2 专用迁移。
+
 ## 6. 固定演示种子
 
 固定种子与 Flyway 结构迁移分离，默认不执行。受控初始化时临时设置：

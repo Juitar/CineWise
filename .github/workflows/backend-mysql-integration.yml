@@ -6,12 +6,14 @@ on:
       - "backend/**"
       - ".github/workflows/backend-mysql-integration.yml"
       - "openspec/changes/ci-mysql-integration-verification/**"
+      - "openspec/changes/h2-mysql-migration-verification/**"
   push:
     branches: [main, dev]
     paths:
       - "backend/**"
       - ".github/workflows/backend-mysql-integration.yml"
       - "openspec/changes/ci-mysql-integration-verification/**"
+      - "openspec/changes/h2-mysql-migration-verification/**"
 
 permissions:
   contents: read
@@ -43,6 +45,7 @@ jobs:
       MYSQL_DATABASE: cinewise_ticketing_concurrency_check
       MYSQL_USER: cinewise_ci
       MYSQL_PASSWORD: cinewise-ci-only
+      SPRING_FLYWAY_TARGET: latest
       JWT_SECRET: cinewise-ci-jwt-secret-at-least-32-bytes-long
       AUTH_AUDIT_HASH_SECRET: cinewise-ci-audit-secret-at-least-32-bytes-long
       CINEWISE_MYSQL_IT: "true"
@@ -63,13 +66,24 @@ jobs:
           java-version: "21"
           cache: maven
           cache-dependency-path: backend/pom.xml
-      - name: Create Agent integration database
+      - name: Create migration and Agent integration databases
         env:
           MYSQL_PWD: root-ci-only
         run: >-
           mysql --protocol=tcp -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u root
-          -e "CREATE DATABASE cinewise_agent_it CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+          -e "CREATE DATABASE cinewise_migration_ci CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+          CREATE DATABASE cinewise_agent_it CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+          GRANT ALL PRIVILEGES ON cinewise_migration_ci.* TO 'cinewise_ci'@'%';
           GRANT ALL PRIVILEGES ON cinewise_agent_it.* TO 'cinewise_ci'@'%';"
+      - name: Verify latest Flyway migrations on empty MySQL
+        working-directory: backend
+        env:
+          MYSQL_DATABASE: cinewise_migration_ci
+          CINEWISE_MYSQL_MIGRATION_IT: "true"
+        run: >-
+          bash ./mvnw --batch-mode --no-transfer-progress
+          -Dtest=FlywayLatestMySqlIntegrationTest
+          test
       - name: Run MySQL 8.4 integration tests
         working-directory: backend
         run: >-
