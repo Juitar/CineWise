@@ -26,4 +26,5 @@
 - [x] 2.7 实现退票影响、退票写入、结果恢复与替代场次查询 Hook；传统页面省略 `actionId`，退款使用稳定 `clientRequestId` 和 `Idempotency-Key`，响应未知后只查询原退款。（Owner: A）
 - [x] 2.8 将 `/orders`、`/orders/:orderNo`、`/payments/:orderNo`、`/payments/:orderNo/result`、`/tickets/:ticketId`、`/orders/:orderNo/refund` 页面由集中 Mock 容器替换为真实 Hook 编排，保留加载、空、失败、离线只读和 RESULT_UNKNOWN 状态。（Owner: A）
 - [x] 2.9 增加 API 契约、明确失败、结果未知、稳定幂等会话、轮询终止和卸载清理测试；执行 `pnpm check`、OpenSpec strict 校验和 `git diff --check`。（Owner: A）
-- [ ] 2.10 C 在公共路由表注册第二批页面并配置 `RequireAuth`；A/C 在合规 Node 环境执行真实路由、认证回跳和交易闭环 E2E。（Owner: C、A）
+- [x] 2.10 C 已在公共路由表注册第二批页面并配置 `RequireAuth`；C 已补认证拦截与安全登录回跳 E2E。（Owner: C）
+- [ ] 2.11 A 补充第二批交易页面 E2E：订单列表/详情/取消、支付与 RESULT_UNKNOWN 读恢复、电子票、退票和替代场次回流；与 C 在合规 Node 环境运行完整闭环 E2E 并记录 PR 验证结果。（Owner: A、C）
