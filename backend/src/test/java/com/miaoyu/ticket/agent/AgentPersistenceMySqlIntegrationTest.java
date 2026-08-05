@@ -391,7 +391,8 @@ class AgentPersistenceMySqlIntegrationTest {
         assertThat(stored.writeIdentifiers()).isEqualTo(claimed.writeIdentifiers());
 
         assertThatThrownBy(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            actionRepository.insert(action("action-rollback"));
+            // 创建去重键包含 nodeId；使用独立节点确保真的进入插入和事务回滚分支。
+            actionRepository.insert(action("action-rollback", "confirm-order-rollback"));
             throw new IllegalStateException("test rollback");
         })).isInstanceOf(IllegalStateException.class);
         assertThat(actionRepository.findByActionId("action-rollback")).isEmpty();
@@ -487,9 +488,13 @@ class AgentPersistenceMySqlIntegrationTest {
     }
 
     private static AgentConfirmationAction action(String actionId) {
+        return action(actionId, "confirm-order");
+    }
+
+    private static AgentConfirmationAction action(String actionId, String nodeId) {
         LocalDateTime now = LocalDateTime.now().withNano(0);
         return AgentConfirmationAction.pending(9_708_300_001L + Math.abs(actionId.hashCode()), actionId, USER_ID,
-                FIRST_SESSION_ID, 9_708_200_001L, "agent-action-run", "agent-action-plan", 1, "confirm-order",
+                FIRST_SESSION_ID, 9_708_200_001L, "agent-action-run", "agent-action-plan", 1, nodeId,
                 new ConfirmedOrderCommand("createOrder", "70001", List.of("2", "4")), now.plusMinutes(5), now);
     }
 
