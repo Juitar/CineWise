@@ -36,4 +36,4 @@
 ## 6. MySQL CI 与交付检查
 
 - [x] 6.1 B/A：已在 `Backend MySQL Integration / mysql-integration` 的一次性 MySQL 8.4 `cinewise_agent_it` 执行空库 Flyway、重复启动、action 创建/查询/过期/重复确认/并发/CAS/未知恢复/回滚；运行 `31025050412`（第 151 次）通过。
-- [ ] 6.2 B：完成本地相关单元和 H2 集成测试、`backend/mvnw.cmd verify`、严格 OpenSpec 校验、`git diff --check`、状态和变更范围核对；验证：记录实际输出和未验证项。
+- [x] 6.2 B：完成本地相关单元和 H2 集成测试、`backend/mvnw.cmd verify`、严格 OpenSpec 校验、`git diff --check`、状态和变更范围核对；验证：本地 `verify` 通过，GitHub Actions Backend Verify `31025050850`（第 307 次）通过；未验证项已列为 A 授权 Port 和真实运行时 Command 来源。
