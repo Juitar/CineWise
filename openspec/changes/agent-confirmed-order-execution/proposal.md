@@ -11,7 +11,7 @@
 - 规定确认拒绝、过期、参数变化、计划版本变化、重复确认、运行结束、越权和业务数据失效时不得调用写工具。
 - 规定确认竞争、结果未知和断线恢复：同一 action 只能产生一个稳定幂等标识；超时、网络或 SSE 中断只按原标识查询，不自动重发建单。
 - A 已确认提供 `CreateOrderTool.execute(ToolContext, CreateOrderForAgentCommand)`；B 只经该类型化 Tool 调用，并提供公开 `AgentActionAuthorizationPort` 供 A 校验 action。A 的 Agent Tool 授权失败统一映射 `205004`。
-- `agent_action` 以 V013 为候选版本，但 A 尚未正式分配；完整 OpenSpec 必须先出现在远端并通过严格校验，随后由 A 静态审查 SQL。本 change 不自行新增或执行迁移。
+- `agent_action` 的迁移版本尚未正式分配。`origin/dev` 已有 V010，V011、V012 的归属、SQL 和发布顺序必须先由 C 明确并由 A 确认；只有随后由 A 正式分配 V013、静态审查字段后，B 才能提交 SQL 草案。本 change 当前不新增或执行迁移。
 
 ## Capabilities
 
@@ -28,6 +28,6 @@
 ## Impact
 
 - B：`agent` 的 domain、application、api、persistence 端口、SSE 事件、Mock/夹具和测试。
-- A：已确认建单 Tool、DTO、调用身份、稳定键、结果查询和结果未知语义；待 A 在远端 OpenSpec 可见后正式分配 V013、审查 SQL，并执行共享数据库验证。
-- C：确认卡和结果事件的前端展示、CSRF 请求行为与断线恢复消费；本 change 不实现前端。
-- 数据库：计划新增 B 拥有的 `agent_action`，但在 A 完成字段静态审查和版本分配前不得写 SQL 或执行迁移。涉及该表、CAS、唯一约束、并发确认和恢复时，必须在 GitHub Actions 的一次性 MySQL 8.4 `cinewise_agent_it` 中验证，H2 不替代该验证。
+- A：已确认建单 Tool、DTO、调用身份、稳定键、结果查询和结果未知语义；待 C 明确 V011/V012 后，正式分配 V013、审查 SQL，并安排共享数据库验证。
+- C：已确认确认卡和结果事件的前端展示、CSRF 请求行为与断线恢复消费；另待 C 明确 V011/V012 各自的正式归属、SQL 范围和发布顺序。本 change 不实现前端。
+- 数据库：计划新增 B 拥有的 `agent_action`，但在 C 确认 V011/V012 顺序、A 正式分配 V013 并完成字段静态审查前不得写 SQL 或执行迁移。涉及该表、CAS、唯一约束、并发确认和恢复时，必须在 GitHub Actions 的一次性 MySQL 8.4 `cinewise_agent_it` 中验证，H2 不替代该验证。

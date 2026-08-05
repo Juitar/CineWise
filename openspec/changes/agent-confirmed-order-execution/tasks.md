@@ -2,8 +2,9 @@
 
 - [x] 1.1 B：依据现有 Agent 运行、SSE、A 建单和 C 前端设计完成 proposal、spec、design、tasks 并严格校验；验证：`openspec validate agent-confirmed-order-execution --strict`。
 - [x] 1.2 A：确认 Agent 专用创建订单公开 Application API/类型化 Tool、DTO、调用身份、`actionId` 校验、稳定幂等键、结果查询、错误码、事务边界和结果未知语义；验证：A 书面确认与契约测试。
-- [ ] 1.3 A：候选 V013 的 `agent_action` 字段、索引、生命周期和 MySQL 验证要求已书面确认；待完整 OpenSpec 提交远端后由 A 正式分配 V013 并完成 SQL 静态审查。B 不得自行分配版本或写 SQL。
-- [ ] 1.4 C：确认确认 REST/SSE 的展示错误码映射、CSRF 和“结果确认中/已失效”消费语义；验证：C 的消费者确认。本 change 不实现前端。
+- [ ] 1.3 C：明确 V011、V012 各自 Owner、迁移文件名、字段范围、SQL 是否已写或进入远端、依赖关系和发布顺序，并确认与 `agent_action` 无字段或版本冲突；验证：C 的书面确认。
+- [ ] 1.4 A：在 1.3 完成且本 change OpenSpec 已推送远端、严格校验通过后，正式分配 V013，审查 `agent_action` 字段表、索引、CHECK、生命周期和 MySQL 验证要求；验证：A 的书面确认。B 不得自行分配版本或写 SQL。
+- [x] 1.5 C：确认确认 REST/SSE 的展示错误码映射、CSRF 和“结果确认中/已失效”消费语义；验证：C 的消费者确认。本 change 不实现前端。
 
 ## 2. B 自有领域模型与状态规则
 
@@ -16,6 +17,7 @@
 
 - [x] 3.1 B：定义 `AgentConfirmationActionRepository`、CAS Claim/完成保存端口和 `CreateOrderToolAdapter`、`ToolContext`、`ToolResult` 边界；验证：ArchUnit 或编译检查不依赖 A Controller/Entity/Mapper/Repository。
 - [x] 3.2 B：实现内存 action Repository、A 建单 Mock、成功/业务失败/结果未知夹具；验证：Mock 调用计数和安全字段扫描测试。
+- [x] 3.4 B：实现 C 已确认的公开 action 状态映射、确认卡 payload 和 `AgentActionResponse` DTO；验证：状态映射、payload 白名单、纯文本展示与 DTO 测试。
 - [ ] 3.3 B：实现确认应用服务的三段流程：短事务 Claim、事务外适配器、新短事务结果保存；验证：事务边界与适配器不在持久化事务内的集成测试。
 
 ## 4. 持久化与确认接口

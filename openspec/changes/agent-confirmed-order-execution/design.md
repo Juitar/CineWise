@@ -9,8 +9,8 @@
 **Goals:**
 
 - 让服务端根据已经校验的创建订单 Command 建立一次性 `AgentConfirmationAction`，绑定用户、session、run、plan、planVersion、节点/工具、参数摘要和有效期。
-- 用 `PENDING`、`REJECTED`、`CLAIMED`、`RESULT_UNKNOWN`、`SUCCEEDED`、`FAILED`、`EXPIRED` 状态表达动作生命周期，并以 CAS 限制不可逆转换。
-- 在短事务中完成归属、时效、运行/计划和参数摘要校验及 `PENDING → CLAIMED`；A 的写调用永远在事务外。
+- 用 `PENDING_CONFIRMATION`、`EXECUTING`、`RESULT_UNKNOWN`、`SUCCEEDED`、`FAILED`、`REJECTED`、`EXPIRED`、`INVALIDATED` 状态表达动作生命周期，并以 CAS 限制不可逆转换。
+- 在短事务中完成归属、时效、运行/计划和参数摘要校验及 `PENDING_CONFIRMATION → EXECUTING`；A 的写调用永远在事务外。
 - 对同一动作固定 `clientRequestId` 与 `idempotencyKey`，未知结果只按原键查询；失败、超时、断线、SSE 重连、重规划和重复点击均不生成新键或重发建单。
 - 提供安全 REST/SSE 投影：确认卡只有 `actionId`、计划版本、到期时间、展示信息与状态；不下发 Command、参数摘要、幂等键、认证信息、完整订单和异常栈。
 
@@ -46,17 +46,49 @@ RESULT_UNKNOWN --原键查询明确失败--> FAILED
 
 ### 3. 持久化与并发
 
-目标表为 B 拥有的 `agent_action`：内部 BIGINT 雪花 ID、`action_id VARCHAR(36)`、`user_id`、与 V008 一致的 BIGINT `session_id/run_id` 逻辑关联、`plan_id`、`plan_version`、`node_id`、`tool_name`、JSON Command 快照、`parameter_hash_version`、`parameter_hash CHAR(64)`、`expire_at`、`status`、`client_request_id`、`idempotency_key`、结果引用、恢复提示、`version`、`create_time`、`update_time`。唯一键为 `action_id`、`(user_id, client_request_id)`、`(user_id, idempotency_key)`；索引为 `(user_id, action_id)`、`(run_id, plan_id, plan_version, node_id)`、`(status, expire_at)`；不建立物理外键。
+目标表为 B 拥有的 `agent_action`，以下字段是 SQL 静态审查前的唯一依据；暂不生成 SQL。
 
-确认 Claim 使用 `WHERE action_id=? AND status='PENDING' AND version=? AND expire_at>?` 的条件更新并递增 `version`。受影响行数为零时重新读取 action：动作不存在/越权不泄露细节，终态返回既有安全结果，`CLAIMED`/`RESULT_UNKNOWN` 返回 `206006`。旧请求用预期版本更新，不能覆盖新状态。
+| 字段 | 类型、默认值和约束 | 用途 |
+| --- | --- | --- |
+| `id` | `BIGINT NOT NULL`，雪花主键 | 内部主键。 |
+| `action_id` | `VARCHAR(36) NOT NULL`，唯一键 | 对外一次性动作标识。 |
+| `user_id` | `BIGINT NOT NULL` | 只来自当前认证用户。 |
+| `agent_session_id` | `BIGINT NOT NULL` | 对应 V008 `agent_session.id` 的逻辑关联，无物理外键。 |
+| `agent_run_id` | `BIGINT NOT NULL` | 对应 V008 `agent_run.id` 的逻辑关联，无物理外键。 |
+| `run_id` | `VARCHAR(36) NOT NULL` | 同一 `agent_run_id` 的外部运行标识，仅用于 ToolContext、SSE 和 REST 关联；不是内部关联列。 |
+| `plan_id` | `VARCHAR(36) NOT NULL` | 已校验计划标识。 |
+| `plan_version` | `INT NOT NULL`，`CHECK (plan_version > 0)` | 已校验计划版本。 |
+| `node_id` | `VARCHAR(128) NOT NULL` | 已校验节点标识。 |
+| `tool_name` | `VARCHAR(128) NOT NULL` | 受控工具标识；本次只允许服务端白名单中的创建订单 Tool。 |
+| `command_snapshot` | `JSON NOT NULL`，JSON 对象 | 仅服务端已校验的 Command 快照；不含用户、金额、订单状态或前端哈希。 |
+| `parameter_hash_version` | `VARCHAR(16) NOT NULL` | 当前为 `v1`。 |
+| `parameter_hash` | `CHAR(64) NOT NULL`，小写 SHA-256 十六进制值 | 由快照重新计算。 |
+| `expire_at` | `DATETIME(3) NOT NULL` | 仅 `PENDING_CONFIRMATION` 可在此时间前确认。 |
+| `status` | `VARCHAR(32) NOT NULL` | 仅允许八个确认动作状态。 |
+| `client_request_id` | `VARCHAR(64) NULL` | `EXECUTING`、`RESULT_UNKNOWN`、`SUCCEEDED`、`FAILED` 必填；其余为空。 |
+| `idempotency_key` | `VARCHAR(128) NULL` | 与 `client_request_id` 同时出现，且每个 action 固定不变。 |
+| `result_reference` | `VARCHAR(128) NULL` | 仅明确成功时保存 A 返回的安全结果引用；不保存完整订单。 |
+| `recovery_hint` | `VARCHAR(256) NULL` | `RESULT_UNKNOWN` 必填，供安全展示；不得含异常堆栈。 |
+| `result_unknown_at` | `DATETIME(3) NULL` | 进入 `RESULT_UNKNOWN` 的服务端时间；仅该状态非空。 |
+| `recovery_until` | `DATETIME(3) NULL` | `result_unknown_at + 30 天`；仅该状态非空。 |
+| `version` | `BIGINT NOT NULL DEFAULT 0`，`CHECK (version >= 0)` | CAS 版本。 |
+| `create_time` / `update_time` | `DATETIME(3) NOT NULL` | 服务端审计时间；`update_time >= create_time`。 |
 
-`agent_action` 的候选版本是 V013，但仍须 A 在远端看到完整 OpenSpec 并完成静态审查后正式分配。此前只实现领域类型、Repository port、内存 Mock 和测试；不把内存实现称为持久化实现。
+除 `version DEFAULT 0` 外，以上字段均无数据库默认值，服务端必须显式写入。唯一键为 `action_id`、`(user_id, client_request_id)`、`(user_id, idempotency_key)` 和 action 创建去重键 `(user_id, agent_run_id, plan_id, plan_version, node_id, tool_name, parameter_hash)`；MySQL 的唯一键允许 NULL，因此未进入写执行状态的动作不会占用稳定键。索引为 `(user_id, action_id)`、`(agent_run_id, plan_id, plan_version, node_id)`、`(status, expire_at)`；不建立物理外键。SQL 还必须用 CHECK 保证：`status` 只能是八个枚举值；`command_snapshot` 的 JSON 类型为对象；`parameter_hash` 为 64 位小写十六进制；`client_request_id` 与 `idempotency_key` 同时为空或同时非空；`result_reference` 只允许 `SUCCEEDED` 非空；`result_unknown_at` 与 `recovery_until` 同时为空或同时非空，且后者恰为前者加 30 天；`RESULT_UNKNOWN` 必须有恢复时间和提示，其他状态不得伪造恢复窗口。
+
+创建 action 以已校验的 `(user_id, agent_run_id, plan_id, plan_version, node_id, tool_name, parameter_hash)` 查询或由唯一键取得原 action；存在时返回原 action，不生成新的 `action_id` 或稳定键。并发创建由该去重唯一键和创建事务保证；正式 SQL 前，`action_id` 全局唯一仍是必须项。
+
+确认使用 `WHERE action_id=? AND status='PENDING_CONFIRMATION' AND version=? AND expire_at>?` 的条件更新并递增 `version`。受影响行数为零时重新读取 action：动作不存在/越权不泄露细节，终态返回既有安全结果，`EXECUTING`/`RESULT_UNKNOWN` 返回 `206006`。旧请求用预期版本更新，不能覆盖新状态。
+
+确认有效期从 action 创建时的服务端 `expire_at` 开始，到 `now >= expire_at` 即不可确认；过期转换为 `EXPIRED`。A 调用出现超时、断流或响应丢失时，以结果保存短事务写入 `RESULT_UNKNOWN`、`result_unknown_at=now`、`recovery_until=now+30天` 和固定恢复提示。恢复窗口内只能按同一 action 的原 `client_request_id` 查询；查询到明确结果后转为 `SUCCEEDED` 或 `FAILED` 并清除恢复窗口字段。窗口外不再调用建单或生成新键，清理任务只能删除已过 `recovery_until` 且仍为 `RESULT_UNKNOWN` 的记录，清理前必须保留原键供恢复。
+
+`agent_action` 不能在 V011/V012 的归属、SQL 和发布顺序由 C 明确并由 A 确认前申请 V013。此前只实现领域类型、Repository port、内存 Mock 和测试；不把内存实现称为持久化实现。
 
 ### 4. 事务与 A 调用方向
 
 确认流程拆为三个阶段：
 
-1. 短事务：从 `CurrentUserAccessor` 取用户，读取 action，校验归属、运行、计划版本、节点、有效期、参数摘要和业务候选；使用 CAS 写为 `CLAIMED` 并保存稳定键。
+1. 短事务：从 `CurrentUserAccessor` 取用户，读取 action，校验归属、运行、计划版本、节点、有效期、参数摘要和业务候选；使用 CAS 写为 `EXECUTING` 并保存稳定键。
 2. 事务外：调用 `CreateOrderTool.execute(ToolContext, CreateOrderForAgentCommand)`；A 在自己的原子建单事务前调用 B 的 `AgentActionAuthorizationPort`，用当前认证用户、ToolContext、actionId、showId 和 seatIds 校验归属、`EXECUTING`、运行/节点/工具、计划/摘要和稳定键。B/A 均不跨模块访问对方持久化。
 3. 新短事务：CAS 保存安全结果和 `SUCCEEDED`、`FAILED` 或 `RESULT_UNKNOWN`，再持久化 SSE 事件；只有保存成功后才对 SSE 重放可见。
 
@@ -64,26 +96,28 @@ RESULT_UNKNOWN --原键查询明确失败--> FAILED
 
 ### 5. REST、SSE 与权限
 
-`POST /api/v1/agent/actions/{actionId}/confirm` 的 body 是 `{ "confirmed": true|false }`。`false` 只在短事务中将当前 `PENDING` 标为 `REJECTED`，不创建键、不调用 A。成功/失败响应和 SSE 都返回稳定安全文案；`206003` 是过期、`206004` 是参数变化、`206006` 是重复确认或仍在确认中。不存在和非本人动作返回同一安全资源不可用语义，运行结束、计划版本变化、业务失效使用固定 Agent 错误码/文案，具体新错误码登记需要 A/C 共同确认。
+`POST /api/v1/agent/actions/{actionId}/confirm` 的 body 是 `{ "confirmed": true|false }`。`false` 只在短事务中将当前 `PENDING_CONFIRMATION` 标为 `REJECTED`，不创建键、不调用 A。成功/失败响应和 SSE 都返回稳定安全文案；`206003` 是过期、`206004` 是参数变化、`206006` 是重复确认或仍在确认中。不存在和非本人动作返回同一安全资源不可用语义，运行结束、计划版本变化、业务失效使用固定 Agent 错误码/文案，具体新错误码登记需要 A/C 共同确认。
 
 SSE 复用 `card` 与 `tool.result` 等持久化事件类型：新增的确认卡 payload 是受控白名单投影，旧卡在 action 过期或计划版本变化时显示失效。重连只回放已保存事件，不能触发确认或建单。
+
+确认 REST 成功响应是 `AgentActionResponse(actionId, runId, planVersion, status, updatedAt)`；业务结果引用在 A Tool 返回值正式联调后再增加。确认卡 payload 固定为 `actionId`、`actionType=CREATE_ORDER`、`expireAt`、`status`、可选纯文本 `displayTitle/displayLines`；`planVersion` 只使用既有 SSE 顶层字段。确认动作内部和对 C 公开的状态都只使用同一组八个值，不存在第二套状态或映射。
 
 ## Risks / Trade-offs
 
 - [A 尚未确认 Agent 建单公开接口] → 只完成 B 的端口、Mock、参数摘要、状态机和测试；任务保持未完成，不写生产调用。
-- [迁移版本、字段或索引未确认] → 不写 SQL、不连接共享数据库；记录待 A 分配，MySQL CI 不宣称通过。
+- [V011/V012 发布顺序、迁移版本或 SQL 静态审查未确认] → 不写 SQL、不连接共享数据库；记录待 C、A 处理，MySQL CI 不宣称通过。
 - [写结果丢失] → 固定原 action 的键并查询；查不到结论保持 `RESULT_UNKNOWN`，宁可提示处理中也不重复建单。
 - [并发确认] → CAS 和唯一约束作为最终保证，单机锁和 SSE 状态不作为正确性依据；在 CI MySQL 8.4 验证并发。
 - [A API 最终需要同步身份] → `ToolContext` 已预留 run/node/trace/稳定键；A 必须确认 userId 如何在公开 API 内安全获得，B 不传递前端用户字段。
 
 ## Migration Plan
 
-1. A 确认建单 Tool/API、DTO、错误码、原键查询、结果未知和 action 验证职责，并分配迁移版本。
-2. A 静态审查 `agent_action` SQL；B 和 A 在 GitHub Actions 的 `Backend MySQL Integration` / `Agent MySQL Integration`（以当前 workflow 实际 job 名为准）对空 `cinewise_agent_it` 验证首次 Flyway、重复启动、CAS、并发和恢复。
+1. C 先明确 V011/V012 的归属、SQL 范围和发布顺序，A 确认该顺序后正式分配 V013。
+2. A 静态审查已获分配的 `agent_action` SQL；B 和 A 在 GitHub Actions 的实际 MySQL job 对空 `cinewise_agent_it` 验证首次 Flyway、重复启动、CAS、并发和恢复。
 3. B 部署领域与适配器；确认卡只在服务端 action 持久化后发布。A 的生产适配器经接口测试后才启用。
 4. 回滚时停止创建新 action；已 `RESULT_UNKNOWN` 的 action 继续按原键查询，不删除记录、不生成替代键。
 
 ## Open Questions
 
-1. A：在远端 OpenSpec 可见并通过严格校验后，正式分配 V013，审查 SQL；`RESULT_UNKNOWN` 必须保留 30 天且仅允许原键查询恢复。
-2. C：请确认确认接口和 SSE 的稳定展示错误码映射、Cookie/CSRF 行为以及前端对“结果确认中/已失效”的展示文案；本 change 不实现前端。
+1. C：明确 V011、V012 各自 Owner、迁移文件名、字段范围、SQL 是否已写或进入远端、依赖关系和发布顺序，并确认与 `agent_action` 没有字段或版本冲突。
+2. A：在 C 的 V011/V012 顺序明确、远端 OpenSpec 可见并通过严格校验后，正式分配 V013，审查 SQL，并确认字段表中的 CHECK 是否符合 MySQL 8.4；`RESULT_UNKNOWN` 必须保留 30 天且仅允许原键查询恢复。
