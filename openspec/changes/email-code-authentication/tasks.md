@@ -30,9 +30,9 @@
 - [x] 5.2 C 实现邀请码 Repository、条件扣减和使用记录；验证：无效、未生效、过期、禁用、耗尽和版本竞争。
 - [x] 5.3 C 实现注册事务和重复 `clientRequestId` 安全恢复；验证：验证码、邀请码、账号和使用记录同事务回滚，重放参数不一致被拒绝。
 - [x] 5.4 C 接入 `POST /api/v1/auth/register`、Cookie、CSRF、错误码和 OpenAPI；验证：Controller 集成测试。
-- [ ] 5.5 C 实现默认关闭的首个邀请码受控 Initializer 和 Git 忽略环境配置；验证：首次插入、配置失败关闭、重复启动不新增且不重置次数、敏感信息不输出。
+- [x] 5.5 C 实现默认关闭的首个邀请码受控 Initializer 和 Git 忽略环境配置；验证：首次插入、配置失败关闭、重复启动不新增且不重置次数、敏感信息不输出。
 
 ## 6. 提交前验证
 
-- [ ] 6.1 C 完成首个邀请码 Initializer 后重新执行后端完整 Maven verify，记录通过、失败和跳过数。
-- [ ] 6.2 C 完成首个邀请码 Initializer 后重新执行 OpenSpec 严格校验、`git diff --check`、状态和变更范围核对。
+- [x] 6.1 C 完成首个邀请码 Initializer 后重新执行后端完整 Maven verify，记录通过、失败和跳过数。
+- [x] 6.2 C 完成首个邀请码 Initializer 后重新执行 OpenSpec 严格校验、`git diff --check`、状态和变更范围核对。
