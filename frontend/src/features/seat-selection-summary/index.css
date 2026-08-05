@@ -1,0 +1,96 @@
+.seat-summary-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: var(--color-bg-container, #fff);
+  border-top: 1px solid var(--color-border-secondary, #f0f0f0);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 5%);
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  z-index: 10;
+}
+
+.seat-summary-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.seat-summary-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text-base, #1f2937);
+}
+
+.seat-summary-count {
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 14px;
+  margin-left: 4px;
+}
+
+.seat-summary-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 28px;
+  align-items: center;
+}
+
+.seat-summary-label-tag {
+  background: var(--color-fill-tertiary, #f3f4f6);
+  border: 1px solid var(--color-border, #d1d5db);
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  color: var(--color-text-base, #1f2937);
+}
+
+.seat-summary-placeholder {
+  color: var(--color-text-quaternary, #9ca3af);
+  font-size: 14px;
+}
+
+.seat-summary-limit-warning {
+  color: var(--color-warning, #faad14);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.seat-summary-action {
+  margin-left: 24px;
+  min-width: 120px;
+}
+
+.seat-summary-confirm-btn {
+  width: 100%;
+}
+
+/* 响应式：移动端适配 */
+@media (max-width: 1023px) {
+  .seat-summary-container {
+    padding: 12px 16px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .seat-summary-title {
+    font-size: 14px;
+  }
+
+  .seat-summary-label-tag {
+    font-size: 12px;
+    padding: 2px 8px;
+  }
+
+  .seat-summary-action {
+    margin-left: 16px;
+    min-width: 100px;
+  }
+
+  .seat-summary-confirm-btn {
+    min-height: 44px; /* 触控目标至少 44px */
+    font-size: 16px;
+  }
+}
