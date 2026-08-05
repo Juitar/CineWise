@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 
 import com.miaoyu.ticket.agent.domain.tool.ToolContext;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
@@ -126,6 +127,61 @@ class CreateOrderToolTest {
         assertThat(result.status()).isEqualTo(ToolStatus.FAILED);
         assertThat(result.errorCode()).isEqualTo(100001);
         verifyNoInteractions(orderApplicationService);
+    }
+
+    @Test
+    void givenCurrentAvailableSelection_whenValidateRuns_thenReturnExecutableWithoutCreate() {
+        CreateOrderTool tool = new CreateOrderTool(orderApplicationService);
+
+        OrderPrecheckResult result = tool.validate(
+                new CreateOrderPrecheckCommand("70001", List.of("80001", "80002")));
+
+        assertThat(result.executable()).isTrue();
+        assertThat(result.errorCode()).isNull();
+        verify(orderApplicationService).validateOrderSelection(70001L, List.of(80001L, 80002L));
+        verify(orderApplicationService, never()).createOrder(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void givenStaleSelection_whenValidateRuns_thenReturnSafeErrorWithoutOrderData() {
+        CreateOrderTool tool = new CreateOrderTool(orderApplicationService);
+        doThrow(new BusinessException(TicketingErrorCode.SEAT_NOT_LOCKABLE))
+                .when(orderApplicationService)
+                .validateOrderSelection(70001L, List.of(80001L));
+
+        OrderPrecheckResult result = tool.validate(
+                new CreateOrderPrecheckCommand("70001", List.of("80001")));
+
+        assertThat(result.executable()).isFalse();
+        assertThat(result.errorCode()).isEqualTo(204001);
+        verify(orderApplicationService, never()).createOrder(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void givenInvalidSelection_whenValidateRuns_thenReturnInvalidParameterWithoutServiceCall() {
+        CreateOrderTool tool = new CreateOrderTool(orderApplicationService);
+
+        OrderPrecheckResult result = tool.validate(
+                new CreateOrderPrecheckCommand("+70001", List.of("80001")));
+
+        assertThat(result.executable()).isFalse();
+        assertThat(result.errorCode()).isEqualTo(100001);
+        verifyNoInteractions(orderApplicationService);
+    }
+
+    @Test
+    void givenQueryDependencyUnavailable_whenValidateRuns_thenReturnStableUnavailableCode() {
+        CreateOrderTool tool = new CreateOrderTool(orderApplicationService);
+        doThrow(new IllegalStateException("database unavailable"))
+                .when(orderApplicationService)
+                .validateOrderSelection(70001L, List.of(80001L));
+
+        OrderPrecheckResult result = tool.validate(
+                new CreateOrderPrecheckCommand("70001", List.of("80001")));
+
+        assertThat(result.executable()).isFalse();
+        assertThat(result.errorCode()).isEqualTo(306003);
+        verify(orderApplicationService, never()).createOrder(org.mockito.ArgumentMatchers.any());
     }
 
     @Test

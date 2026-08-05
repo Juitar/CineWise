@@ -6,6 +6,9 @@ import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.auth.application.RoleCode;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
+import com.miaoyu.ticket.order.api.CreateOrderPrecheckCommand;
+import com.miaoyu.ticket.order.api.CreateOrderTool;
+import com.miaoyu.ticket.order.api.OrderPrecheckResult;
 import com.miaoyu.ticket.order.domain.OrderStatus;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -41,6 +44,9 @@ class OrderLifecycleMySqlIntegrationTest {
 
     @Autowired
     private OrderApplicationService orderApplicationService;
+
+    @Autowired
+    private CreateOrderTool createOrderTool;
 
     @Autowired
     private OrderCancellationService orderCancellationService;
@@ -128,6 +134,22 @@ class OrderLifecycleMySqlIntegrationTest {
         assertThat(seatStatus(fixture.seatIds().get(1))).isEqualTo("AVAILABLE");
     }
 
+    @Test
+    void givenMySqlAvailableSelection_whenPrecheck_thenDoNotWriteOrderOrSeat() {
+        assertThat(jdbcTemplate.queryForObject("SELECT VERSION()", String.class)).startsWith("8.4.");
+        ShowSeats fixture = findFutureShowSeats(1);
+        long seatId = fixture.seatIds().getFirst();
+
+        OrderPrecheckResult result = createOrderTool.validate(new CreateOrderPrecheckCommand(
+                Long.toString(fixture.showId()),
+                List.of(Long.toString(seatId))));
+
+        assertThat(result.executable()).isTrue();
+        assertThat(result.errorCode()).isNull();
+        assertThat(seatStatus(seatId)).isEqualTo("AVAILABLE");
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ticket_order", Long.class)).isZero();
+    }
+
     private OrderView createOrder(long showId, List<Long> seatIds, String requestId, String idempotencyKey) {
         return orderApplicationService.createOrder(new CreateOrderCommand(
                 showId,
@@ -137,21 +159,23 @@ class OrderLifecycleMySqlIntegrationTest {
     }
 
     private ShowSeats findFutureShowSeats(int seatCount) {
+        LocalDateTime businessNow = LocalDateTime.ofInstant(
+                clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         ShowContext show = jdbcTemplate.queryForObject("""
                 SELECT id,
                        movie_id,
                        cinema_id,
                        start_time
-                  FROM movie_show
+                 FROM movie_show
                  WHERE status = 'ON_SALE'
-                   AND start_time > CURRENT_TIMESTAMP(3)
+                   AND start_time > ?
                  ORDER BY start_time, id
                  LIMIT 1
                 """, (resultSet, rowNumber) -> new ShowContext(
                 resultSet.getLong("id"),
                 resultSet.getLong("movie_id"),
                 resultSet.getLong("cinema_id"),
-                resultSet.getTimestamp("start_time").toLocalDateTime()));
+                resultSet.getTimestamp("start_time").toLocalDateTime()), businessNow);
         List<Long> seatIds = jdbcTemplate.queryForList("""
                 SELECT id
                   FROM show_seat

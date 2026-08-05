@@ -6,6 +6,7 @@ import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
+import com.miaoyu.ticket.ticketing.application.TicketingErrorCode;
 import com.miaoyu.ticket.order.application.CreateOrderCommand;
 import com.miaoyu.ticket.order.application.OrderApplicationService;
 import com.miaoyu.ticket.order.application.OrderView;
@@ -42,6 +43,27 @@ public class CreateOrderTool {
 
     public CreateOrderTool(OrderApplicationService orderApplicationService) {
         this.orderApplicationService = orderApplicationService;
+    }
+
+    /**
+     * 确认前只读预检；无 actionId、无当前用户写入、无锁座和订单副作用。
+     * 结果未知或数据库不可用只返回稳定的 QUERY_UNAVAILABLE，不让 B 把故障当成可执行。
+     */
+    public OrderPrecheckResult validate(CreateOrderPrecheckCommand command) {
+        try {
+            if (command == null) {
+                throw new IllegalArgumentException("command 不能为空");
+            }
+            orderApplicationService.validateOrderSelection(command.parsedShowId(), command.parsedSeatIds());
+            return OrderPrecheckResult.allowed();
+        } catch (IllegalArgumentException exception) {
+            return OrderPrecheckResult.rejected(CommonErrorCode.INVALID_PARAMETER.code());
+        } catch (BusinessException exception) {
+            return OrderPrecheckResult.rejected(exception.getErrorCode().code());
+        } catch (RuntimeException exception) {
+            // 不泄露数据库异常文本；B 只能按稳定不可用错误处理并拒绝确认。
+            return OrderPrecheckResult.rejected(TicketingErrorCode.QUERY_UNAVAILABLE.code());
+        }
     }
 
     /**
