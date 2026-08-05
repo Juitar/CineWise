@@ -27,9 +27,26 @@ public class MybatisAgentMessageRepository implements AgentMessageRepository {
     }
 
     @Override
+    public List<AgentMessage> findBySessionIdAndUserId(long sessionId, long userId, int offset, int limit) {
+        return mapper.findMessagesBySessionIdAndUserIdPage(sessionId, userId, offset, limit).stream()
+                .map(AgentPersistenceMappings::toDomain)
+                .toList();
+    }
+
+    @Override
+    public long countBySessionIdAndUserId(long sessionId, long userId) {
+        return mapper.countMessagesBySessionIdAndUserId(sessionId, userId);
+    }
+
+    @Override
     public List<AgentMessage> findByRunIdAndUserId(long runId, long userId) {
         return mapper.findMessagesByRunIdAndUserId(runId, userId).stream()
                 .map(AgentPersistenceMappings::toDomain)
                 .toList();
+    }
+
+    @Override
+    public int deleteByRunId(long runId) {
+        return mapper.deleteMessagesByRunId(runId);
     }
 }

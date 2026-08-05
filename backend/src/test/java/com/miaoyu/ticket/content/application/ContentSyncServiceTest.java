@@ -6,6 +6,7 @@ import com.miaoyu.ticket.content.domain.ContentItem;
 import com.miaoyu.ticket.content.domain.ContentResourceType;
 import com.miaoyu.ticket.content.domain.ContentSource;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
+import com.miaoyu.ticket.content.domain.CinemaContent;
 import com.miaoyu.ticket.content.domain.MovieContent;
 import com.miaoyu.ticket.content.application.ContentPersistencePort.SyncLogRow;
 import java.math.BigDecimal;
@@ -14,6 +15,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,10 +39,10 @@ class ContentSyncServiceTest {
                         LiveContentSyncPort.Outcome.SUCCESS, null), snapshotPort(snapshots), cachePort(caches),
                 persistence(logs, new AtomicReference<>()), () -> 99L,
                 Clock.fixed(Instant.parse("2026-08-04T01:00:00Z"), ZoneId.of("Asia/Shanghai")));
-        // 同步写入两个层级，防止旧缓存压过刚保存的真实快照。
+        // 单条影片同时写详情键和影片列表键；两者均在事务提交后覆盖对应旧缓存。
         assertThat(service.synchronizeDailyContent()).isEqualTo(1);
-        assertThat(snapshots).hasValue(1);
-        assertThat(caches).hasValue(1);
+        assertThat(snapshots).hasValue(2);
+        assertThat(caches).hasValue(2);
         assertThat(logs).hasValue(1);
     }
 
@@ -117,6 +120,69 @@ class ContentSyncServiceTest {
     }
 
     @Test
+    void givenProviderQueriesUseExternalIdsAndSearchKeyword_whenSynchronize_thenSnapshotsUsePublicQueryKeys() {
+        ContentQuery providerMovieQuery = new ContentQuery(ContentResourceType.MOVIE, 7001L, null, null);
+        ContentQuery providerCinemaQuery = new ContentQuery(ContentResourceType.CINEMA, null, "70", "影");
+        ContentResult<List<? extends ContentItem>> movieResult = new ContentResult<>(List.of(
+                new MovieContent(null, "7001", "真实影片", "[\"剧情\"]", 100, new BigDecimal("8.1"),
+                        "https://example.test/real-poster.jpg", "真实简介", "2026-08-01", "NOW_SHOWING")),
+                new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), LocalDateTime.of(2026, 8, 4, 9, 0),
+                LocalDateTime.of(2026, 8, 4, 15, 0), false, false, null);
+        ContentResult<List<? extends ContentItem>> cinemaResult = new ContentResult<>(List.of(
+                new CinemaContent("8001", "真实影院", "70", "测试区", "测试地址", null, null)),
+                new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), LocalDateTime.of(2026, 8, 4, 9, 0),
+                LocalDateTime.of(2026, 8, 4, 15, 0), false, false, null);
+        Map<ContentQuery, ContentResult<List<? extends ContentItem>>> snapshots = new LinkedHashMap<>();
+        ContentSyncService service = new ContentSyncService(
+                () -> batch(List.of(new LiveContentSyncPort.SynchronizedContent(providerMovieQuery, movieResult),
+                        new LiveContentSyncPort.SynchronizedContent(providerCinemaQuery, cinemaResult)), 2,
+                        LiveContentSyncPort.Outcome.SUCCESS, null), captureSnapshots(snapshots),
+                cachePort(new AtomicInteger()), persistence(new AtomicInteger(), new AtomicReference<>()), () -> 99L,
+                Clock.fixed(Instant.parse("2026-08-04T01:00:00Z"), ZoneId.of("Asia/Shanghai")));
+
+        assertThat(service.synchronizeDailyContent()).isEqualTo(2);
+        // 外部 7001 和同步关键词“影”都不能进入公开缓存/快照键；页面只会用内部 ID 或列表条件查询。
+        assertThat(snapshots).containsKeys(
+                new ContentQuery(ContentResourceType.MOVIE, 99L, null, null),
+                new ContentQuery(ContentResourceType.MOVIE, null, null, null),
+                new ContentQuery(ContentResourceType.CINEMA, 99L, null, null),
+                new ContentQuery(ContentResourceType.CINEMA, null, "70", null));
+        assertThat(snapshots).doesNotContainKeys(providerMovieQuery, providerCinemaQuery);
+        // Provider 已规范化的展示资料要随内部 ID 一起写入公开列表、详情快照和后续 Redis 缓存。
+        MovieContent publicMovie = (MovieContent) snapshots.get(
+                new ContentQuery(ContentResourceType.MOVIE, null, null, null)).data().getFirst();
+        assertThat(publicMovie.posterUrl()).isEqualTo("https://example.test/real-poster.jpg");
+        assertThat(publicMovie.summary()).isEqualTo("真实简介");
+        assertThat(publicMovie.releaseDate()).isEqualTo("2026-08-01");
+        assertThat(publicMovie.releaseStatus()).isEqualTo("NOW_SHOWING");
+    }
+
+    @Test
+    void givenExistingMovieDirectory_whenSynchronizingLimitedBatch_thenItKeepsUnseenMovies() {
+        ContentQuery listQuery = new ContentQuery(ContentResourceType.MOVIE, null, null, null);
+        ContentResult<List<? extends ContentItem>> existing = new ContentResult<>(List.of(
+                new MovieContent(10L, "old-1", "已有影片", "[\"剧情\"]", 100, new BigDecimal("8.0"))),
+                new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), LocalDateTime.of(2026, 8, 3, 9, 0),
+                LocalDateTime.of(2026, 8, 3, 15, 0), false, false, null);
+        ContentResult<List<? extends ContentItem>> incoming = new ContentResult<>(List.of(
+                new MovieContent("new-1", "新增影片", "[\"喜剧\"]", 90, new BigDecimal("8.5"))),
+                new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), LocalDateTime.of(2026, 8, 4, 9, 0),
+                LocalDateTime.of(2026, 8, 4, 15, 0), false, false, null);
+        Map<ContentQuery, ContentResult<List<? extends ContentItem>>> snapshots = new LinkedHashMap<>();
+        snapshots.put(listQuery, existing);
+        ContentSyncService service = new ContentSyncService(
+                () -> batch(List.of(new LiveContentSyncPort.SynchronizedContent(
+                        new ContentQuery(ContentResourceType.MOVIE, 1L, null, null), incoming)), 1,
+                        LiveContentSyncPort.Outcome.SUCCESS, null), captureSnapshots(snapshots),
+                cachePort(new AtomicInteger()), persistence(new AtomicInteger(), new AtomicReference<>()), () -> 99L,
+                Clock.fixed(Instant.parse("2026-08-04T01:00:00Z"), ZoneId.of("Asia/Shanghai")));
+
+        assertThat(service.synchronizeDailyContent()).isEqualTo(1);
+        assertThat(snapshots.get(listQuery).data()).extracting(item -> ((MovieContent) item).sourceMovieId())
+                .containsExactly("old-1", "new-1");
+    }
+
+    @Test
     void givenTransactionRollsBack_whenSynchronize_thenItDoesNotPublishLiveCache() {
         ContentQuery query = new ContentQuery(ContentResourceType.MOVIE, 1L, null, null);
         ContentResult<List<? extends ContentItem>> result = new ContentResult<>(List.of(
@@ -163,6 +229,16 @@ class ContentSyncServiceTest {
             }
             @Override public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) {
                 saved.set(result);
+            }
+        };
+    }
+    private ContentSnapshotPort captureSnapshots(Map<ContentQuery, ContentResult<List<? extends ContentItem>>> saved) {
+        return new ContentSnapshotPort() {
+            @Override public Optional<ContentResult<List<? extends ContentItem>>> findLatest(ContentQuery query) {
+                return Optional.ofNullable(saved.get(query));
+            }
+            @Override public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) {
+                saved.put(query, result);
             }
         };
     }

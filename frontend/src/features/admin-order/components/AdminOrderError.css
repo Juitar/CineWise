@@ -1,0 +1,30 @@
+.admin-orders-error-container {
+  background: var(--color-bg-container, #fff);
+  border-radius: var(--border-radius-lg, 8px);
+  padding: 48px 24px;
+  text-align: center;
+  box-shadow:
+    0 1px 2px 0 rgba(0, 0, 0, 3%),
+    0 1px 6px -1px rgba(0, 0, 0, 2%),
+    0 2px 4px 0 rgba(0, 0, 0, 2%);
+}
+
+.admin-orders-error-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text, #111827);
+  margin-bottom: 16px;
+}
+
+.admin-orders-error-desc {
+  font-size: 14px;
+  color: var(--color-text-secondary, #6b7280);
+  margin-bottom: 24px;
+}
+
+.admin-orders-error-trace {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--color-text-tertiary, #9ca3af);
+  margin-top: 24px;
+}

@@ -39,6 +39,7 @@
 - [x] 4.5 实现 PC Web 用户/管理员共用的密码登录视图，使用 Ant Design 和独立 CSS 文件。
 - [x] 4.6 实现移动 H5 响应式登录视图，复用同一 Hook，并保证触控目标不小于 44px。
 - [x] 4.7 只保留 `/login` 登录入口并增加统一 403 路由；未实现的验证码、注册和重置密码入口不得变成可点击死链接。
+- [x] 4.8 为 HTTP IP 非安全上下文增加 `clientRequestId` 降级生成，HTTPS 仍优先使用 `crypto.randomUUID()`。
 
 ## 5. 前端测试
 
@@ -47,6 +48,7 @@
 - [x] 5.3 覆盖 `returnUrl` 合法回跳、外部 URL、双斜线、控制字符、USER 管理路径和 ADMIN 默认页。
 - [x] 5.4 覆盖桌面/移动视图切换、字段校验、加载、错误和无障碍名称。
 - [x] 5.5 增加用户登录刷新恢复、登出失效、普通用户访问管理端和移动视口 E2E 场景。
+- [x] 5.6 覆盖缺少 `crypto.randomUUID()` 时降级 ID 的格式、长度和同页唯一性。
 
 ## 6. 文档、迁移与联调验收
 
@@ -57,3 +59,4 @@
 - [x] 6.5 使用受控测试账号完成用户/管理员真实 MySQL 登录、刷新恢复、登出、401/403、CSRF 和 Cookie 冒烟。
 - [x] 6.6 执行 `openspec validate password-login-and-session --strict`、后端 `mvnw.cmd verify`、前端 `pnpm check` 和相关 E2E，并记录实际结果。
 - [x] 6.7 导出 `/v3/api-docs`，由 A/B/C/D 复核认证响应、Cookie 安全方案、CSRF Header 和公共错误码。
+- [ ] 6.8 在公网 HTTP IP Demo 验证 `/csrf` → `/login/password` → `/auth/me` 请求顺序和登录成功。

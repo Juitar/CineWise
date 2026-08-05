@@ -32,19 +32,20 @@ docker version
 
 ## 3. 准备本地环境变量
 
-在仓库根目录复制环境变量模板：
+在仓库根目录复制本机环境变量模板：
 
 ```powershell
-Copy-Item .env.example .env
+Copy-Item .env.local.example .env
 ```
 
 然后编辑 `.env`，至少填写以下私密值：
 
 ```dotenv
-MYSQL_HOST=团队提供的云端MySQL主机
+MYSQL_HOST=host.docker.internal
+MYSQL_PORT=13306
 MYSQL_PASSWORD=云端共享数据库账号密码
-REDIS_HOST=团队提供的共享Redis主机
-REDIS_PORT=6379
+REDIS_HOST=host.docker.internal
+REDIS_PORT=16379
 REDIS_PASSWORD=共享Redis密码
 JWT_SECRET=由认证模块负责人确认的JWT密钥
 ```
@@ -52,7 +53,9 @@ JWT_SECRET=由认证模块负责人确认的JWT密钥
 规则：
 
 - `.env` 不得提交到 Git；仓库已通过 `.gitignore` 忽略它。
-- `.env` 中的 `MYSQL_*` 必须指向共享 `cinewise` 库，`REDIS_*` 必须指向团队共享 Redis；不得使用 `localhost` 作为隐式回退。
+- 本机先启动 A 分配的 SSH 隧道；Docker 容器通过 `host.docker.internal:13306/16379` 访问隧道，最终仍连接云端共享 `cinewise` 与 Redis，不是在本机创建基础服务。
+- 本机浏览器统一访问 `http://localhost:8000`，不要在同一调试会话中混用 `127.0.0.1:8000`，两者属于不同 Origin。
+- 本机 HTTP 联调使用 `AUTH_COOKIE_SECURE=false`；这只适用于本机或 HTTP 演示入口。
 - A 的迁移验证使用独立的 `.env.migration-check` 和云端 `cinewise_migration_check` 库；不得用共享库做首次迁移验证。
 - `JWT_SECRET` 由认证模块负责人定义算法和密钥要求；部署负责人只负责安全注入，不在源码或镜像中保存。
 - 启用对象存储的模块从 A 获取云端 MinIO 的 `MINIO_ENDPOINT`、最小权限 `MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY` 和 `MINIO_BUCKET=cinewise`；不得使用或保存 MinIO root 管理员凭据。
@@ -94,6 +97,7 @@ docker compose logs -f backend
 后端成功启动后可访问：
 
 ```text
+http://localhost:8000
 http://localhost:8080/actuator/health
 http://localhost:8080/swagger-ui.html
 ```

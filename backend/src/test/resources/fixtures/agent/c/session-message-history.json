@@ -1,0 +1,20 @@
+{
+  "code": 0,
+  "message": "success",
+  "traceId": "1234567890abcdef1234567890abcdef",
+  "data": {
+    "total": 1,
+    "page": 1,
+    "size": 20,
+    "records": [{
+      "messageId": "message-example-2",
+      "role": "ASSISTANT",
+      "type": "TEXT",
+      "text": "已生成推荐结果",
+      "payload": {},
+      "status": "COMPLETED",
+      "completedAt": "2026-08-05T10:01:00+08:00",
+      "createdAt": "2026-08-05T10:01:00+08:00"
+    }]
+  }
+}

@@ -3,6 +3,7 @@ package com.miaoyu.ticket.agent;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -15,6 +16,7 @@ import com.miaoyu.ticket.agent.application.persistence.AgentMessageRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionCommand;
 import com.miaoyu.ticket.agent.application.persistence.AgentRequestHashFactory;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunRepository;
+import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeEventService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSessionStatus;
@@ -58,6 +60,21 @@ class AgentInitialRunTransactionTest {
 
         assertEquals(AgentErrorCode.ACTIVE_RUN_CONFLICT, exception.getErrorCode());
         verify(fixture.sessionRepository()).claimActiveRun(1L, 7L, 100L, NOW.plusDays(30));
+    }
+
+    @Test
+    void shouldRejectClearedSessionBeforeWritingRunMessageOrEvent() {
+        Fixture fixture = fixture(true);
+        when(fixture.sessionRepository().findBySessionIdAndUserId("session-1", 7L))
+                .thenReturn(Optional.of(clearedSession()));
+
+        BusinessException exception =
+                assertThrows(BusinessException.class, () -> fixture.transaction().submit(7L, command()));
+
+        assertEquals(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND, exception.getErrorCode());
+        verify(fixture.runRepository(), never()).insert(any());
+        verify(fixture.messageRepository(), never()).insert(any());
+        verify(fixture.sessionRepository(), never()).claimActiveRun(anyLong(), anyLong(), anyLong(), any());
     }
 
     @Test
@@ -114,6 +131,7 @@ class AgentInitialRunTransactionTest {
         AgentSessionRepository sessionRepository = Mockito.mock(AgentSessionRepository.class);
         AgentRunRepository runRepository = Mockito.mock(AgentRunRepository.class);
         AgentMessageRepository messageRepository = Mockito.mock(AgentMessageRepository.class);
+        AgentRuntimeEventService runtimeEventService = Mockito.mock(AgentRuntimeEventService.class);
         when(sessionRepository.findBySessionIdAndUserId("session-1", 7L)).thenReturn(Optional.of(session()));
         when(runRepository.findByClientRequestId(7L, 1L, "request-1")).thenReturn(Optional.empty());
         when(sessionRepository.claimActiveRun(1L, 7L, 100L, NOW.plusDays(30))).thenReturn(claimResult);
@@ -130,6 +148,7 @@ class AgentInitialRunTransactionTest {
                 runRepository,
                 messageRepository,
                 new AgentRequestHashFactory(),
+                runtimeEventService,
                 idGenerator,
                 Clock.fixed(Instant.parse("2026-08-04T02:00:00Z"), ZoneId.of("Asia/Shanghai")));
         return new Fixture(transaction, sessionRepository, runRepository, messageRepository);
@@ -149,6 +168,11 @@ class AgentInitialRunTransactionTest {
     private static AgentSession session() {
         return new AgentSession(
                 1L, "session-1", 7L, null, AgentSessionStatus.ACTIVE, null, 0L, NOW, NOW, NOW.plusDays(30));
+    }
+
+    private static AgentSession clearedSession() {
+        return new AgentSession(
+                1L, "session-1", 7L, null, AgentSessionStatus.CLEARED, null, 1L, NOW, NOW, NOW.plusDays(30));
     }
 
     private record Fixture(

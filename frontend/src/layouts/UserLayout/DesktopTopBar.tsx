@@ -1,15 +1,15 @@
 import { Avatar, Dropdown, Input } from 'antd';
 import type { MenuProps } from 'antd';
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'umi';
+import React from 'react';
+import { Link } from 'umi';
 
+import { useLogout } from '../../modules/auth/useLogout';
 import { useAuth } from '../../shared/auth/AuthProvider';
 import { MapPinIcon, SearchIcon, UserIcon } from '../../shared/components/icons/layout-icons';
 
 export const DesktopTopBar: React.FC = () => {
-  const navigate = useNavigate();
-  const { currentUser, logout, status } = useAuth();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { currentUser, status } = useAuth();
+  const { handleLogout, isLoggingOut } = useLogout();
   const userMenu: MenuProps['items'] = [
     {
       key: 'profile',
@@ -29,11 +29,7 @@ export const DesktopTopBar: React.FC = () => {
     if (key !== 'logout' || isLoggingOut) {
       return;
     }
-    setIsLoggingOut(true);
-    void logout().finally(() => {
-      navigate('/login', { replace: true });
-      setIsLoggingOut(false);
-    });
+    void handleLogout();
   };
 
   const cityMenu: MenuProps['items'] = [

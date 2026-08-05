@@ -55,19 +55,22 @@ CD 不使用服务器目录中“当前最新”的不确定代码，而是部�
 1. Linux、Git、Docker Engine 和支持 `--wait` 的 Docker Compose v2 已安装。
 2. `DEPLOY_PATH` 已克隆 CineWise 仓库，`origin` 允许部署账号只读获取 `dev`。
 3. SSH 部署账号可以在不使用 root 的情况下运行该项目的 Docker Compose。
-4. 仓库根目录存在被 Git 忽略的 `.env`，真实凭据只保存在服务器。
+4. 仓库根目录存在被 Git 忽略的 `.env`，真实凭据只保存在服务器。首次可从 `.env.server.example` 复制，不能复制开发者的本机 `.env`。
 5. 应用服务器能通过私网或固定公网 `/32` 白名单访问基础服务 ECS 的 MySQL、Redis 和可选 MinIO API；应用 Compose 不运行重复基础服务。
 6. `.env` 使用演示环境配置，且至少满足：
 
 ```dotenv
 SPRING_PROFILES_ACTIVE=demo
-MYSQL_HOST=基础服务ECS地址
-REDIS_HOST=基础服务ECS地址
+MYSQL_HOST=基础服务ECS私网或固定白名单地址
+REDIS_HOST=基础服务ECS私网或固定白名单地址
 REDIS_PORT=6379
 REDIS_PASSWORD=共享Redis密码
 FLYWAY_ENABLED=false
 SEED_ENABLED=false
+AUTH_COOKIE_SECURE=false
 ```
+
+当前公网 IP HTTP 演示入口必须使用 `AUTH_COOKIE_SECURE=false`，否则浏览器不会保存认证与 CSRF Cookie。后续启用 HTTPS 域名后，必须改为 `AUTH_COOKIE_SECURE=true` 并重新部署。应用 Compose 会显式将该值传入 backend；只修改服务器 `.env` 后必须重建 backend 容器。
 
 启用对象存储时再填写 `MINIO_ENDPOINT`、最小权限 `MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY` 和 `MINIO_BUCKET`。`MINIO_ENDPOINT` 必须是 API 地址而不是 9001 Console 地址；不得使用 MinIO root 管理员凭据。
 

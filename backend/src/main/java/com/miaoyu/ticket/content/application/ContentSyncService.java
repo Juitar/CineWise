@@ -6,11 +6,13 @@ import com.miaoyu.ticket.content.domain.CinemaContent;
 import com.miaoyu.ticket.content.domain.ContentItem;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
 import com.miaoyu.ticket.content.domain.MovieContent;
+import java.util.ArrayList;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -105,6 +107,8 @@ public class ContentSyncService {
         acceptedItems.addAll(identityDecision.accepted());
         int synchronizedItemCount = 0;
         int identityRejectedCount = identityDecision.rejected().size();
+        List<MovieContent> synchronizedMovies = new ArrayList<>();
+        ContentResult<?> movieEnvelope = null;
         for (LiveContentSyncPort.SynchronizedContent content : contents) {
             // 端口的契约要求 LIVE；再次校验可防止错误实现把 Demo 或旧快照污染真实读取层。
             if (content.result().source().type() != ContentSourceType.LIVE) {
@@ -116,14 +120,14 @@ public class ContentSyncService {
             if (acceptedForQuery.isEmpty()) {
                 continue;
             }
-            ContentResult<List<? extends com.miaoyu.ticket.content.domain.ContentItem>> accepted = new ContentResult<>(
-                    acceptedForQuery, content.result().source(), content.result().dataTime(),
-                    content.result().expiresAt(), content.result().expired(), content.result().degraded(),
-                    content.result().fallbackType());
-            snapshots.save(content.query(), accepted);
-            writeCacheAfterCommit(content.query(), accepted);
+            ContentResult<List<? extends ContentItem>> accepted = contentResult(acceptedForQuery, content.result());
+            savePublicQueries(content.query(), accepted, synchronizedMovies);
+            if (content.query().resourceType() == com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE) {
+                movieEnvelope = content.result();
+            }
             synchronizedItemCount += acceptedForQuery.size();
         }
+        saveMovieListAfterSync(synchronizedMovies, movieEnvelope);
         // 审计只保存统计值和固定状态，不保存 Provider 原始 JSON、关键词或任何用户数据。
         LocalDateTime finishedAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         // V004 的计数约束要求 total = success + failure。Provider 的候选数与身份隔离后的条目数取较大值，
@@ -136,6 +140,72 @@ public class ContentSyncService {
                 auditSummary(batch, contents, synchronizedItemCount, failureCount, identityRejectedCount, startedAt,
                         finishedAt)));
         return synchronizedItemCount;
+    }
+
+    /**
+     * Provider 查询条件不能直接作为页面快照键。
+     *
+     * <p>影片详情入站时携带的是第三方外部 ID，影院同步还会带受控搜索词；页面却只认本库业务 ID、影片
+     * 列表和城市影院列表。若直接复用入站查询，数据虽然落库却永远不会被公开查询命中。</p>
+     */
+    private void savePublicQueries(ContentQuery providerQuery,
+                                   ContentResult<List<? extends ContentItem>> accepted,
+                                   List<MovieContent> synchronizedMovies) {
+        if (providerQuery.resourceType() == com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE) {
+            for (ContentItem item : accepted.data()) {
+                MovieContent movie = (MovieContent) item;
+                // 详情只接受内部 movieId；外部 sourceMovieId 不能成为页面快照键。
+                saveLiveResult(new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
+                        movie.movieId(), null, null), contentResult(List.of(movie), accepted));
+                synchronizedMovies.add(movie);
+            }
+            return;
+        }
+        // 同步搜索词只是向第三方缩小请求范围，不能要求页面带同一个词才能读取城市影院列表。
+        ContentQuery cityListQuery = new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA,
+                null, providerQuery.cityCode(), null);
+        saveLiveResult(cityListQuery, accepted);
+        for (ContentItem item : accepted.data()) {
+            CinemaContent cinema = (CinemaContent) item;
+            saveLiveResult(new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA,
+                    cinema.cinemaId(), null, null), contentResult(List.of(cinema), accepted));
+        }
+    }
+
+    /** 同步完成后合并公开影片目录，局部 Provider 批次绝不能删掉已经同步的其余影片。 */
+    private void saveMovieListAfterSync(List<MovieContent> synchronizedMovies, ContentResult<?> envelope) {
+        if (synchronizedMovies.isEmpty() || envelope == null) {
+            return;
+        }
+        ContentQuery listQuery = new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
+                null, null, null);
+        saveLiveResult(listQuery, contentResult(mergeMovieDirectory(listQuery, synchronizedMovies), envelope));
+    }
+
+    /**
+     * NetStart 当前只能受限地返回一小批详情；按外部影片身份增量覆盖本批资料，同时保留旧目录。
+     * 真正的近一年全量回填和两版本快照仍由未完成任务实现，本方法不把小批结果伪装成完整目录。
+     */
+    private List<MovieContent> mergeMovieDirectory(ContentQuery listQuery, List<MovieContent> incoming) {
+        LinkedHashMap<String, MovieContent> merged = new LinkedHashMap<>();
+        snapshots.findLatest(listQuery).filter(existing -> existing.source().type() == ContentSourceType.LIVE)
+                .ifPresent(existing -> existing.data().stream().map(item -> (MovieContent) item)
+                        .forEach(movie -> merged.put(movie.sourceMovieId(), movie)));
+        incoming.forEach(movie -> merged.put(movie.sourceMovieId(), movie));
+        return List.copyOf(merged.values());
+    }
+
+    /** 把同一批已校验的内容换成公开查询使用的键，来源、时间和降级标记保持不变。 */
+    private ContentResult<List<? extends ContentItem>> contentResult(List<? extends ContentItem> items,
+                                                                       ContentResult<?> envelope) {
+        return new ContentResult<>(items, envelope.source(), envelope.dataTime(), envelope.expiresAt(),
+                envelope.expired(), envelope.degraded(), envelope.fallbackType());
+    }
+
+    /** 快照先落 MySQL，缓存仍只在事务提交后更新，避免公开键在回滚后留下无法追溯的数据。 */
+    private void saveLiveResult(ContentQuery query, ContentResult<List<? extends ContentItem>> result) {
+        snapshots.save(query, result);
+        writeCacheAfterCommit(query, result);
     }
 
     /**
@@ -155,8 +225,11 @@ public class ContentSyncService {
             long movieId = persistence.ensureMovie(new ContentPersistencePort.MovieRow(idGenerator.nextId(),
                     movie.sourceMovieId(), movie.title(), movie.genresJson(), movie.durationMinutes(), movie.rating(),
                     result.source().type(), result.source().name(), result.dataTime(), result.expiresAt()));
+            // 这四项属于 Provider 已校验过的可选展示资料，业务 ID 回填后仍要进入快照和 Redis。
+            // 不能只保留落库的旧基础列，否则同步成功后前端会读到没有海报和简介的影片。
             return new MovieContent(movieId, movie.sourceMovieId(), movie.title(), movie.genresJson(),
-                    movie.durationMinutes(), movie.rating());
+                    movie.durationMinutes(), movie.rating(), movie.posterUrl(), movie.summary(), movie.releaseDate(),
+                    movie.releaseStatus());
         }
         CinemaContent cinema = (CinemaContent) item;
         long cinemaId = persistence.ensureCinema(new ContentPersistencePort.CinemaRow(idGenerator.nextId(),

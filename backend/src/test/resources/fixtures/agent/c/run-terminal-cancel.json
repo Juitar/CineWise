@@ -1,0 +1,10 @@
+{
+  "code": 0,
+  "message": "success",
+  "traceId": "1234567890abcdef1234567890abcdef",
+  "data": {
+    "runId": "run-example-3",
+    "status": "COMPLETED",
+    "finishedAt": "2026-08-05T10:02:00+08:00"
+  }
+}

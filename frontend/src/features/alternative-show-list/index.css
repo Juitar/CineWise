@@ -1,0 +1,103 @@
+.alt-shows-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-top: 24px;
+}
+
+.alt-shows-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 12px;
+}
+
+.alt-shows-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.alt-show-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  background-color: #fff;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.alt-show-card:hover {
+  border-color: #91caff;
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 12%);
+}
+
+.alt-show-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.alt-show-time {
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.alt-show-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #8c8c8c;
+}
+
+.alt-show-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.alt-show-price {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ff4d4f;
+}
+
+@media (max-width: 1023px) {
+  .alt-shows-container {
+    padding: 0 16px;
+  }
+
+  .alt-show-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .alt-show-action {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .alt-show-action .ant-btn {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+.mobile-loading-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #999;
+}
+
+.mobile-spin-large {
+  --size: 48px;
+}

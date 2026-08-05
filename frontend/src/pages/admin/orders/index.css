@@ -1,120 +1,64 @@
-/* ==========================================================================
-   Admin Orders Page Styles
-   ========================================================================== */
-
 .admin-orders-page {
   display: flex;
   flex-direction: column;
   gap: 24px;
 }
 
-/* Filter Card */
-.orders-filter-card {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  border: 1px solid rgba(226, 228, 235, 60%);
-}
-
-.filter-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
-.filter-item {
-  flex: 1;
-  min-width: 200px;
-}
-
-.filter-date {
-  flex: 1.5;
-  min-width: 280px;
-}
-
-.filter-label {
+.admin-breadcrumb {
   font-size: 14px;
-  color: #646a73;
+  color: var(--color-text-secondary, #6b7280);
   margin-bottom: 8px;
 }
 
-.filter-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
+.admin-breadcrumb span {
+  margin-right: 8px;
 }
 
-/* Table Card */
-.orders-table-card {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  border: 1px solid rgba(226, 228, 235, 60%);
-}
-
-/* Ant Table Customization */
-.admin-ant-table .ant-table-thead > tr > th {
-  background: white;
-  color: #646a73;
-  font-weight: 500;
-  border-bottom: 1px solid rgba(226, 228, 235, 60%);
-}
-
-.admin-ant-table .ant-table-tbody > tr > td {
-  border-bottom: 1px solid rgba(226, 228, 235, 60%);
-  color: #1f2329;
-}
-
-.order-status-tag {
-  font-size: 13px;
-  padding: 4px 10px;
-  border-radius: 4px;
+.admin-breadcrumb .current {
+  color: var(--color-text, #111827);
   font-weight: 500;
 }
 
-.status-purple {
-  background: rgba(99, 91, 255, 10%);
-  color: #635bff;
+.admin-orders-error-container {
+  background: var(--color-bg-container, #fff);
+  border-radius: var(--border-radius-lg, 8px);
+  padding: 48px 24px;
+  text-align: center;
+  box-shadow:
+    0 1px 2px 0 rgba(0, 0, 0, 3%),
+    0 1px 6px -1px rgba(0, 0, 0, 2%),
+    0 2px 4px 0 rgba(0, 0, 0, 2%);
 }
 
-.status-green {
-  background: rgba(16, 185, 129, 10%);
-  color: #10b981;
+.admin-orders-error-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text, #111827);
+  margin-bottom: 16px;
 }
 
-.status-blue {
-  background: rgba(59, 130, 246, 10%);
-  color: #3b82f6;
-}
-
-.status-orange {
-  background: rgba(245, 158, 11, 10%);
-  color: #f59e0b;
-}
-
-.table-actions {
-  display: flex;
-  gap: 16px;
-}
-
-.table-actions a {
-  color: #635bff;
-  text-decoration: none;
-}
-
-.orders-pagination {
-  margin-top: 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.total-text {
+.admin-orders-error-desc {
   font-size: 14px;
-  color: #646a73;
+  color: var(--color-text-secondary, #6b7280);
+  margin-bottom: 24px;
 }
 
-.filter-control-full-width {
-  width: 100%;
+.admin-orders-error-trace {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--color-text-tertiary, #9ca3af);
+  margin-top: 24px;
+}
+
+/* 调试控制面板样式，实际生产应移除或隐藏 */
+.admin-orders-debug-panel {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }

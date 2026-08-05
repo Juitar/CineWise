@@ -10,6 +10,8 @@ spring:
         enabled: false
   flyway:
     enabled: true
+    # H2 只提供快速反馈；V010 起的 MySQL 专属 DDL 由一次性 MySQL 8.4 CI 验证。
+    target: "009"
   main:
     banner-mode: "off"
 
@@ -27,6 +29,8 @@ cinewise:
   transaction:
     expiry-job-enabled: false
     paid-travel-reconciliation:
+      enabled: false
+    refunded-travel-reconciliation:
       enabled: false
 
 springdoc:

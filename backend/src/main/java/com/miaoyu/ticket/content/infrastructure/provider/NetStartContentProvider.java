@@ -48,6 +48,8 @@ import org.springframework.web.client.RestClientResponseException;
  */
 public final class NetStartContentProvider implements ContentProvider, LiveContentSyncPort {
     private static final String PROVIDER = "NETSTART_MAOYAN";
+    // 对页面和快照使用国家行政区划代码，不能把 NetStart 的 ci 当成业务城市代码。
+    private static final String CHANGSHA_CITY_CODE = "430100";
     private final NetStartProperties properties;
     private final Environment environment;
     private final Clock clock;
@@ -144,7 +146,8 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
     }
 
     /**
-     * 每日同步先从热映列表取得外部 ID，再逐部请求详情补齐最低字段；影院使用已验证的长沙 ci=70。
+     * 每日同步先从热映列表取得外部 ID，再逐部请求详情补齐最低字段；影院公开使用长沙行政代码
+     * 430100，HTTP 适配器再转换为已验证的 NetStart ci=70。
      *
      * <p>热映列表本身缺少类型和片长，因此绝不直接保存。单条失败只跳过该条，保留其余合格内容，
      * 由上层审计记录本轮统计。</p>
@@ -171,7 +174,9 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
                 com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE, null, null, null);
         RawFetchResult hotListResult = fetchWithPolicy(hotMovieList);
         if (hotListResult.payload() == null) {
-            return new DailySyncBatch(List.of(), 0, hotListResult.outcome(), hotListResult.errorCode());
+            // 热映目录请求本身已经发生且失败，审计必须按一条失败内容项记账；否则 V004 会把连接失败误判为
+            // total=0 的 SUCCESS，排障人员只能从摘要反推真实结果，无法按结构化状态筛选失败批次。
+            return new DailySyncBatch(List.of(), 1, hotListResult.outcome(), hotListResult.errorCode());
         }
         // 热映列表与影院各预留一个请求额度，避免十部详情把本地 10 req/min 用尽后跳过影院。
         int movieDetailLimit = Math.max(0, properties.requestsPerMinute() - 2);
@@ -197,8 +202,9 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
                 if (normalized.isEmpty()) { rejectedItemCount++; }
                 else { synchronizedContent.add(new SynchronizedContent(query, normalized.get())); }
         }
+        // Provider 和公开结果只使用行政区划代码；HTTP 适配器负责转换 NetStart 的 ci。
         ContentQuery cinemas = new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA,
-                null, "70", "影");
+                null, CHANGSHA_CITY_CODE, "影");
         RawFetchResult cinema = fetchWithPolicy(cinemas);
         if (cinema.payload() == null) {
             rejectedItemCount++;

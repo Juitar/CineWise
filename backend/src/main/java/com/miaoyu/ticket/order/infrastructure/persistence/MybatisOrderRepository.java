@@ -58,10 +58,16 @@ public class MybatisOrderRepository implements OrderRepository {
     }
 
     @Override
-    public List<OrderSnapshot> findOrderPage(OrderListCriteria criteria) {
-        return mapper.findOrderPage(criteria).stream()
-                .map(this::toSnapshot)
+    public List<OrderQuerySnapshot> findOrderQueryPage(OrderListCriteria criteria) {
+        return mapper.findOrderQueryPage(criteria).stream()
+                .map(this::toQuerySnapshot)
                 .toList();
+    }
+
+    @Override
+    public Optional<OrderQuerySnapshot> findOrderQueryByOrderNo(long userId, String orderNo) {
+        return Optional.ofNullable(mapper.findOrderQueryByOrderNo(userId, orderNo))
+                .map(this::toQuerySnapshot);
     }
 
     @Override
@@ -123,6 +129,29 @@ public class MybatisOrderRepository implements OrderRepository {
                         row.showId(),
                         row.orderVersion(),
                         row.paidAt()))
+                .toList();
+    }
+
+    @Override
+    public List<RefundedTravelReconciliationCandidate> findRefundedTravelReconciliationCandidates(
+            LocalDateTime refundedAtOrAfter,
+            LocalDateTime refundedAtOrBefore,
+            LocalDateTime afterRefundedAt,
+            long afterOrderId,
+            int limit) {
+        return mapper.findRefundedTravelReconciliationCandidates(
+                        refundedAtOrAfter,
+                        refundedAtOrBefore,
+                        afterRefundedAt,
+                        afterOrderId,
+                        limit)
+                .stream()
+                .map(row -> new RefundedTravelReconciliationCandidate(
+                        row.orderId(),
+                        row.userId(),
+                        row.showId(),
+                        row.orderVersion(),
+                        row.refundedAt()))
                 .toList();
     }
 
@@ -230,6 +259,24 @@ public class MybatisOrderRepository implements OrderRepository {
                 row.expireTime(),
                 row.clientRequestId(),
                 row.idempotencyKey(),
+                row.version(),
+                row.updatedAt());
+    }
+
+    private OrderQuerySnapshot toQuerySnapshot(OrderQuerySnapshotRow row) {
+        return new OrderQuerySnapshot(
+                row.orderId(),
+                row.orderNo(),
+                row.userId(),
+                row.showId(),
+                row.movieId(),
+                row.cinemaId(),
+                row.showStartTime(),
+                row.ticketCount(),
+                row.unitPrice(),
+                row.totalAmount(),
+                OrderStatus.valueOf(row.status()),
+                row.expireTime(),
                 row.version(),
                 row.updatedAt());
     }

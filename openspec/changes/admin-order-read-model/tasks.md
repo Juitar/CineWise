@@ -11,7 +11,7 @@
 - [x] 2.1 实现管理订单查询条件、ADMIN应用层复核和只读视图；验证：非法条件与USER角色测试通过。
 - [x] 2.2 实现A自有交易表的管理只读Repository及稳定分页；验证：组合筛选、空分页和固定排序测试通过。
 - [x] 2.3 实现订单、座位、支付、电子票、退款和场次引用的批量聚合；验证：列表按关联类型批量读取，详情关联状态正确。
-- [ ] 2.4 C实现合入后接入`UserAdminQueryPort`，实现`userKeyword`和`emailMasked`；验证：未知用户空分页、历史用户缺失保留订单、过宽条件400、摘要不可用503。
+- [x] 2.4 C正式`UserAdminQueryPort`随PR #71合入并自动替换A失败关闭兜底；验证：真实管理订单接口返回`emailMasked`，未知用户保留历史订单、101条过宽返回`400/201010`、目录不可用返回`503/301002`。
 - [x] 2.5 实现两个REST Controller、DTO和OpenAPI契约；验证：字符串ID、两位小数金额、ISO时间、稳定错误码和Mock夹具正确。
 
 ## 3. 测试与交付
@@ -19,9 +19,11 @@
 - [x] 3.1 覆盖ADMIN成功、USER 403、非法筛选、详情404和严格只读测试。
 - [x] 3.2 覆盖完整邮箱、JWT、Cookie、幂等键、二维码载荷、impactSnapshot和actionId敏感字段扫描。
 - [x] 3.3 运行`mvnw.cmd verify`、`openspec validate admin-order-read-model --strict`和`git diff --check`；结果：全部通过，PR有效注释率30.93%，admin模块30.19%。
-- [ ] 3.4 C正式认证合入后验证安全链ADMIN/USER/匿名HTTP语义；当前A测试不得冒充C认证验收。
+- [x] 3.4 C通过PR #71完成真实CSRF、登录和Cookie/JWT安全链验收；验证：ADMIN访问列表和详情均为`200/0`，USER均为`403/201007`，匿名均为`401/201006`，未使用测试身份注入冒充认证验收。
 - [x] 3.5 在A本地隔离MySQL库验证有界用户ID筛选、稳定分页、聚合映射和严格只读；结果：本地MySQL 8.0.40与CI MySQL 8.4.11下4个用例均通过；迁移发布仍须遵守专项迁移门禁。
 
 ## 4. 后续非本PR任务
 
-- [ ] 4.1 C壳层定稿后实现管理订单前端筛选表格和详情抽屉，不提供交易状态修改操作。
+- [x] 4.1 管理订单展示组件、集中 Mock、响应式布局与组件测试
+- [x] 4.2 管理订单真实 DTO/API/Hook 和错误码联调；验证：消费后端夹具，筛选竞态、错误码、详情取消与手动重试测试通过。
+- [x] 4.3 C安全链及ADMIN/USER/匿名真实HTTP验证；验证证据为PR #71的`AdminOrderRealAuthenticationIntegrationTest`及其通过的前端、后端、MySQL、Redis CI。

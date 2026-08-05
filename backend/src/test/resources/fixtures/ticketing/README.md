@@ -25,6 +25,7 @@
 | `c/seat-map-success.json` | `GET /api/v1/shows/{showId}/seats` | Cookie 认证 | 只读查询，可重新读取权威座位图。 |
 | `c/create-order-success.json` | `POST /api/v1/orders` | Cookie 认证、`Idempotency-Key`、`Content-Type: application/json` | 使用原 `clientRequestId` 调用 `GET /api/v1/orders/by-request/{clientRequestId}`；不得生成新键重发建单。 |
 | `c/order-page-success.json` | `GET /api/v1/orders` | Cookie 认证 | 只读分页查询，可直接重新查询。 |
+| `c/order-detail-success.json` | `GET /api/v1/orders/{orderNo}` | Cookie 认证 | 只读详情查询，可直接重新查询。 |
 | `c/payment-success.json` | `POST /api/v1/orders/{orderNo}/payments` | Cookie 认证、`Idempotency-Key`；无请求体 | 使用原 `orderNo` 调用 `GET /api/v1/orders/{orderNo}/payment`；不得自动重发支付。 |
 | `c/electronic-ticket-success.json` | `GET /api/v1/tickets/{ticketId}` | Cookie 认证 | 只读查询，可直接重新查询。 |
 | `c/refund-impact-success.json` | `POST /api/v1/orders/{orderNo}/refund-confirmation` | Cookie 认证；无请求体 | 只读影响查询，可重新查询后由用户再次确认。 |

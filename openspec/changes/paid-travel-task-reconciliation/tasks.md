@@ -15,4 +15,4 @@
 
 - [x] 3.1 A 完成与 D 公开服务的 H2 和 MySQL 8.4 集成测试；验证：遗漏任务可补建、同毫秒键集分页、重复补偿任务唯一、交易终态不改变。
 - [x] 3.2 A 执行完整质量门；验证：`mvnw.cmd verify`、关键生产代码有效注释、`git diff --check` 和范围检查通过。
-- [ ] 3.3 A/D 在 D 交付 `ensureTaskCancelled(OrderInvalidated)` 后补充“重读后退款、再执行 ensureTask”竞态联调；通过前生产保持 `PAID_TRAVEL_RECONCILIATION_ENABLED=false`。
+- [x] 3.3 A/D 在 D 交付 `ensureTaskCancelled(OrderInvalidated)` 后补充“重读后退款、再执行 ensureTask”竞态联调；结果：H2真实链路最终保持唯一 `CANCELLED` 任务，生产默认启用并由 REFUNDED 对账兜底。

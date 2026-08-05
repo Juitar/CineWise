@@ -31,7 +31,7 @@ public interface UserAdminQueryPort {
 
 ## 权限边界
 
-Application Service每次查询都从`CurrentUserAccessor.requireCurrentUser()`取得身份并要求`role=ADMIN`，否则抛出`CommonErrorCode.FORBIDDEN`。该检查不替代C的安全链；C仍需把`/api/v1/admin/**`配置为ADMIN。测试使用替换的`CurrentUserAccessor`覆盖ADMIN、USER和未认证目标语义，不实现JWT。
+Application Service每次查询都从`CurrentUserAccessor.requireCurrentUser()`取得身份并要求`role=ADMIN`，否则抛出`CommonErrorCode.FORBIDDEN`（`100403`）。该检查是绕过HTTP入口调用时的纵深防御，不替代C的安全链；C已在唯一安全链限制`/api/v1/admin/**`为ADMIN。真实HTTP请求先经过该安全链，普通用户返回`403/201007`，匿名用户返回`401/201006`。PR #71 已通过真实CSRF、登录和Cookie/JWT链路验证列表与详情；A的应用层测试仅验证纵深防御，不实现JWT或冒充C的认证验收。
 
 ## 查询模型
 
@@ -64,7 +64,9 @@ Application Service每次查询都从`CurrentUserAccessor.requireCurrentUser()`�
 
 ## 错误与空结果
 
-- 非ADMIN：HTTP 403 / `100403`；
+- 普通用户经真实HTTP安全链访问：HTTP 403 / `201007`；
+- 匿名用户经真实HTTP安全链访问：HTTP 401 / `201006`；
+- 绕过HTTP入口直接调用A应用服务的非ADMIN身份：`100403`；
 - 非法参数：HTTP 400 / `100001`；
 - 认证用户查询参数非法：HTTP 400 / `101001`；
 - 用户关键字匹配超过100人：HTTP 400 / `201010`；
@@ -74,9 +76,9 @@ Application Service每次查询都从`CurrentUserAccessor.requireCurrentUser()`�
 
 ## 迁移与发布
 
-现有V002、V003、V005和V006已包含查询所需字段与索引。本change不新增、不修改任何Flyway文件。发布顺序为：C确认用户摘要契约；A实现管理查询；C接入安全链；后端和前端分别联调。
+现有V002、V003、V005和V006已包含查询所需字段与索引。本change不新增、不修改任何Flyway文件。发布顺序为：C确认用户摘要契约；A实现管理查询；C通过PR #71接入正式用户目录端口并完成安全链验收；后端和前端分别联调。
 
-C正式`UserAdminQueryPort` Bean尚未合入时，A注册`@ConditionalOnMissingBean`失败关闭兜底，两个端口方法统一抛出`301002/503`，不查询`sys_user`、不返回空集合或伪造用户。C正式实现存在后兜底自动让位。
+C正式`UserAdminQueryPort` Bean已随PR #71合入；A的`@ConditionalOnMissingBean`失败关闭兜底已自动让位。兜底仅在正式Bean异常缺失的部署故障中返回`301002/503`，不查询`sys_user`、不返回空集合或伪造用户。
 
 ## 测试策略
 
@@ -87,3 +89,11 @@ C正式`UserAdminQueryPort` Bean尚未合入时，A注册`@ConditionalOnMissingB
 - Repository测试验证分页稳定排序、组合筛选、批量聚合和无N+1调用。
 - JSON夹具和OpenAPI测试覆盖管理列表、详情、`201010`、`301002`以及敏感字段隔离。
 - 按PR审核规范分别统计本PR新增生产代码与admin模块有效注释率，二者均不得低于30%。
+
+## 前端展示层
+
+- **响应式布局**：以 `1024px` 为断点，PC 端显示 Table，移动端显示单列卡片。
+- **状态及错误处理**：对各种可能的 HTTP 和业务错误状态使用独立的 `AdminOrderError` 显示安全错误信息；列表通过 `AdminOrderStatus` 统一渲染所有子状态。
+- **展示层隔离**：`pages` 只组合状态，`modules/admin` 通过 C 的唯一 `apiRequest` 调用管理订单 GET 接口，`features` 仅渲染展示模型；路由和 `RequireAdmin` 仍由 C 维护。
+- **查询恢复**：筛选变化取消旧请求并拒绝迟到响应。`301002` 或网络/5xx 保留筛选条件和已有内存列表并允许手动重试；`201010` 引导收窄条件，403 失败关闭且不展示历史数据。
+- **详情查询**：打开抽屉后按订单号查询，切换或关闭时取消旧请求；403/404 不重试，网络和服务异常允许按原订单号手动重查。

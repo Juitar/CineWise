@@ -6,6 +6,32 @@
 
 系统 SHALL 提供`GET /api/v1/admin/orders`和`GET /api/v1/admin/orders/{orderNo}`，并在应用层根据`CurrentUserAccessor`复核当前角色。系统 SHALL NOT 信任请求参数中的用户或角色。
 
+#### 3.4 `301002 USER_DIRECTORY_UNAVAILABLE`
+
+用户服务暂时不可用或熔断时抛出，包括：
+
+- A尝试调用C查询接口，C抛出连接异常或超时。
+- 此时A必须中断整个订单查询流程，不可降级返回全量数据，也不可返回空数据。
+- 响应体同样为标准错误格式，包含TraceID。
+
+## 4. 前端展示层
+
+### 4.1 页面要求
+
+- 通过 `modules/admin` 和 C 的公共 `apiRequest` 消费真实管理订单列表与详情接口。
+- 集中 mock 只供组件和契约测试使用，不得进入生产页面数据流。
+- 对订单数据和详细数据，使用 `AdminOrderStatus` 和相应的展示组件显示内容。
+
+### 4.2 错误状态展示
+
+- 提供独立的 `AdminOrderError` 组件用于渲染错误，需支持 `FORBIDDEN`、`DIRECTORY_UNAVAILABLE`、`QUERY_TOO_BROAD` 和 `GENERAL_ERROR` 等状态，并能接收和展示 `traceId`。
+
+### 4.3 响应式设计
+
+- `>=1024px` 的设备显示表格视图。
+- `<1024px` 的设备显示卡片视图。
+- 操作热区满足 `>= 44px`。
+
 #### Scenario: ADMIN查询管理订单
 
 - GIVEN 当前身份角色为ADMIN
@@ -15,8 +41,23 @@
 #### Scenario: 普通用户访问管理订单
 
 - GIVEN 当前身份角色为USER
-- WHEN 访问任一管理订单接口
-- THEN 返回HTTP 403和`100403`
+- WHEN 通过真实HTTP安全链访问任一管理订单接口
+- THEN 返回HTTP 403和`201007`
+- AND 不执行管理订单Repository查询
+
+#### Scenario: 匿名用户访问管理订单
+
+- GIVEN 当前请求没有有效登录会话
+- WHEN 通过真实HTTP安全链访问任一管理订单接口
+- THEN 返回HTTP 401和`201006`
+- AND 不执行管理订单Repository查询
+
+#### Scenario: 应用层拒绝非管理员调用
+
+- GIVEN 调用方绕过HTTP入口直接调用管理订单Application Service
+- AND 当前身份不是ADMIN
+- WHEN 查询管理订单列表或详情
+- THEN 抛出`100403`
 - AND 不执行管理订单Repository查询
 
 ### Requirement: 管理订单列表使用白名单筛选

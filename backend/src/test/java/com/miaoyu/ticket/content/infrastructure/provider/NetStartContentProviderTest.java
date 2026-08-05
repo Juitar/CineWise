@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.web.client.ResourceAccessException;
@@ -32,7 +33,8 @@ class NetStartContentProviderTest {
     void givenCurrentDetailShape_whenNormalize_thenOnlyCompleteMovieFieldsBecomeLiveContent() throws Exception {
         NetStartContentProvider provider = provider(query -> json("""
                 {"detailMovie":{"id":1525000,"nm":"年会不能停！2","cat":"剧情,喜剧","dur":"118分钟","sc":"9.6",
-                "showInfo":"今天282家影院放映1596场","commentedUsers":123}}"""));
+                "img":"https://p0.meituan.net/movie/test.jpg","dra":"合格短简介","rt":"2026-08-01",
+                "globalReleased":true,"showInfo":"今天282家影院放映1596场","commentedUsers":123}}"""));
 
         ContentResult<List<? extends ContentItem>> result = provider.query(movieDetail()).orElseThrow();
 
@@ -41,8 +43,54 @@ class NetStartContentProviderTest {
         assertThat(movie.sourceMovieId()).isEqualTo("1525000");
         assertThat(movie.genresJson()).isEqualTo("[\"剧情\",\"喜剧\"]");
         assertThat(movie.durationMinutes()).isEqualTo(118);
+        assertThat(movie.posterUrl()).isEqualTo("https://p0.meituan.net/movie/test.jpg");
+        assertThat(movie.summary()).isEqualTo("合格短简介");
+        assertThat(movie.releaseDate()).isEqualTo("2026-08-01");
+        assertThat(movie.releaseStatus()).isEqualTo("NOW_SHOWING");
         assertThat(result.source().type()).isEqualTo(ContentSourceType.LIVE);
         assertThat(result.degraded()).isFalse();
+    }
+
+    @Test
+    void givenHttpOrRelativePoster_whenNormalize_thenItIsDiscardedWithoutRejectingMovie() throws Exception {
+        NetStartContentProvider provider = provider(query -> json("""
+                {"detailMovie":{"id":1525002,"nm":"测试影片","cat":"剧情","dur":"90分钟","sc":"8.0",
+                "img":"http://example.test/poster.jpg","dra":"  ","rt":"2026-09-01"}}"""));
+
+        MovieContent movie = (MovieContent) provider.query(movieDetail()).orElseThrow().data().getFirst();
+
+        // 海报是可选资料，HTTP 地址只置空，不能让一部最低字段合格的影片整体丢失。
+        assertThat(movie.posterUrl()).isNull();
+        assertThat(movie.summary()).isNull();
+        assertThat(movie.releaseStatus()).isEqualTo("COMING_SOON");
+    }
+
+    @Test
+    void givenRelativeOrBlankPoster_whenNormalize_thenItIsDiscardedWithoutRejectingMovie() throws Exception {
+        NetStartContentProvider relative = provider(query -> json("""
+                {"detailMovie":{"id":1525003,"nm":"相对地址片","cat":"剧情","dur":"90分钟","sc":"8.0",
+                "img":"/movie/poster.jpg"}}"""));
+        NetStartContentProvider blank = provider(query -> json("""
+                {"detailMovie":{"id":1525004,"nm":"空海报片","cat":"剧情","dur":"90分钟","sc":"8.0",
+                "img":"  "}}"""));
+
+        assertThat(((MovieContent) relative.query(movieDetail()).orElseThrow().data().getFirst()).posterUrl()).isNull();
+        assertThat(((MovieContent) blank.query(movieDetail()).orElseThrow().data().getFirst()).posterUrl()).isNull();
+    }
+
+    @Test
+    void givenCurrentMovieWrapper_whenNormalize_thenItKeepsTheSameMovieFields() throws Exception {
+        NetStartContentProvider provider = provider(query -> json("""
+                {"movie":{"id":1525001,"nm":"测试影片","cat":"剧情,喜剧","dur":"118分钟","sc":"9.6",
+                "comments":{"content":"不应保存"},"showInfo":"不应保存"}}"""));
+
+        ContentResult<List<? extends ContentItem>> result = provider.query(movieDetail()).orElseThrow();
+
+        MovieContent movie = (MovieContent) result.data().getFirst();
+        // 当前页面详情把最低字段放入 movie；评论和场次说明仍不得进入内容模型。
+        assertThat(movie.sourceMovieId()).isEqualTo("1525001");
+        assertThat(movie.genresJson()).isEqualTo("[\"剧情\",\"喜剧\"]");
+        assertThat(movie.durationMinutes()).isEqualTo(118);
     }
 
     @Test
@@ -71,12 +119,27 @@ class NetStartContentProviderTest {
                 "distance":"1836km","price":"33","tags":["座"]}]"""));
 
         ContentResult<List<? extends ContentItem>> result = provider.query(
-                new ContentQuery(ContentResourceType.CINEMA, null, "1", "影城")).orElseThrow();
+                new ContentQuery(ContentResourceType.CINEMA, null, "430100", "影城")).orElseThrow();
         CinemaContent cinema = (CinemaContent) result.data().getFirst();
         assertThat(cinema.sourceCinemaId()).isEqualTo("41478");
+        assertThat(cinema.cityCode()).isEqualTo("430100");
         assertThat(cinema.address()).isEqualTo("大兴区康泰街26号");
         assertThat(cinema.longitude()).isNull();
         assertThat(cinema.latitude()).isNull();
+    }
+
+    @Test
+    void givenLegalStaticCoordinates_whenQuery_thenItKeepsCoordinatesWithoutUsingDistance() {
+        NetStartContentProvider provider = provider(query -> json("""
+                [{"id":41478,"lng":"112.9388","lat":"28.2282","distance":"100m",
+                "info":{"name":"长沙测试影城","address":"长沙市芙蓉区测试路1号"}}]"""));
+
+        CinemaContent cinema = (CinemaContent) provider.query(
+                new ContentQuery(ContentResourceType.CINEMA, null, "430100", "影城")).orElseThrow().data().getFirst();
+
+        // distance 是相对请求位置的临时值，不能进入内容模型；只保留上游明确给出的影院静态坐标。
+        assertThat(cinema.longitude()).isEqualByComparingTo("112.9388");
+        assertThat(cinema.latitude()).isEqualByComparingTo("28.2282");
     }
 
     @Test
@@ -110,9 +173,11 @@ class NetStartContentProviderTest {
     @Test
     void givenDailySync_whenHotListDetailsAndCinemaAreFetched_thenEveryRequestUsesTheSameLimit() throws Exception {
         AtomicInteger calls = new AtomicInteger();
+        AtomicReference<String> cinemaCityCode = new AtomicReference<>();
         NetStartContentProvider provider = provider(query -> {
             calls.incrementAndGet();
             if (query.resourceType() == ContentResourceType.CINEMA) {
+                cinemaCityCode.set(query.cityCode());
                 return json("[{\"id\":41478,\"info\":{\"name\":\"测试影城一号\",\"address\":\"测试一区\"}},"
                         + "{\"id\":41479,\"info\":{\"name\":\"测试影城二号\",\"address\":\"测试二区\"}}]");
             }
@@ -128,11 +193,27 @@ class NetStartContentProviderTest {
 
         // 一轮保留热映列表、八部详情和影院共十次额度，不能因十部详情挤掉影院或越过本地限制。
         assertThat(calls).hasValue(10);
+        assertThat(cinemaCityCode).hasValue("430100");
         assertThat(batch.contents()).hasSize(9);
         // 八部影片和两家影院都合格时，成功内容总数为十；不能因影院来自同一查询被误判字段不合格。
         assertThat(batch.attemptedCount()).isEqualTo(10);
         assertThat(batch.outcome())
                 .isEqualTo(com.miaoyu.ticket.content.application.LiveContentSyncPort.Outcome.SUCCESS);
+    }
+
+    @Test
+    void givenDailySyncHotListConnectionFailure_whenSynchronize_thenItCountsOneFailedContentItem() {
+        NetStartContentProvider provider = provider(query -> {
+            throw new ResourceAccessException("offline");
+        });
+
+        var batch = provider.fetchForDailySync();
+
+        // 目录请求失败也必须进入内容项统计，才能让 ContentSyncService 写出 V004 要求的 FAILED 状态。
+        assertThat(batch.contents()).isEmpty();
+        assertThat(batch.attemptedCount()).isEqualTo(1);
+        assertThat(batch.outcome())
+                .isEqualTo(com.miaoyu.ticket.content.application.LiveContentSyncPort.Outcome.CONNECTION_FAILED);
     }
 
     @Test

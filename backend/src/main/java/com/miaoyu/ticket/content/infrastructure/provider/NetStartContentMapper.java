@@ -46,24 +46,64 @@ final class NetStartContentMapper {
     }
 
     private Optional<ContentItem> mapMovie(JsonNode raw) {
-        // 影片详情接口把字段放在 detailMovie；测试夹具可直接传该对象，避免原始结构扩散到业务层。
-        JsonNode movie = raw.path("detailMovie").isObject() ? raw.path("detailMovie") : raw;
+        // 旧接口使用 detailMovie；当前页面详情接口使用 movie。两种响应都只取最低基础字段，
+        // 不能因包装层调整把本来合格的影片误判为字段缺失，也不能把整份页面响应向上透传。
+        JsonNode movie = movieNode(raw);
         return text(movie, "id").flatMap(id -> text(movie, "nm").flatMap(title -> text(movie, "cat")
                 .flatMap(genres -> positiveInt(movie, "dur").flatMap(duration -> decimal(movie, "sc")
-                        .map(rating -> new MovieContent(id, title, genresJson(genres), duration, rating))))));
+                        .map(rating -> new MovieContent(null, id, title, genresJson(genres), duration, rating,
+                                // 海报、简介和上映字段都在 Adapter 收缩，后续层不接触 NetStart 原始字段名。
+                                httpsUrl(movie.path("img").asText(null)), optionalText(movie, "dra"),
+                                optionalText(movie, "rt"), releaseStatus(movie)))))));
+    }
+
+    /** 详情字段不存在时保留直接对象兼容，方便受控夹具只描述影片本身而不复制页面外层结构。 */
+    private JsonNode movieNode(JsonNode raw) {
+        if (raw.path("detailMovie").isObject()) {
+            return raw.path("detailMovie");
+        }
+        return raw.path("movie").isObject() ? raw.path("movie") : raw;
     }
 
     private Optional<ContentItem> mapCinema(JsonNode raw, String cityCode) {
         JsonNode info = raw.path("info").isObject() ? raw.path("info") : raw;
         return text(raw, "id").flatMap(id -> text(info, "name").flatMap(name -> text(info, "address")
                 .flatMap(address -> text(cityCode).map(city -> new CinemaContent(id, name, city,
-                        areaFromAddress(address), address, null, null)))));
+                        areaFromAddress(address), address, coordinate(raw, "lng", "longitude", 180),
+                        coordinate(raw, "lat", "latitude", 90))))));
     }
 
     private Optional<String> text(JsonNode node, String field) { return text(node.path(field).asText(null)); }
     private Optional<String> text(String value) {
         if (value == null || value.trim().isEmpty()) { return Optional.empty(); }
         return Optional.of(value.trim());
+    }
+    /** 可选字段缺失时返回 null，让 REST 明确表达“来源未提供”，而不是用猜测文本补全。 */
+    private String optionalText(JsonNode node, String field) { return text(node, field).orElse(null); }
+
+    /**
+     * NetStart 的海报可能是 HTTP、相对路径或异常文本；这些地址不会越过 Provider 适配层。
+     */
+    private String httpsUrl(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            java.net.URI uri = java.net.URI.create(value.trim());
+            return "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null
+                    ? uri.normalize().toString() : null;
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    /** 上游只有全局上映标记时，保留受控枚举，不用场次或票务字段推断影片状态。 */
+    /** 仅输出 C 已确认的两个状态；未知上游形态保持 null，不能泄漏任意 Provider 原值。 */
+    private String releaseStatus(JsonNode movie) {
+        if (movie.path("globalReleased").asBoolean(false)) {
+            return "NOW_SHOWING";
+        }
+        return text(movie, "rt").isPresent() ? "COMING_SOON" : null;
     }
     private Optional<Integer> positiveInt(JsonNode node, String field) {
         String value = node.path(field).asText("").replaceAll("[^0-9]", "");
@@ -76,6 +116,11 @@ final class NetStartContentMapper {
     private Optional<BigDecimal> decimal(JsonNode node, String field) {
         try { return Optional.of(new BigDecimal(node.path(field).asText(""))); }
         catch (NumberFormatException exception) { return Optional.empty(); }
+    }
+    /** 经纬度只接受上游明确提供且落在地理范围内的静态坐标，不能由地址或距离文本反推。 */
+    private BigDecimal coordinate(JsonNode node, String shortField, String longField, int maximumAbsoluteValue) {
+        Optional<BigDecimal> value = decimal(node, shortField).or(() -> decimal(node, longField));
+        return value.filter(item -> item.abs().compareTo(BigDecimal.valueOf(maximumAbsoluteValue)) <= 0).orElse(null);
     }
     private String areaFromAddress(String address) {
         int index = address.indexOf('区');

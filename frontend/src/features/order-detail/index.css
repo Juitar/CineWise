@@ -1,0 +1,129 @@
+.order-detail-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 24px;
+  background-color: var(--color-bg-container, #fff);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 8%);
+}
+
+.order-detail-alert {
+  margin-bottom: 16px;
+}
+
+.order-detail-header {
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+
+.order-detail-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.order-detail-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #262626;
+  margin: 0;
+}
+
+.order-detail-no {
+  font-size: 14px;
+  color: #8c8c8c;
+}
+
+.order-detail-section {
+  margin-bottom: 24px;
+}
+
+.order-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 12px;
+}
+
+.order-movie-card {
+  padding: 16px;
+  background-color: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+
+.order-movie-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #262626;
+  margin-bottom: 8px;
+}
+
+.order-movie-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: #595959;
+}
+
+.order-seat-list {
+  color: #1677ff;
+  font-weight: 600;
+}
+
+.order-amount-highlight {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ff4d4f;
+}
+
+.order-detail-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 12px;
+  border-top: 1px solid #f0f0f0;
+  padding-top: 20px;
+  flex-wrap: wrap;
+}
+
+.order-detail-btn {
+  min-width: 110px;
+}
+
+@media (max-width: 1023px) {
+  .order-detail-container {
+    padding: 16px;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .order-detail-actions {
+    flex-direction: column;
+    justify-content: stretch;
+  }
+
+  .order-detail-actions .order-detail-btn {
+    width: 100%;
+    min-height: 44px;
+    margin-left: 0;
+  }
+}
+
+.mobile-loading-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #999;
+}
+
+.mobile-spin-large {
+  --size: 48px;
+}

@@ -23,7 +23,7 @@
 
 ### 1. 新建 content 模块 API 与查询 Hook
 
-在 `frontend/src/modules/content/` 中增加影片列表 API、查询参数解析和 `useMovieList`。API 只负责把 `MovieListQuery` 传给 `apiRequest<ContentPageResponse<MovieSummary>>()`；Hook 管理加载、保留旧数据刷新、错误、重试、AbortController 和最新查询标识。
+在 `frontend/src/modules/content/` 中增加影片列表 API、查询参数解析和 `useMovieList`。API 只负责把 `MovieListQuery` 传给 `apiRequest<ContentPageResponse<MovieSummary>>()`；Hook 管理加载、旧数据失败恢复、错误、重试、AbortController 和最新查询标识。
 
 页面不直接调用 `fetch` 或 `apiRequest`。本次不引入 TanStack Query 等新依赖，避免为了一个只读列表扩大安装和缓存改造范围。
 
@@ -52,7 +52,7 @@
 
 每次 URL 条件变化时取消上一请求，同时保存规范化查询键。即使运行环境无法及时取消已发出的响应，也只接受与当前查询键一致的结果。组件卸载时取消请求。
 
-首次加载无数据时显示 Skeleton；已有数据刷新时保留旧卡片并显示局部加载。失败时保留旧数据和来源提示；无旧数据时显示错误区与手动重试。离线只保留当前页面内存数据，不写 localStorage、IndexedDB 或 Service Worker。
+首次加载以及筛选、搜索、分页切换时都显示卡片 Skeleton，并隐藏旧卡片、旧来源、空状态和分页，避免新查询条件与旧结果同时出现。Hook 继续在内存中保留旧数据，但只在刷新失败后恢复旧卡片和来源提示；无旧数据时显示错误区与手动重试。离线只保留当前页面内存数据，不写 localStorage、IndexedDB 或 Service Worker。
 
 ### 6. 先做消费者测试，再做真实 HTTP 冒烟
 

@@ -14,6 +14,7 @@ import com.miaoyu.ticket.agent.application.persistence.AgentPersistenceJsonFacto
 import com.miaoyu.ticket.agent.application.persistence.AgentRunRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunResultTransaction;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunStepRepository;
+import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeEventService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.application.reply.ErrorReplyFacts;
@@ -24,6 +25,8 @@ import com.miaoyu.ticket.agent.domain.persistence.AgentRequestHash;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStep;
+import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
+import com.miaoyu.ticket.agent.domain.persistence.AgentSessionStatus;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlan;
 import com.miaoyu.ticket.agent.domain.plan.ExecutionPlan;
 import com.miaoyu.ticket.agent.domain.plan.ExecutionPlanNode;
@@ -170,6 +173,11 @@ class AgentRunResultTransactionTest {
         AgentRunStepRepository stepRepository = Mockito.mock(AgentRunStepRepository.class);
         AgentMessageRepository messageRepository = Mockito.mock(AgentMessageRepository.class);
         AgentSessionRepository sessionRepository = Mockito.mock(AgentSessionRepository.class);
+        AgentRuntimeEventService runtimeEventService = Mockito.mock(AgentRuntimeEventService.class);
+        LocalDateTime now = LocalDateTime.of(2026, 8, 4, 10, 0);
+        when(sessionRepository.findByIdAndUserId(1L, 7L)).thenReturn(java.util.Optional.of(new AgentSession(
+                1L, "session-1", 7L, null, AgentSessionStatus.ACTIVE, 100L, 0L,
+                now, now, now.plusDays(30))));
         BusinessIdGenerator idGenerator = new BusinessIdGenerator() {
             private long next = 1000L;
 
@@ -184,6 +192,7 @@ class AgentRunResultTransactionTest {
                 messageRepository,
                 sessionRepository,
                 new AgentPersistenceJsonFactory(new ObjectMapper()),
+                runtimeEventService,
                 idGenerator,
                 Clock.fixed(Instant.parse("2026-08-04T02:00:00Z"), ZoneId.of("Asia/Shanghai")));
         return new Fixture(transaction, runRepository, stepRepository, messageRepository, sessionRepository);

@@ -12,6 +12,8 @@ import org.springframework.web.client.RestClient;
  * 立即交给同包映射器，不能越过这里传给 Application。</p>
  */
 final class RestClientNetStartRawClient implements NetStartRawClient {
+    private static final String CHANGSHA_CITY_CODE = "430100";
+    private static final String CHANGSHA_PROVIDER_CITY_ID = "70";
     private final RestClient restClient;
 
     RestClientNetStartRawClient(RestClient restClient) { this.restClient = restClient; }
@@ -25,7 +27,17 @@ final class RestClientNetStartRawClient implements NetStartRawClient {
                     .queryParam("movieId", query.contentId()).build()).retrieve().body(JsonNode.class);
         }
         return restClient.get().uri(uri -> uri.path("/search/cinemas")
-                .queryParam("keyword", query.keyword()).queryParam("ci", query.cityCode()).build())
+                .queryParam("keyword", query.keyword())
+                .queryParam("ci", providerCityId(query.cityCode()))
+                .build())
                 .retrieve().body(JsonNode.class);
+    }
+
+    /** 第三方城市 ID 只能存在于 HTTP 边界，公开 DTO、快照和 URL 始终使用标准行政代码。 */
+    static String providerCityId(String cityCode) {
+        if (CHANGSHA_CITY_CODE.equals(cityCode)) {
+            return CHANGSHA_PROVIDER_CITY_ID;
+        }
+        throw new IllegalArgumentException("NetStart 当前只支持长沙行政代码 430100");
     }
 }

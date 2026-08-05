@@ -1,0 +1,13 @@
+{
+  "eventId": "43",
+  "sessionId": "session-example-1",
+  "runId": "run-example-1",
+  "planVersion": 1,
+  "nodeId": "rank-movie",
+  "eventType": "step.complete",
+  "displayText": "步骤已完成",
+  "payload": {
+    "nodeId": "rank-movie"
+  },
+  "occurredAt": "2026-08-05T10:00:03+08:00"
+}

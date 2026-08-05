@@ -33,5 +33,5 @@
 - 前端：`modules/auth`、`shared/auth`、`shared/api`、登录页路由和响应式登录视图；现有 `apiRequest` 对外调用方式保持不变。
 - 公共接口：新增密码登录、管理员登录、当前用户、登出和 CSRF Token 获取接口；A/B/D 已完成对 CSRF 接口、Header 和浏览器写请求处理规则的审查。
 - 数据库：需要 `sys_user`、`sys_login_log`；A 已分配版本，C 编写本地 SQL 草案，A 负责最终审查、执行授权和空 MySQL 8.4 验证。
-- 部署：正式环境必须使用 HTTPS 和 `Secure` Cookie；本地 HTTP 仅允许通过环境配置关闭 `Secure`，不得成为生产默认值。
+- 部署：长期正式入口必须使用 HTTPS 和 `Secure` Cookie；域名备案完成前，HTTP IP Demo 可通过环境配置关闭 `Secure`，前端为不支持 `crypto.randomUUID()` 的非安全上下文生成仅用于请求追踪和幂等的降级 `clientRequestId`。
 - 文档：认证设计、前端应用设计中残留的 Umi `request` 描述，以及后端总系分中 `CurrentUser` 的 `userId/email` 描述需要后续按已确认接口修正。
