@@ -73,6 +73,49 @@ public interface TicketingQueryMapper {
             """)
     List<ShowQueryRow> findSaleableShows(@Param("criteria") ShowQueryRepository.QueryCriteria criteria);
 
+    /** 推荐批量查询在数据库侧排除售罄场次，并只多读取一条用于截断探测。 */
+    @Select("""
+            <script>
+            SELECT ms.id AS show_id,
+                   ms.movie_id,
+                   ms.cinema_id,
+                   ms.auditorium_id,
+                   a.name AS auditorium_name,
+                   ms.start_time,
+                   ms.end_time,
+                   ms.language_version,
+                   ms.base_price,
+                   SUM(CASE WHEN ss.status = 'AVAILABLE' THEN 1 ELSE 0 END) AS available_seat_count,
+                   ms.status,
+                   ms.data_type,
+                   ms.version,
+                   ms.update_time AS updated_at
+              FROM movie_show ms
+              JOIN auditorium a ON a.id = ms.auditorium_id
+              LEFT JOIN show_seat ss ON ss.show_id = ms.id
+             WHERE ms.cinema_id IN
+            <foreach collection="criteria.cinemaIds" item="cinemaId" open="(" separator="," close=")">
+                #{cinemaId}
+            </foreach>
+               AND ms.status = 'ON_SALE'
+               AND ms.start_time &gt; #{criteria.startsAfter}
+               AND ms.start_time &gt;= #{criteria.dateStart}
+               AND ms.start_time &lt; #{criteria.dateEnd}
+            <if test="criteria.timeFrom != null">
+               AND CAST(ms.start_time AS TIME) &gt;= #{criteria.timeFrom}
+               AND CAST(ms.start_time AS TIME) &lt; #{criteria.timeTo}
+            </if>
+             GROUP BY ms.id, ms.movie_id, ms.cinema_id, ms.auditorium_id, a.name,
+                      ms.start_time, ms.end_time, ms.language_version, ms.base_price,
+                      ms.status, ms.data_type, ms.version, ms.update_time
+            HAVING SUM(CASE WHEN ss.status = 'AVAILABLE' THEN 1 ELSE 0 END) &gt; 0
+             ORDER BY ms.start_time, ms.id
+             LIMIT #{criteria.fetchLimit}
+            </script>
+            """)
+    List<ShowQueryRow> findSaleableShowsByCinemaIds(
+            @Param("criteria") ShowQueryRepository.BatchQueryCriteria criteria);
+
     /** 查询座位图头部，同时取场次与座位中较新的更新时间作为快照时间。 */
     @Select("""
             SELECT ms.id AS show_id,

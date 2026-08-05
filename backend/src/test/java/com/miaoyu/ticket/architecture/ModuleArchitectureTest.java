@@ -33,4 +33,13 @@ class ModuleArchitectureTest {
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage("org.springframework.web..", "jakarta.servlet..");
+
+    /** D 推荐只能通过 A 的 application 契约读取票务数据，不能耦合 HTTP 或持久化适配器。 */
+    @ArchTest
+    static final ArchRule RECOMMENDATION_MUST_NOT_DEPEND_ON_TICKETING_ADAPTERS = noClasses()
+            .that()
+            .resideInAPackage("..recommendation..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("..ticketing.api..", "..ticketing.infrastructure..");
 }
