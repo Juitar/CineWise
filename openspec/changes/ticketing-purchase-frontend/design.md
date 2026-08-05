@@ -70,9 +70,16 @@ frontend/src/
 ## 5. 外部依赖边界 (C 与 D 模块协作)
 
 - **C 认证与路由依赖**：C 已经合入统一 RequireAuth、安全 returnUrl、认证 Provider 和 401 单飞处理能力。A 不负责配置 `.umirc.ts` 或定义第二套路由守卫；购票选座与订单确认的路由表注册及 Auth 保护统一由 Owner C 负责配置；
-- **D 替代场次依赖**：后台 `GET /api/v1/orders/{orderNo}/alternative-shows` 返回候选对象包含 `movieId: string`。前端对该接口在第一批中仅作接口契约与 Mock 定义，暂不进行页面调用，必须等待后台分支合入 `dev` 后进行 rebase 再行接入；页面禁止从订单、标题或其他状态推断 `movieId`。
+- **D 替代场次依赖**：当前后台 `GET /api/v1/orders/{orderNo}/alternative-shows` 已返回包含 `movieId: string` 的候选对象，A 只消费该公开 REST 契约。页面禁止从订单、标题或其他状态推断 `movieId`，进入候选场次后仍重新查询 A 的权威座位图。
 
-## 6. 原型图引用与视觉遵循
+## 6. 第二批交易会话与有界轮询
+
+- 支付按 `orderNo` 保存一组稳定 `Idempotency-Key` 与 RESULT_UNKNOWN 标记；退款按 `orderNo` 保存稳定 `clientRequestId`、`Idempotency-Key` 与 RESULT_UNKNOWN 标记。会话只包含恢复写操作所需的非敏感标识，不保存模拟密码、完整错误响应或个人信息。
+- 明确收到 4xx 或普通 5xx 业务响应时结束本次提交并展示错误；仅网络断开、超时、502/504 进入 RESULT_UNKNOWN。进入后页面隐藏或禁用对应写按钮，只开放原订单/支付/退款只读查询。
+- 支付自动查询最多 15 次且总时长不超过 30 秒。`SUCCESS/PAID`、`PENDING_PAYMENT`、`CANCELLED`、`EXPIRED` 或 `REFUNDED` 都会停止自动查询；页面卸载也必须清理定时器。达到上限后保留手动查询入口，不重发支付 POST。
+- 取消订单不建设第二个取消结果接口。响应未知时查询 `GET /api/v1/orders/{orderNo}`；只有服务端订单状态确认后才更新页面。
+
+## 7. 原型图引用与视觉遵循
 
 - A 的原型图存放在 `D:\Programming\妙语购票\CineWise-Docs\系分文档\前端\A负责前端展示图\`，仅决定页面层级和信息关系；
 - 严禁实现原型中已过时的：服务费、优惠券、AI 推荐座位、Agent 聊天侧栏、餐饮与路线推荐、真实支付渠道；

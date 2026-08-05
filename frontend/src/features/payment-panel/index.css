@@ -1,0 +1,122 @@
+/* 模拟支付面板基础布局 */
+.payment-panel-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 24px;
+  background-color: var(--color-bg-container, #fff);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 8%);
+}
+
+.payment-panel-alert {
+  margin-bottom: 16px;
+}
+
+.payment-page-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 16px;
+}
+
+.payment-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background-color: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  margin-bottom: 24px;
+}
+
+.payment-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.payment-summary-label {
+  color: #595959;
+}
+
+.payment-summary-value {
+  color: #262626;
+  font-weight: 500;
+}
+
+.payment-summary-amount {
+  color: #ff4d4f;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.payment-countdown-banner {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #e8e8e8;
+  font-size: 13px;
+  color: #8c8c8c;
+  text-align: right;
+}
+
+.countdown-time {
+  color: #faad14;
+  font-weight: 600;
+}
+
+/* 密码区域视觉规范 */
+.payment-password-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.payment-password-label {
+  font-size: 14px;
+  color: #262626;
+}
+
+.payment-password-input {
+  max-width: 320px;
+}
+
+.payment-password-error {
+  color: var(--color-error, #dc2626);
+  font-size: 14px;
+}
+
+.payment-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  justify-content: center;
+}
+
+.payment-unknown-container,
+.payment-processing-container,
+.payment-success-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+}
+
+.payment-processing-tip {
+  font-size: 14px;
+  color: #595959;
+}
+
+.payment-query-btn {
+  min-width: 140px;
+}
+
+.payment-cancel-btn {
+  min-width: 80px;
+}

@@ -17,6 +17,13 @@
 
 ## 第二批：后续迭代（支付、电子票只读展示、订单管理、退票与替代场次回流）
 
-- [ ] 2.1 定义后续支付、电子票、订单管理、退票以及 `AlternativeShow`（包含 `movieId: string`）等 DTO 与 Mock。（Owner: A）
-- [ ] 2.2 待后端替代场次等 PR 正式合入 dev 并 rebase 最新 dev 后，实现 Mock 模拟支付 `/payments/:orderNo`、支付只读轮询 `/payments/:orderNo/result`、电子票只读展示 `/tickets/:ticketId` 及订单详情页面。（Owner: A）
-- [ ] 2.3 实现个人订单查询 `/orders` 与退票确认 / 替代场次 `/orders/:orderNo/refund` 页面。（Owner: A）
+- [x] 2.1 完成支付、支付结果、电子票、订单列表/详情、退票确认和替代场次纯展示组件及集中 Mock；组件不直接请求接口或决定交易成功。（Owner: A）
+- [x] 2.2 按后端冻结 DTO 扩展 `modules/order/types.ts` 与 `api.ts`：补齐 `PAYING`、分页订单、取消、支付、电子票、退票影响/结果和包含 `movieId` 的替代场次契约，并消费 `backend/src/test/resources/fixtures/ticketing/c/` 固定夹具。（Owner: A）
+- [x] 2.3 实现订单列表/详情查询和取消 Hook；取消请求使用稳定 `Idempotency-Key`，响应未知后只查询订单详情，不自动重发取消 POST。（Owner: A）
+- [x] 2.4 实现 Mock 支付 Hook 与页面容器；六位数字仅在支付展示组件内存中校验并在调用回调前清空，支付 POST 为空业务请求体；响应未知后只查询支付结果。（Owner: A）
+- [x] 2.5 实现支付结果查询与有界轮询：最多 15 次且总时长不超过 30 秒，成功、待支付或订单终态立即停止；卸载页面时清理定时器，达到上限后仅允许手动查询。（Owner: A）
+- [x] 2.6 实现电子票查询与只读页面；票务状态以服务端为准，二维码仅根据 `qrPayload` 在浏览器本地渲染，不发送第三方请求。（Owner: A）
+- [x] 2.7 实现退票影响、退票写入、结果恢复与替代场次查询 Hook；传统页面省略 `actionId`，退款使用稳定 `clientRequestId` 和 `Idempotency-Key`，响应未知后只查询原退款。（Owner: A）
+- [x] 2.8 将 `/orders`、`/orders/:orderNo`、`/payments/:orderNo`、`/payments/:orderNo/result`、`/tickets/:ticketId`、`/orders/:orderNo/refund` 页面由集中 Mock 容器替换为真实 Hook 编排，保留加载、空、失败、离线只读和 RESULT_UNKNOWN 状态。（Owner: A）
+- [x] 2.9 增加 API 契约、明确失败、结果未知、稳定幂等会话、轮询终止和卸载清理测试；执行 `pnpm check`、OpenSpec strict 校验和 `git diff --check`。（Owner: A）
+- [ ] 2.10 C 在公共路由表注册第二批页面并配置 `RequireAuth`；A/C 在合规 Node 环境执行真实路由、认证回跳和交易闭环 E2E。（Owner: C、A）
