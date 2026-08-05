@@ -1,6 +1,6 @@
 ## Context
 
-现有 `password-login-and-session` 已提供账号查询、JWT Cookie、CSRF、当前用户和登录审计，但明确排除了验证码和注册。认证设计已经确定验证码、邀请码、邀请码使用记录的表字段，以及注册接口、事务和错误码；当前缺少对应迁移版本、首个邀请码数据迁移和正式 SMTP 环境配置。
+现有 `password-login-and-session` 已提供账号查询、JWT Cookie、CSRF、当前用户和登录审计，但明确排除了验证码和注册。认证设计已经确定验证码、邀请码、邀请码使用记录的表字段，以及注册接口、事务和错误码；迁移版本已确定为 V011/V012，当前仍缺少 A 审查后的正式 SQL、空 MySQL 验证和正式 SMTP 环境配置。
 
 ## Goals / Non-Goals
 
@@ -42,9 +42,9 @@
 
 邮件端口返回 `SENT/FAILED/UNKNOWN`。SMTP Adapter 使用 Spring Boot Mail 的 `JavaMailSender` 发送纯文本认证模板，主题和正文固定，不接受前端模板；地址、认证和超时由 `spring.mail.*` 环境配置提供。未启用 SMTP 时使用失败关闭 Adapter，接口返回 `301001`。代码和测试不打印验证码。
 
-### 7. 数据迁移由 A 分配版本
+### 7. 数据迁移使用已确认的 V011/V012
 
-`sys_email_verify_code` 使用设计已确认的 11 个字段，补充 `status` 仅允许 `UNUSED/USED/INVALID`、`attempt_count` 在 0～5、摘要为 64 位小写十六进制、使用时间与状态一致的 CHECK。索引为 `idx_verify_lookup(email,purpose,status,expire_time)` 和用于短生命周期清理的 `idx_verify_expire(expire_time)`。V006 的 `chk_sys_login_log_type` 当前只允许 `PASSWORD/ADMIN_PASSWORD`，新迁移必须在同一条 `ALTER TABLE` 中删除并重建该约束，加入 `EMAIL_CODE`；不得修改 V006。C 提交字段与约束申请；A 分配 V009 之后的实际版本、生成或审核 SQL，并决定是否授权空 MySQL 8.4 验证。
+`sys_email_verify_code` 使用设计已确认的 11 个字段，补充 `status` 仅允许 `UNUSED/USED/INVALID`、`attempt_count` 在 0～5、摘要为 64 位小写十六进制、使用时间与状态一致的 CHECK。索引为 `idx_verify_lookup(email,purpose,status,expire_time)` 和用于短生命周期清理的 `idx_verify_expire(expire_time)`。V006 的 `chk_sys_login_log_type` 当前只允许 `PASSWORD/ADMIN_PASSWORD`，`V011__create_auth_email_code_and_registration_tables.sql` 必须在同一条 `ALTER TABLE` 中删除并重建该约束，加入 `EMAIL_CODE`；不得修改 V006。C 提交字段与约束申请；A 生成或审核 V011/V012 的正式 SQL，并决定是否授权空 MySQL 8.4 验证。
 
 ### 8. 注册事务同时消费验证码和邀请码
 
@@ -72,7 +72,8 @@
 - OpenSpec change：`openspec/changes/email-code-authentication/`
 - 领域 Owner：C
 - 涉及表：新增 `sys_email_verify_code`、`sys_registration_invite`、`sys_registration_invite_use`；向前修改 `sys_login_log` 的 `chk_sys_login_log_type`
-- 申请版本：等待 A 分配；不得自行使用 V010
+- 结构迁移：`V011__create_auth_email_code_and_registration_tables.sql`
+- 邀请码数据迁移：`V012__seed_training_registration_invite.sql`
 - 验证码字段：`id,email,purpose,code_hash,status,send_time,expire_time,used_time,attempt_count,create_time,update_time`
 - 邀请码字段：`id,code_hash,status,max_uses,used_count,valid_from,expire_time,version,create_time,update_time`
 - 使用记录字段：`id,invite_id,user_id,client_request_id,used_at,create_time`
@@ -80,7 +81,7 @@
 - 索引：按认证总系分 T02、T03、T04；补充 `idx_verify_expire(expire_time)`；邮箱、邀请码摘要、用户和 clientRequestId 的唯一/查询规则不得删减
 - CHECK：用途白名单、状态白名单、尝试次数 0～5、摘要格式、`USED` 必须有 `used_time` 且其他状态为空
 - 兼容修改：`chk_sys_login_log_type` 从 `PASSWORD/ADMIN_PASSWORD` 增加 `EMAIL_CODE`，在同一条 `ALTER TABLE` 中 DROP 和 ADD，不得修改 V006
-- 数据迁移：结构迁移之后另建首个培训邀请码数据迁移，只保存预计算摘要，不保存明文；使用“摘要不存在才插入”，不得重置既有使用次数
+- 数据迁移：`V012__seed_training_registration_invite.sql` 在 V011 之后执行，只保存预计算摘要，不保存明文；使用“摘要不存在才插入”，不得重置既有使用次数
 - 验证：冷却重复发送、错误尝试上限、过期、一次性消费、邮箱唯一竞争、邀请码最后一次竞争、注册回滚、字符集和重复 migrate
 
 ## Verification

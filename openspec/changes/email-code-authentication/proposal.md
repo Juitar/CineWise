@@ -29,6 +29,6 @@
 
 - 后端：`auth/api`、`auth/application`、`auth/domain`、`auth/infrastructure/persistence`、`auth/infrastructure/rate`、`auth/infrastructure/mail` 和认证配置。
 - 接口：新增 `/api/v1/auth/email-codes`、`/api/v1/auth/login/email` 和 `/api/v1/auth/register`；复用现有 `CurrentUserResponse`、Cookie 和 CSRF Header。
-- 数据库：新增 `sys_email_verify_code`、`sys_registration_invite`、`sys_registration_invite_use`，并以向前迁移把 `sys_login_log.login_type` 的 CHECK 增加 `EMAIL_CODE`；首个培训邀请码使用独立数据迁移。A 分配版本、审查 SQL 并决定空 MySQL 8.4 验证授权。
+- 数据库：`V011__create_auth_email_code_and_registration_tables.sql` 新增 `sys_email_verify_code`、`sys_registration_invite`、`sys_registration_invite_use`，并以向前迁移把 `sys_login_log.login_type` 的 CHECK 增加 `EMAIL_CODE`；`V012__seed_training_registration_invite.sql` 独立写入首个培训邀请码摘要。A 审查 SQL 并决定空 MySQL 8.4 验证授权。
 - 配置：新增验证码摘要密钥、邀请码摘要密钥、当前隐私政策版本、SMTP Provider 开关、发件人和超时环境变量；正式环境不得使用 Demo 验证码。
-- Owner：C；A 只负责迁移版本、SQL 审查和受控验证，不修改 A/B/D 业务模块。
+- Owner：C；A 负责 V011/V012 的 SQL 审查和受控验证，不修改 A/B/D 业务模块。

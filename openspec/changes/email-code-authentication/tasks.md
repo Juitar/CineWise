@@ -2,7 +2,7 @@
 
 - [x] 1.1 C 对照 PRD、认证设计、后端总系分、现有密码登录实现确认发送与验证码登录范围。
 - [x] 1.2 C 建立 `email-code-authentication` proposal、spec、design、tasks 和迁移申请；验证：OpenSpec 严格校验。
-- [ ] 1.3 A 分配认证结构迁移和首个培训邀请码数据迁移版本，完成 T02/T03/T04、登录日志 CHECK、索引、约束和兼容性静态审查。
+- [ ] 1.3 迁移版本已确定为 V011/V012；A 继续完成 T02/T03/T04、登录日志 CHECK、索引、约束和兼容性静态审查。
 
 ## 2. 验证码领域和应用服务
 
@@ -20,7 +20,7 @@
 
 ## 4. 迁移和真实环境
 
-- [ ] 4.1 A 创建或审核正式 Flyway 迁移；C 不自行占用版本、不执行迁移。
+- [ ] 4.1 A 创建或审核 `V011__create_auth_email_code_and_registration_tables.sql` 和 `V012__seed_training_registration_invite.sql`；C 不执行迁移。
 - [ ] 4.2 A 授权后在空 MySQL 8.4 验证首次/重复迁移、结构、索引、CHECK 和并发消费。
 - [ ] 4.3 C/A 在真实 Redis 和真实测试邮箱验证一次投递、冷却、登录、结果未知与敏感信息检查。
 
