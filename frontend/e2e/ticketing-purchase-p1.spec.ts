@@ -184,8 +184,21 @@ test('订单确认页正常提交 POST /api/v1/orders 并展现成功订单信�
   await expect(page.getByRole('heading', { level: 1, name: '确认订单信息' })).toBeVisible();
   await page.getByRole('button', { name: '确认并提交订单' }).click();
 
-  await expect(page.getByText('订单创建成功！')).toBeVisible();
+  await expect(page.getByText('订单创建成功')).toBeVisible();
   await expect(page.getByText('CW2084194500000000001')).toBeVisible();
+  await expect(page.getByText('模拟支付等功能将于下一迭代正式接入')).not.toBeVisible();
+
+  await page.getByRole('button', { name: '查看订单' }).click();
+  await expect(page).toHaveURL('/orders/CW2084194500000000001');
+
+  // 重新进入确认页并再次获得服务端建单结果，单独验证支付出口，避免依赖浏览器后退缓存恢复组件状态。
+  await page.goto(
+    '/orders/confirm?showId=2084194401305432066&movieId=2084194398004512769&cinemaId=2084194399128586242&seatId=2084194402305432067',
+  );
+  await page.getByRole('button', { name: '确认并提交订单' }).click();
+  await expect(page.getByRole('button', { name: '去支付' })).toBeVisible();
+  await page.getByRole('button', { name: '去支付' }).click();
+  await expect(page).toHaveURL('/payments/CW2084194500000000001');
 });
 
 test('订单确认页发生 RESULT_UNKNOWN (502) 时自动发起等幂查询恢复而不再发 POST', async ({
@@ -232,7 +245,7 @@ test('订单确认页发生 RESULT_UNKNOWN (502) 时自动发起等幂查询恢�
   await page.getByRole('button', { name: '确认并提交订单' }).click();
 
   // 验证经由 getOrderByRequestId 成功恢复，同时 post 仅被执行了 1 次
-  await expect(page.getByText('订单创建成功！')).toBeVisible();
+  await expect(page.getByText('订单创建成功')).toBeVisible();
   expect(postCount).toBe(1);
 });
 
@@ -358,7 +371,7 @@ test('订单确认页发生 RESULT_UNKNOWN 且恢复查询 404 后仍禁止第�
 
   // 点击“重新查询订单结果”，调用 query 成功，不触发 POST
   await page.getByRole('button', { name: '重新查询订单结果' }).click();
-  await expect(page.getByText('订单创建成功！')).toBeVisible();
+  await expect(page.getByText('订单创建成功')).toBeVisible();
   expect(postCount).toBe(1);
   expect(queryCount).toBe(2);
 });
@@ -426,7 +439,7 @@ test('订单确认页在 RESULT_UNKNOWN 状态下刷新页面，继续使用原 
     });
   });
   await page.getByRole('button', { name: '重新查询订单结果' }).click();
-  await expect(page.getByText('订单创建成功！')).toBeVisible();
+  await expect(page.getByText('订单创建成功')).toBeVisible();
   expect(queriedRequestId).toBe(firstRequestId);
   expect(postCount).toBe(1);
 });

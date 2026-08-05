@@ -14,6 +14,13 @@ const businessDateTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
   hourCycle: 'h23',
 });
 
+const businessTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: BUSINESS_TIME_ZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
 function hasValidCalendarDate(value: string): boolean {
   const match = calendarDatePattern.exec(value);
   if (!match) {
@@ -76,4 +83,19 @@ export function formatOrderDateTime(
     return formatted === expected ? formatted : fallback;
   }
   return formatted;
+}
+
+/**
+ * 以固定业务时区展示订单时间的时分部分。
+ * 非法或缺失值使用调用方提供的降级文案，避免直接构造 Date 产生错误时区或 Invalid Date。
+ */
+export function formatOrderTime(
+  value: string | null | undefined,
+  fallback = '支付期限以订单信息为准',
+): string {
+  const date = parseOrderDateTime(value);
+  if (!date) {
+    return fallback;
+  }
+  return businessTimeFormatter.format(date);
 }

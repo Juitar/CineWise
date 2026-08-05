@@ -3,6 +3,11 @@ import { history, useParams } from 'umi';
 import { PaymentResult } from '../../../features/payment-result/PaymentResult';
 import { useOrder, usePaymentResult } from '../../../modules/order/transaction-hooks';
 import { resolvePaymentResultStatus } from './payment-result-status';
+import {
+  buildElectronicTicketPath,
+  buildOrderDetailPath,
+  buildPaymentPath,
+} from '../../../modules/order/routes';
 import './index.css';
 
 /**
@@ -26,9 +31,16 @@ export default function PaymentResultPage() {
         amount={orderQuery.data?.totalAmount ?? '0.00'}
         status={status}
         error={paymentAction.error?.message}
-        onViewOrder={() => history.push(`/orders/${encodeURIComponent(orderNo)}`)}
+        ticketId={paymentAction.payment?.ticketId}
+        onViewTicket={() => {
+          const ticketId = paymentAction.payment?.ticketId;
+          if (status === 'SUCCESS' && ticketId) {
+            history.push(buildElectronicTicketPath(ticketId));
+          }
+        }}
+        onViewOrder={() => history.push(buildOrderDetailPath(orderNo))}
         onRetryQuery={() => void paymentAction.query()}
-        onRetryPay={() => history.push(`/payments/${encodeURIComponent(orderNo)}`)}
+        onRetryPay={() => history.push(buildPaymentPath(orderNo))}
         onBackToHome={() => history.push('/')}
       />
     </div>
