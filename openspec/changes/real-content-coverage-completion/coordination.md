@@ -26,8 +26,8 @@
 
 - 现有前端共享类型已包含可空 `posterUrl`、`summary`，影片页已做 HTTPS/同源二次校验和空海报占位；本次后端可复用该字段名和可空类型。
 - `releaseDate`、`releaseStatus` 已由 C 确认纳入影片列表和详情 DTO：前者只接受可空 `YYYY-MM-DD`，后者只允许 `NOW_SHOWING`、`COMING_SOON` 或 `null`。保留 `expiresAt/isExpired` 及既有来源字段，后端 DTO、OpenAPI、Mock 和组合测试必须同步采用同一规则。
-- C 的手动城市选择和 B 的对话地点输入统一向 D 提供临时 `locationText`；D 返回唯一城市名或不可用/需选择结果。地点原文不得进入页面长期状态、用户偏好、日志或画像。浏览页不计算或展示距离。
-- 管理员同步接口继续复用现有 Cookie + CSRF 规则，后端 `/api/v1/admin/**` 已由安全配置限制 `ADMIN`；新请求只包含 `clientRequestId/cityName`，具体路径和响应字段需 C 按本 change 更新确认。
+- C 以 `POST /api/v1/content/cities/resolve` 向 D 提交 `{locationText}`，避免地点原文进入 URL；响应只含 `status=RESOLVED|UNRECOGNIZED|SELECTION_REQUIRED` 和仅在 `RESOLVED` 时返回的 `cityName`。不返回候选地点、`providerCityId` 或 `ci`。页面只以 `cityName` 查询影院和展示影院 DTO。
+- 管理员同步接口继续复用 Cookie + CSRF 规则，后端 `/api/v1/admin/**` 已由安全配置限制 `ADMIN`。`POST /api/v1/admin/content/sync` 的请求只含 `clientRequestId/cityName`；结果查询固定为 `GET /api/v1/admin/content/sync/by-request/{clientRequestId}`。公开响应不返回 `providerCityId`、`ci`、Provider URL、原始异常或原始响应。
 
 ### 3. A 的迁移与票务边界输入
 
@@ -62,7 +62,9 @@
 
 ### B
 
-B 已确认本次无需修改 B 侧代码和 Tool Schema。`RankMoviePlanTool` 保持只接收内部 `movieId`、`cinemaId`、`date`、`timeFrom`、`timeTo`；身份解析 API 不得把 `userId`、外部 ID、海报、定位、场次、价格、库存或座位加入 ToolContext、命令或模型槽位。场次、价格、库存继续只来自 A 的公开查询。
+B 已确认 `RankMoviePlanTool` 保持只接收内部 `movieId`、`cinemaId`、`date`、`timeFrom`、`timeTo`，不新增 `locationText`；身份解析 API 不得把 `userId`、外部 ID、海报、定位、场次、价格、库存或座位加入 ToolContext、命令或模型槽位。场次、价格、库存继续只来自 A 的公开查询。
+
+B 同时确认：`locationText` 只作为本次 D 城市解析调用的内存参数，调用结束立即丢弃。由于 Agent 会持久化用户消息，B 必须在保存用户消息、事件、槽位快照、长期上下文、日志和缓存前剔除或替换原始地点文本，不能只依赖 DTO 不落库。允许保存 D 返回的城市名或标准 `cityCode`，但不得保存原始地点文本、精确位置、经纬度或 NetStart 内部城市 ID。
 
 ### C
 
@@ -70,8 +72,11 @@ B 已确认本次无需修改 B 侧代码和 Tool Schema。`RankMoviePlanTool` �
 - 保留 `source`、`sourceType`、`dataTime`、`expiresAt`、`isExpired`、`degraded`、`fallbackType`；不得删除或改变 `dataTime` 的现有含义。
 - 当前真实版本无论直接读取、Redis 命中还是读取当前快照，均返回 `sourceType=LIVE`、`degraded=false`、`fallbackType=null`；`dataTime` 始终是成功同步时间。`isExpired=true` 只提示资料已过期，不自动表示降级。
 - 只有两版本快照实现后，无法读取最新版本而回退到上一份真实版本时才返回 `degraded=true`、`fallbackType=SNAPSHOT`。`CACHE` 仅为兼容保留，不能用于普通 Redis 命中。
-- 原管理员接口和城市编码确认已被本 change 的新方案替换：待 C 确认的同步请求只包含 `clientRequestId/cityName`；状态至少包含城市名、`PENDING/RUNNING/SUCCESS/PARTIAL/FAILED`，地点原文和 `ci` 不对外返回。
-- 本期影院浏览默认长沙，支持手动城市和 C/B 已得到的临时地点字符串解析；不计算距离或距离优先。基础路线仍由用户主动触发定位，精确位置不传给内容接口且不持久化。
+- C 已确认城市解析接口为 `POST /api/v1/content/cities/resolve`，请求 `{locationText}`，响应 `{status, cityName}`；只有 `RESOLVED` 返回城市名。地点原文只在当前调用内存中存在；当前页面会话可保留 `cityName`，不得保留原始文本。
+- C 已确认影院查询参数与影院 DTO 使用 `cityName`，不再使用 `location=430100` 或公开 `cityCode`；本期不计算距离或距离优先。
+- C 已确认管理员同步接口和响应字段：`POST /api/v1/admin/content/sync`、`GET /api/v1/admin/content/sync/by-request/{clientRequestId}`、`GET /api/v1/admin/content/sources`。同步结果只含 `syncId/clientRequestId/cityName/status/startedAt/finishedAt/successCount/failureCount/failureCategory`；来源状态只含 C 已确认字段，不公开 Provider 城市 ID。
+- C 已确认两个 GET 不要求 CSRF，POST 必须携带 `X-XSRF-TOKEN`；未登录 `401/201006`、非管理员 `403/201007`、CSRF 无效 `403/201009`、无效城市 `400/100001`、整体不可用 `503/303004`。同一 `clientRequestId + cityName` 返回原任务；同一请求标识但城市不同返回 `409/100409`；原任务不存在返回 `404/100404`。
+- C 已确认 POST 超时或断网时页面进入 `RESULT_UNKNOWN`，禁用再次同步并只查询原 `clientRequestId`；重新取得 CSRF Token 后不得自动重发同步请求。
 
 ## 2026-08-05 本次方案更新
 

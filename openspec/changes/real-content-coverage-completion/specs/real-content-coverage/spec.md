@@ -20,13 +20,13 @@
 
 ### Requirement: 地点字符串必须经本地城市目录解析为 Provider 城市标识
 
-系统 SHALL 将 NetStart `cities.json` 的经核验最小城市目录作为版本化本地 JSON 随应用发布。应用启动时必须校验每条城市名和 Provider `ci` 非空且唯一，并构建只读索引；地点解析、页面查询和同步不得在用户请求中访问 NetStart 城市列表。C/B 只向 D 提交临时 `locationText`，D 只能在唯一城市名匹配时得到 Provider `ci`。`ci` 只可作为 D 的外部请求参数，不能返回给 C/B，也不能把地点原文持久化。
+系统 SHALL 将 NetStart `cities.json` 的经核验最小城市目录作为版本化本地 JSON 随应用发布。应用启动时必须校验每条城市名和 Provider `ci` 非空且唯一，并构建只读索引；地点解析、页面查询和同步不得在用户请求中访问 NetStart 城市列表。C 使用 `POST /api/v1/content/cities/resolve` 提交 `{locationText:string}`，响应固定为 `{status:"RESOLVED"|"UNRECOGNIZED"|"SELECTION_REQUIRED", cityName:string|null}`；只有 `RESOLVED` 返回 `cityName`。D 只能在唯一城市名匹配时得到 Provider `ci`。公开结果不返回候选地点、`providerCityId` 或 `ci`，地点原文不能持久化。
 
 #### Scenario: 地点字符串解析为长沙
 
 - **GIVEN** 本地城市目录包含 `长沙 -> 70`
-- **WHEN** C 或 B 提交 `湖南省长沙市岳麓区` 作为 `locationText`
-- **THEN** D 返回城市名 `长沙`，并仅在内部使用 `ci=70` 查询或同步影院
+- **WHEN** C 向城市解析接口或 B 向 D 的受控调用提交 `湖南省长沙市岳麓区` 作为 `locationText`
+- **THEN** D 返回 `RESOLVED + cityName=长沙`，并仅在内部使用 `ci=70` 查询或同步影院
 - **AND** 不访问 NetStart 城市列表，不保存该地点原文
 
 #### Scenario: 地点无法解析或存在多个城市候选
@@ -42,6 +42,13 @@
 - **WHEN** 页面按城市名查询影院
 - **THEN** 查询能取得杭州真实影院资料，返回城市名 `杭州`
 - **AND** Provider `ci` 不出现在公开 DTO、缓存键、URL 或页面状态中
+
+#### Scenario: Agent 对话地点文本不会进入长期数据
+
+- **GIVEN** 用户在 Agent 对话正文中提供地点文本
+- **WHEN** B 将它用于一次 D 城市解析调用
+- **THEN** 调用结束后原始地点文本被丢弃，并在保存用户消息、事件、槽位快照、长期上下文、日志和缓存前被剔除或替换
+- **AND** 可以保存 D 返回的城市名或标准 `cityCode`，但不能保存地点原文、精确位置、经纬度或 NetStart 内部城市 ID
 
 ### Requirement: D 必须提供批量影院摘要供 A 聚合可售影院
 
@@ -170,13 +177,24 @@
 
 ### Requirement: 内容来源状态和手动同步必须受权限保护
 
-系统 SHALL 提供管理员读取的内容来源状态，至少包含 Provider、城市名、资源类型、最近一次结果、开始/结束时间、成功/失败数量和脱敏失败分类。管理员发起手动同步时只提交稳定请求标识和城市名；D 必须先由本地城市目录解析 `ci`，先创建 `RUNNING` 审计记录，再调用 Provider。请求结果未知时只能按原请求标识查询，普通用户不得访问这些接口。
+系统 SHALL 提供 `GET /api/v1/admin/content/sources`、`POST /api/v1/admin/content/sync` 和 `GET /api/v1/admin/content/sync/by-request/{clientRequestId}`。三个接口都要求管理员 Cookie；两个 GET 不要求 CSRF，POST 必须携带 `X-XSRF-TOKEN`。未登录返回 `401/201006`，非管理员返回 `403/201007`，CSRF 无效返回 `403/201009`，参数缺失、空城市或目录不支持的城市返回 `400/100001`，服务整体不可用返回 `503/303004`。
+
+管理员发起同步时，POST 请求只能提交 `{clientRequestId, cityName}`；D 必须先由本地城市目录解析 `ci`，先创建 `RUNNING` 审计记录，再调用 Provider。同一 `clientRequestId + cityName` 必须返回原任务且不再次同步；同一 `clientRequestId` 携带不同城市名返回 `409/100409`。请求不存在时，按请求查询返回 `404/100404`。
+
+POST 响应和按请求查询统一返回 `syncId/clientRequestId/cityName/status/startedAt/finishedAt/successCount/failureCount/failureCategory`；`status` 只允许 `PENDING/RUNNING/SUCCESS/PARTIAL/FAILED`，未完成时 `finishedAt=null`，无失败时 `failureCategory=null`。Provider 在任务受理后超时或失败时，查询结果返回 `PARTIAL` 或 `FAILED`，不改写 POST 的 HTTP 返回。来源状态每条返回 `provider/resourceType/cityName/status/startedAt/finishedAt/lastSuccessAt/successCount/failureCount/failureCategory/dataTime/expiresAt/isExpired/licenseNotice`。公开响应不得返回 `providerCityId`、`ci`、Provider URL、原始异常或原始响应。
 
 #### Scenario: 管理员查看同步状态
 
 - **GIVEN** 已存在真实内容同步记录
 - **WHEN** 管理员查询内容来源状态
 - **THEN** 返回最近同步结果和时效信息，不返回 Key 或完整原始响应
+
+#### Scenario: 管理员同步结果未知
+
+- **GIVEN** 管理员已带稳定 `clientRequestId` 提交同步，但页面收到超时或断网
+- **WHEN** 页面进入 `RESULT_UNKNOWN`
+- **THEN** 页面禁用再次同步，只能调用按请求查询接口查询原 `clientRequestId`
+- **AND** 不生成新的请求标识、不重新 POST，也不以来源状态接口的最近结果替代原任务
 
 #### Scenario: 普通用户尝试手动同步
 

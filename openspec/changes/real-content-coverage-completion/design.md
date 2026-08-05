@@ -50,7 +50,9 @@ D 在 Mapper 内将 Provider 海报字段转换为绝对 HTTPS URL。不能解�
 
 NetStart `cities.json` 已实测返回 1151 条 `id/nm/py`，其中长沙为 `70`、杭州为 `50`。D 将经过人工核验的最小城市目录以版本化 JSON 放在应用资源中，记录来源、检查时间、城市名和 Provider `ci`；应用启动时一次性加载并校验城市名、`ci` 均唯一。日常用户请求、页面加载和影院查询绝不访问城市列表接口。
 
-C 的手动选择或浏览器侧已经得到的地点信息、B 的对话地点信息，只向 D 传临时 `locationText`。D 按规范化后的地点字符串匹配本地城市名：唯一命中才返回城市名和内部 `ci`；零命中返回“当前地点暂无法识别城市”，多命中返回“请明确选择城市”。地点原文、浏览器位置和候选列表不得写入 MySQL、Redis、日志、快照、URL、画像或 Agent 轨迹。
+C 的手动选择或浏览器侧已经得到的地点信息通过 `POST /api/v1/content/cities/resolve` 向 D 传临时 `{locationText}`，避免它进入 URL。D 按规范化后的地点字符串匹配本地城市名：唯一命中才返回 `RESOLVED + cityName` 并在内部取得 `ci`；零命中返回 `UNRECOGNIZED`，多命中返回 `SELECTION_REQUIRED`。公开响应不返回候选地点、`providerCityId` 或 `ci`；页面会话只能保存返回的城市名。
+
+B 的对话地点信息只作为该次 D 城市解析调用的内存参数，调用结束立即丢弃。Agent 会持久化用户消息，因此 B 必须在保存用户消息、事件、槽位快照、长期上下文、日志和缓存前剔除或替换原始地点文本；不能只依靠 D 的 DTO 不落库。地点原文、浏览器位置和候选列表不得写入 MySQL、Redis、日志、快照、URL、画像或 Agent 轨迹；允许保存城市名或标准 `cityCode`，但不保存经纬度或 NetStart 内部城市 ID。
 
 `ci` 仅用于 D 调用 NetStart，不能返回给 C/B。页面查询和展示只使用城市名；影院持久化与同步审计另存规范化 `city_name` 和 `provider_city_id`，不再把中国行政区划代码作为新城市资料的前置条件。影院坐标仅映射 Provider 已给出的合法静态经纬度，不能通过地点字符串或地址猜测。
 
@@ -100,7 +102,9 @@ C 的手动选择或浏览器侧已经得到的地点信息、B 的对话地点�
 
 来源状态是管理员只读接口。管理员手动同步提交稳定 `clientRequestId` 和城市名，D 必须先在本地城市目录中解析 `ci`，再同步该城市资料；不接受地点原文、任意 `ci` 或任意 Provider URL。同步开始前先持久化 `RUNNING` 记录，以 `(provider, request_id)` 唯一键阻止重复请求；网络响应未知时只能按原 `clientRequestId` 查询，不得重新调用 Provider。
 
-来源状态和按请求查询的结果必须包含城市名、Provider 城市 ID、状态、开始/结束时间、成功/失败数量和脱敏失败分类。具体路径、响应字段、错误码和 CSRF 由 C 确认，并由 D 在 OpenAPI、测试和前端调用中同步。
+公开同步结果固定为 `syncId/clientRequestId/cityName/status/startedAt/finishedAt/successCount/failureCount/failureCategory`；`finishedAt` 未完成时可为空，`failureCategory` 无失败时可为空。按请求查询复用同一结构。来源状态每条返回 `provider/resourceType/cityName/status/startedAt/finishedAt/lastSuccessAt/successCount/failureCount/failureCategory/dataTime/expiresAt/isExpired/licenseNotice`。Provider 城市 ID 仅可留在服务端审计数据，不得出现在任何公开响应。
+
+两个管理员 GET 不要求 CSRF，POST 必须带 `X-XSRF-TOKEN`。同一 `clientRequestId + cityName` 返回原任务；同一请求标识提交不同城市返回 `409/100409`；不存在的原任务返回 `404/100404`。Provider 已受理后的超时或失败通过任务状态 `PARTIAL/FAILED` 表示，不改写 POST 的 HTTP 返回；POST 超时或断网后，C 进入 `RESULT_UNKNOWN`，只查询原请求，不能重新 POST 或生成新请求标识。
 
 ### 8. C 页面只展示 D 内容和 A 公开票务查询的实际结果
 
