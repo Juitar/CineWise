@@ -19,7 +19,9 @@ import com.miaoyu.ticket.agent.application.AgentFailurePersistedException;
 import com.miaoyu.ticket.agent.application.AgentInteractionRuntimeService;
 import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationService;
 import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationResult;
+import com.miaoyu.ticket.agent.application.AgentErrorCode;
 import com.miaoyu.ticket.common.api.PageResult;
+import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.error.GlobalExceptionHandler;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationAction;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationValidationFailure;
@@ -124,6 +126,25 @@ class AgentControllerTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"confirmed\":true}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(206006));
+    }
+
+    @Test
+    void shouldMapChangedOrUnavailableActionToFixedSafeErrors() throws Exception {
+        when(confirmationService.confirm(eq("changed"), eq(true), anyString()))
+                .thenReturn(new AgentConfirmationResult(
+                        action(), AgentConfirmationValidationFailure.PARAMETERS_CHANGED, false));
+        when(confirmationService.confirm(eq("unavailable"), eq(true), anyString()))
+                .thenThrow(new BusinessException(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND, "操作不可用或已失效"));
+
+        mockMvc.perform(post("/api/v1/agent/actions/changed/confirm")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"confirmed\":true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(206004));
+        mockMvc.perform(post("/api/v1/agent/actions/unavailable/confirm")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"confirmed\":true}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(206005))
+                .andExpect(jsonPath("$.message").value("操作不可用或已失效"));
     }
 
     @Test
