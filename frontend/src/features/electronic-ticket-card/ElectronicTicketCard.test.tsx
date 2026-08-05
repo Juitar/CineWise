@@ -22,6 +22,8 @@ describe('ElectronicTicketCard 组件', () => {
       />,
     );
     expect(screen.getByText('流浪地球3')).toBeInTheDocument();
+    expect(screen.getByText(/座位编号[：:]/)).toBeInTheDocument();
+    expect(screen.getByText(/5排10座\s+5排11座/)).toBeInTheDocument();
     expect(screen.getByText('1001')).toBeInTheDocument();
     expect(screen.getByText('202608051234')).toBeInTheDocument();
     expect(screen.getByLabelText('有效电子票二维码')).toBeInTheDocument();

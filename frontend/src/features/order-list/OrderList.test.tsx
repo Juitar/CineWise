@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { OrderList } from './OrderList';
-import { setupTestEnvironment } from '../test-utils';
+import { setupTestEnvironment, setMobileView } from '../test-utils';
 
 setupTestEnvironment();
 
@@ -55,5 +55,14 @@ describe('OrderList 组件', () => {
     fireEvent.click(btns[0]);
     expect(handleClick).toHaveBeenCalledTimes(1);
     expect(handleClick).toHaveBeenCalledWith('202608050001');
+  });
+
+  it('在移动端视图渲染 ErrorBlock 和 SpinLoading', () => {
+    setMobileView(true);
+    const { container, rerender } = render(<OrderList orders={[]} loading={true} />);
+    expect(container.querySelector('.adm-spin-loading')).toBeInTheDocument();
+
+    rerender(<OrderList orders={[]} loading={false} error="测试错误" />);
+    expect(container.querySelector('.adm-error-block')).toBeInTheDocument();
   });
 });

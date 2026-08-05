@@ -3,6 +3,7 @@ import { history, useParams } from 'umi';
 import { PaymentPanel } from '../../features/payment-panel/PaymentPanel';
 import { useOrder, usePaymentAction } from '../../modules/order/transaction-hooks';
 import { formatOrderDateTime } from '../../modules/order/formatters';
+import { usePaymentDeadline } from '../../modules/order/payment-deadline';
 import './index.css';
 
 /**
@@ -30,6 +31,7 @@ export default function PaymentPage() {
             : isOrderNotPayable
               ? 'ERROR'
               : 'NORMAL';
+  const paymentDeadline = usePaymentDeadline(orderQuery.data?.expireTime, status === 'NORMAL');
 
   const submitPayment = async () => {
     const payment = await paymentAction.submit();
@@ -51,6 +53,7 @@ export default function PaymentPage() {
         ticketCount={orderQuery.data?.ticketCount ?? 0}
         totalAmount={orderQuery.data?.totalAmount ?? '0.00'}
         showTime={formatOrderDateTime(orderQuery.data?.showStartTime)}
+        paymentDeadlineText={paymentDeadline.text}
         status={status}
         error={
           paymentAction.error?.message ??

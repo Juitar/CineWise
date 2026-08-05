@@ -15,14 +15,18 @@ const basePayment: PaymentResponse = {
 
 describe('支付结果状态映射', () => {
   it('保留取消、过期和退款的不同订单终态原因', () => {
-    expect(resolvePaymentResultStatus({ ...basePayment, orderStatus: 'CANCELLED' }, false)).toBe(
-      'CANCELLED',
-    );
-    expect(resolvePaymentResultStatus({ ...basePayment, orderStatus: 'EXPIRED' }, false)).toBe(
-      'EXPIRED',
-    );
-    expect(resolvePaymentResultStatus({ ...basePayment, orderStatus: 'REFUNDED' }, false)).toBe(
-      'REFUNDED',
-    );
+    expect(
+      resolvePaymentResultStatus({ ...basePayment, orderStatus: 'CANCELLED' }, false, false),
+    ).toBe('CANCELLED');
+    expect(
+      resolvePaymentResultStatus({ ...basePayment, orderStatus: 'EXPIRED' }, false, false),
+    ).toBe('EXPIRED');
+    expect(
+      resolvePaymentResultStatus({ ...basePayment, orderStatus: 'REFUNDED' }, false, false),
+    ).toBe('REFUNDED');
+  });
+
+  it('响应丢失时优先进入只读结果查询状态', () => {
+    expect(resolvePaymentResultStatus(basePayment, true, false)).toBe('RESULT_UNKNOWN');
   });
 });

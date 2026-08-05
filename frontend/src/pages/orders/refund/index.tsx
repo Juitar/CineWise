@@ -19,11 +19,13 @@ export default function RefundPage() {
       ? 'RESULT_UNKNOWN'
       : state.refund?.refundStatus === 'SUCCESS'
         ? 'SUCCESS'
-        : state.submitting || state.refund?.refundStatus === 'PROCESSING'
-          ? 'PROCESSING'
-          : state.error
-            ? 'ERROR'
-            : 'NORMAL';
+        : state.refund?.refundStatus === 'REQUESTED'
+          ? 'REQUESTED'
+          : state.submitting || state.refund?.refundStatus === 'PROCESSING'
+            ? 'PROCESSING'
+            : state.error
+              ? 'ERROR'
+              : 'NORMAL';
   const impact = state.impact;
   return (
     <div className="refund-page-wrapper">

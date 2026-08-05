@@ -1,5 +1,7 @@
 import React from 'react';
 import { Button, Alert, Spin } from 'antd';
+import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
+import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 
 export type PaymentResultStatus =
@@ -8,6 +10,7 @@ export type PaymentResultStatus =
   | 'CONFIRMING'
   | 'SUCCESS'
   | 'PENDING_PAYMENT'
+  | 'INITIALIZED'
   | 'CANCELLED'
   | 'EXPIRED'
   | 'REFUNDED'
@@ -41,10 +44,42 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
   onRetryPay,
   onBackToHome,
 }) => {
+  const isMobile = useMediaQuery('(max-width: 1023px)');
+
+  const renderPrimaryBtn = (text: string, onClick?: () => void) => {
+    return isMobile ? (
+      <MobileButton color="primary" className="payment-result-btn" onClick={onClick}>
+        {text}
+      </MobileButton>
+    ) : (
+      <Button type="primary" className="payment-result-btn" onClick={onClick}>
+        {text}
+      </Button>
+    );
+  };
+
+  const renderDefaultBtn = (text: string, onClick?: () => void) => {
+    return isMobile ? (
+      <MobileButton className="payment-result-btn" onClick={onClick}>
+        {text}
+      </MobileButton>
+    ) : (
+      <Button className="payment-result-btn" onClick={onClick}>
+        {text}
+      </Button>
+    );
+  };
   if (status === 'LOADING') {
     return (
       <div className="payment-result-container">
-        <Spin tip="正在加载支付结果信息..." />
+        {isMobile ? (
+          <div className="mobile-loading-wrapper">
+            <SpinLoading color="primary" />
+            <span>正在加载支付结果信息...</span>
+          </div>
+        ) : (
+          <Spin tip="正在加载支付结果信息..." />
+        )}
       </div>
     );
   }
@@ -59,12 +94,8 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
               订单已完成支付，金额 ¥ {amount}，您的电子票已生成。
             </p>
             <div className="payment-result-actions">
-              <Button type="primary" onClick={onViewOrder} className="payment-result-btn">
-                查看订单
-              </Button>
-              <Button onClick={onBackToHome} className="payment-result-btn">
-                返回首页
-              </Button>
+              {renderPrimaryBtn('查看订单', onViewOrder)}
+              {renderDefaultBtn('返回首页', onBackToHome)}
             </div>
           </div>
         );
@@ -73,23 +104,24 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
       case 'CONFIRMING':
         return (
           <div className="payment-result-state">
-            <Spin size="large" />
+            {isMobile ? (
+              <SpinLoading color="primary" className="mobile-spin-large" />
+            ) : (
+              <Spin size="large" />
+            )}
             <div className="payment-result-badge processing">
               {status === 'PROCESSING' ? '支付处理中' : '结果确认中'}
             </div>
             <p className="payment-result-desc">银行或支付网关正在处理中，请勿重复发起支付。</p>
             <div className="payment-result-actions">
-              <Button type="primary" onClick={onRetryQuery} className="payment-result-btn">
-                刷新结果
-              </Button>
-              <Button onClick={onViewOrder} className="payment-result-btn">
-                查看订单
-              </Button>
+              {renderPrimaryBtn('刷新结果', onRetryQuery)}
+              {renderDefaultBtn('查看订单', onViewOrder)}
             </div>
           </div>
         );
 
       case 'PENDING_PAYMENT':
+      case 'INITIALIZED':
         return (
           <div className="payment-result-state">
             <div className="payment-result-badge pending">订单仍待支付</div>
@@ -97,14 +129,8 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
               该订单尚未完成支付，应付 ¥ {amount}，请尽快完成付款。
             </p>
             <div className="payment-result-actions">
-              {!isOfflineReadOnly && (
-                <Button type="primary" onClick={onRetryPay} className="payment-result-btn">
-                  前往支付
-                </Button>
-              )}
-              <Button onClick={onViewOrder} className="payment-result-btn">
-                查看订单
-              </Button>
+              {!isOfflineReadOnly && renderPrimaryBtn('前往支付', onRetryPay)}
+              {renderDefaultBtn('查看订单', onViewOrder)}
             </div>
           </div>
         );
@@ -117,9 +143,7 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
               该订单未在有效时间内完成付款，系统已自动释放座位。
             </p>
             <div className="payment-result-actions">
-              <Button type="primary" onClick={onBackToHome} className="payment-result-btn">
-                返回首页
-              </Button>
+              {renderPrimaryBtn('返回首页', onBackToHome)}
             </div>
           </div>
         );
@@ -130,9 +154,7 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
             <div className="payment-result-badge expired">订单已取消</div>
             <p className="payment-result-desc">该订单已取消，系统已释放原锁定座位。</p>
             <div className="payment-result-actions">
-              <Button type="primary" onClick={onBackToHome} className="payment-result-btn">
-                返回首页
-              </Button>
+              {renderPrimaryBtn('返回首页', onBackToHome)}
             </div>
           </div>
         );
@@ -143,9 +165,7 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
             <div className="payment-result-badge expired">订单已退款</div>
             <p className="payment-result-desc">该订单已完成退票，关联电子票已失效。</p>
             <div className="payment-result-actions">
-              <Button type="primary" onClick={onViewOrder} className="payment-result-btn">
-                查看订单
-              </Button>
+              {renderPrimaryBtn('查看订单', onViewOrder)}
             </div>
           </div>
         );
@@ -153,19 +173,23 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
       case 'RESULT_UNKNOWN':
         return (
           <div className="payment-result-state">
-            <Alert
-              type="warning"
-              showIcon
-              message="支付状态未知"
-              description="网关响应超时或处理异常，为确保表单与资金安全，禁止再次支付，仅提供结果复查。"
-            />
+            {isMobile ? (
+              <ErrorBlock
+                status="default"
+                title="支付状态未知"
+                description="网关响应超时或处理异常，为确保表单与资金安全，禁止再次支付，仅提供结果复查。"
+              />
+            ) : (
+              <Alert
+                type="warning"
+                showIcon
+                message="支付状态未知"
+                description="网关响应超时或处理异常，为确保表单与资金安全，禁止再次支付，仅提供结果复查。"
+              />
+            )}
             <div className="payment-result-actions">
-              <Button type="primary" onClick={onRetryQuery} className="payment-result-btn">
-                重新查询订单结果
-              </Button>
-              <Button onClick={onViewOrder} className="payment-result-btn">
-                查看订单
-              </Button>
+              {renderPrimaryBtn('重新查询订单结果', onRetryQuery)}
+              {renderDefaultBtn('查看订单', onViewOrder)}
             </div>
           </div>
         );
@@ -174,16 +198,22 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
       default:
         return (
           <div className="payment-result-state">
-            <Alert
-              type="error"
-              showIcon
-              message="支付异常"
-              description={error || '在获取支付结果期间发生错误。'}
-            />
+            {isMobile ? (
+              <ErrorBlock
+                status="default"
+                title="支付异常"
+                description={error || '在获取支付结果期间发生错误。'}
+              />
+            ) : (
+              <Alert
+                type="error"
+                showIcon
+                message="支付异常"
+                description={error || '在获取支付结果期间发生错误。'}
+              />
+            )}
             <div className="payment-result-actions">
-              <Button onClick={onViewOrder} className="payment-result-btn">
-                查看订单
-              </Button>
+              {renderDefaultBtn('查看订单', onViewOrder)}
             </div>
           </div>
         );

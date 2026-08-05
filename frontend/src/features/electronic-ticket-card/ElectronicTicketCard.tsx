@@ -103,7 +103,7 @@ export const ElectronicTicketCard: React.FC<ElectronicTicketCardProps> = ({
             <span className="ticket-info-value">{showTime}</span>
           </div>
           <div className="ticket-info-item">
-            <span className="ticket-info-label">座位：</span>
+            <span className="ticket-info-label">座位编号：</span>
             <span className="ticket-info-value seats-highlight">
               {seatLabels.length > 0 ? seatLabels.join('  ') : '详见凭证'}
             </span>

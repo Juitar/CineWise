@@ -1,5 +1,7 @@
 import React from 'react';
 import { Spin, Alert, Empty, Tabs, Pagination, Button, Tag, Input } from 'antd';
+import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
+import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 
 export type OrderStatus =
@@ -52,6 +54,7 @@ export const OrderList: React.FC<OrderListProps> = ({
   onPageChange,
   onOrderClick,
 }) => {
+  const isMobile = useMediaQuery('(max-width: 1023px)');
   const statusTabs = [
     { key: 'ALL', label: '全部订单' },
     { key: 'PENDING_PAYMENT', label: '待支付' },
@@ -124,15 +127,30 @@ export const OrderList: React.FC<OrderListProps> = ({
 
       {loading ? (
         <div className="order-list-loading">
-          <Spin tip="正在载入订单列表..." />
+          {isMobile ? (
+            <div className="mobile-loading-wrapper">
+              <SpinLoading color="primary" />
+              <span>正在载入订单列表...</span>
+            </div>
+          ) : (
+            <Spin tip="正在载入订单列表..." />
+          )}
         </div>
       ) : error ? (
         <div className="order-list-error">
-          <Alert type="error" showIcon message="加载失败" description={error} />
+          {isMobile ? (
+            <ErrorBlock status="default" title="加载失败" description={error} />
+          ) : (
+            <Alert type="error" showIcon message="加载失败" description={error} />
+          )}
         </div>
       ) : orders.length === 0 ? (
         <div className="order-list-empty">
-          <Empty description="暂无符合条件的购票订单" />
+          {isMobile ? (
+            <ErrorBlock status="empty" title="暂无符合条件的购票订单" />
+          ) : (
+            <Empty description="暂无符合条件的购票订单" />
+          )}
         </div>
       ) : (
         <div className="order-card-list" role="list">
@@ -158,13 +176,23 @@ export const OrderList: React.FC<OrderListProps> = ({
                   <span className="order-card-total">实付款 ¥ {item.totalAmount}</span>
                 </div>
                 <div className="order-card-actions">
-                  <Button
-                    type="link"
-                    className="order-card-btn"
-                    onClick={() => onOrderClick?.(item.orderNo)}
-                  >
-                    查看详情
-                  </Button>
+                  {isMobile ? (
+                    <MobileButton
+                      color="primary"
+                      fill="none"
+                      onClick={() => onOrderClick?.(item.orderNo)}
+                    >
+                      查看详情
+                    </MobileButton>
+                  ) : (
+                    <Button
+                      type="link"
+                      className="order-card-btn"
+                      onClick={() => onOrderClick?.(item.orderNo)}
+                    >
+                      查看详情
+                    </Button>
+                  )}
                 </div>
               </div>
             </article>

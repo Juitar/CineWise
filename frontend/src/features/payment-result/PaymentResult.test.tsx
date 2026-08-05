@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { PaymentResult } from './PaymentResult';
-import { setupTestEnvironment } from '../test-utils';
+import { setupTestEnvironment, setMobileView } from '../test-utils';
 
 setupTestEnvironment();
 
@@ -42,5 +42,16 @@ describe('PaymentResult 组件', () => {
     rerender(<PaymentResult orderNo="202608050001" amount="78.00" status="REFUNDED" />);
     expect(screen.getByText('订单已退款')).toBeInTheDocument();
     expect(screen.getByText(/关联电子票已失效/)).toBeInTheDocument();
+  });
+
+  it('在 INITIALIZED 状态下显示待支付 UI', () => {
+    render(<PaymentResult orderNo="202608050001" amount="78.00" status="INITIALIZED" />);
+    expect(screen.getByText('订单仍待支付')).toBeInTheDocument();
+  });
+  it('在移动端渲染 ErrorBlock 和 Button', () => {
+    setMobileView(true);
+    const { container } = render(<PaymentResult orderNo="1" amount="1" status="RESULT_UNKNOWN" />);
+    expect(container.querySelector('.adm-error-block')).toBeInTheDocument();
+    expect(container.querySelector('.adm-button')).toBeInTheDocument();
   });
 });

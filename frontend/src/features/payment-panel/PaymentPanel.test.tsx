@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { PaymentPanel } from './PaymentPanel';
-import { setupTestEnvironment } from '../test-utils';
+import { setupTestEnvironment, setMobileView } from '../test-utils';
 
 setupTestEnvironment();
 
@@ -21,6 +21,19 @@ describe('PaymentPanel 组件', () => {
     expect(screen.getByText('¥ 78.00')).toBeInTheDocument();
     expect(screen.getByText('2026-08-10 14:30')).toBeInTheDocument();
     expect(screen.getByLabelText('六位模拟支付密码')).toBeInTheDocument();
+    expect(screen.getByText('支付期限以订单信息为准')).toBeInTheDocument();
+  });
+
+  it('传入 paymentDeadlineText 时正确渲染支付剩余时间', () => {
+    render(
+      <PaymentPanel
+        orderNo="202608050001"
+        ticketCount={2}
+        totalAmount="78.00"
+        paymentDeadlineText="14分30秒"
+      />,
+    );
+    expect(screen.getByText('14分30秒')).toBeInTheDocument();
   });
 
   it('点击确认支付按钮仅抛出 onPay 回调', () => {
@@ -85,5 +98,19 @@ describe('PaymentPanel 组件', () => {
     expect(screen.getByText('离线只读提示')).toBeInTheDocument();
     const btn = screen.getByRole('button', { name: '确认支付' });
     expect(btn).toBeDisabled();
+  });
+
+  it('在移动端视图渲染 ErrorBlock、SpinLoading 以及 antd-mobile 按钮', () => {
+    setMobileView(true);
+    const { container, rerender } = render(
+      <PaymentPanel orderNo="1" ticketCount={1} totalAmount="1" status="LOADING" />,
+    );
+    expect(container.querySelector('.adm-spin-loading')).toBeInTheDocument();
+
+    rerender(<PaymentPanel orderNo="1" ticketCount={1} totalAmount="1" error="测试错误" />);
+    expect(container.querySelector('.adm-error-block')).toBeInTheDocument();
+
+    rerender(<PaymentPanel orderNo="1" ticketCount={1} totalAmount="1" status="NORMAL" />);
+    expect(container.querySelectorAll('.adm-button').length).toBeGreaterThan(0);
   });
 });

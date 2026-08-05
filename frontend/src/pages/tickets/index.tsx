@@ -28,7 +28,7 @@ export default function TicketPage() {
         showId={order?.showId ?? ticket?.showId}
         showTime={formatOrderDateTime(order?.showStartTime)}
         seatLabels={ticket?.seatIds}
-        issuedAt={ticket?.issuedAt}
+        issuedAt={ticket?.issuedAt ? formatOrderDateTime(ticket.issuedAt) : undefined}
         status={ticket?.status ?? 'INVALIDATED'}
         loading={loading}
         error={error}

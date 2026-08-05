@@ -1,5 +1,6 @@
 const BUSINESS_TIME_ZONE = 'Asia/Shanghai';
 const BUSINESS_OFFSET = '+08:00';
+const calendarDatePattern = /^(\d{4})-(\d{2})-(\d{2})/;
 const localDateTimePattern =
   /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d{1,9})?)?$/;
 
@@ -13,6 +14,43 @@ const businessDateTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
   hourCycle: 'h23',
 });
 
+function hasValidCalendarDate(value: string): boolean {
+  const match = calendarDatePattern.exec(value);
+  if (!match) {
+    return false;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  return (
+    candidate.getUTCFullYear() === year &&
+    candidate.getUTCMonth() === month - 1 &&
+    candidate.getUTCDate() === day
+  );
+}
+
+/**
+ * 将后端交易时间解析为时间点。
+ *
+ * 不带偏移量的 Java LocalDateTime 按 CineWise 固定业务时区解释；非法日历日期直接拒绝，
+ * 避免 JavaScript 自动把 2 月 31 日滚动到 3 月后向用户展示错误期限。
+ */
+export function parseOrderDateTime(value: string | null | undefined): Date | null {
+  if (!value || !hasValidCalendarDate(value)) {
+    return null;
+  }
+  const localDateTimeMatch = localDateTimePattern.exec(value);
+  const normalizedValue = localDateTimeMatch
+    ? `${value.replace(' ', 'T')}${BUSINESS_OFFSET}`
+    : value;
+  const date = new Date(normalizedValue);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date;
+}
+
 /**
  * 以固定业务时区展示服务端时间，避免同一场次随浏览器所在时区发生偏移。
  * 非法或缺失值使用明确降级文案，不能让订单页面因单条异常数据崩溃。
@@ -25,12 +63,8 @@ export function formatOrderDateTime(
     return fallback;
   }
   const localDateTimeMatch = localDateTimePattern.exec(value);
-  // Java LocalDateTime 不携带偏移量；该字段按 CineWise 的上海业务时区解释。
-  const normalizedValue = localDateTimeMatch
-    ? `${value.replace(' ', 'T')}${BUSINESS_OFFSET}`
-    : value;
-  const date = new Date(normalizedValue);
-  if (Number.isNaN(date.getTime())) {
+  const date = parseOrderDateTime(value);
+  if (!date) {
     return fallback;
   }
   const parts = Object.fromEntries(

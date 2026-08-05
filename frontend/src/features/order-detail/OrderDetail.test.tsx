@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { OrderDetail } from './OrderDetail';
-import { setupTestEnvironment } from '../test-utils';
+import { setupTestEnvironment, setMobileView } from '../test-utils';
 
 setupTestEnvironment();
 
@@ -31,6 +31,7 @@ describe('OrderDetail 组件', () => {
     );
     expect(screen.getByText('订单详情')).toBeInTheDocument();
     expect(screen.getByText('流浪地球3')).toBeInTheDocument();
+    expect(screen.getByText(/座位编号[：:]/)).toBeInTheDocument();
     expect(screen.getByText('5排10座、5排11座')).toBeInTheDocument();
     expect(screen.getByText('¥ 78.00')).toBeInTheDocument();
 
@@ -84,5 +85,17 @@ describe('OrderDetail 组件', () => {
     expect(screen.queryByRole('button', { name: '取消订单' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '重新查询订单状态' }));
     expect(recover).toHaveBeenCalledTimes(1);
+  });
+
+  it('在移动端视图渲染 ErrorBlock、SpinLoading 以及 antd-mobile 按钮', () => {
+    setMobileView(true);
+    const { container, rerender } = render(<OrderDetail {...defaultProps} loading={true} />);
+    expect(container.querySelector('.adm-spin-loading')).toBeInTheDocument();
+
+    rerender(<OrderDetail {...defaultProps} error="测试错误" />);
+    expect(container.querySelector('.adm-error-block')).toBeInTheDocument();
+
+    rerender(<OrderDetail {...defaultProps} status="PENDING_PAYMENT" />);
+    expect(container.querySelectorAll('.adm-button').length).toBeGreaterThan(0);
   });
 });

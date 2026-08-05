@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Button, Alert, Input, Spin } from 'antd';
+import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
+import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 
 export type PaymentPanelStatus =
@@ -10,7 +12,7 @@ export interface PaymentPanelProps {
   ticketCount: number;
   totalAmount: string;
   showTime?: string;
-  countdownText?: string;
+  paymentDeadlineText?: string;
   status?: PaymentPanelStatus;
   error?: string;
   isOfflineReadOnly?: boolean;
@@ -28,7 +30,7 @@ export const PaymentPanel: React.FC<PaymentPanelProps> = ({
   ticketCount,
   totalAmount,
   showTime,
-  countdownText = '15分00秒',
+  paymentDeadlineText,
   status = 'NORMAL',
   error,
   isOfflineReadOnly = false,
@@ -36,13 +38,21 @@ export const PaymentPanel: React.FC<PaymentPanelProps> = ({
   onQueryOrderResult,
   onCancelPayment,
 }) => {
+  const isMobile = useMediaQuery('(max-width: 1023px)');
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState<string>();
 
   if (status === 'LOADING') {
     return (
       <div className="payment-panel-container">
-        <Spin tip="正在加载模拟支付面板..." />
+        {isMobile ? (
+          <div className="mobile-loading-wrapper">
+            <SpinLoading color="primary" />
+            <span>正在加载模拟支付面板...</span>
+          </div>
+        ) : (
+          <Spin tip="正在加载模拟支付面板..." />
+        )}
       </div>
     );
   }
@@ -71,13 +81,19 @@ export const PaymentPanel: React.FC<PaymentPanelProps> = ({
       )}
 
       {error && (
-        <Alert
-          className="payment-panel-alert"
-          type="error"
-          showIcon
-          message="支付错误"
-          description={error}
-        />
+        <div className="payment-panel-error-wrapper">
+          {isMobile ? (
+            <ErrorBlock status="default" title="支付错误" description={error} />
+          ) : (
+            <Alert
+              className="payment-panel-alert"
+              type="error"
+              showIcon
+              message="支付错误"
+              description={error}
+            />
+          )}
+        </div>
       )}
 
       <div className="payment-summary-card">
@@ -102,29 +118,62 @@ export const PaymentPanel: React.FC<PaymentPanelProps> = ({
         </div>
         {status === 'NORMAL' && (
           <div className="payment-countdown-banner">
-            支付剩余时间：<span className="countdown-time">{countdownText}</span>
+            {paymentDeadlineText ? (
+              <>
+                支付剩余时间：<span className="countdown-time">{paymentDeadlineText}</span>
+              </>
+            ) : (
+              <span>支付期限以订单信息为准</span>
+            )}
           </div>
         )}
       </div>
 
       {status === 'RESULT_UNKNOWN' ? (
         <div className="payment-unknown-container">
-          <Alert
-            type="warning"
-            showIcon
-            message="支付结果未知"
-            description="模拟支付请求已提交，但尚未收到网关确认。为防冲突和重复支付，禁止再次发起支付，请重新查询确认当前结果。"
-          />
+          {isMobile ? (
+            <ErrorBlock
+              status="default"
+              title="支付结果未知"
+              description="模拟支付请求已提交，但尚未收到网关确认。为防冲突和重复支付，禁止再次发起支付，请重新查询确认当前结果。"
+            />
+          ) : (
+            <Alert
+              type="warning"
+              showIcon
+              message="支付结果未知"
+              description="模拟支付请求已提交，但尚未收到网关确认。为防冲突和重复支付，禁止再次发起支付，请重新查询确认当前结果。"
+            />
+          )}
           <div className="payment-actions">
-            <Button type="primary" className="payment-query-btn" onClick={onQueryOrderResult}>
-              重新查询订单结果
-            </Button>
+            {isMobile ? (
+              <MobileButton
+                color="primary"
+                className="payment-query-btn"
+                onClick={onQueryOrderResult}
+              >
+                重新查询订单结果
+              </MobileButton>
+            ) : (
+              <Button type="primary" className="payment-query-btn" onClick={onQueryOrderResult}>
+                重新查询订单结果
+              </Button>
+            )}
           </div>
         </div>
       ) : status === 'PROCESSING' ? (
         <div className="payment-processing-container">
-          <Spin tip="正在处理中..." />
-          <p className="payment-processing-tip">网关受理中...</p>
+          {isMobile ? (
+            <div className="mobile-loading-wrapper">
+              <SpinLoading color="primary" />
+              <span>网关受理中...</span>
+            </div>
+          ) : (
+            <>
+              <Spin tip="正在处理中..." />
+              <p className="payment-processing-tip">网关受理中...</p>
+            </>
+          )}
         </div>
       ) : status === 'SUCCESS' ? (
         <div className="payment-success-container">
@@ -152,18 +201,33 @@ export const PaymentPanel: React.FC<PaymentPanelProps> = ({
           />
           {passwordError && <div className="payment-password-error">{passwordError}</div>}
           <div className="payment-actions">
-            <Button
-              type="primary"
-              disabled={isOfflineReadOnly || status !== 'NORMAL'}
-              onClick={handlePay}
-            >
-              确认支付
-            </Button>
-            {onCancelPayment && (
-              <Button onClick={onCancelPayment} className="payment-cancel-btn">
-                取消
+            {isMobile ? (
+              <MobileButton
+                color="primary"
+                disabled={isOfflineReadOnly || status !== 'NORMAL'}
+                onClick={handlePay}
+              >
+                确认支付
+              </MobileButton>
+            ) : (
+              <Button
+                type="primary"
+                disabled={isOfflineReadOnly || status !== 'NORMAL'}
+                onClick={handlePay}
+              >
+                确认支付
               </Button>
             )}
+            {onCancelPayment &&
+              (isMobile ? (
+                <MobileButton onClick={onCancelPayment} className="payment-cancel-btn">
+                  取消
+                </MobileButton>
+              ) : (
+                <Button onClick={onCancelPayment} className="payment-cancel-btn">
+                  取消
+                </Button>
+              ))}
           </div>
         </div>
       )}

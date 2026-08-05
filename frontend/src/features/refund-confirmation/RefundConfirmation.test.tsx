@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { RefundConfirmation } from './RefundConfirmation';
-import { setupTestEnvironment } from '../test-utils';
+import { setupTestEnvironment, setMobileView } from '../test-utils';
 
 setupTestEnvironment();
 
@@ -49,5 +49,16 @@ describe('RefundConfirmation 组件', () => {
     expect(queryBtn).toBeInTheDocument();
     fireEvent.click(queryBtn);
     expect(handleQuery).toHaveBeenCalled();
+  });
+
+  it('在 REQUESTED 状态下显示申请已提交提示', () => {
+    render(<RefundConfirmation {...defaultProps} status="REQUESTED" />);
+    expect(screen.getByText('退款申请已提交...')).toBeInTheDocument();
+  });
+
+  it('在移动端 REQUESTED 状态下渲染 SpinLoading', () => {
+    setMobileView(true);
+    const { container } = render(<RefundConfirmation {...defaultProps} status="REQUESTED" />);
+    expect(container.querySelector('.adm-spin-loading')).toBeInTheDocument();
   });
 });

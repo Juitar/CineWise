@@ -375,7 +375,7 @@ export function useRefundPage(orderNo: string): RefundPageState {
         if (impactResult.status === 'fulfilled') {
           setImpact(impactResult.value);
           setError(null);
-        } else if (refundResult.status === 'rejected') {
+        } else {
           setError(toApiError(impactResult.reason));
         }
         if (alternativeResult.status === 'fulfilled') {
