@@ -61,7 +61,13 @@ public class RedisContentCacheAdapter implements ContentCachePort {
             ContentResult<List<? extends ContentItem>> result = codec.read(
                     payload, query, ContentFallbackType.CACHE, false);
             LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
-            return result.expiresAt().isBefore(now) ? Optional.empty() : Optional.of(result);
+            if (result.expiresAt().isBefore(now)) {
+                return Optional.empty();
+            }
+            // Redis 只是当前真实资料的读取位置，不能把命中缓存误报为降级。
+            ContentResult<List<? extends ContentItem>> current = new ContentResult<>(
+                    result.data(), result.source(), result.dataTime(), result.expiresAt(), false, false, null);
+            return Optional.of(current);
         } catch (DataAccessException | IllegalStateException exception) {
             // 包括连接断开和损坏 JSON，统一让调用方继续走快照。
             return Optional.empty();

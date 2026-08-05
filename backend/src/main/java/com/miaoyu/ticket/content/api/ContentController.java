@@ -215,14 +215,17 @@ public class ContentController {
     }
 
     private MovieResponse toMovieResponse(MovieContent movie) {
-        // 列表故意不返回 summary；Demo 暂无简介，真实 Provider 补齐前不能编造内容。
+        // 海报和上映资料来自已标准化的内容模型；列表不返回长简介，避免首屏加载不必要文本。
+        // 这里不重新校验 URL：Provider/领域模型已完成 HTTPS 校验，Controller 只做公开 DTO 映射。
         return new MovieResponse(
                 toPublicId(movie.movieId()),
                 movie.title(),
-                null,
+                movie.posterUrl(),
                 parseGenres(movie.genresJson()),
                 movie.durationMinutes(),
-                movie.rating());
+                movie.rating(),
+                movie.releaseDate(),
+                movie.releaseStatus());
     }
 
     /**
@@ -237,15 +240,18 @@ public class ContentController {
 
     private MovieDetailResponse toMovieDetailResponse(MovieContent movie, ContentResult<?> result) {
         // 详情把时效字段下沉到记录本身，页面刷新详情时无需再拼接列表包装中的来源信息。
+        // summary 为空表示来源未给短简介，不能把评分、影评或场次说明替换进去。
         ContentMeta meta = toMeta(result);
         return new MovieDetailResponse(
                 toPublicId(movie.movieId()),
                 movie.title(),
-                null,
-                null,
+                movie.posterUrl(),
+                movie.summary(),
                 parseGenres(movie.genresJson()),
                 movie.durationMinutes(),
                 movie.rating(),
+                movie.releaseDate(),
+                movie.releaseStatus(),
                 meta.source(),
                 meta.sourceType(),
                 meta.dataTime(),
@@ -381,7 +387,9 @@ public class ContentController {
             String posterUrl,
             List<String> genres,
             Integer durationMinutes,
-            BigDecimal rating) {
+            BigDecimal rating,
+            String releaseDate,
+            String releaseStatus) {
     }
 
     /**
@@ -400,6 +408,8 @@ public class ContentController {
             List<String> genres,
             Integer durationMinutes,
             BigDecimal rating,
+            String releaseDate,
+            String releaseStatus,
             String source,
             String sourceType,
             OffsetDateTime dataTime,

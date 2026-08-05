@@ -48,6 +48,10 @@ import org.springframework.web.client.RestClientResponseException;
  */
 public final class NetStartContentProvider implements ContentProvider, LiveContentSyncPort {
     private static final String PROVIDER = "NETSTART_MAOYAN";
+    // 对页面和快照使用国家行政区划代码，不能把 NetStart 的 ci 当成业务城市代码。
+    private static final String CHANGSHA_CITY_CODE = "430100";
+    // 该值只用于本 Provider 的外部请求参数，不能返回给前端。
+    private static final String NETSTART_CHANGSHA_CITY_CODE = "70";
     private final NetStartProperties properties;
     private final Environment environment;
     private final Clock clock;
@@ -199,9 +203,12 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
                 if (normalized.isEmpty()) { rejectedItemCount++; }
                 else { synchronizedContent.add(new SynchronizedContent(query, normalized.get())); }
         }
+        // 对外请求仍使用 NetStart 的 ci；标准化结果和公开查询始终使用系统行政区划城市代码。
+        ContentQuery providerCinemas = new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA,
+                null, NETSTART_CHANGSHA_CITY_CODE, "影");
         ContentQuery cinemas = new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA,
-                null, "70", "影");
-        RawFetchResult cinema = fetchWithPolicy(cinemas);
+                null, CHANGSHA_CITY_CODE, "影");
+        RawFetchResult cinema = fetchWithPolicy(providerCinemas);
         if (cinema.payload() == null) {
             rejectedItemCount++;
             failureOutcome = cinema.outcome();

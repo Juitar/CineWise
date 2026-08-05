@@ -104,7 +104,8 @@ class ContentControllerIntegrationTest {
                 "NETSTART_MAOYAN", dataTime, dataTime.plusHours(6)));
         ContentQuery query = new ContentQuery(ContentResourceType.MOVIE, null, null, "LIVE 测试片");
         snapshots.save(query, new ContentResult<>(List.of(new MovieContent(movieId, "live-movie-1", "LIVE 测试片",
-                "[\"剧情\",\"喜剧\"]", 100, new BigDecimal("8.8"))),
+                "[\"剧情\",\"喜剧\"]", 100, new BigDecimal("8.8"),
+                "https://example.test/live-poster.jpg", "真实简介", "2026-08-01", "NOW_SHOWING")),
                 new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), dataTime, dataTime.plusHours(6),
                 false, false, null));
 
@@ -112,6 +113,8 @@ class ContentControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records[0].movieId").value(Long.toString(movieId)))
                 .andExpect(jsonPath("$.data.records[0].genres[0]").value("剧情"))
+                .andExpect(jsonPath("$.data.records[0].posterUrl").value("https://example.test/live-poster.jpg"))
+                .andExpect(jsonPath("$.data.records[0].releaseDate").value("2026-08-01"))
                 .andExpect(jsonPath("$.data.sourceType").value("LIVE"));
     }
 

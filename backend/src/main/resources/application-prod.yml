@@ -15,3 +15,9 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+cinewise:
+  content:
+    netstart:
+      # NetStart 仅有学习/演示用途许可；生产环境不接受环境变量误开启。
+      enabled: false

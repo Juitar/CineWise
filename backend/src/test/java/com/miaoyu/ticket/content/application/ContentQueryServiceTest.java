@@ -71,19 +71,20 @@ class ContentQueryServiceTest {
         // 过期快照可供页面标注时间展示，但 3.6 要求其 expired=true，推荐不能把它当作可购事实。
         ContentResult<List<? extends ContentItem>> result = service.query(QUERY);
         assertThat(result.expired()).isTrue();
-        assertThat(result.fallbackType()).isEqualTo(ContentFallbackType.SNAPSHOT);
+        assertThat(result.degraded()).isFalse();
+        assertThat(result.fallbackType()).isNull();
     }
 
     @Test
-    void givenCacheMissAndValidSnapshot_whenQuery_thenItReturnsSnapshotAndKeepsDegradedMarker() {
+    void givenCacheMissAndCurrentSnapshot_whenQuery_thenItReturnsTheLatestRealVersionWithoutDegradation() {
         ContentQueryService service = service(Optional.empty(), Optional.of(result(NOW.plusHours(1), false,
                 ContentFallbackType.SNAPSHOT, ContentSourceType.LIVE)), Optional.empty());
 
         ContentResult<List<? extends ContentItem>> result = service.query(QUERY);
 
-        // 缓存未命中时不能跳过最近有效快照直接展示 Demo，页面仍需知道这是降级结果。
-        assertThat(result.fallbackType()).isEqualTo(ContentFallbackType.SNAPSHOT);
-        assertThat(result.degraded()).isTrue();
+        // Redis 未命中不等于资料降级；当前完整真实快照仍是最新版本。
+        assertThat(result.fallbackType()).isNull();
+        assertThat(result.degraded()).isFalse();
         assertThat(result.expired()).isFalse();
     }
 
