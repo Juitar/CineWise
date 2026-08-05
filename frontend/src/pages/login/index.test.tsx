@@ -95,12 +95,12 @@ describe('LoginPage', () => {
 
   afterEach(cleanup);
 
-  it('默认显示用户登录文案，不显示尚未实现的注册链接', () => {
+  it('默认显示用户登录文案和注册链接', () => {
     render(<LoginPage />);
 
     expect(screen.getByRole('heading', { name: '登录' })).toBeInTheDocument();
     expect(screen.getByText('登录后继续购票、查看订单与个性化观影服务')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: '立即注册' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '立即注册' })).toHaveAttribute('href', '/register');
     expect(screen.getByRole('link', { name: '查看隐私政策' })).toHaveAttribute('href', '/privacy');
     expect(screen.queryByText(/ICP备|公网安备/)).not.toBeInTheDocument();
   });
