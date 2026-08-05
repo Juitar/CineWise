@@ -43,6 +43,7 @@
 - **WHEN** 游标不大于当前会话已提交水位线，且小于游标记录中的最早保留 ID，或该会话已经没有保留事件
 - **THEN** 系统只发送一个不入库的 `stream.reset` 事件，其 `eventId` 为当前会话最新已提交事件水位线
 - **AND** 客户端可通过运行详情和历史消息重建展示，不得自动重发原消息或确认操作
+- **AND** 重建完成后的下一次 `Last-Event-ID` MUST 使用该 `stream.reset` 的 `eventId`（等于 `payload.watermark`），不得使用单次运行详情的 `lastEventId`
 
 #### Scenario: 跨会话或正常空洞游标
 - **WHEN** 游标对应的保留事件属于另一会话，或位于当前会话最早/最高保留区间内但没有对应事件
@@ -52,7 +53,7 @@
 #### Scenario: 未来游标
 - **WHEN** 游标大于当前会话游标记录的最高已提交事件 ID
 - **THEN** 系统不执行事件查询，只发送当前会话水位线的 `stream.reset`
-- **AND** 客户端必须先重建投影再续传
+- **AND** 客户端必须先重建投影，再以该 `stream.reset` 的会话水位线续传
 
 ### Requirement: 事件载荷必须受控、脱敏且有大小上限
 系统 SHALL 只接受白名单事件类型和类型化事件载荷。持久化 `event_type` MUST 是公共枚举中除 `stream.reset` 外的非空值，并由数据库 CHECK 白名单约束；心跳和 `stream.reset` MUST NOT 写入 `agent_event`。`payload_json` MUST 是非空 JSON 对象，序列化后的 UTF-8 字节数 MUST 不超过 16 KiB。载荷 MUST NOT 包含模型原始思维、系统提示词、认证信息、精确位置、完整订单、完整第三方响应或异常堆栈。

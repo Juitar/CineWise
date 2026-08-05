@@ -45,6 +45,17 @@ class AgentCFixtureContractTest {
         assertThat(fixture.path("data").path("events").isArray()).isTrue();
     }
 
+    @Test
+    void shouldUseStreamResetWatermarkAsTheSessionResumeCursor() throws Exception {
+        JsonNode reset = fixture("stream-reset.json");
+        JsonNode run = fixture("run-completed.json");
+
+        assertThat(reset.path("eventType").asText()).isEqualTo("stream.reset");
+        assertThat(reset.path("eventId").isTextual()).isTrue();
+        assertThat(reset.path("payload").path("watermark").asText()).isEqualTo(reset.path("eventId").asText());
+        assertThat(run.path("data").path("lastEventId").isTextual()).isTrue();
+    }
+
     private JsonNode fixture(String fixtureName) throws Exception {
         try (InputStream input = getClass().getResourceAsStream("/fixtures/agent/c/" + fixtureName)) {
             assertThat(input).as("夹具必须存在: %s", fixtureName).isNotNull();

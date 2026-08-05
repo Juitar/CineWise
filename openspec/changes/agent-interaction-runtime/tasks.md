@@ -24,3 +24,4 @@
 - [x] 4.2 扩展 Agent MySQL 8.4 临时库集成测试；验证：GitHub Actions `Backend MySQL Integration` #98 在 `cinewise_agent_it` 通过，确认 V009、同会话行锁、提交顺序、同请求并发、统一到期时间和事件游标更新；游标起始、无效游标、断线续传、轨迹索引、终态保护与清理顺序由对应单元/接口测试覆盖。A 的 MySQL 8.4 迁移验证另行执行，CI 不替代它。
 - [x] 4.3 执行 Agent 单元/接口/集成测试及 `backend/mvnw.cmd verify`；验证：本地 `backend\\mvnw.cmd verify` 通过（285 tests，0 failures，0 errors，16 skipped）；本 PR 最新提交的 Backend Verify、Backend MySQL Integration、Backend Redis Integration 与 Frontend Verify 均通过。
 - [x] 4.4 执行 `openspec validate agent-interaction-runtime --strict`、`git diff --check`、`git status`，并把 C 的夹具联调结果和未验证项写入交付说明；验证：C 在 PR #53 评论确认字符串 ID、重复事件去重、安全错误和重置恢复流程；其指出的 `traceId`、可区分事件 ID 与非空恢复快照已在 `b1e93d7` 修正。真实推荐卡字段仍是 D 的后续只读摘要范围，本 Change 保持安全占位，不把未确认字段写入载荷。
+- [ ] 4.5 修正 `stream.reset` 会话水位线续传规则；验证：B 夹具断言重置事件 `eventId` 与 `payload.watermark` 一致，C 先 GET 重建后以该值作为下一次 `Last-Event-ID`，不会因运行级 `lastEventId` 较小而循环重置。

@@ -20,6 +20,7 @@
 - **WHEN** SSE 连接断开后当前用户查询运行详情
 - **THEN** 系统返回已经持久化的状态、消息和步骤摘要
 - **AND** 工具调用次数和运行版本不因查询增加
+- **AND** 当查询由 `stream.reset` 触发时，查询只用于重建该 runId；后续 SSE 续传仍使用重置事件给出的会话水位线
 
 ### Requirement: 运行详情的最后事件游标必须来自已提交事件水位线
 系统 SHALL 以当前用户有权读取的该 runId 的最大已提交 `agent_event.event_id` 作为 `lastEventId`；没有已提交事件时 MUST 返回十进制字符串 `"0"`。查询 MUST 走 `idx_agent_event_run_event(run_id, event_id)`，不得从消息表推导续传游标。会话级 `agent_event_stream_cursor.last_committed_event_id` 只用于 SSE 重置水位线，不得误作单个 runId 的最后事件。
