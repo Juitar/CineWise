@@ -20,7 +20,7 @@
 
 ### 1. 验证码规则使用独立配置
 
-默认生成 6 位数字，使用 `SecureRandom`；有效期 300 秒、发送冷却 60 秒、最大失败次数 5。部署可以在安全范围内调整时间和次数，但不能配置固定生产验证码。摘要使用独立必填 `AUTH_VERIFICATION_HASH_SECRET` 计算 HMAC-SHA-256，不复用 JWT 或登录审计密钥。
+默认生成 6 位数字，使用 `SecureRandom`；有效期 300 秒、发送冷却 60 秒、最大失败次数 5。部署可以在安全范围内调整时间和次数，但不能配置固定生产验证码。摘要使用独立必填 `AUTH_VERIFICATION_HASH_SECRET` 计算 HMAC-SHA-256，不复用 JWT 或登录审计密钥；数据库以 `CHAR(64) CHARACTER SET ascii COLLATE ascii_bin` 保存小写十六进制摘要，并通过 CHECK 拒绝其他格式。
 
 ### 2. 发送限流先于账号可用性判断
 
@@ -44,7 +44,7 @@
 
 ### 7. 数据迁移由 A 分配版本
 
-`sys_email_verify_code` 使用设计已确认的 11 个字段，补充 `status` 仅允许 `UNUSED/USED/INVALID`、`attempt_count` 非负、使用时间与状态一致的 CHECK。索引为 `idx_verify_lookup(email,purpose,status,expire_time)`。V006 的 `chk_sys_login_log_type` 当前只允许 `PASSWORD/ADMIN_PASSWORD`，新迁移还必须以向前方式删除并重建该约束，加入 `EMAIL_CODE`；不得修改 V006。C 提交字段与约束申请；A 分配 V009 之后的实际版本、生成或审核 SQL，并决定是否授权空 MySQL 8.4 验证。
+`sys_email_verify_code` 使用设计已确认的 11 个字段，补充 `status` 仅允许 `UNUSED/USED/INVALID`、`attempt_count` 在 0～5、摘要为 64 位小写十六进制、使用时间与状态一致的 CHECK。索引为 `idx_verify_lookup(email,purpose,status,expire_time)` 和用于短生命周期清理的 `idx_verify_expire(expire_time)`。V006 的 `chk_sys_login_log_type` 当前只允许 `PASSWORD/ADMIN_PASSWORD`，新迁移必须在同一条 `ALTER TABLE` 中删除并重建该约束，加入 `EMAIL_CODE`；不得修改 V006。C 提交字段与约束申请；A 分配 V009 之后的实际版本、生成或审核 SQL，并决定是否授权空 MySQL 8.4 验证。
 
 ### 8. 注册事务同时消费验证码和邀请码
 
@@ -58,7 +58,7 @@
 
 ### 10. 邀请码使用独立 HMAC 密钥
 
-邀请码不保存明文，使用必填 `AUTH_INVITE_HASH_SECRET` 计算 HMAC-SHA-256 后按唯一索引查询。首个培训邀请码由 A 在结构迁移后的独立数据迁移写入预计算摘要、有效期和次数；代码、OpenSpec、日志和 Git 不保存邀请码明文。
+邀请码不保存明文，使用必填 `AUTH_INVITE_HASH_SECRET` 计算 HMAC-SHA-256 后按唯一索引查询。摘要同样使用 `CHAR(64) CHARACTER SET ascii COLLATE ascii_bin` 和小写十六进制 CHECK。首个培训邀请码由 A 在结构迁移后的独立数据迁移写入预计算摘要、有效期和次数；正式数据迁移使用“摘要不存在才插入”，不得用会重置 `used_count` 的 `ON DUPLICATE KEY UPDATE`。代码、OpenSpec、日志和 Git 不保存邀请码明文或摘要密钥。
 
 ## Risks / Trade-offs
 
@@ -76,10 +76,11 @@
 - 验证码字段：`id,email,purpose,code_hash,status,send_time,expire_time,used_time,attempt_count,create_time,update_time`
 - 邀请码字段：`id,code_hash,status,max_uses,used_count,valid_from,expire_time,version,create_time,update_time`
 - 使用记录字段：`id,invite_id,user_id,client_request_id,used_at,create_time`
-- 索引：按认证总系分 T02、T03、T04；邮箱、邀请码摘要、用户和 clientRequestId 的唯一/查询规则不得删减
-- CHECK：用途白名单、状态白名单、尝试次数非负、`USED` 必须有 `used_time` 且其他状态为空
-- 兼容修改：`chk_sys_login_log_type` 从 `PASSWORD/ADMIN_PASSWORD` 增加 `EMAIL_CODE`，不得修改 V006
-- 数据迁移：结构迁移之后另建首个培训邀请码数据迁移，只保存预计算摘要，不保存明文
+- 摘要列：验证码和邀请码的 `code_hash` 均为 `CHAR(64) CHARACTER SET ascii COLLATE ascii_bin`，CHECK 只允许 64 位小写十六进制
+- 索引：按认证总系分 T02、T03、T04；补充 `idx_verify_expire(expire_time)`；邮箱、邀请码摘要、用户和 clientRequestId 的唯一/查询规则不得删减
+- CHECK：用途白名单、状态白名单、尝试次数 0～5、摘要格式、`USED` 必须有 `used_time` 且其他状态为空
+- 兼容修改：`chk_sys_login_log_type` 从 `PASSWORD/ADMIN_PASSWORD` 增加 `EMAIL_CODE`，在同一条 `ALTER TABLE` 中 DROP 和 ADD，不得修改 V006
+- 数据迁移：结构迁移之后另建首个培训邀请码数据迁移，只保存预计算摘要，不保存明文；使用“摘要不存在才插入”，不得重置既有使用次数
 - 验证：冷却重复发送、错误尝试上限、过期、一次性消费、邮箱唯一竞争、邀请码最后一次竞争、注册回滚、字符集和重复 migrate
 
 ## Verification
