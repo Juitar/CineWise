@@ -49,6 +49,8 @@ class CreateOrderToolTest {
         assertThat(result.data().showId()).isEqualTo("70001");
         assertThat(result.data().seatIds()).containsExactly("80001", "80002");
         assertThat(result.data().totalAmount()).isEqualTo("78.00");
+        assertThat(result.stateVersion()).isEqualTo(3L);
+        assertThat(result.data().stateVersion()).isEqualTo(7);
         verify(orderApplicationService).createOrder(org.mockito.ArgumentMatchers.argThat(request ->
                 request.showId() == 70001L
                         && request.seatIds().equals(List.of(80001L, 80002L))
@@ -67,6 +69,7 @@ class CreateOrderToolTest {
         assertThat(result.status()).isEqualTo(ToolStatus.FAILED);
         assertThat(result.errorCode()).isEqualTo(204001);
         assertThat(result.retryable()).isFalse();
+        assertThat(result.stateVersion()).isEqualTo(3L);
     }
 
     @Test
@@ -80,6 +83,7 @@ class CreateOrderToolTest {
         assertThat(result.status()).isEqualTo(ToolStatus.PROCESSING);
         assertThat(result.retryable()).isFalse();
         assertThat(result.suggestedNextAction()).isEqualTo(CreateOrderTool.QUERY_ORIGINAL_ORDER);
+        assertThat(result.stateVersion()).isEqualTo(3L);
     }
 
     @Test
@@ -157,7 +161,7 @@ class CreateOrderToolTest {
                 new BigDecimal("78.00"),
                 OrderStatus.PENDING_PAYMENT,
                 EXPIRE_TIME,
-                3,
+                7,
                 UPDATED_AT);
     }
 }

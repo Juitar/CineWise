@@ -68,7 +68,7 @@ public class CreateOrderTool {
                     command.parsedSeatIds(),
                     context.clientRequestId(),
                     context.idempotencyKey()));
-            return success(order);
+            return success(order, context);
         } catch (IllegalArgumentException exception) {
             // 参数失败不可重试；B 应重新检查受信任槽位与确认动作，而不是重复调用工具。
             return failed(CommonErrorCode.INVALID_PARAMETER.code(), context, "CHECK_INPUT");
@@ -96,7 +96,9 @@ public class CreateOrderTool {
         try {
             // 恢复必须复用原键；空白或超长键直接失败，不能用新的请求标识替代。
             requireClientRequestId(context.clientRequestId());
-            return success(orderApplicationService.queryByClientRequestId(context.clientRequestId()));
+            return success(
+                    orderApplicationService.queryByClientRequestId(context.clientRequestId()),
+                    context);
         } catch (IllegalArgumentException exception) {
             return failed(CommonErrorCode.INVALID_PARAMETER.code(), context, "CHECK_INPUT");
         } catch (BusinessException exception) {
@@ -108,8 +110,8 @@ public class CreateOrderTool {
         }
     }
 
-    private ToolResult<AgentOrderResult> success(OrderView order) {
-        // ToolResult.stateVersion 使用实际订单版本，供 B 丢弃旧结果，而不是沿用计划输入版本。
+    private ToolResult<AgentOrderResult> success(OrderView order, ToolContext context) {
+        // 外层版本用于 B 审计 Agent 状态快照；订单行版本只保留在类型化业务结果中。
         AgentOrderResult result = toResult(order);
         return new ToolResult<>(
                 ToolStatus.SUCCESS,
@@ -120,7 +122,7 @@ public class CreateOrderTool {
                 "CONTINUE_ORDER_FLOW",
                 false,
                 null,
-                (long) order.stateVersion(),
+                context.stateVersion(),
                 null,
                 null);
     }

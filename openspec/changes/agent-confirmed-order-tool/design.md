@@ -8,7 +8,7 @@
 
 `CreateOrderForAgentCommand` 仅包含 `actionId`、`showId`、`seatIds`。命令构造时校验标准 UUID 确认动作关联标识、正十进制业务 ID、座位数量上限和重复座位；不包含 `userId`、金额、订单状态、`clientRequestId` 或 `idempotencyKey`。
 
-`ToolContext` 是幂等和身份上下文的唯一来源：当前用户由 A 的 `CurrentUserAccessor` 获取，`clientRequestId` 与 `idempotencyKey` 必须经过 `requireWriteRequestIdentifiers()`，并继续遵守 A 现有建单契约的非空且最多 64 字符限制。返回 `AgentOrderResult` 使用十进制字符串 ID、两位小数金额和带 `+08:00` 的时间；不暴露 Entity 或确认存储内容。
+`ToolContext` 是幂等和身份上下文的唯一来源：当前用户由 A 的 `CurrentUserAccessor` 获取，`clientRequestId` 与 `idempotencyKey` 必须经过 `requireWriteRequestIdentifiers()`，并继续遵守 A 现有建单契约的非空且最多 64 字符限制。外层 `ToolResult.stateVersion` 始终回传 `ToolContext.stateVersion`，表示 B 的 Agent 槽位/状态快照版本；内层 `AgentOrderResult.stateVersion` 独立回传订单行版本。返回 `AgentOrderResult` 使用十进制字符串 ID、两位小数金额和带 `+08:00` 的时间；不暴露 Entity 或确认存储内容。
 
 ## Execution and recovery
 
