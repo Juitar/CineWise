@@ -40,8 +40,6 @@ public interface ShowQueryRepository {
             LocalDateTime startsAfter,
             LocalDateTime dateStart,
             LocalDateTime dateEnd,
-            LocalTime timeFrom,
-            LocalTime timeTo,
             int fetchLimit) {
     }
 
@@ -58,6 +56,7 @@ public interface ShowQueryRepository {
             int availableSeatCount,
             String status,
             String dataType,
+            String source,
             int version,
             LocalDateTime updatedAt) {
     }

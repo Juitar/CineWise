@@ -84,6 +84,7 @@ public class MybatisShowQueryRepository implements ShowQueryRepository {
                 row.availableSeatCount(),
                 row.status(),
                 row.dataType(),
+                row.source(),
                 row.version(),
                 row.updatedAt());
     }

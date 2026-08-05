@@ -45,6 +45,7 @@ public interface TicketingQueryMapper {
                    SUM(CASE WHEN ss.status = 'AVAILABLE' THEN 1 ELSE 0 END) AS available_seat_count,
                    ms.status,
                    ms.data_type,
+                   ms.source,
                    ms.version,
                    ms.update_time AS updated_at
               FROM movie_show ms
@@ -67,7 +68,7 @@ public interface TicketingQueryMapper {
             </if>
              GROUP BY ms.id, ms.movie_id, ms.cinema_id, ms.auditorium_id, a.name,
                       ms.start_time, ms.end_time, ms.language_version, ms.base_price,
-                      ms.status, ms.data_type, ms.version, ms.update_time
+                      ms.status, ms.data_type, ms.source, ms.version, ms.update_time
              ORDER BY ms.start_time, ms.id
             </script>
             """)
@@ -88,6 +89,7 @@ public interface TicketingQueryMapper {
                    SUM(CASE WHEN ss.status = 'AVAILABLE' THEN 1 ELSE 0 END) AS available_seat_count,
                    ms.status,
                    ms.data_type,
+                   ms.source,
                    ms.version,
                    ms.update_time AS updated_at
               FROM movie_show ms
@@ -101,13 +103,9 @@ public interface TicketingQueryMapper {
                AND ms.start_time &gt; #{criteria.startsAfter}
                AND ms.start_time &gt;= #{criteria.dateStart}
                AND ms.start_time &lt; #{criteria.dateEnd}
-            <if test="criteria.timeFrom != null">
-               AND CAST(ms.start_time AS TIME) &gt;= #{criteria.timeFrom}
-               AND CAST(ms.start_time AS TIME) &lt; #{criteria.timeTo}
-            </if>
              GROUP BY ms.id, ms.movie_id, ms.cinema_id, ms.auditorium_id, a.name,
                       ms.start_time, ms.end_time, ms.language_version, ms.base_price,
-                      ms.status, ms.data_type, ms.version, ms.update_time
+                      ms.status, ms.data_type, ms.source, ms.version, ms.update_time
             HAVING SUM(CASE WHEN ss.status = 'AVAILABLE' THEN 1 ELSE 0 END) &gt; 0
              ORDER BY ms.start_time, ms.id
              LIMIT #{criteria.fetchLimit}

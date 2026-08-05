@@ -10,7 +10,6 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -136,7 +135,7 @@ class ShowQueryMySqlIntegrationTest {
                 queryDate.atTime(15, 0), "ON_SALE", "AVAILABLE", createdAt);
 
         SaleableShowBatchResult result = saleableShowBatchQueryService.query(
-                new SaleableShowBatchQuery(queryDate, List.of(cinemaOne, cinemaTwo), null, null, 200));
+                new SaleableShowBatchQuery(queryDate, List.of(cinemaOne, cinemaTwo)));
 
         assertThat(result.truncated()).isFalse();
         assertThat(result.shows()).extracting(SaleableShowView::showId)
@@ -148,25 +147,13 @@ class ShowQueryMySqlIntegrationTest {
         assertThat(result.shows()).allSatisfy(show -> {
             assertThat(show.availableSeatCount()).isPositive();
             assertThat(show.saleable()).isTrue();
-            assertThat(show.expiresAt()).isEqualTo(show.startTime());
             assertThat(show.price().scale()).isEqualTo(2);
+            assertThat(show.dataType()).isEqualTo("MOCK");
+            assertThat(show.source()).isEqualTo("batch-query-test");
+            assertThat(show.expiresAt()).isBeforeOrEqualTo(show.startTime());
+            assertThat(show.expiresAt()).isEqualTo(show.dataAt().plusSeconds(60));
         });
 
-        SaleableShowBatchResult boundary = saleableShowBatchQueryService.query(
-                new SaleableShowBatchQuery(
-                        queryDate,
-                        List.of(cinemaOne),
-                        LocalTime.of(14, 0),
-                        LocalTime.of(15, 0),
-                        200));
-        assertThat(boundary.shows()).extracting(SaleableShowView::showId)
-                .containsExactly(9_942_000_006L);
-
-        SaleableShowBatchResult limited = saleableShowBatchQueryService.query(
-                new SaleableShowBatchQuery(queryDate, List.of(cinemaOne, cinemaTwo), null, null, 1));
-        assertThat(limited.shows()).extracting(SaleableShowView::showId)
-                .containsExactly(9_942_000_001L);
-        assertThat(limited.truncated()).isTrue();
     }
 
     private void insertAuditorium(long auditoriumId, long cinemaId, String name, LocalDateTime createdAt) {
