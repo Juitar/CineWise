@@ -8,7 +8,7 @@ public enum TicketingErrorCode implements ErrorCode {
     SEAT_NOT_LOCKABLE(204001, "座位不可锁定", HttpStatus.CONFLICT),
     SHOW_NOT_SALEABLE(204002, "场次不可售或已开场", HttpStatus.CONFLICT),
     SEAT_SNAPSHOT_STALE(204003, "座位快照版本已过期", HttpStatus.CONFLICT),
-    QUERY_UNAVAILABLE(306003, "票务查询暂不可用", HttpStatus.INTERNAL_SERVER_ERROR);
+    QUERY_UNAVAILABLE(306003, "票务查询暂不可用", HttpStatus.SERVICE_UNAVAILABLE);
 
     private final int code;
     private final String message;

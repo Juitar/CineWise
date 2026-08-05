@@ -7,6 +7,7 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -19,9 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SaleableShowBatchQueryService {
 
-    public static final int DEFAULT_LIMIT = 200;
     public static final int MAX_LIMIT = 200;
-    public static final int MAX_CINEMA_IDS = 50;
+    public static final int MAX_CINEMA_IDS = 100;
+    private static final long SNAPSHOT_TTL_SECONDS = 60;
     private static final int ROLLING_WINDOW_DAYS = 7;
 
     private final ShowQueryRepository repository;
@@ -42,7 +43,10 @@ public class SaleableShowBatchQueryService {
             return new SaleableShowBatchResult(List.of(), false);
         }
 
-        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
+        // 所有记录共享同一 dataAt，确保 D 不会因逐条取时产生不一致的候选时效。
+        LocalDateTime dataAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID)
+                .truncatedTo(ChronoUnit.MILLIS);
+        LocalDateTime now = dataAt;
         LocalDateTime dateStart = validated.date().atStartOfDay();
         LocalDateTime dateEnd = validated.date().plusDays(1).atStartOfDay();
         List<ShowQueryRepository.ShowSnapshot> snapshots;
@@ -53,19 +57,17 @@ public class SaleableShowBatchQueryService {
                             now,
                             dateStart,
                             dateEnd,
-                            validated.timeFrom(),
-                            validated.timeTo(),
-                            validated.limit() + 1));
+                            MAX_LIMIT + 1));
         } catch (DataAccessException exception) {
             // 查询故障与“无匹配场次”语义不同，必须让调用方得到稳定的不可用错误。
             throw new BusinessException(TicketingErrorCode.QUERY_UNAVAILABLE);
         }
 
-        boolean truncated = snapshots.size() > validated.limit();
-        int resultSize = Math.min(snapshots.size(), validated.limit());
+        boolean truncated = snapshots.size() > MAX_LIMIT;
+        int resultSize = Math.min(snapshots.size(), MAX_LIMIT);
         List<SaleableShowView> shows = new ArrayList<>(resultSize);
         for (int index = 0; index < resultSize; index++) {
-            shows.add(toView(snapshots.get(index)));
+            shows.add(toView(snapshots.get(index), dataAt));
         }
         return new SaleableShowBatchResult(shows, truncated);
     }
@@ -76,17 +78,6 @@ public class SaleableShowBatchQueryService {
         }
         LocalDate today = LocalDate.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         if (query.date().isBefore(today) || !query.date().isBefore(today.plusDays(ROLLING_WINDOW_DAYS))) {
-            throw invalidParameter();
-        }
-        boolean hasTimeFrom = query.timeFrom() != null;
-        boolean hasTimeTo = query.timeTo() != null;
-        if (hasTimeFrom != hasTimeTo
-                || (hasTimeFrom && !query.timeFrom().isBefore(query.timeTo()))) {
-            throw invalidParameter();
-        }
-
-        int limit = query.limit() == null ? DEFAULT_LIMIT : query.limit();
-        if (limit <= 0 || limit > MAX_LIMIT) {
             throw invalidParameter();
         }
         Set<Long> uniqueCinemaIds = new LinkedHashSet<>();
@@ -101,13 +92,14 @@ public class SaleableShowBatchQueryService {
         }
         return new ValidatedQuery(
                 query.date(),
-                List.copyOf(uniqueCinemaIds),
-                query.timeFrom(),
-                query.timeTo(),
-                limit);
+                List.copyOf(uniqueCinemaIds));
     }
 
-    private SaleableShowView toView(ShowQueryRepository.ShowSnapshot snapshot) {
+    private SaleableShowView toView(ShowQueryRepository.ShowSnapshot snapshot, LocalDateTime dataAt) {
+        // 快照最多可被推荐层使用 60 秒；更早开场的场次以开场时刻为最终边界。
+        LocalDateTime expiresAt = snapshot.startTime().isBefore(dataAt.plusSeconds(SNAPSHOT_TTL_SECONDS))
+                ? snapshot.startTime()
+                : dataAt.plusSeconds(SNAPSHOT_TTL_SECONDS);
         return new SaleableShowView(
                 snapshot.showId(),
                 snapshot.movieId(),
@@ -115,8 +107,10 @@ public class SaleableShowBatchQueryService {
                 snapshot.basePrice().setScale(2, RoundingMode.UNNECESSARY),
                 snapshot.startTime(),
                 snapshot.endTime(),
-                snapshot.startTime(),
                 snapshot.dataType(),
+                snapshot.source(),
+                dataAt,
+                expiresAt,
                 true,
                 snapshot.availableSeatCount(),
                 snapshot.version(),
@@ -127,11 +121,6 @@ public class SaleableShowBatchQueryService {
         return new BusinessException(CommonErrorCode.INVALID_PARAMETER);
     }
 
-    private record ValidatedQuery(
-            LocalDate date,
-            List<Long> cinemaIds,
-            java.time.LocalTime timeFrom,
-            java.time.LocalTime timeTo,
-            int limit) {
+    private record ValidatedQuery(LocalDate date, List<Long> cinemaIds) {
     }
 }
