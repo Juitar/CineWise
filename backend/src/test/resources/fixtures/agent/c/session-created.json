@@ -1,0 +1,12 @@
+{
+  "code": 0,
+  "message": "success",
+  "traceId": "1234567890abcdef1234567890abcdef",
+  "data": {
+    "sessionId": "session-example-2",
+    "summary": null,
+    "status": "ACTIVE",
+    "createdAt": "2026-08-05T10:00:00+08:00",
+    "updatedAt": "2026-08-05T10:00:00+08:00"
+  }
+}

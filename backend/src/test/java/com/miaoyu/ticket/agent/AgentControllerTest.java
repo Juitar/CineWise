@@ -3,6 +3,7 @@ package com.miaoyu.ticket.agent;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -12,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.agent.api.AgentController;
 import com.miaoyu.ticket.agent.application.AgentFailurePersistedException;
 import com.miaoyu.ticket.agent.application.AgentInteractionRuntimeService;
+import com.miaoyu.ticket.common.api.PageResult;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -54,6 +56,46 @@ class AgentControllerTest {
                 .andExpect(jsonPath("$.data.runId").value("run-1"))
                 .andExpect(jsonPath("$.data.sessionId").value("session-1"))
                 .andExpect(jsonPath("$.data.lastEventId").value("9"));
+    }
+
+    @Test
+    void shouldMapSessionManagementAndCancelResponses() throws Exception {
+        OffsetDateTime created = OffsetDateTime.parse("2026-08-05T10:00:00+08:00");
+        when(runtimeService.createMySession()).thenReturn(new AgentInteractionRuntimeService.SessionView(
+                "session-1", null, "ACTIVE", created, created));
+        when(runtimeService.listMySessions(1, 20)).thenReturn(new PageResult<>(1L, 1, 20,
+                List.of(new AgentInteractionRuntimeService.SessionView(
+                        "session-1", "摘要", "ACTIVE", created, created))));
+        when(runtimeService.listMySessionMessages("session-1", 1, 20)).thenReturn(new PageResult<>(1L, 1, 20,
+                List.of(new AgentInteractionRuntimeService.MessageView("message-1", "ASSISTANT", "TEXT", "已完成",
+                        new ObjectMapper().readTree("{}"), "COMPLETED", created, created))));
+        when(runtimeService.clearMySession("session-1"))
+                .thenReturn(new AgentInteractionRuntimeService.ClearSessionView("session-1", true));
+        when(runtimeService.clearMySessions())
+                .thenReturn(new AgentInteractionRuntimeService.BulkClearSessionView(1, 2));
+        when(runtimeService.cancelMyRun("run-1"))
+                .thenReturn(new AgentInteractionRuntimeService.CancelRunView("run-1", "CANCELLED", created));
+
+        mockMvc.perform(post("/api/v1/agent/sessions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sessionId").value("session-1"));
+        mockMvc.perform(get("/api/v1/agent/sessions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].sessionId").value("session-1"));
+        mockMvc.perform(get("/api/v1/agent/sessions/session-1/messages"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].messageId").value("message-1"));
+        mockMvc.perform(delete("/api/v1/agent/sessions/session-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.cleared").value(true));
+        mockMvc.perform(delete("/api/v1/agent/sessions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.clearedCount").value(1))
+                .andExpect(jsonPath("$.data.skippedCount").value(2));
+        mockMvc.perform(post("/api/v1/agent/runs/run-1/cancel"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("CANCELLED"));
     }
 
     @Test

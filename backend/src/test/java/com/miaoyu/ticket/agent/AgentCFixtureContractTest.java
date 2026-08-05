@@ -56,6 +56,35 @@ class AgentCFixtureContractTest {
         assertThat(run.path("data").path("lastEventId").isTextual()).isTrue();
     }
 
+    @Test
+    void shouldKeepSessionManagementFixturesCompatibleWithSharedEnvelope() throws Exception {
+        JsonNode created = fixture("session-created.json");
+        JsonNode sessions = fixture("session-list.json");
+        JsonNode messages = fixture("session-message-history.json");
+        JsonNode cleared = fixture("session-cleared.json");
+        JsonNode bulkCleared = fixture("sessions-bulk-cleared.json");
+
+        assertThat(created.path("data").path("sessionId").isTextual()).isTrue();
+        assertThat(created.path("data").has("activeRunId")).isFalse();
+        assertThat(sessions.path("data").path("records").isArray()).isTrue();
+        assertThat(messages.path("data").path("records").get(0).path("messageId").isTextual()).isTrue();
+        assertThat(messages.path("data").path("records").get(0).has("runId")).isFalse();
+        assertThat(cleared.path("data").path("cleared").isBoolean()).isTrue();
+        assertThat(bulkCleared.path("data").path("clearedCount").canConvertToInt()).isTrue();
+        assertThat(bulkCleared.path("data").path("skippedCount").canConvertToInt()).isTrue();
+    }
+
+    @Test
+    void shouldKeepRunCancelFixturesIdempotentAndStringIdentified() throws Exception {
+        JsonNode cancelled = fixture("run-cancelled.json");
+        JsonNode terminal = fixture("run-terminal-cancel.json");
+
+        assertThat(cancelled.path("data").path("runId").isTextual()).isTrue();
+        assertThat(cancelled.path("data").path("status").asText()).isEqualTo("CANCELLED");
+        assertThat(terminal.path("data").path("runId").isTextual()).isTrue();
+        assertThat(terminal.path("data").path("status").asText()).isEqualTo("COMPLETED");
+    }
+
     private JsonNode fixture(String fixtureName) throws Exception {
         try (InputStream input = getClass().getResourceAsStream("/fixtures/agent/c/" + fixtureName)) {
             assertThat(input).as("夹具必须存在: %s", fixtureName).isNotNull();

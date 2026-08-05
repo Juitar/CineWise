@@ -61,6 +61,18 @@ public interface AgentPersistenceMapper {
     @Select("SELECT " + SESSION_COLUMNS + " FROM agent_session WHERE id = #{id} AND user_id = #{userId} LIMIT 1")
     AgentSessionEntity findSessionByIdAndUserId(@Param("id") long id, @Param("userId") long userId);
 
+    @Select("SELECT " + SESSION_COLUMNS + " FROM agent_session WHERE user_id = #{userId} AND status = 'ACTIVE'"
+            + " ORDER BY update_time DESC, id DESC LIMIT #{limit} OFFSET #{offset}")
+    List<AgentSessionEntity> findActiveSessionsByUserId(
+            @Param("userId") long userId, @Param("offset") int offset, @Param("limit") int limit);
+
+    @Select("SELECT COUNT(*) FROM agent_session WHERE user_id = #{userId} AND status = 'ACTIVE'")
+    long countActiveSessionsByUserId(@Param("userId") long userId);
+
+    @Select("SELECT " + SESSION_COLUMNS + " FROM agent_session WHERE user_id = #{userId} AND status = 'ACTIVE'"
+            + " ORDER BY id ASC")
+    List<AgentSessionEntity> findAllActiveSessionsByUserId(@Param("userId") long userId);
+
     @Insert("""
             INSERT INTO agent_session (
                 id, session_id, user_id, summary, status, active_run_id, version, create_time, update_time, expire_at
@@ -89,6 +101,34 @@ public interface AgentPersistenceMapper {
              WHERE id = #{sessionId} AND active_run_id = #{runId}
             """)
     int releaseActiveRun(@Param("sessionId") long sessionId, @Param("runId") long runId);
+
+    @Update("""
+            UPDATE agent_session
+               SET status = 'CLEARED', active_run_id = NULL, expire_at = #{now}, update_time = #{now},
+                   version = version + 1
+             WHERE id = #{sessionId} AND user_id = #{userId} AND status = 'ACTIVE' AND active_run_id IS NULL
+            """)
+    int clearActiveInactiveSession(
+            @Param("sessionId") long sessionId, @Param("userId") long userId, @Param("now") LocalDateTime now);
+
+    @Update("UPDATE agent_run SET expire_at = #{now} WHERE session_id = #{sessionId}")
+    int expireRunsBySessionId(@Param("sessionId") long sessionId, @Param("now") LocalDateTime now);
+
+    @Update("UPDATE agent_message SET expire_at = #{now} WHERE session_id = #{sessionId}")
+    int expireMessagesBySessionId(@Param("sessionId") long sessionId, @Param("now") LocalDateTime now);
+
+    @Update("""
+            UPDATE agent_run_step SET expire_at = #{now}
+             WHERE run_id IN (SELECT id FROM agent_run WHERE session_id = #{sessionId})
+            """)
+    int expireStepsBySessionId(@Param("sessionId") long sessionId, @Param("now") LocalDateTime now);
+
+    @Update("UPDATE agent_event SET expire_at = #{now} WHERE session_id = #{sessionId}")
+    int expireEventsBySessionId(@Param("sessionId") String sessionId, @Param("now") LocalDateTime now);
+
+    @Update("UPDATE agent_event_stream_cursor SET expire_at = #{now}, update_time = #{now}"
+            + " WHERE session_id = #{sessionId}")
+    int expireEventCursorBySessionId(@Param("sessionId") String sessionId, @Param("now") LocalDateTime now);
 
     @Delete("""
             DELETE FROM agent_session
@@ -167,6 +207,15 @@ public interface AgentPersistenceMapper {
             + " AND user_id = #{userId} ORDER BY id DESC LIMIT #{limit}")
     List<AgentMessageEntity> findMessagesBySessionIdAndUserId(
             @Param("sessionId") long sessionId, @Param("userId") long userId, @Param("limit") int limit);
+
+    @Select("SELECT " + MESSAGE_COLUMNS + " FROM agent_message WHERE session_id = #{sessionId}"
+            + " AND user_id = #{userId} ORDER BY id ASC LIMIT #{limit} OFFSET #{offset}")
+    List<AgentMessageEntity> findMessagesBySessionIdAndUserIdPage(
+            @Param("sessionId") long sessionId, @Param("userId") long userId,
+            @Param("offset") int offset, @Param("limit") int limit);
+
+    @Select("SELECT COUNT(*) FROM agent_message WHERE session_id = #{sessionId} AND user_id = #{userId}")
+    long countMessagesBySessionIdAndUserId(@Param("sessionId") long sessionId, @Param("userId") long userId);
 
     @Select("SELECT " + MESSAGE_COLUMNS + " FROM agent_message WHERE run_id = #{runId}"
             + " AND user_id = #{userId} ORDER BY id ASC")

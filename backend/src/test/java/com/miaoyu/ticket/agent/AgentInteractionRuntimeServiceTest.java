@@ -11,6 +11,9 @@ import com.miaoyu.ticket.agent.application.AgentInteractionRuntimeService;
 import com.miaoyu.ticket.agent.application.persistence.AgentEventReplayService;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeQueryService;
+import com.miaoyu.ticket.agent.application.persistence.AgentRunCancellationService;
+import com.miaoyu.ticket.agent.application.persistence.AgentSessionCreationService;
+import com.miaoyu.ticket.agent.application.persistence.AgentSessionManagementService;
 import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEvent;
 import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
@@ -26,8 +29,12 @@ class AgentInteractionRuntimeServiceTest {
         AgentMessageSubmissionService submissionService = mock(AgentMessageSubmissionService.class);
         AgentEventReplayService replayService = mock(AgentEventReplayService.class);
         AgentRuntimeQueryService queryService = mock(AgentRuntimeQueryService.class);
-        AgentInteractionRuntimeService service = new AgentInteractionRuntimeService(submissionService, replayService,
-                queryService, new ObjectMapper());
+        AgentSessionCreationService sessionCreationService = mock(AgentSessionCreationService.class);
+        AgentSessionManagementService sessionManagementService = mock(AgentSessionManagementService.class);
+        AgentRunCancellationService runCancellationService = mock(AgentRunCancellationService.class);
+        AgentInteractionRuntimeService service = new AgentInteractionRuntimeService(
+                submissionService, replayService, queryService, sessionCreationService, sessionManagementService,
+                runCancellationService, new ObjectMapper());
         LocalDateTime time = LocalDateTime.of(2026, 8, 5, 11, 20);
         AgentRuntimeEvent error = new AgentRuntimeEvent(8L, "session-1", "run-1", AgentEventType.MESSAGE_ERROR,
                 new AgentStoredJson("{\"reason\":\"RUN_FAILED\"}"), time.plusDays(30), time);
@@ -42,6 +49,7 @@ class AgentInteractionRuntimeServiceTest {
         assertThat(replay.events()).extracting(AgentInteractionRuntimeService.EventView::eventType)
                 .containsExactly("message.error", "run.complete");
         verify(replayService).replay("session-1", 0L);
-        verifyNoInteractions(submissionService, queryService);
+        verifyNoInteractions(submissionService, queryService, sessionCreationService, sessionManagementService,
+                runCancellationService);
     }
 }

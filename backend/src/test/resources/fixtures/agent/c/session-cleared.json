@@ -1,0 +1,9 @@
+{
+  "code": 0,
+  "message": "success",
+  "traceId": "1234567890abcdef1234567890abcdef",
+  "data": {
+    "sessionId": "session-example-2",
+    "cleared": true
+  }
+}
