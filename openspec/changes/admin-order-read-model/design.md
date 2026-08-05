@@ -31,7 +31,7 @@ public interface UserAdminQueryPort {
 
 ## 权限边界
 
-Application Service每次查询都从`CurrentUserAccessor.requireCurrentUser()`取得身份并要求`role=ADMIN`，否则抛出`CommonErrorCode.FORBIDDEN`（`100403`）。该检查是绕过HTTP入口调用时的纵深防御，不替代C的安全链；C仍需把`/api/v1/admin/**`配置为ADMIN。真实HTTP请求先经过C的唯一安全链，普通用户返回`403/201007`，匿名用户返回`401/201006`。A的应用层测试使用替换的`CurrentUserAccessor`验证纵深防御，不实现JWT或冒充C的真实Cookie验收。
+Application Service每次查询都从`CurrentUserAccessor.requireCurrentUser()`取得身份并要求`role=ADMIN`，否则抛出`CommonErrorCode.FORBIDDEN`（`100403`）。该检查是绕过HTTP入口调用时的纵深防御，不替代C的安全链；C已在唯一安全链限制`/api/v1/admin/**`为ADMIN。真实HTTP请求先经过该安全链，普通用户返回`403/201007`，匿名用户返回`401/201006`。PR #71 已通过真实CSRF、登录和Cookie/JWT链路验证列表与详情；A的应用层测试仅验证纵深防御，不实现JWT或冒充C的认证验收。
 
 ## 查询模型
 
@@ -76,9 +76,9 @@ Application Service每次查询都从`CurrentUserAccessor.requireCurrentUser()`�
 
 ## 迁移与发布
 
-现有V002、V003、V005和V006已包含查询所需字段与索引。本change不新增、不修改任何Flyway文件。发布顺序为：C确认用户摘要契约；A实现管理查询；C接入安全链；后端和前端分别联调。
+现有V002、V003、V005和V006已包含查询所需字段与索引。本change不新增、不修改任何Flyway文件。发布顺序为：C确认用户摘要契约；A实现管理查询；C通过PR #71接入正式用户目录端口并完成安全链验收；后端和前端分别联调。
 
-C正式`UserAdminQueryPort` Bean尚未合入时，A注册`@ConditionalOnMissingBean`失败关闭兜底，两个端口方法统一抛出`301002/503`，不查询`sys_user`、不返回空集合或伪造用户。C正式实现存在后兜底自动让位。
+C正式`UserAdminQueryPort` Bean已随PR #71合入；A的`@ConditionalOnMissingBean`失败关闭兜底已自动让位。兜底仅在正式Bean异常缺失的部署故障中返回`301002/503`，不查询`sys_user`、不返回空集合或伪造用户。
 
 ## 测试策略
 
