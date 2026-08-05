@@ -8,8 +8,13 @@ import type { PaymentResponse } from '../../../modules/order/types';
  */
 export function resolvePaymentResultStatus(
   payment: PaymentResponse | null,
+  isResultUnknown: boolean,
   hasQueryError: boolean,
 ): PaymentResultStatus {
+  // 写请求响应丢失时，不能把未知结果错误显示为可再次支付的待支付状态。
+  if (isResultUnknown) {
+    return 'RESULT_UNKNOWN';
+  }
   if (hasQueryError) {
     return 'ERROR';
   }

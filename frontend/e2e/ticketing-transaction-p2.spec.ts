@@ -264,7 +264,7 @@ test('退票确认提交服务端影响摘要，并在成功后展示退款结�
   await page.getByLabel('退票原因输入').fill('行程变化');
   await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: '确认申请退票' }).click();
-  await expect(page.getByText('退票申请成功')).toBeVisible();
+  await expect(page.getByText('退款成功')).toBeVisible();
 });
 
 test('替代场次只使用服务端返回的关联 ID 回流选座页', async ({ page }) => {

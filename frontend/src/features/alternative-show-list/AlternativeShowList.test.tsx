@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { AlternativeShowList } from './AlternativeShowList';
-import { setupTestEnvironment } from '../test-utils';
+import { setupTestEnvironment, setMobileView } from '../test-utils';
 
 setupTestEnvironment();
 
@@ -51,5 +51,17 @@ describe('AlternativeShowList 组件', () => {
     fireEvent.click(btns[0]);
     expect(handleSelect).toHaveBeenCalledTimes(1);
     expect(handleSelect).toHaveBeenCalledWith(sampleShows[0]);
+  });
+
+  it('在移动端视图渲染 ErrorBlock 和 SpinLoading 以及 antd-mobile 按钮', () => {
+    setMobileView(true);
+    const { container, rerender } = render(<AlternativeShowList shows={[]} loading={true} />);
+    expect(container.querySelector('.adm-spin-loading')).toBeInTheDocument();
+
+    rerender(<AlternativeShowList shows={[]} error="测试错误" />);
+    expect(container.querySelector('.adm-error-block')).toBeInTheDocument();
+
+    rerender(<AlternativeShowList shows={sampleShows} />);
+    expect(container.querySelectorAll('.adm-button').length).toBeGreaterThan(0);
   });
 });

@@ -60,8 +60,8 @@ export default function OrderDetailPage() {
         ticketCount={order?.ticketCount ?? 0}
         unitPrice={order?.unitPrice ?? '0.00'}
         totalAmount={order?.totalAmount ?? '0.00'}
-        expireTime={order?.expireTime}
-        updatedAt={order?.updatedAt}
+        expireTime={order?.expireTime ? formatOrderDateTime(order.expireTime) : undefined}
+        updatedAt={order?.updatedAt ? formatOrderDateTime(order.updatedAt) : undefined}
         loading={orderQuery.loading}
         error={
           orderQuery.error?.message ?? cancellation.error?.message ?? paymentQuery.error?.message

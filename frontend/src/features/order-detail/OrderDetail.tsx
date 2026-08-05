@@ -1,6 +1,9 @@
 import React from 'react';
 import { Button, Alert, Spin, Tag, Descriptions } from 'antd';
-import type { OrderStatus } from '../order-list/OrderList';
+import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
+import { ORDER_STATUS_LABELS } from '../../modules/order/status-presentation';
+import type { OrderStatus } from '../../modules/order/types';
+import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 
 export interface OrderDetailProps {
@@ -57,10 +60,18 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
   cancelResultUnknown = false,
   onRecoverCancel,
 }) => {
+  const isMobile = useMediaQuery('(max-width: 1023px)');
   if (loading) {
     return (
       <div className="order-detail-container">
-        <Spin tip="正在读取订单详细信息..." />
+        {isMobile ? (
+          <div className="mobile-loading-wrapper">
+            <SpinLoading color="primary" />
+            <span>正在读取订单详细信息...</span>
+          </div>
+        ) : (
+          <Spin tip="正在读取订单详细信息..." />
+        )}
       </div>
     );
   }
@@ -68,7 +79,11 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
   if (error) {
     return (
       <div className="order-detail-container">
-        <Alert type="error" showIcon message="加载订单详情失败" description={error} />
+        {isMobile ? (
+          <ErrorBlock status="default" title="加载订单详情失败" description={error} />
+        ) : (
+          <Alert type="error" showIcon message="加载订单详情失败" description={error} />
+        )}
       </div>
     );
   }
@@ -77,43 +92,77 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
     switch (status) {
       case 'PENDING_PAYMENT':
       case 'PAYING':
-        return <Tag color="warning">待支付</Tag>;
+        return <Tag color="warning">{ORDER_STATUS_LABELS[status]}</Tag>;
       case 'PAID':
-        return <Tag color="success">已出票</Tag>;
+        return <Tag color="success">{ORDER_STATUS_LABELS[status]}</Tag>;
       case 'REFUNDING':
-        return <Tag color="processing">退款处理中</Tag>;
+        return <Tag color="processing">{ORDER_STATUS_LABELS[status]}</Tag>;
       case 'REFUNDED':
-        return <Tag color="default">已退款</Tag>;
+        return <Tag color="default">{ORDER_STATUS_LABELS[status]}</Tag>;
       case 'CANCELLED':
-        return <Tag color="default">已取消</Tag>;
+        return <Tag color="default">{ORDER_STATUS_LABELS[status]}</Tag>;
       case 'EXPIRED':
-        return <Tag color="error">已过期</Tag>;
-      default:
-        return <Tag>{status}</Tag>;
+        return <Tag color="error">{ORDER_STATUS_LABELS[status]}</Tag>;
     }
   };
 
   const renderActions = () => {
+    const renderPrimaryBtn = (text: string, onClick?: () => void, danger?: boolean) => {
+      return isMobile ? (
+        <MobileButton
+          color={danger ? 'danger' : 'primary'}
+          className="order-detail-btn"
+          onClick={onClick}
+        >
+          {text}
+        </MobileButton>
+      ) : (
+        <Button type="primary" danger={danger} className="order-detail-btn" onClick={onClick}>
+          {text}
+        </Button>
+      );
+    };
+
+    const renderDefaultBtn = (text: string, onClick?: () => void, danger?: boolean) => {
+      return isMobile ? (
+        <MobileButton
+          color={danger ? 'danger' : 'default'}
+          className="order-detail-btn"
+          onClick={onClick}
+        >
+          {text}
+        </MobileButton>
+      ) : (
+        <Button danger={danger} className="order-detail-btn" onClick={onClick}>
+          {text}
+        </Button>
+      );
+    };
+
     if (isOfflineReadOnly) {
       return (
-        <div className="order-detail-actions">
-          <Button onClick={onBackToHome}>返回首页</Button>
-        </div>
+        <div className="order-detail-actions">{renderDefaultBtn('返回首页', onBackToHome)}</div>
       );
     }
 
     if (cancelResultUnknown) {
       return (
         <div className="order-detail-actions">
-          <Alert
-            type="warning"
-            showIcon
-            message="取消结果尚未确认"
-            description="禁止再次取消，请查询当前订单状态确认服务端结果。"
-          />
-          <Button type="primary" onClick={onRecoverCancel} className="order-detail-btn">
-            重新查询订单状态
-          </Button>
+          {isMobile ? (
+            <ErrorBlock
+              status="default"
+              title="取消结果尚未确认"
+              description="禁止再次取消，请查询当前订单状态确认服务端结果。"
+            />
+          ) : (
+            <Alert
+              type="warning"
+              showIcon
+              message="取消结果尚未确认"
+              description="禁止再次取消，请查询当前订单状态确认服务端结果。"
+            />
+          )}
+          {renderPrimaryBtn('重新查询订单状态', onRecoverCancel)}
         </div>
       );
     }
@@ -122,48 +171,44 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
       case 'PENDING_PAYMENT':
         return (
           <div className="order-detail-actions">
-            <Button type="primary" onClick={onPay} className="order-detail-btn">
-              去支付
-            </Button>
-            <Button danger onClick={onCancel} className="order-detail-btn">
-              取消订单
-            </Button>
+            {renderPrimaryBtn('去支付', onPay)}
+            {renderDefaultBtn('取消订单', onCancel, true)}
           </div>
         );
 
       case 'PAYING':
         return (
           <div className="order-detail-actions">
-            <Alert
-              type="info"
-              showIcon
-              message="支付结果确认中"
-              description="请前往支付结果页查询，不要重复支付或取消订单。"
-            />
-            <Button type="primary" onClick={onPay} className="order-detail-btn">
-              查询支付结果
-            </Button>
+            {isMobile ? (
+              <ErrorBlock
+                status="default"
+                title="支付结果确认中"
+                description="请前往支付结果页查询，不要重复支付或取消订单。"
+              />
+            ) : (
+              <Alert
+                type="info"
+                showIcon
+                message="支付结果确认中"
+                description="请前往支付结果页查询，不要重复支付或取消订单。"
+              />
+            )}
+            {renderPrimaryBtn('查询支付结果', onPay)}
           </div>
         );
 
       case 'PAID':
         return (
           <div className="order-detail-actions">
-            <Button type="primary" onClick={onViewTicket} className="order-detail-btn">
-              查看电子票
-            </Button>
-            <Button onClick={onApplyRefund} className="order-detail-btn">
-              申请退票
-            </Button>
+            {renderPrimaryBtn('查看电子票', onViewTicket)}
+            {renderDefaultBtn('申请退票', onApplyRefund)}
           </div>
         );
 
       case 'REFUNDING':
         return (
           <div className="order-detail-actions">
-            <Button onClick={onApplyRefund} className="order-detail-btn">
-              查看退款进度
-            </Button>
+            {renderDefaultBtn('查看退款进度', onApplyRefund)}
           </div>
         );
 
@@ -172,11 +217,7 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
       case 'EXPIRED':
       default:
         return (
-          <div className="order-detail-actions">
-            <Button onClick={onBackToHome} className="order-detail-btn">
-              返回首页
-            </Button>
-          </div>
+          <div className="order-detail-actions">{renderDefaultBtn('返回首页', onBackToHome)}</div>
         );
     }
   };
@@ -210,7 +251,7 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
             <div>影院：{cinemaName}</div>
             <div>开场时间：{showTime}</div>
             <div>
-              座位：
+              座位编号：
               <span className="order-seat-list">
                 {seatLabels.length > 0 ? seatLabels.join('、') : '见凭证座位'}
               </span>

@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { OrderList } from './OrderList';
-import { setupTestEnvironment } from '../test-utils';
+import { setupTestEnvironment, setMobileView } from '../test-utils';
 
 setupTestEnvironment();
 
@@ -40,6 +40,23 @@ describe('OrderList 组件', () => {
     expect(screen.getAllByText('已出票').length).toBeGreaterThanOrEqual(1);
   });
 
+  it('PAYING 状态使用统一的支付确认中文文案', () => {
+    render(
+      <OrderList
+        orders={[
+          {
+            ...sampleOrders[0],
+            orderId: '10003',
+            orderNo: '202608050003',
+            status: 'PAYING',
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('支付确认中')).toBeInTheDocument();
+  });
+
   it('无数据时显示空状态 Empty 提示', () => {
     render(<OrderList orders={[]} />);
     expect(screen.getByText('暂无符合条件的购票订单')).toBeInTheDocument();
@@ -55,5 +72,14 @@ describe('OrderList 组件', () => {
     fireEvent.click(btns[0]);
     expect(handleClick).toHaveBeenCalledTimes(1);
     expect(handleClick).toHaveBeenCalledWith('202608050001');
+  });
+
+  it('在移动端视图渲染 ErrorBlock 和 SpinLoading', () => {
+    setMobileView(true);
+    const { container, rerender } = render(<OrderList orders={[]} loading={true} />);
+    expect(container.querySelector('.adm-spin-loading')).toBeInTheDocument();
+
+    rerender(<OrderList orders={[]} loading={false} error="测试错误" />);
+    expect(container.querySelector('.adm-error-block')).toBeInTheDocument();
   });
 });

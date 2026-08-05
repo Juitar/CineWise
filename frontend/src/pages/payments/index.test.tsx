@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupTestEnvironment } from '../../features/test-utils';
 import { useOrder, usePaymentAction } from '../../modules/order/transaction-hooks';
 
@@ -18,6 +18,15 @@ import PaymentPage from './index';
 setupTestEnvironment();
 
 describe('支付页面场次上下文', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-10T05:59:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('复用订单详情查询展示开场时间', () => {
     vi.mocked(useOrder).mockReturnValue({
       data: {
@@ -53,5 +62,7 @@ describe('支付页面场次上下文', () => {
     render(<PaymentPage />);
 
     expect(screen.getByText('2026-08-10 14:30')).toBeInTheDocument();
+    expect(screen.getByText('1分00秒')).toBeInTheDocument();
+    expect(screen.queryByText('15分00秒')).not.toBeInTheDocument();
   });
 });

@@ -91,3 +91,35 @@
 .payment-result-btn {
   min-width: 120px;
 }
+
+@media (max-width: 1023px) {
+  .payment-result-container {
+    padding: 16px;
+    border-radius: 0;
+    box-shadow: none;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .payment-result-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .payment-result-actions .ant-btn {
+    width: 100%;
+    min-height: 44px;
+    margin-bottom: 8px;
+  }
+}
+
+.mobile-loading-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #999;
+}
+
+.mobile-spin-large {
+  --size: 48px;
+}

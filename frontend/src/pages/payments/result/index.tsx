@@ -13,7 +13,11 @@ export default function PaymentResultPage() {
   const { orderNo = '' } = useParams<{ orderNo: string }>();
   const orderQuery = useOrder(orderNo);
   const paymentAction = usePaymentResult(orderNo);
-  const status = resolvePaymentResultStatus(paymentAction.payment, paymentAction.error !== null);
+  const status = resolvePaymentResultStatus(
+    paymentAction.payment,
+    paymentAction.resultUnknown,
+    paymentAction.error !== null,
+  );
 
   return (
     <div className="payment-result-page-wrapper">

@@ -375,7 +375,7 @@ export function useRefundPage(orderNo: string): RefundPageState {
         if (impactResult.status === 'fulfilled') {
           setImpact(impactResult.value);
           setError(null);
-        } else if (refundResult.status === 'rejected') {
+        } else {
           setError(toApiError(impactResult.reason));
         }
         if (alternativeResult.status === 'fulfilled') {
@@ -386,6 +386,9 @@ export function useRefundPage(orderNo: string): RefundPageState {
         }
         if (refundResult.status === 'fulfilled') {
           setRefund(refundResult.value);
+          // 查到任意退款记录都说明原写请求已被服务端受理，不能继续保留结果未知保护。
+          clearWriteOperationSession('refund', orderNo);
+          setResultUnknown(false);
         }
       })
       .finally(() => {
@@ -403,10 +406,9 @@ export function useRefundPage(orderNo: string): RefundPageState {
     try {
       const result = await getRefund(orderNo);
       setRefund(result);
-      if (result.refundStatus === 'SUCCESS') {
-        clearWriteOperationSession('refund', orderNo);
-        setResultUnknown(false);
-      }
+      // REQUESTED、PROCESSING 和 SUCCESS 都是服务端明确结果，只读查询后允许页面退出未知态。
+      clearWriteOperationSession('refund', orderNo);
+      setResultUnknown(false);
       return result;
     } catch (requestError: unknown) {
       setError(toApiError(requestError));

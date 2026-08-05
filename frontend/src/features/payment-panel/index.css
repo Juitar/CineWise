@@ -120,3 +120,38 @@
 .payment-cancel-btn {
   min-width: 80px;
 }
+@media (max-width: 1023px) {
+  .payment-panel-container {
+    padding: 16px;
+    border-radius: 0;
+    box-shadow: none;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .payment-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .payment-actions .ant-btn {
+    width: 100%;
+    min-height: 44px;
+    margin-bottom: 8px;
+  }
+
+  .payment-password-input {
+    max-width: 100%;
+  }
+}
+
+.mobile-loading-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #999;
+}
+
+.mobile-spin-large {
+  --size: 48px;
+}

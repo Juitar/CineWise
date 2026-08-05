@@ -1,15 +1,23 @@
 import React, { useState } from 'react';
 import { Button, Alert, Spin, Input, Checkbox } from 'antd';
+import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
+import {
+  ELECTRONIC_TICKET_STATUS_LABELS,
+  ORDER_STATUS_LABELS,
+  REFUND_STATUS_LABELS,
+} from '../../modules/order/status-presentation';
+import type { ElectronicTicketStatus, OrderStatus } from '../../modules/order/types';
+import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 
 export type RefundVisualStatus =
-  'NORMAL' | 'PROCESSING' | 'SUCCESS' | 'RESULT_UNKNOWN' | 'ERROR' | 'LOADING';
+  'NORMAL' | 'REQUESTED' | 'PROCESSING' | 'SUCCESS' | 'RESULT_UNKNOWN' | 'ERROR' | 'LOADING';
 
 export interface RefundConfirmationProps {
   orderNo: string;
   refundAmount: string;
-  orderStatus: string;
-  ticketStatus: string;
+  orderStatus: OrderStatus;
+  ticketStatus: ElectronicTicketStatus;
   showStartTime: string;
   impactText: string;
   status?: RefundVisualStatus;
@@ -41,11 +49,19 @@ export const RefundConfirmation: React.FC<RefundConfirmationProps> = ({
 }) => {
   const [reason, setReason] = useState<string>('');
   const [confirmed, setConfirmed] = useState<boolean>(false);
+  const isMobile = useMediaQuery('(max-width: 1023px)');
 
   if (status === 'LOADING') {
     return (
       <div className="refund-container">
-        <Spin tip="正在处理退款申请..." />
+        {isMobile ? (
+          <div className="mobile-loading-wrapper">
+            <SpinLoading color="primary" />
+            <span>正在处理退款申请...</span>
+          </div>
+        ) : (
+          <Spin tip="正在处理退款申请..." />
+        )}
       </div>
     );
   }
@@ -69,13 +85,19 @@ export const RefundConfirmation: React.FC<RefundConfirmationProps> = ({
       )}
 
       {error && (
-        <Alert
-          className="refund-alert"
-          type="error"
-          showIcon
-          message="退票处理异常"
-          description={error}
-        />
+        <div className="refund-alert-wrapper">
+          {isMobile ? (
+            <ErrorBlock status="default" title="退票处理异常" description={error} />
+          ) : (
+            <Alert
+              className="refund-alert"
+              type="error"
+              showIcon
+              message="退票处理异常"
+              description={error}
+            />
+          )}
+        </div>
       )}
 
       <div className="refund-header">
@@ -90,11 +112,13 @@ export const RefundConfirmation: React.FC<RefundConfirmationProps> = ({
         </div>
         <div className="refund-summary-row">
           <span className="refund-summary-label">当前订单状态</span>
-          <span className="refund-summary-value">{orderStatus}</span>
+          <span className="refund-summary-value">{ORDER_STATUS_LABELS[orderStatus]}</span>
         </div>
         <div className="refund-summary-row">
           <span className="refund-summary-label">电子票状态</span>
-          <span className="refund-summary-value">{ticketStatus}</span>
+          <span className="refund-summary-value">
+            {ELECTRONIC_TICKET_STATUS_LABELS[ticketStatus]}
+          </span>
         </div>
         <div className="refund-summary-row">
           <span className="refund-summary-label">放映开场时间</span>
@@ -109,29 +133,51 @@ export const RefundConfirmation: React.FC<RefundConfirmationProps> = ({
 
       {status === 'RESULT_UNKNOWN' ? (
         <div className="refund-state-container">
-          <Alert
-            type="warning"
-            showIcon
-            message="退款状态未知"
-            description="已向后端提交退票请求，但尚未确认最终退款结果。为防止重复扣除或状态冲突，禁止再次退票，请重新查询确认当前结果。"
-          />
+          {isMobile ? (
+            <ErrorBlock
+              status="default"
+              title="退款状态未知"
+              description="已向后端提交退票请求，但尚未确认最终退款结果。为防止重复扣除或状态冲突，禁止再次退票，请重新查询确认当前结果。"
+            />
+          ) : (
+            <Alert
+              type="warning"
+              showIcon
+              message="退款状态未知"
+              description="已向后端提交退票请求，但尚未确认最终退款结果。为防止重复扣除或状态冲突，禁止再次退票，请重新查询确认当前结果。"
+            />
+          )}
           <div className="refund-actions">
-            <Button type="primary" onClick={onQueryRefundResult} className="refund-btn">
-              重新查询退款结果
-            </Button>
+            {isMobile ? (
+              <MobileButton color="primary" onClick={onQueryRefundResult} className="refund-btn">
+                重新查询退款结果
+              </MobileButton>
+            ) : (
+              <Button type="primary" onClick={onQueryRefundResult} className="refund-btn">
+                重新查询退款结果
+              </Button>
+            )}
           </div>
         </div>
-      ) : status === 'PROCESSING' ? (
+      ) : status === 'PROCESSING' || status === 'REQUESTED' ? (
         <div className="refund-state-container">
-          <Spin size="large" />
-          <p className="refund-processing-tip">退款申请处理中...</p>
+          {isMobile ? (
+            <SpinLoading color="primary" className="mobile-spin-large" />
+          ) : (
+            <Spin size="large" />
+          )}
+          <p className="refund-processing-tip">
+            {status === 'REQUESTED'
+              ? `退款${REFUND_STATUS_LABELS.REQUESTED}...`
+              : `退款${REFUND_STATUS_LABELS.PROCESSING}...`}
+          </p>
         </div>
       ) : status === 'SUCCESS' ? (
         <div className="refund-state-container">
           <Alert
             type="success"
             showIcon
-            message="退票申请成功"
+            message={REFUND_STATUS_LABELS.SUCCESS}
             description={`退款 ¥ ${refundAmount} 申请成功。`}
           />
         </div>
@@ -164,18 +210,35 @@ export const RefundConfirmation: React.FC<RefundConfirmationProps> = ({
           </div>
 
           <div className="refund-actions">
-            <Button
-              type="primary"
-              danger
-              disabled={!confirmed || isOfflineReadOnly || status !== 'NORMAL'}
-              onClick={handleSubmit}
-              className="refund-btn"
-            >
-              确认申请退票
-            </Button>
-            <Button onClick={onCancel} className="refund-btn">
-              暂不退票
-            </Button>
+            {isMobile ? (
+              <MobileButton
+                color="danger"
+                disabled={!confirmed || isOfflineReadOnly || status !== 'NORMAL'}
+                onClick={handleSubmit}
+                className="refund-btn"
+              >
+                确认申请退票
+              </MobileButton>
+            ) : (
+              <Button
+                type="primary"
+                danger
+                disabled={!confirmed || isOfflineReadOnly || status !== 'NORMAL'}
+                onClick={handleSubmit}
+                className="refund-btn"
+              >
+                确认申请退票
+              </Button>
+            )}
+            {isMobile ? (
+              <MobileButton onClick={onCancel} className="refund-btn">
+                暂不退票
+              </MobileButton>
+            ) : (
+              <Button onClick={onCancel} className="refund-btn">
+                暂不退票
+              </Button>
+            )}
           </div>
         </div>
       )}

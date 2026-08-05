@@ -1,5 +1,7 @@
 import React from 'react';
 import { Button, Tag, Empty, Spin, Alert } from 'antd';
+import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
+import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 
 export interface AlternativeShowItem {
@@ -30,10 +32,18 @@ export const AlternativeShowList: React.FC<AlternativeShowListProps> = ({
   error,
   onSelectShow,
 }) => {
+  const isMobile = useMediaQuery('(max-width: 1023px)');
   if (loading) {
     return (
       <div className="alt-shows-container">
-        <Spin tip="正在查询其他可选替代场次..." />
+        {isMobile ? (
+          <div className="mobile-loading-wrapper">
+            <SpinLoading color="primary" />
+            <span>正在查询其他可选替代场次...</span>
+          </div>
+        ) : (
+          <Spin tip="正在查询其他可选替代场次..." />
+        )}
       </div>
     );
   }
@@ -41,7 +51,11 @@ export const AlternativeShowList: React.FC<AlternativeShowListProps> = ({
   if (error) {
     return (
       <div className="alt-shows-container">
-        <Alert type="error" showIcon message="获取替代场次失败" description={error} />
+        {isMobile ? (
+          <ErrorBlock status="default" title="获取替代场次失败" description={error} />
+        ) : (
+          <Alert type="error" showIcon message="获取替代场次失败" description={error} />
+        )}
       </div>
     );
   }
@@ -49,7 +63,11 @@ export const AlternativeShowList: React.FC<AlternativeShowListProps> = ({
   if (shows.length === 0) {
     return (
       <div className="alt-shows-container">
-        <Empty description="当前暂无其他可替代的同类放映场次" />
+        {isMobile ? (
+          <ErrorBlock status="empty" title="当前暂无其他可替代的同类放映场次" />
+        ) : (
+          <Empty description="当前暂无其他可替代的同类放映场次" />
+        )}
       </div>
     );
   }
@@ -69,9 +87,20 @@ export const AlternativeShowList: React.FC<AlternativeShowListProps> = ({
             </div>
             <div className="alt-show-action">
               <span className="alt-show-price">¥ {item.basePrice}</span>
-              <Button type="primary" size="small" onClick={() => onSelectShow?.(item)}>
-                选择此场
-              </Button>
+              {isMobile ? (
+                <MobileButton
+                  color="primary"
+                  size="small"
+                  fill="none"
+                  onClick={() => onSelectShow?.(item)}
+                >
+                  选择此场
+                </MobileButton>
+              ) : (
+                <Button type="primary" size="small" onClick={() => onSelectShow?.(item)}>
+                  选择此场
+                </Button>
+              )}
             </div>
           </article>
         ))}

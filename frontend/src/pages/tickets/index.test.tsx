@@ -60,6 +60,7 @@ describe('电子票页面场次上下文', () => {
 
     expect(useOrder).toHaveBeenCalledWith('CW1');
     expect(screen.getByText('2026-08-10 14:30')).toBeInTheDocument();
+    expect(screen.getByText('2026-08-05 12:00')).toBeInTheDocument();
     expect(screen.getByText('影片信息暂不可用')).toBeInTheDocument();
     expect(screen.queryByText(/场次时间请在/)).not.toBeInTheDocument();
   });

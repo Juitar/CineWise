@@ -146,3 +146,47 @@
   display: flex;
   justify-content: flex-end;
 }
+
+@media (max-width: 1023px) {
+  .order-list-container {
+    padding: 16px;
+    border-radius: 0;
+  }
+
+  .order-list-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .order-list-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .order-date-input {
+    width: 100%;
+  }
+
+  .order-card-footer {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .order-card-footer .ant-btn {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+.mobile-loading-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #999;
+}
+
+.mobile-spin-large {
+  --size: 48px;
+}
