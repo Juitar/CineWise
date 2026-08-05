@@ -19,7 +19,9 @@ public record AvailableMoviesResponse(List<AvailableMovieItemResponse> movies) {
             String posterUrl,
             int showCount,
             OffsetDateTime nearestStartTime,
-            String dataSource,
-            OffsetDateTime dataTime) {
+            String contentSource,
+            OffsetDateTime contentDataTime,
+            String scheduleSource,
+            OffsetDateTime scheduleDataTime) {
     }
 }

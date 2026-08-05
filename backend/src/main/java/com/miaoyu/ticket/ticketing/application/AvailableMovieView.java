@@ -9,6 +9,8 @@ public record AvailableMovieView(
         String posterUrl,
         int showCount,
         LocalDateTime nearestStartTime,
-        String dataSource,
-        LocalDateTime dataTime) {
+        String contentSource,
+        LocalDateTime contentDataTime,
+        String scheduleSource,
+        LocalDateTime scheduleDataTime) {
 }

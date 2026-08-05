@@ -179,6 +179,8 @@ class ContentQueryServiceTest {
         assertThat(cacheFindCount).hasValue(1);
         assertThat(summaries).containsOnlyKeys(101L, 102L);
         assertThat(summaries.get(101L).title()).isEqualTo("影片甲");
+        assertThat(summaries.get(101L).contentSource()).isEqualTo("TEST");
+        assertThat(summaries.get(101L).contentDataTime()).isEqualTo(NOW);
     }
 
     @Test

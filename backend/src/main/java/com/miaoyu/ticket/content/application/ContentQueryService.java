@@ -91,8 +91,12 @@ public class ContentQueryService implements ContentPurchaseQueryPort {
                     .map(MovieContent.class::cast)
                     .filter(movie -> movie.movieId() != null && movieIds.contains(movie.movieId()))
                     .sorted(java.util.Comparator.comparingLong(MovieContent::movieId))
-                    .forEach(movie -> summaries.put(movie.movieId(),
-                            new MovieSummary(movie.movieId(), movie.title(), movie.posterUrl())));
+                    .forEach(movie -> summaries.put(movie.movieId(), new MovieSummary(
+                            movie.movieId(),
+                            movie.title(),
+                            movie.posterUrl(),
+                            result.source().name(),
+                            result.dataTime())));
             return Map.copyOf(summaries);
         } catch (BusinessException exception) {
             return Map.of();

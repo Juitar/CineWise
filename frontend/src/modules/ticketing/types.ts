@@ -30,8 +30,10 @@ export interface AvailableMovie {
   posterUrl: string | null;
   showCount: number;
   nearestStartTime: string;
-  dataSource: string;
-  dataTime: string;
+  contentSource: string;
+  contentDataTime: string;
+  scheduleSource: string;
+  scheduleDataTime: string;
 }
 
 export interface AvailableMoviesResponse {

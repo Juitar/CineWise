@@ -16,8 +16,10 @@ const response = {
       posterUrl: null,
       showCount: 6,
       nearestStartTime: '2026-08-05T19:30:00+08:00',
-      dataSource: 'demo-seed',
-      dataTime: '2026-08-05T10:00:00+08:00',
+      contentSource: 'NETSTART_MAOYAN',
+      contentDataTime: '2026-08-05T09:00:00+08:00',
+      scheduleSource: 'demo-seed',
+      scheduleDataTime: '2026-08-05T10:00:00+08:00',
     },
   ],
 };

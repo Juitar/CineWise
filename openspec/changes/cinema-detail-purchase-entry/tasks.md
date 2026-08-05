@@ -10,7 +10,7 @@
 ## A：按影院查询和演示排期
 
 - [x] A 实现按 `cinemaId` 聚合未来 7 天 `ON_SALE` 且未开场场次的 Application 查询。
-- [ ] D 扩展公开影片摘要 Application API，支持 A 批量取得标题、海报、内容来源和内容时间；当前实现已在 `ContentPurchaseQueryPort` 提供最小公开边界，待 D 审查确认。
+- [ ] D 审查确认 `ContentPurchaseQueryPort` 的批量输入、`MovieSummary` 五个输出字段、缺失项排除和整体不可用返回空 Map 的规则；未取得 D 确认前不得勾选。
 - [x] A 实现 `GET /api/v1/shows/available-movies?cinemaId=`、REST DTO、参数校验、统一错误映射和 OpenAPI。
 - [x] A 为至少一家已确认的长沙 LIVE 影院建立明确标记 `demo-seed` 的可重复 Mock 排期；不得覆盖非 `AVAILABLE` 座位。
 - [x] A 增加 H2 HTTP 契约测试和演示种子测试，覆盖聚合、排序、空数组、非法参数和种子幂等；真实 MySQL 集成仍待共享库验收。
@@ -25,6 +25,7 @@
 - [x] C 将影片选择入口跳转到 `/shows?movieId={movieId}&cinemaId={cinemaId}`，不改写现有选座、建单和支付规则。
 - [x] C 完成 PC 和移动端响应式、键盘访问、可见焦点和不小于 44px 的触控目标。
 - [x] C 修复共享环境连续写请求复用旧 CSRF Token 的问题，建单响应后支付必须重新取得服务端更新的 Token。
+- [x] A、C 按评审意见拆分并展示 `contentSource/contentDataTime` 与 `scheduleSource/scheduleDataTime`，同步 OpenAPI、DTO 和测试。
 
 ## 验证与交付
 

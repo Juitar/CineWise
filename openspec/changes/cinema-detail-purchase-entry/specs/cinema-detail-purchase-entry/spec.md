@@ -54,11 +54,11 @@
 
 ### Requirement: 演示排期必须在页面明确标识
 
-页面 SHALL 根据可售影片响应的来源展示排期属性。`demo-seed` 或其他 Mock 来源必须显示“演示排期”；影院的 LIVE 基础资料和 Mock 排期必须分别说明，不得合并描述为真实可售排期或实时库存。
+页面 SHALL 分别展示可售影片响应中的内容资料来源和排期来源。`scheduleSource` 为 `demo-seed` 或其他 Mock 来源时必须显示“演示排期”；`contentSource/contentDataTime` 与 `scheduleSource/scheduleDataTime` 必须分别说明，不得合并描述为真实可售排期或实时库存。
 
 #### Scenario: LIVE 影院返回 demo-seed 排期
 
-- **GIVEN** 影院基础资料来源为 LIVE，可售影片来源为 `demo-seed`
+- **GIVEN** 影院和影片基础资料来源为 LIVE，`scheduleSource` 为 `demo-seed`
 - **WHEN** 页面展示该影片入口
 - **THEN** 影院资料继续显示其真实内容来源
 - **AND** 影片区域明确显示“演示排期”，不称为真实排期或实时库存

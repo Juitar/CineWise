@@ -31,8 +31,10 @@ A 在 ticketing 模块实现公开查询。查询窗口按 `Asia/Shanghai` 和�
       "posterUrl": "/demo/poster/10001.webp",
       "showCount": 6,
       "nearestStartTime": "2026-08-05T19:30:00+08:00",
-      "dataSource": "demo-seed",
-      "dataTime": "2026-08-05T10:00:00+08:00"
+      "contentSource": "NETSTART_MAOYAN",
+      "contentDataTime": "2026-08-05T09:00:00+08:00",
+      "scheduleSource": "demo-seed",
+      "scheduleDataTime": "2026-08-05T10:00:00+08:00"
     }
   ]
 }
@@ -46,7 +48,7 @@ A 在 ticketing 模块实现公开查询。查询窗口按 `Asia/Shanghai` 和�
 
 为了支持长沙现场演示，系统直接采用“LIVE 影院基础资料 + Mock 票务数据”的组合，不再等待真实排片来源。D 通过公开身份解析 Application API 返回一家具名长沙 LIVE 影院及演示影片的内部 ID；A 使用这些 ID 生成可重复的 Mock 影厅、场次和座位。种子不得修改 D 的影院基础资料，不得按影院名称或地址模糊匹配，并且重复执行不得覆盖已锁定或已售座位。
 
-当 `dataSource` 表示 `demo-seed` 或其他 Mock 来源时，前端在影片区域显示“演示排期”。演示排期可以继续进入选场次、选座、建单和模拟支付，这就是本期要求的完整购票流程。没有 A 的可售场次时，页面只显示影院资料和“未来 7 天暂无可售影片”，不显示价格、余座或购票按钮。
+`contentSource/contentDataTime` 只描述 D 的影片基础资料，`scheduleSource/scheduleDataTime` 只描述 A 的排期快照，两组字段不得互相替代。当 `scheduleSource` 表示 `demo-seed` 或其他 Mock 来源时，前端在影片区域显示“演示排期”，同时继续展示影片资料来源。演示排期可以继续进入选场次、选座、建单和模拟支付，这就是本期要求的完整购票流程。没有 A 的可售场次时，页面只显示影院资料和“未来 7 天暂无可售影片”，不显示价格、余座或购票按钮。
 
 ## 前端结构
 

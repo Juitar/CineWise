@@ -66,6 +66,8 @@ public class AvailableMovieQueryService {
                 summary.posterUrl(),
                 snapshot.showCount(),
                 snapshot.nearestStartTime(),
+                summary.contentSource(),
+                summary.contentDataTime(),
                 snapshot.dataSource(),
                 snapshot.dataTime());
     }

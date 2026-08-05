@@ -1,6 +1,8 @@
 package com.miaoyu.ticket.content.application;
 
+import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -12,7 +14,12 @@ import java.util.Set;
  */
 public interface ContentPurchaseQueryPort {
 
-    /** 批量取得影片展示摘要；未找到或不可展示的 ID 不进入结果。 */
+    /**
+     * 批量取得最多 100 个影片展示摘要。
+     *
+     * <p>空输入返回空 Map；未找到或不可展示的 ID 不进入结果；内容目录整体不可用时返回空 Map，
+     * 由 A 排除所有缺失摘要的排期，不得补写标题或来源。</p>
+     */
     Map<Long, MovieSummary> findMovieSummaries(Set<Long> movieIds);
 
     /**
@@ -22,7 +29,29 @@ public interface ContentPurchaseQueryPort {
      */
     Optional<ContentSeedCatalog> findChangshaLivePurchaseCatalog();
 
-    /** 票务页面只需要影片 ID、标题和海报，不获得 D 的内部内容对象。 */
-    record MovieSummary(long movieId, String title, String posterUrl) {
+    /** 票务页面只获得公开展示摘要和内容时效，不获得 D 的内部内容对象。 */
+    record MovieSummary(
+            long movieId,
+            String title,
+            String posterUrl,
+            String contentSource,
+            LocalDateTime contentDataTime) {
+
+        public MovieSummary {
+            if (movieId <= 0) {
+                throw new IllegalArgumentException("movieId must be positive");
+            }
+            title = requireText(title, "title");
+            contentSource = requireText(contentSource, "contentSource");
+            contentDataTime = Objects.requireNonNull(contentDataTime, "contentDataTime must not be null");
+        }
+
+        private static String requireText(String value, String fieldName) {
+            String normalized = Objects.requireNonNull(value, fieldName + " must not be null").trim();
+            if (normalized.isEmpty()) {
+                throw new IllegalArgumentException(fieldName + " must not be blank");
+            }
+            return normalized;
+        }
     }
 }

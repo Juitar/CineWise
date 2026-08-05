@@ -60,8 +60,10 @@ public class ShowController {
                         view.posterUrl(),
                         view.showCount(),
                         toOffsetDateTime(view.nearestStartTime()),
-                        view.dataSource(),
-                        toOffsetDateTime(view.dataTime())))
+                        view.contentSource(),
+                        toOffsetDateTime(view.contentDataTime()),
+                        view.scheduleSource(),
+                        toOffsetDateTime(view.scheduleDataTime())))
                 .toList();
         return Result.success(new AvailableMoviesResponse(movies));
     }

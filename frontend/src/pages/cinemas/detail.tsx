@@ -49,11 +49,16 @@ function AvailableMovieCard({ cinemaId, movie }: { cinemaId: string; movie: Avai
       <div className="cinema-detail-movie-main">
         <div className="cinema-detail-movie-heading">
           <h3>{movie.title}</h3>
-          {isDemoSchedule(movie.dataSource) ? <Tag color="purple">演示排期</Tag> : null}
+          {isDemoSchedule(movie.scheduleSource) ? <Tag color="purple">演示排期</Tag> : null}
         </div>
         <p>{movie.showCount} 个可选场次</p>
         <p>最近开场：{formatDateTime(movie.nearestStartTime)}</p>
-        <p className="cinema-detail-data-time">排期更新：{formatDateTime(movie.dataTime)}</p>
+        <p className="cinema-detail-data-time">
+          影片资料：{movie.contentSource} · {formatDateTime(movie.contentDataTime)}
+        </p>
+        <p className="cinema-detail-data-time">
+          排期来源：{movie.scheduleSource} · {formatDateTime(movie.scheduleDataTime)}
+        </p>
       </div>
       <Link
         className="cinema-detail-purchase-link"

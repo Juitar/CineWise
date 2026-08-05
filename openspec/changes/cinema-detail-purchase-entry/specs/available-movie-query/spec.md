@@ -10,7 +10,7 @@
 
 - **GIVEN** 某影院未来 7 天内存在多个 `ON_SALE` 且未开场的影片场次
 - **WHEN** 客户端使用该 `cinemaId` 查询可售影片
-- **THEN** 接口按 `movieId` 返回每部影片的标题、海报、场次数、最近开场时间、数据来源和数据时间
+- **THEN** 接口按 `movieId` 返回每部影片的标题、海报、场次数、最近开场时间、`contentSource/contentDataTime` 和 `scheduleSource/scheduleDataTime`
 - **AND** 结果按最近开场时间升序、`movieId` 升序稳定排列
 
 #### Scenario: 影院没有未来可售影片
@@ -35,8 +35,8 @@ A SHALL 通过 D 的公开影片摘要 Application API 批量取得 `title`、`p
 
 - **GIVEN** 排期聚合得到影片内部 ID，且 D 的公开接口返回对应摘要
 - **WHEN** A 组装可售影片响应
-- **THEN** 响应使用 D 返回的标题、海报、内容来源和内容时间
-- **AND** `showCount` 和 `nearestStartTime` 仍以 A 的当前排期查询为准
+- **THEN** 响应使用 D 返回的标题、海报、`contentSource` 和 `contentDataTime`
+- **AND** `showCount`、`nearestStartTime`、`scheduleSource` 和 `scheduleDataTime` 仍以 A 的当前排期查询为准
 
 #### Scenario: 排期影片摘要缺失
 
