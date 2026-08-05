@@ -5,7 +5,7 @@
 
 #### Scenario: 合法计划生成确认卡
 - **WHEN** 服务端已校验当前运行、计划版本和创建订单 Command
-- **THEN** 系统创建只属于当前用户且初始为 `PENDING` 的 action
+- **THEN** 系统创建只属于当前用户且初始为 `PENDING_CONFIRMATION` 的 action
 - **AND** 仅发布含 actionId、planVersion、expireAt 和安全展示信息的确认卡
 
 ### Requirement: 参数摘要必须保护已校验 Command
@@ -29,5 +29,5 @@
 
 #### Scenario: 并发确认同一动作
 - **WHEN** 两个请求并发确认相同 actionId
-- **THEN** 至多一个请求从 `PENDING` 成功推进为 `CLAIMED` 并调用一次写工具
+- **THEN** 至多一个请求从 `PENDING_CONFIRMATION` 成功推进为 `EXECUTING` 并调用一次写工具
 - **AND** 另一请求读取已经提交的状态或结果，不再调用写工具

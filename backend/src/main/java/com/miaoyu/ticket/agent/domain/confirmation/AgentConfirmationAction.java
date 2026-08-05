@@ -8,7 +8,8 @@ public record AgentConfirmationAction(
         long id,
         String actionId,
         long userId,
-        long sessionId,
+        long agentSessionId,
+        long agentRunId,
         String runId,
         String planId,
         int planVersion,
@@ -31,7 +32,8 @@ public record AgentConfirmationAction(
             throw new IllegalArgumentException("actionId 最多 36 个字符");
         }
         requirePositive(userId, "userId");
-        requirePositive(sessionId, "sessionId");
+        requirePositive(agentSessionId, "agentSessionId");
+        requirePositive(agentRunId, "agentRunId");
         requireText(runId, "runId");
         requireText(planId, "planId");
         if (planVersion < 1) {
@@ -70,7 +72,8 @@ public record AgentConfirmationAction(
             long id,
             String actionId,
             long userId,
-            long sessionId,
+            long agentSessionId,
+            long agentRunId,
             String runId,
             String planId,
             int planVersion,
@@ -79,7 +82,7 @@ public record AgentConfirmationAction(
             LocalDateTime expireAt,
             LocalDateTime now) {
         return new AgentConfirmationAction(
-                id, actionId, userId, sessionId, runId, planId, planVersion, nodeId, command,
+                id, actionId, userId, agentSessionId, agentRunId, runId, planId, planVersion, nodeId, command,
                 AgentActionParameterHash.from(command), expireAt, AgentConfirmationActionStatus.PENDING_CONFIRMATION,
                 null, null, null, 0L, now, now);
     }
@@ -136,7 +139,8 @@ public record AgentConfirmationAction(
             throw new IllegalArgumentException("action 更新时间不能倒退");
         }
         return new AgentConfirmationAction(
-                id, actionId, userId, sessionId, runId, planId, planVersion, nodeId, command, parameterHash,
+                id, actionId, userId, agentSessionId, agentRunId, runId, planId, planVersion, nodeId, command,
+                parameterHash,
                 expireAt, nextStatus, nextWriteIdentifiers, nextResultReference, nextRecoveryHint,
                 version + 1, createTime, update);
     }
