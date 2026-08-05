@@ -2,6 +2,7 @@
 
 - [x] 1.1 Owner：B；修改范围：Agent Repository 端口、MyBatis Mapper 和持久化实现，新增本人活动会话/消息分页查询、总数、逻辑清空和到期标记 SQL；验证：`AgentSessionPersistenceIntegrationTest` 覆盖用户隔离、排序、分页和条件更新。
 - [x] 1.2 Owner：B；修改范围：`agent/application/persistence`，实现创建、会话列表、历史消息、单个清空和批量清空应用用例，只从 `CurrentUserAccessor` 获取身份；验证：`AgentSessionManagementServiceTest` 覆盖正常、空列表、越权/已清空资源不存在、活动运行 `206008`、批量跳过和查询无副作用。
+- [x] 1.3 Owner：B；修改范围：既有 POST SSE 初始运行事务和会话占用条件 SQL，已清空会话按 `206005` 拒绝且不写入运行、消息或事件；验证：本地 `AgentInitialRunTransactionTest`、`AgentSessionPersistenceIntegrationTest` 通过；CI MySQL `AgentPersistenceMySqlIntegrationTest` 覆盖清空后提交和最终条件更新。
 
 ## 2. 运行取消
 

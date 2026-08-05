@@ -30,7 +30,7 @@
 
 `AgentSessionManagementService` 在事务中从 `CurrentUserAccessor` 取得用户，按会话、用户、`ACTIVE` 和 `active_run_id IS NULL` 条件更新会话为 `CLEARED`。同一事务把该会话下运行、消息、步骤、事件和事件游标的 `expire_at` 设为当前时间，供已有清理任务处理；不物理删除，也不写 SSE 事件。单个操作条件不满足时重新读取本人活动会话：仍有活动运行返回 `206008`，其他情况按 `206005`；批量操作逐个条件更新，可成功的记为清空、竞争中变为活动的记为跳过。
 
-这比先读取再无条件更新能避免清空过程中创建新运行。所有 Repository 新增方法均在 B 的 application 端口，MyBatis 实现在 infrastructure，Controller 不触碰 Mapper。
+既有 POST SSE 提交入口也只接受 `ACTIVE` 会话：初始事务读到 `CLEARED` 时按 `206005` 拒绝；最终占用 `active_run_id` 的条件更新再次要求 `status = ACTIVE`，避免读取后被并发清空的会话重新写入运行、消息或事件。所有 Repository 新增方法均在 B 的 application 端口，MyBatis 实现在 infrastructure，Controller 不触碰 Mapper。
 
 ### 3. 取消只推进 PENDING 步骤并以 CAS 写入运行终态
 
@@ -49,7 +49,7 @@ CAS 失败时不重发取消命令：服务只重新读取当前运行并返回�
 ## Risks / Trade-offs
 
 - [取消与运行完成同时发生] → 使用 `version + RUNNING` 条件更新，失败后只读回当前状态，不重试写入。
-- [清空和新运行创建并发] → 更新条件同时要求 `ACTIVE` 与空 `active_run_id`；批量接口把失败项目记为跳过。
+- [清空和新运行创建并发] → 提交前只读取 `ACTIVE` 会话，最终占用条件同时要求 `ACTIVE` 与空 `active_run_id`；批量接口把失败项目记为跳过。
 - [已运行的只读工具不能被线程安全地打断] → 保持其 `RUNNING` 状态，不增加未设计的中断机制；运行终态以保存后的取消事实为准。
 - [逻辑清空的数据仍短暂存在] → 立即标记为可清理并从所有用户查询中排除，保留审计与既有异步清理顺序。
 - [C 尚未接入新接口] → 同 change 提供固定 JSON 夹具和 Controller 测试；C 的页面联调不是 B 代码完成的前置条件。

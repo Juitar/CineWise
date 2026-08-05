@@ -87,7 +87,7 @@ public interface AgentPersistenceMapper {
     @Update("""
             UPDATE agent_session
                SET active_run_id = #{runId}, expire_at = GREATEST(expire_at, #{runExpireAt}), version = version + 1
-             WHERE id = #{sessionId} AND user_id = #{userId} AND active_run_id IS NULL
+             WHERE id = #{sessionId} AND user_id = #{userId} AND status = 'ACTIVE' AND active_run_id IS NULL
             """)
     int claimActiveRun(
             @Param("sessionId") long sessionId,

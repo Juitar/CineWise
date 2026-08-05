@@ -166,6 +166,23 @@ class AgentPersistenceMySqlIntegrationTest {
     }
 
     @Test
+    void shouldRejectSubmissionAndClaimAfterSessionIsCleared() {
+        insertSession(FIRST_SESSION_ID, FIRST_SESSION);
+        assertThat(sessionManagementService.clearMySession(FIRST_SESSION).cleared()).isTrue();
+
+        assertThatThrownBy(() -> initialRunTransaction.submit(USER_ID, command(FIRST_SESSION, "cleared-request")))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND);
+        assertThat(sessionRepository.claimActiveRun(FIRST_SESSION_ID, USER_ID, 9_708_100_901L,
+                LocalDateTime.now().plusDays(30))).isFalse();
+        assertThat(count("SELECT COUNT(*) FROM agent_run WHERE session_id = ?", FIRST_SESSION_ID)).isZero();
+        assertThat(count("SELECT COUNT(*) FROM agent_message WHERE session_id = ?", FIRST_SESSION_ID)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM agent_event WHERE session_id = ?", Integer.class, FIRST_SESSION)).isZero();
+    }
+
+    @Test
     void shouldAllowOnlyOneConcurrentDifferentRequestToClaimSession() throws Exception {
         insertSession(SECOND_SESSION_ID, SECOND_SESSION);
         CountDownLatch start = new CountDownLatch(1);

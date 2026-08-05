@@ -3,6 +3,7 @@ package com.miaoyu.ticket.agent;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -59,6 +60,21 @@ class AgentInitialRunTransactionTest {
 
         assertEquals(AgentErrorCode.ACTIVE_RUN_CONFLICT, exception.getErrorCode());
         verify(fixture.sessionRepository()).claimActiveRun(1L, 7L, 100L, NOW.plusDays(30));
+    }
+
+    @Test
+    void shouldRejectClearedSessionBeforeWritingRunMessageOrEvent() {
+        Fixture fixture = fixture(true);
+        when(fixture.sessionRepository().findBySessionIdAndUserId("session-1", 7L))
+                .thenReturn(Optional.of(clearedSession()));
+
+        BusinessException exception =
+                assertThrows(BusinessException.class, () -> fixture.transaction().submit(7L, command()));
+
+        assertEquals(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND, exception.getErrorCode());
+        verify(fixture.runRepository(), never()).insert(any());
+        verify(fixture.messageRepository(), never()).insert(any());
+        verify(fixture.sessionRepository(), never()).claimActiveRun(anyLong(), anyLong(), anyLong(), any());
     }
 
     @Test
@@ -152,6 +168,11 @@ class AgentInitialRunTransactionTest {
     private static AgentSession session() {
         return new AgentSession(
                 1L, "session-1", 7L, null, AgentSessionStatus.ACTIVE, null, 0L, NOW, NOW, NOW.plusDays(30));
+    }
+
+    private static AgentSession clearedSession() {
+        return new AgentSession(
+                1L, "session-1", 7L, null, AgentSessionStatus.CLEARED, null, 1L, NOW, NOW, NOW.plusDays(30));
     }
 
     private record Fixture(

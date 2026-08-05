@@ -9,6 +9,7 @@ import com.miaoyu.ticket.agent.domain.persistence.AgentRequestHash;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
+import com.miaoyu.ticket.agent.domain.persistence.AgentSessionStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
 import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
@@ -57,6 +58,9 @@ public class AgentInitialRunTransaction {
     public AgentInitialRunResult submit(long userId, AgentMessageSubmissionCommand command) {
         AgentSession session = sessionRepository.findBySessionIdAndUserId(command.sessionId(), userId)
                 .orElseThrow(() -> new BusinessException(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND));
+        if (session.status() != AgentSessionStatus.ACTIVE) {
+            throw new BusinessException(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND);
+        }
         AgentRequestHash requestHash = requestHashFactory.create(command.content(), command.slotSnapshot());
         AgentRun existing = runRepository
                 .findByClientRequestId(userId, session.id(), command.clientRequestId())
