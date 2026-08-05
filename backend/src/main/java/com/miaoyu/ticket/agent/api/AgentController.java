@@ -3,6 +3,7 @@ package com.miaoyu.ticket.agent.api;
 import com.miaoyu.ticket.agent.application.AgentInteractionRuntimeService;
 import com.miaoyu.ticket.agent.application.AgentFailurePersistedException;
 import com.miaoyu.ticket.common.api.Result;
+import com.miaoyu.ticket.common.api.PageResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -11,22 +12,28 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.security.concurrent.DelegatingSecurityContextExecutor;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.validation.annotation.Validated;
 
 /** Agent HTTP 入口只委托应用服务，用户归属由 CurrentUserAccessor 统一校验。 */
 @RestController
+@Validated
 @RequestMapping("/api/v1/agent")
 public class AgentController {
     private static final Duration HEARTBEAT_INTERVAL = Duration.ofSeconds(10);
@@ -43,6 +50,51 @@ public class AgentController {
         this.applicationTaskExecutor = applicationTaskExecutor;
         this.taskSchedulerProvider = taskSchedulerProvider;
         this.objectMapper = objectMapper;
+    }
+
+    @PostMapping("/sessions")
+    public Result<AgentSessionResponse> createMySession() {
+        return Result.success(session(runtimeService.createMySession()));
+    }
+
+    @GetMapping("/sessions")
+    public Result<PageResult<AgentSessionResponse>> listMySessions(
+            @RequestParam(defaultValue = "1") @Min(1) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        PageResult<AgentInteractionRuntimeService.SessionView> view = runtimeService.listMySessions(page, size);
+        PageResult<AgentSessionResponse> response = new PageResult<>(view.total(), view.page(), view.size(),
+                view.records().stream().map(this::session).toList());
+        return Result.success(response);
+    }
+
+    @GetMapping("/sessions/{sessionId}/messages")
+    public Result<PageResult<AgentMessageResponse>> listMySessionMessages(
+            @PathVariable String sessionId,
+            @RequestParam(defaultValue = "1") @Min(1) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        PageResult<AgentInteractionRuntimeService.MessageView> view =
+                runtimeService.listMySessionMessages(sessionId, page, size);
+        PageResult<AgentMessageResponse> response = new PageResult<>(view.total(), view.page(), view.size(),
+                view.records().stream().map(this::message).toList());
+        return Result.success(response);
+    }
+
+    @DeleteMapping("/sessions/{sessionId}")
+    public Result<AgentSessionClearResponse> clearMySession(@PathVariable String sessionId) {
+        var result = runtimeService.clearMySession(sessionId);
+        return Result.success(new AgentSessionClearResponse(result.sessionId(), result.cleared()));
+    }
+
+    @DeleteMapping("/sessions")
+    public Result<AgentSessionBulkClearResponse> clearMySessions() {
+        var result = runtimeService.clearMySessions();
+        return Result.success(new AgentSessionBulkClearResponse(result.clearedCount(), result.skippedCount()));
+    }
+
+    @PostMapping("/runs/{runId}/cancel")
+    public Result<AgentRunCancelResponse> cancelMyRun(@PathVariable String runId) {
+        var result = runtimeService.cancelMyRun(runId);
+        return Result.success(new AgentRunCancelResponse(result.runId(), result.status(), result.finishedAt()));
     }
 
     @GetMapping("/runs/{runId}")
@@ -143,6 +195,16 @@ public class AgentController {
     private AgentRunResponse.EventSummary eventSummary(AgentInteractionRuntimeService.EventView event) {
         return new AgentRunResponse.EventSummary(event.eventId(), event.sessionId(), event.runId(), event.planVersion(),
                 event.nodeId(), event.eventType(), event.displayText(), event.payload(), event.occurredAt());
+    }
+
+    private AgentSessionResponse session(AgentInteractionRuntimeService.SessionView view) {
+        return new AgentSessionResponse(view.sessionId(), view.summary(), view.status(), view.createdAt(),
+                view.updatedAt());
+    }
+
+    private AgentMessageResponse message(AgentInteractionRuntimeService.MessageView view) {
+        return new AgentMessageResponse(view.messageId(), view.role(), view.type(), view.text(), view.payload(),
+                view.status(), view.completedAt(), view.createdAt());
     }
 
     private JsonNode payload(String value) {

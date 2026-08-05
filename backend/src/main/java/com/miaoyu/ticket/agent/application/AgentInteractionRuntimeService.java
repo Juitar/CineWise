@@ -7,6 +7,13 @@ import com.miaoyu.ticket.agent.application.persistence.AgentEventReplayService;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionCommand;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeQueryService;
+import com.miaoyu.ticket.agent.application.persistence.AgentRunCancellationService;
+import com.miaoyu.ticket.agent.application.persistence.AgentSessionCreationService;
+import com.miaoyu.ticket.agent.application.persistence.AgentSessionManagementService;
+import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
+import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
+import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
+import com.miaoyu.ticket.common.api.PageResult;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationContext;
 import com.miaoyu.ticket.agent.domain.plan.SlotSnapshot;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
@@ -22,14 +29,57 @@ public class AgentInteractionRuntimeService {
     private final AgentMessageSubmissionService submissionService;
     private final AgentEventReplayService replayService;
     private final AgentRuntimeQueryService queryService;
+    private final AgentSessionCreationService sessionCreationService;
+    private final AgentSessionManagementService sessionManagementService;
+    private final AgentRunCancellationService runCancellationService;
     private final ObjectMapper objectMapper;
 
     public AgentInteractionRuntimeService(AgentMessageSubmissionService submissionService,
-            AgentEventReplayService replayService, AgentRuntimeQueryService queryService, ObjectMapper objectMapper) {
+            AgentEventReplayService replayService, AgentRuntimeQueryService queryService,
+            AgentSessionCreationService sessionCreationService,
+            AgentSessionManagementService sessionManagementService,
+            AgentRunCancellationService runCancellationService, ObjectMapper objectMapper) {
         this.submissionService = submissionService;
         this.replayService = replayService;
         this.queryService = queryService;
+        this.sessionCreationService = sessionCreationService;
+        this.sessionManagementService = sessionManagementService;
+        this.runCancellationService = runCancellationService;
         this.objectMapper = objectMapper;
+    }
+
+    /** 只创建空会话；摘要由后续安全运行事实生成，不接收前端伪造的身份或摘要。 */
+    public SessionView createMySession() {
+        return session(sessionCreationService.createSession());
+    }
+
+    public PageResult<SessionView> listMySessions(int page, int size) {
+        var result = sessionManagementService.listMySessions(page, size);
+        return new PageResult<>(result.total(), result.page(), result.size(), result.records().stream()
+                .map(this::session)
+                .toList());
+    }
+
+    public PageResult<MessageView> listMySessionMessages(String sessionId, int page, int size) {
+        var result = sessionManagementService.listMySessionMessages(sessionId, page, size);
+        return new PageResult<>(result.total(), result.page(), result.size(), result.records().stream()
+                .map(this::message)
+                .toList());
+    }
+
+    public ClearSessionView clearMySession(String sessionId) {
+        var result = sessionManagementService.clearMySession(sessionId);
+        return new ClearSessionView(result.sessionId(), result.cleared());
+    }
+
+    public BulkClearSessionView clearMySessions() {
+        var result = sessionManagementService.clearMySessions();
+        return new BulkClearSessionView(result.clearedCount(), result.skippedCount());
+    }
+
+    public CancelRunView cancelMyRun(String runId) {
+        AgentRun run = runCancellationService.cancelMyRun(runId);
+        return new CancelRunView(run.runId(), run.status().name(), time(run.finishedAt()));
     }
 
     public StreamView submitAndReplay(
@@ -56,7 +106,7 @@ public class AgentInteractionRuntimeService {
                 view.run().planId(),
                 view.run().planVersion(), time(view.run().startedAt()), time(view.run().finishedAt()),
                 Long.toString(view.lastEventId()), view.messages().stream()
-                        .map(message -> new MessageView(message.messageId(), message.role().name(),
+                        .map(message -> new RunMessageView(message.messageId(), message.role().name(),
                                 message.type().name(), message.text(), time(message.completedAt())))
                         .toList(), view.steps().stream()
                         .map(step -> new StepView(step.nodeId(), step.nodeType().name(), step.status().name(),
@@ -100,6 +150,17 @@ public class AgentInteractionRuntimeService {
         }
     }
 
+    private SessionView session(AgentSession session) {
+        return new SessionView(session.sessionId(), session.summary(), session.status().name(),
+                time(session.createTime()), time(session.updateTime()));
+    }
+
+    private MessageView message(AgentMessage message) {
+        return new MessageView(message.messageId(), message.role().name(), message.type().name(), message.text(),
+                message.payload() == null ? null : payload(message.payload().value()), message.status().name(),
+                time(message.completedAt()), time(message.createTime()));
+    }
+
     private static OffsetDateTime time(LocalDateTime time) {
         return time == null ? null : time.atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime();
     }
@@ -107,10 +168,22 @@ public class AgentInteractionRuntimeService {
     public record StreamView(String sessionId, String runId, boolean reset, long watermark, List<EventView> events) {
     }
     public record RunView(String runId, String sessionId, String status, String planId, Integer planVersion,
-            OffsetDateTime startedAt, OffsetDateTime finishedAt, String lastEventId, List<MessageView> messages,
+            OffsetDateTime startedAt, OffsetDateTime finishedAt, String lastEventId, List<RunMessageView> messages,
             List<StepView> steps, List<EventView> events) {
     }
-    public record MessageView(String messageId, String role, String type, String text, OffsetDateTime completedAt) {
+    public record RunMessageView(String messageId, String role, String type, String text, OffsetDateTime completedAt) {
+    }
+    public record SessionView(String sessionId, String summary, String status, OffsetDateTime createdAt,
+            OffsetDateTime updatedAt) {
+    }
+    public record ClearSessionView(String sessionId, boolean cleared) {
+    }
+    public record BulkClearSessionView(int clearedCount, int skippedCount) {
+    }
+    public record CancelRunView(String runId, String status, OffsetDateTime finishedAt) {
+    }
+    public record MessageView(String messageId, String role, String type, String text, JsonNode payload, String status,
+            OffsetDateTime completedAt, OffsetDateTime createdAt) {
     }
     public record StepView(String nodeId, String nodeType, String status, int attemptCount, boolean autoSkipped,
             String recoveryHint) {

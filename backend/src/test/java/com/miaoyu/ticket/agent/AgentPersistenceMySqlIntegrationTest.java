@@ -11,6 +11,8 @@ import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionCom
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionResult;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeEventService;
+import com.miaoyu.ticket.agent.application.persistence.AgentRunCancellationService;
+import com.miaoyu.ticket.agent.application.persistence.AgentSessionManagementService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.application.reply.ErrorReplyFacts;
@@ -100,6 +102,12 @@ class AgentPersistenceMySqlIntegrationTest {
     private AgentRuntimeEventService runtimeEventService;
 
     @Autowired
+    private AgentRunCancellationService runCancellationService;
+
+    @Autowired
+    private AgentSessionManagementService sessionManagementService;
+
+    @Autowired
     private PlatformTransactionManager transactionManager;
 
     @Autowired
@@ -155,6 +163,23 @@ class AgentPersistenceMySqlIntegrationTest {
                   FROM agent_event_stream_cursor
                  WHERE session_id = ?
                 """, Long.class, FIRST_SESSION)).isGreaterThan(0L);
+    }
+
+    @Test
+    void shouldRejectSubmissionAndClaimAfterSessionIsCleared() {
+        insertSession(FIRST_SESSION_ID, FIRST_SESSION);
+        assertThat(sessionManagementService.clearMySession(FIRST_SESSION).cleared()).isTrue();
+
+        assertThatThrownBy(() -> initialRunTransaction.submit(USER_ID, command(FIRST_SESSION, "cleared-request")))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND);
+        assertThat(sessionRepository.claimActiveRun(FIRST_SESSION_ID, USER_ID, 9_708_100_901L,
+                LocalDateTime.now().plusDays(30))).isFalse();
+        assertThat(count("SELECT COUNT(*) FROM agent_run WHERE session_id = ?", FIRST_SESSION_ID)).isZero();
+        assertThat(count("SELECT COUNT(*) FROM agent_message WHERE session_id = ?", FIRST_SESSION_ID)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM agent_event WHERE session_id = ?", Integer.class, FIRST_SESSION)).isZero();
     }
 
     @Test
@@ -263,6 +288,39 @@ class AgentPersistenceMySqlIntegrationTest {
                     """, Long.class, FIRST_SESSION)).isEqualTo(secondEvent.eventId());
         } finally {
             allowFirstCommit.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void shouldLeaveNoActiveRunReferenceWhenCancelAndClearRace() throws Exception {
+        insertSession(FIRST_SESSION_ID, FIRST_SESSION);
+        AgentInitialRunResult initial = initialRunTransaction.submit(USER_ID, command(FIRST_SESSION, "request-cancel"));
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<AgentRunStatus> cancelled = executor.submit(() -> {
+                start.await();
+                return runCancellationService.cancelMyRun(initial.run().runId()).status();
+            });
+            Future<Boolean> cleared = executor.submit(() -> {
+                start.await();
+                try {
+                    return sessionManagementService.clearMySession(FIRST_SESSION).cleared();
+                } catch (BusinessException exception) {
+                    assertThat(exception.getErrorCode()).isEqualTo(AgentErrorCode.ACTIVE_RUN_CONFLICT);
+                    return false;
+                }
+            });
+            start.countDown();
+
+            assertThat(cancelled.get()).isEqualTo(AgentRunStatus.CANCELLED);
+            cleared.get();
+            AgentSession session = sessionRepository.findBySessionIdAndUserId(FIRST_SESSION, USER_ID).orElseThrow();
+            assertThat(session.activeRunId()).isNull();
+            assertThat(session.status()).isIn(AgentSessionStatus.ACTIVE, AgentSessionStatus.CLEARED);
+        } finally {
+            start.countDown();
             executor.shutdownNow();
         }
     }
