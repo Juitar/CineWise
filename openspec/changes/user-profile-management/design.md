@@ -60,7 +60,9 @@ Redis 缓存键为 `profile:{userId}:v:{version}`。标签、开关、软删除�
 
 ### 5. B 和推荐只能通过公开摘要能力使用画像
 
-`GetProfileSummaryTool` 只能调用 D 的 Application Service，接收不含 userId 的 `ToolContext` 和固定用途 `RECOMMENDATION`；D 在 `execute(...)` 内通过 C 提供的 `CurrentUserAccessor.requireCurrentUserId()` 取得当前认证用户。当前工具只允许在 HTTP 认证线程同步执行；后续若改为异步执行，必须先由 B、C 提供认证上下文的安全传递方式。B 负责注册只读工具并确认“长期保存”的对话意图；D 不发布 SSE、不保存 Agent 运行数据。实际确认后的 `CONVERSATION` 写工具、其注册和联调不属于当前 B 的 `agent-interaction-runtime` change，必须由 B、D、C 后续单独建跨模块 change。推荐只读取 `ProfileSummary`，并且仍以用户本轮明确要求优先。
+`GetProfileSummaryTool` 只能调用 D 的 Application Service，接收不含 userId 的 `ToolContext` 和固定用途 `RECOMMENDATION`；D 在 `execute(...)` 内通过 C 提供的 `CurrentUserAccessor.requireCurrentUserId()` 取得当前认证用户。当前工具只允许在 HTTP 认证线程同步执行；后续若改为异步执行，必须先由 B、C 提供认证上下文的安全传递方式。B 负责注册只读工具并确认“长期保存”的对话意图；D 不发布 SSE、不保存 Agent 运行数据。
+
+B 已确认方案反馈通过 D 在 `profile/application` 定义并实现的 `ProfileBehaviorRecorder` 调用：`recordPlanAccepted` 固定映射 `ACCEPT_PLAN/PLAN/planId`，`recordPlanRejected` 固定映射 `REJECT_PLAN/PLAN/planId`。`planId` 由 B 在服务端完成计划校验、准备持久化用户可见方案时生成，为 36 位小写 UUID；同一已保存方案及同一最终决定重试时复用原 `planId`、`eventId` 和 `occurredAt`。未确认、取消、过期或无效方案不调用 D；调用失败不改变 B 已保存的用户决定，且无认证后台线程不自动补发。实际确认后的 `CONVERSATION` 写工具、其注册和联调不属于当前 B 的 `agent-interaction-runtime` change，必须由 B、D、C 后续单独建跨模块 change。推荐只读取 `ProfileSummary`，并且仍以用户本轮明确要求优先。
 
 推荐结果必须记录本次 `profileApplied` 及实际采用的标签证据，便于向用户解释“本次参考了什么”；关闭开关、没有有效标签或画像读取失败时该值为 false。推荐记录不复制原始行为和完整画像，且画像服务不可用只降级为不使用长期特征，不阻断候选筛选与排序。
 
@@ -92,7 +94,7 @@ C 的账户删除流程需要通过一个类型化 Application API 或事件通�
 - B 尚未交付长期偏好确认入口：先实现手工标签和受控内部 Command，B 对接作为独立确认任务。
 - C 的画像页面可能仍是静态页面：先以 REST/OpenAPI 和 Mock 夹具交付，页面接入由 C 确认后完成。
 - 用户行为与推荐记录的实际来源尚未全部接通：先通过类型化内部入口和测试夹具验证，不能伪造生产行为。
-- B 尚未提供稳定 `planId`：V010 已允许 `PLAN` 目标类型，但在 B 提供该业务 ID 前，D 不接收 `ACCEPT_PLAN/REJECT_PLAN` 写入。
+- B 已确认稳定 `planId` 和 `ProfileBehaviorRecorder` 调用边界；实际接入仍等待 B 的 `agent-plan-feedback-events` change，D 在此之前不接收 `ACCEPT_PLAN/REJECT_PLAN` 生产写入。
 - 总设计与画像设计的标签类型、来源名称不一致：先确认唯一枚举和兼容规则，再写表约束、DTO 与消费者夹具。
 - 总设计要求 Idempotency-Key 重放原响应，但原三表没有保存写请求结果：以 `profile_write_request` 补足；若 A/C 不接受新增表，必须共同给出同等可靠的持久化恢复方案。
 - 隐私文档要求同意后才保存个性化数据，但未定义 D 获取同意状态的契约：在 C 确认前不得把“已登录”视为“已同意”。
@@ -107,10 +109,10 @@ C 的账户删除流程需要通过一个类型化 Application API 或事件通�
 ## Open Questions
 
 - A：已确认四表范围、正式版本 V010、D 创建 SQL 草案/A 静态审查与授权验证的职责、UTC 时间规则、`profile_write_request` 的唯一键/字段/30 天保留期/无 `PROCESSING` 规则，以及 `PaymentSucceededEvent` 的最小使用字段。
-- B：请确认 `GetProfileSummaryTool` 的注册方式、`ToolContext` 当前用户来源，以及对话长期保存确认的结构化输入。
+- B：已确认 `GetProfileSummaryTool` 通过 D 的 `CurrentUserAccessor` 取得认证用户，并确认 `ProfileBehaviorRecorder`、服务端 UUID `planId`、重放和不调用边界；实际接入由 B 的 `agent-plan-feedback-events` change 完成。
 - C：请确认 `CurrentUserAccessor` 可用于画像 REST，及前端处理 202001、202002、202003 的展示方式。
 - C：请确认账户删除时调用 D 的类型化 API 或事件名称、字段、幂等/重试和清理触发时机；登录退出不得触发画像清理。
-- D：已确认 `DIALOG -> CONVERSATION`、`ORDER -> BEHAVIOR`、`GENRE -> MOVIE_GENRE`，以及六种标签类型、三种来源、四种状态、两种极性、六种行为和三种目标类型；B 需在接入前确认稳定 `planId` 的来源和格式。
+- D：已确认 `DIALOG -> CONVERSATION`、`ORDER -> BEHAVIOR`、`GENRE -> MOVIE_GENRE`，以及六种标签类型、三种来源、四种状态、两种极性、六种行为和三种目标类型；B 已确认稳定 UUID `planId` 的来源和格式。
 - A、C：A 已确认 `profile_write_request` 保留 30 天、幂等键最大 128、唯一键 `(user_id, operation, idempotency_key)`、同键不同请求为 HTTP 409 / `202004`；不采用持久化 `PROCESSING`，不新增 `202005`，同键并发由唯一键和同一本地事务串行化处理。
 - C：请提供个人数据保存同意状态的类型化读取或撤回通知；并确认关闭个性化但未撤回同意时的行为采集产品规则。
 - A、D：已确认 `DATETIME(3)` 按 UTC 存储，Java 经注入 `Clock` 写入，REST 返回带时区 ISO 8601。

@@ -5,7 +5,7 @@
 ## What Changes
 
 - 在 D 的 `profile` 模块实现个性化开关、本人标签管理、最小化画像摘要和行为事件接收。
-- 新增 `user_preference`、`user_profile_tag`、`user_behavior_event`、`profile_write_request` 四张 D 负责表的迁移申请；`profile_write_request` 仅用于画像写请求的幂等恢复，不作为通用审计表。当前远端最新版本为 V009，V010 仅为候选版本；版本号正式分配、最终 SQL 创建和 MySQL 验证均由 A 负责。
+- 新增 `user_preference`、`user_profile_tag`、`user_behavior_event`、`profile_write_request` 四张 D 负责表的迁移申请；`profile_write_request` 仅用于画像写请求的幂等恢复，不作为通用审计表。A 已正式分配 V010；D 创建草案，A 审核并在明确授权后完成 MySQL 验证。
 - 提供个人中心 REST 接口，以及仅供 B 调用的 `GetProfileSummaryTool`；摘要只在个性化开启时返回有效标签。
 - 让推荐模块能够取得并实际使用受控摘要；本 change 只增加画像特征、当前需求优先和解释证据，不改 B 的 Agent 运行、SSE、确认页面。
 - 覆盖首次默认开关、单标签停用/恢复、分页查询、账户删除后的画像停用与清理，以及画像使用审计所需的最小结果字段。
@@ -23,7 +23,7 @@
 ## Impact
 
 - D：新增 `profile` 的 api/application/domain/infrastructure 分层、缓存、定时过期处理和测试。
-- A：收到完整 OpenSpec 后正式分配 V010 或其他未占用版本，审核或生成最终前向迁移，并在隔离 MySQL 验证四张画像表迁移。
+- A：审核 D 的 V010 草案，并在明确授权后在隔离 MySQL 验证四张画像表迁移。
 - B：确认 `GetProfileSummaryTool` 的注册、`ToolContext` 身份注入，以及“仅用户确认后才写长期对话偏好”的调用边界。
 - C：确认 `CurrentUserAccessor` 的接入方式，并在后续单独任务中对接画像页面、版本冲突提示和 API 类型。
 - 推荐：D 将 `ProfileSummary` 作为可选特征接入确定性评分，并记录本次是否使用画像及使用的标签证据；本轮明确要求仍优先。

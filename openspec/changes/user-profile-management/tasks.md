@@ -2,8 +2,8 @@
 
 - [ ] 1.1 D 复核画像设计、推荐设计、现有 `CurrentUserAccessor`、`ToolContext`、`ToolResult<T>` 和错误码实现；验证：记录实际类型、调用方向和与本 change 的差异，不直接修改公共契约。
 - [ ] 1.2 D 向 A 提交 `user_preference`、`user_profile_tag`、`user_behavior_event`、`profile_write_request` 的字段、类型、可空性、默认值、索引、UNIQUE、CHECK、软删除、幂等状态和清理申请，并创建 `V010__create_profile_tables.sql` 草案；A 静态审查后明确授权迁移验证。验证：记录 A 已确认的四表范围、V010、UTC 时间规则、幂等键规则和待确认枚举；D 不执行 Flyway、不连接迁移验证库或发布共享库。
-- [ ] 1.3 B 确认 `GetProfileSummaryTool` 的注册、当前用户注入和长期对话偏好确认输入；C 确认 `CurrentUserAccessor`、账户删除通知和前端错误展示边界。验证：确认的字段和未确认项写入 design，不把待确认接口写成已完成。
-- [ ] 1.4 D 确认标签类型、来源、状态、极性、行为与目标类型的唯一映射：`DIALOG -> CONVERSATION`、`ORDER -> BEHAVIOR`、`GENRE -> MOVIE_GENRE`；A 审查 V010 的对应 CHECK，B 在接入前提供 `PLAN` 的稳定 `planId`，C 仅发送已鉴权的 `MOVIE` 行为。验证：表 CHECK、Java 枚举、REST DTO、工具夹具和推荐消费者使用同一套值。
+- [ ] 1.3 B 已确认 `GetProfileSummaryTool` 的注册、当前用户注入、`ProfileBehaviorRecorder`、稳定 UUID `planId` 和长期对话偏好确认输入；C 确认 `CurrentUserAccessor`、账户删除通知和前端错误展示边界。验证：确认的字段和未确认项写入 design，不把待确认接口写成已完成。
+- [ ] 1.4 D 确认标签类型、来源、状态、极性、行为与目标类型的唯一映射：`DIALOG -> CONVERSATION`、`ORDER -> BEHAVIOR`、`GENRE -> MOVIE_GENRE`；A 审查 V010 的对应 CHECK，B 在 `agent-plan-feedback-events` 接入已确认的稳定 `PLAN` UUID，C 仅发送已鉴权的 `MOVIE` 行为。验证：表 CHECK、Java 枚举、REST DTO、工具夹具和推荐消费者使用同一套值。
 - [ ] 1.5 C 提供个人数据保存同意的类型化查询或撤回通知；A/B/C 确认各类行为事件的可信来源、目标校验和关闭开关后的采集规则。验证：无同意、撤回同意、未受信任支付事件和关闭后的行为均有唯一处理规则与错误码。
 
 ## 2. 画像数据与本人管理
