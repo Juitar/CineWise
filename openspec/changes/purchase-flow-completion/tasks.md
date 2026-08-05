@@ -6,4 +6,4 @@
 - [x] 2.2 前端展示 AI 实现 `OrderCreateSuccess` 与 `PaymentResult` 的纯展示 Props、视觉和组件测试。（Owner: 前端展示 AI）
 - [x] 2.3 接线支付成功“查看电子票”出口，处理无 `ticketId` 与非成功状态。（Owner: A；Blocked by 2.2）
 - [x] 3.1 执行 `pnpm check`、完整 E2E、OpenSpec strict 和差异检查。（Owner: A）
-- [ ] 3.2 完成差异审查后提交独立 PR。（Owner: A）
+- [x] 3.2 完成差异审查后提交独立 PR。（Owner: A）
