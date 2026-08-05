@@ -6,6 +6,8 @@ target/
 .env
 .env.*
 !.env.example
+!.env.local.example
+!.env.server.example
 logs/
 data/
 coverage/

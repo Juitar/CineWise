@@ -12,4 +12,6 @@ public interface AgentRunStepRepository {
     List<AgentRunStep> findByRunId(long runId);
 
     boolean updateWithCas(AgentRunStep nextStep, long expectedVersion, PlanNodeStatus expectedStatus);
+
+    int deleteByRunId(long runId);
 }

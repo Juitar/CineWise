@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../../shared/api/ApiError';
 import type { CurrentUser } from './types';
@@ -34,6 +34,11 @@ describe('usePasswordLogin', () => {
     vi.stubGlobal('crypto', { randomUUID: () => 'request-uuid' });
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
   it('生成一次 clientRequestId 并提交规范化邮箱', async () => {
     authMocks.login.mockResolvedValue(user);
     const { result } = renderHook(() => usePasswordLogin());
@@ -49,6 +54,26 @@ describe('usePasswordLogin', () => {
       password: 'Password1',
     });
     expect(submission).toEqual({ clearPassword: true, user });
+  });
+
+  it('HTTP IP 环境缺少 randomUUID 时生成不同的降级 clientRequestId', async () => {
+    vi.stubGlobal('crypto', {});
+    vi.spyOn(Date, 'now').mockReturnValue(1_754_352_000_000);
+    vi.spyOn(Math, 'random').mockReturnValue(0.123456789);
+    authMocks.login.mockResolvedValue(user);
+    const { result } = renderHook(() => usePasswordLogin());
+
+    await act(async () => {
+      await result.current.submit('user@cinewise.test', 'Password1');
+      await result.current.submit('user@cinewise.test', 'Password1');
+    });
+
+    const firstRequestId = authMocks.login.mock.calls[0]?.[0].clientRequestId;
+    const secondRequestId = authMocks.login.mock.calls[1]?.[0].clientRequestId;
+    expect(firstRequestId).toMatch(/^login-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+$/);
+    expect(firstRequestId).not.toBe(secondRequestId);
+    expect(firstRequestId.length).toBeLessThanOrEqual(64);
+    expect(secondRequestId.length).toBeLessThanOrEqual(64);
   });
 
   it('登录响应丢失时只查询 /auth/me，不重发密码', async () => {

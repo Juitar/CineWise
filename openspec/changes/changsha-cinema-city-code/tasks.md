@@ -18,9 +18,9 @@
 
 ## 5. 验证记录
 
-- 后端定向测试使用 `-DforkCount=0` 执行：`NetStartContentProviderTest` 12 项、`RestClientNetStartRawClientTest` 2 项，共 14 项全部通过。默认 fork 模式受当前中文用户临时目录影响，在执行用例前退出并显示 `Tests run: 0`，不记为测试失败或通过。
-- 前端 `pnpm check` 通过：格式、Lint、类型检查、20 个测试文件共 96 项测试、生产构建和哈希资源检查全部通过。
-- 后端完整 `mvn verify -DforkCount=0` 已完成 81 个测试文件、290 项测试，0 失败、0 错误、17 项按环境跳过；随后打包因本机正在运行的后端进程占用 `target/cinewise-backend-0.1.0-SNAPSHOT.jar` 而未完成。影院定向测试和代码结果不受影响，PR 的后端 CI 需要完成最终打包检查。
+- 同步最新 `origin/dev@67d8ef7` 并人工解决 Provider 冲突后，后端定向测试使用 `-DforkCount=0` 执行：`NetStartContentProviderTest` 15 项、`RestClientNetStartRawClientTest` 2 项，共 17 项全部通过。
+- 同步最新 `dev` 后前端 `pnpm check` 通过：格式、Lint、类型检查、38 个测试文件共 142 项测试、生产构建和哈希资源检查全部通过。
+- 同步最新 `dev` 后执行 `mvn verify -DforkCount=0 -Dspring-boot.repackage.skip=true`：94 个测试文件、333 项测试，0 失败、0 错误、21 项按环境跳过，完整测试和静态检查通过。因本机正在运行的后端进程占用目标 JAR，本地只跳过 Spring Boot JAR 重打包，PR 的后端 CI 负责完成最终打包检查。
 - `openspec validate changsha-cinema-city-code --strict`、`openspec validate frontend-cinema-list-api-integration --strict` 和两个工作树的 `git diff --check` 通过。
 - 2026-08-05 重新同步成功；`GET /api/v1/cinemas?location=430100&page=1&size=50` 返回 HTTP 200、20 家影院、`source=NETSTART_MAOYAN`、`sourceType=LIVE`，20 条记录的 `cityCode` 均为 `430100`。
 - Redis 当前不可用，页面从 MySQL 真实快照读取，因此返回 `degraded=true/fallbackType=SNAPSHOT`；来源仍为 LIVE，不显示演示数据。

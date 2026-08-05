@@ -64,6 +64,34 @@
 - **WHEN** MinIO 环境变量为空且当前模块未启用对象存储客户端
 - **THEN** 后端核心查询、交易和健康检查仍可启动
 
+### Requirement: 公共 Compose 显式传递后端运行配置
+
+系统 SHALL 保持一份公共应用 Compose，并显式将环境文件中的认证 Cookie、认证演示种子、票务时限和内容同步运行开关传递给 backend；不得依赖容器未声明的环境变量或成员私有 Compose 覆盖。
+
+#### Scenario: HTTP 演示入口使用非 Secure Cookie
+
+- **WHEN** 环境文件将 `AUTH_COOKIE_SECURE` 配置为 `false` 且应用通过 HTTP 演示入口运行
+- **THEN** backend 容器收到同一值，认证与 CSRF Cookie 不带 `Secure` 属性
+
+#### Scenario: HTTPS 演示入口使用 Secure Cookie
+
+- **WHEN** 环境文件将 `AUTH_COOKIE_SECURE` 配置为 `true` 且应用通过 HTTPS 入口运行
+- **THEN** backend 容器收到同一值，认证与 CSRF Cookie 带 `Secure` 属性
+
+### Requirement: 本地与服务器使用不同无密钥环境模板
+
+系统 SHALL 提供本地与服务器环境模板，但不得复制 Dockerfile 或完整 Compose 服务定义。模板不得包含真实密码、JWT、MinIO Key、SSH 私钥或服务器地址。
+
+#### Scenario: 本地 SSH 隧道联调
+
+- **WHEN** 开发者基于本地模板配置应用
+- **THEN** MySQL 和 Redis 默认指向 `host.docker.internal` 的本地隧道端口，浏览器使用 `http://localhost:8000`
+
+#### Scenario: 服务器连接共享基础服务
+
+- **WHEN** 部署人员基于服务器模板配置应用
+- **THEN** MySQL、Redis 与可选 MinIO 使用基础服务 ECS 的私网或受白名单保护的地址，应用 Compose 不创建第二套基础服务
+
 ### Requirement: 部署失败恢复上一应用版本
 
 系统 SHALL 记录部署前 Git SHA，使用 Compose 健康检查验证新版本，并在构建或健康检查失败时恢复上一提交。

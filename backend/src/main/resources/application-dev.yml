@@ -17,3 +17,9 @@ spring:
 logging:
   level:
     com.miaoyu.ticket: DEBUG
+
+cinewise:
+  content:
+    netstart:
+      # 开发环境默认拉取已确认的学习来源；排障时可显式设为 false，生产 profile 仍会拒绝该 Provider。
+      enabled: ${CINEWISE_CONTENT_NETSTART_ENABLED:true}

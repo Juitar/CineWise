@@ -1,5 +1,6 @@
 package com.miaoyu.ticket.agent.application.persistence;
 
+import com.miaoyu.ticket.agent.application.AgentFailurePersistedException;
 import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentRequest;
 import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentResult;
 import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentService;
@@ -70,7 +71,7 @@ public class AgentMessageSubmissionService {
         } catch (RuntimeException exception) {
             // 仅持久化稳定失败事实；异常原文不能进入 Agent 表。
             runResultTransaction.recordFailure(initial.run());
-            throw exception;
+            throw new AgentFailurePersistedException();
         }
     }
 

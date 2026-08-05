@@ -50,6 +50,8 @@ springdoc:
     path: /swagger-ui.html
 
 cinewise:
+  agent:
+    event-cleanup-cron: "${AGENT_EVENT_CLEANUP_CRON:0 30 2 * * *}"
   content:
     demo-ttl: 6h
     cache-ttl: 6h
