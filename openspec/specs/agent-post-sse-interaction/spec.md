@@ -17,6 +17,11 @@
 - **THEN** C 的认证边界返回 HTTP 401 和错误码 201006
 - **AND** B 的 Agent 应用服务不创建任何运行或事件
 
+#### Scenario: 最小只读工具异常后重放安全失败事件
+- **WHEN** 本次 POST SSE 的最小只读工具在运行执行中抛出异常，且 Agent 已提交安全失败事实
+- **THEN** 当前 SSE 连接按已保存事件顺序发送 `message.error`、`run.complete` 等失败事件后正常结束
+- **AND** 系统不得发送异常文本、异常堆栈、工具原始参数，且不得创建第二个运行或再次调用工具
+
 ### Requirement: 重复消息提交不得再次执行最小只读工具
 系统 SHALL 复用已有的 `userId + sessionId + clientRequestId + requestHash` 幂等规则。相同摘要的重复 POST MUST 返回原 runId 并仅重放已保存事件；同一 `clientRequestId` 摘要不同 MUST 返回 `409 / 206009`；会话存在其他 `RUNNING` 运行时 MUST 返回 `409 / 206008`。
 
