@@ -1,83 +1,22 @@
-import React, { useRef, useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { history, useSearchParams } from 'umi';
-import { Button, Spin, Alert, message } from 'antd';
+import { Alert, message } from 'antd';
+import { ErrorBlock } from 'antd-mobile';
+import { OrderConfirmation } from '../../../features/order-confirmation/OrderConfirmation';
+import { OrderCreateSuccess } from '../../../features/order-create-success/OrderCreateSuccess';
 import { useShows, useSeatMap } from '../../../modules/ticketing/hooks';
 import { useCreateOrder } from '../../../modules/order/hooks';
-import { buildOrderDetailPath, buildPaymentPath } from '../../../modules/order/routes';
+import {
+  clearConfirmOrderSession,
+  markConfirmOrderUnknown,
+  useConfirmOrderSession,
+} from '../../../modules/order/confirm-session';
+import { calculateOrderTotalAmount } from '../../../modules/order/money';
 import { formatOrderTime } from '../../../modules/order/formatters';
-import { OrderCreateSuccess } from '../../../features/order-create-success/OrderCreateSuccess';
+import { buildOrderDetailPath, buildPaymentPath } from '../../../modules/order/routes';
 import { ApiError } from '../../../shared/api/ApiError';
+import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import './index.css';
-
-interface PendingOrderSession {
-  clientRequestId: string;
-  idempotencyKey: string;
-  isResultUnknown?: boolean;
-}
-
-function getOrderSession(showId: string, seatIds: string[]): PendingOrderSession {
-  if (!showId || seatIds.length === 0) {
-    return {
-      clientRequestId: crypto.randomUUID(),
-      idempotencyKey: crypto.randomUUID(),
-      isResultUnknown: false,
-    };
-  }
-  const key = `cw_order_${showId}_${[...seatIds].sort().join('_')}`;
-  try {
-    const raw = sessionStorage.getItem(key);
-    if (raw) {
-      return JSON.parse(raw) as PendingOrderSession;
-    }
-  } catch {
-    // ignore
-  }
-  const session: PendingOrderSession = {
-    clientRequestId: crypto.randomUUID(),
-    idempotencyKey: crypto.randomUUID(),
-    isResultUnknown: false,
-  };
-  try {
-    sessionStorage.setItem(key, JSON.stringify(session));
-  } catch {
-    // ignore
-  }
-  return session;
-}
-
-function saveOrderSessionUnknown(showId: string, seatIds: string[]): void {
-  const key = `cw_order_${showId}_${[...seatIds].sort().join('_')}`;
-  try {
-    const raw = sessionStorage.getItem(key);
-    if (raw) {
-      const parsed = JSON.parse(raw) as PendingOrderSession;
-      parsed.isResultUnknown = true;
-      sessionStorage.setItem(key, JSON.stringify(parsed));
-    }
-  } catch {
-    // ignore
-  }
-}
-
-function clearOrderSession(showId: string, seatIds: string[]): void {
-  const key = `cw_order_${showId}_${[...seatIds].sort().join('_')}`;
-  try {
-    sessionStorage.removeItem(key);
-  } catch {
-    // ignore
-  }
-}
-
-function calculateTotalAmount(basePriceStr: string | undefined, count: number): string {
-  if (!basePriceStr || count <= 0) return '0.00';
-  const parts = basePriceStr.split('.');
-  const yuan = parseInt(parts[0] || '0', 10);
-  const fen = parseInt((parts[1] || '00').padEnd(2, '0').slice(0, 2), 10);
-  const totalCents = (yuan * 100 + fen) * count;
-  const totalYuan = Math.floor(totalCents / 100);
-  const totalFen = totalCents % 100;
-  return `${totalYuan}.${totalFen.toString().padStart(2, '0')}`;
-}
 
 /**
  * 订单确认页面：/orders/confirm?showId=...&seatId=1&seatId=2&movieId=...&cinemaId=...
@@ -91,19 +30,22 @@ export default function OrderConfirmPage() {
   const showId = searchParams.get('showId') || '';
   const movieId = searchParams.get('movieId') || '';
   const cinemaId = searchParams.get('cinemaId') || '';
+  const isMobile = useMediaQuery('(max-width: 1023px)');
 
   const requestedSeatIds = useMemo(() => {
     return searchParams.getAll('seatId');
   }, [searchParams]);
 
-  const sessionRef = useRef<PendingOrderSession | null>(null);
-  if (!sessionRef.current) {
-    sessionRef.current = getOrderSession(showId, requestedSeatIds);
-  }
-  const { clientRequestId, idempotencyKey } = sessionRef.current;
+  const confirmSession = useConfirmOrderSession(showId, requestedSeatIds);
+  const { clientRequestId, idempotencyKey } = confirmSession;
 
   // 1. 获取真实场次列表，根据 showId 匹配权威 basePrice 字符串
-  const { loading: showsLoading, shows, error: showsError } = useShows(movieId, cinemaId);
+  const {
+    loading: showsLoading,
+    shows,
+    error: showsError,
+    refetch: refetchShows,
+  } = useShows(movieId, cinemaId);
   const currentShow = useMemo(() => {
     return shows.find((s) => s.showId === showId);
   }, [shows, showId]);
@@ -129,14 +71,12 @@ export default function OrderConfirmPage() {
   } = useCreateOrder();
 
   useEffect(() => {
-    if (sessionRef.current?.isResultUnknown) {
-      setResultUnknownState(true);
-    }
-  }, [setResultUnknownState]);
+    setResultUnknownState(confirmSession.isResultUnknown);
+  }, [confirmSession.isResultUnknown, setResultUnknownState]);
 
   useEffect(() => {
     if (isResultUnknown) {
-      saveOrderSessionUnknown(showId, requestedSeatIds);
+      markConfirmOrderUnknown(showId, requestedSeatIds);
     }
   }, [isResultUnknown, showId, requestedSeatIds]);
 
@@ -160,18 +100,26 @@ export default function OrderConfirmPage() {
     if (order) {
       return order.totalAmount;
     }
-    return calculateTotalAmount(currentShow?.basePrice, availableSeats.length);
+    return calculateOrderTotalAmount(currentShow?.basePrice, availableSeats.length);
   }, [order, currentShow, availableSeats.length]);
 
   if (!showId || requestedSeatIds.length === 0) {
     return (
       <div className="confirm-page-container">
-        <Alert
-          type="error"
-          showIcon
-          message="参数错误"
-          description="缺失场次 showId 或有效的 seatId 列表。"
-        />
+        {isMobile ? (
+          <ErrorBlock
+            status="default"
+            title="参数错误"
+            description="缺失场次 showId 或有效的 seatId 列表。"
+          />
+        ) : (
+          <Alert
+            type="error"
+            showIcon
+            message="参数错误"
+            description="缺失场次 showId 或有效的 seatId 列表。"
+          />
+        )}
       </div>
     );
   }
@@ -180,19 +128,6 @@ export default function OrderConfirmPage() {
     history.push(
       `/shows/${encodeURIComponent(showId)}/seats?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`,
     );
-  };
-
-  const handleViewOrder = () => {
-    if (order) {
-      history.push(buildOrderDetailPath(order.orderNo));
-    }
-  };
-
-  const handlePayOrder = () => {
-    if (order?.status === 'PENDING_PAYMENT') {
-      // 支付必须由用户在支付页主动确认，建单成功页仅提供安全导航出口。
-      history.push(buildPaymentPath(order.orderNo));
-    }
   };
 
   const handleSubmitOrder = async () => {
@@ -218,13 +153,13 @@ export default function OrderConfirmPage() {
         idempotencyKey,
       );
       if (res) {
-        clearOrderSession(showId, requestedSeatIds);
+        clearConfirmOrderSession(showId, requestedSeatIds);
       }
     } catch (error: unknown) {
       if (error instanceof ApiError && error.code === 204001) {
         // 204001 是明确失败，可以清除本次幂等会话；刷新后回到座位图，避免旧 URL 继续携带失效选择。
         await refetchSeats();
-        clearOrderSession(showId, requestedSeatIds);
+        clearConfirmOrderSession(showId, requestedSeatIds);
         message.error('座位不可锁定，请重新选择');
         handleReturnToSeats();
       }
@@ -236,174 +171,79 @@ export default function OrderConfirmPage() {
     try {
       const res = await recoverOrder(clientRequestId);
       if (res) {
-        clearOrderSession(showId, requestedSeatIds);
+        clearConfirmOrderSession(showId, requestedSeatIds);
       }
     } catch {
       // 仅捕获异常以防止未处理Promise拒绝
     }
   };
 
-  const selectedLabels = availableSeats.map((s) => s.seatLabel).join('，');
+  const selectedLabels = availableSeats.map((seat) => seat.seatLabel);
+  const isShowNotAvailable =
+    !showsLoading && !showsError && (!currentShow || currentShow.status !== 'ON_SALE');
+  const isNotAvailable = hasInvalidSeats || isShowNotAvailable;
+  const contextError = showsError ?? seatError;
+  const confirmationError = isSeatConflict ? null : (contextError ?? orderError);
+  const submitDisabled =
+    hasInvalidSeats ||
+    availableSeats.length === 0 ||
+    seatLoading ||
+    showsLoading ||
+    !!contextError ||
+    !currentShow ||
+    currentShow.showId !== showId ||
+    currentShow.status !== 'ON_SALE';
+
+  const handleReloadContext = () => {
+    void Promise.all([refetchShows(), refetchSeats()]);
+  };
+
+  const handlePay = () => {
+    if (order?.status === 'PENDING_PAYMENT') {
+      // 支付必须由用户在支付页主动确认，建单成功页只提供安全导航出口。
+      history.push(buildPaymentPath(order.orderNo));
+    }
+  };
+
+  const handleViewOrder = () => {
+    if (order) {
+      history.push(buildOrderDetailPath(order.orderNo));
+    }
+  };
 
   return (
     <div className="confirm-page-container">
       <h1 className="confirm-page-title">确认订单信息</h1>
-
-      {showsError && (
-        <Alert
-          type="error"
-          showIcon
-          className="confirm-alert"
-          message="场次信息查询发生异常"
-          description={showsError.message || '请重试'}
-        />
-      )}
-
-      {!showsLoading && !showsError && (!currentShow || currentShow.status !== 'ON_SALE') && (
-        <Alert
-          type="warning"
-          showIcon
-          className="confirm-alert"
-          message="场次不可售或已失效"
-          description="该场次当前不可售或不存在，禁止提交建单，请返回场次列表重新选择。"
-          action={
-            <Button size="small" onClick={handleReturnToSeats}>
-              返回选择
-            </Button>
-          }
-        />
-      )}
-
-      {seatError && (
-        <Alert
-          type="error"
-          showIcon
-          className="confirm-alert"
-          message="无法验证座位最新状态"
-          description={seatError.message || '请重试'}
-          action={
-            <Button size="small" onClick={refetchSeats}>
-              重新拉取
-            </Button>
-          }
-        />
-      )}
-
-      {hasInvalidSeats && (
-        <Alert
-          type="warning"
-          showIcon
-          className="confirm-alert"
-          message="任一所选座位不再为 AVAILABLE"
-          description="您选择的座位中任一座位已不是 AVAILABLE 状态，为保障交易准确，禁止按照剩余可用座位直接建单。请返回选座页重新选择。"
-          action={
-            <Button size="small" onClick={handleReturnToSeats}>
-              重新选择座位
-            </Button>
-          }
-        />
-      )}
-
-      {isSeatConflict && (
-        <Alert
-          type="error"
-          showIcon
-          className="confirm-alert"
-          message="座位不可锁定"
-          description="您选中的座位刚好被其他用户锁定，请返回场次座位图选择其他有效座位。"
-          action={
-            <Button size="small" type="primary" onClick={handleReturnToSeats}>
-              重选座位
-            </Button>
-          }
-        />
-      )}
-
-      {orderError && !isSeatConflict && (
-        <Alert
-          type={orderError.status === 401 ? 'warning' : 'error'}
-          showIcon
-          className="confirm-alert"
-          message={orderError.status === 401 ? '需要用户登录' : '提交建单遇到异常'}
-          description={
-            isResultUnknown || isRecovering
-              ? '提交建单未能确认服务端结果，已锁定为 RESULT_UNKNOWN 保护状态。禁止发起新请求重投，请查询原请求状态。'
-              : orderError.message || '系统繁忙，请稍后重试'
-          }
-        />
-      )}
-
-      {seatLoading ? (
-        <div className="confirm-loading">
-          <Spin tip="核验服务端座位可用情况..." />
-        </div>
-      ) : (
-        <div className="confirm-card">
-          <div className="confirm-item-row">
-            <span className="confirm-item-label">影厅场次</span>
-            <span className="confirm-item-value">
-              {seatMap ? seatMap.auditoriumName : '加载中...'}
-            </span>
-          </div>
-
-          <div className="confirm-item-row">
-            <span className="confirm-item-label">选择座位</span>
-            <span className="confirm-item-value">
-              {availableSeats.length > 0 ? selectedLabels : '无有效座位'}
-            </span>
-          </div>
-
-          <div className="confirm-item-row">
-            <span className="confirm-item-label">座位数量</span>
-            <span className="confirm-item-value">{availableSeats.length} 张</span>
-          </div>
-
-          <div className="confirm-item-row">
-            <span className="confirm-item-label">总价</span>
-            <span className="confirm-item-price">¥ {totalAmount}</span>
-          </div>
-        </div>
-      )}
 
       {order ? (
         <OrderCreateSuccess
           orderNo={order.orderNo}
           totalAmount={order.totalAmount}
           expireTimeText={formatOrderTime(order.expireTime)}
-          onPay={order.status === 'PENDING_PAYMENT' ? handlePayOrder : undefined}
+          onPay={order.status === 'PENDING_PAYMENT' ? handlePay : undefined}
           onViewOrder={handleViewOrder}
           loading={orderLoading || isRecovering}
         />
-      ) : isResultUnknown ? (
-        <div className="confirm-actions">
-          <Button type="primary" size="large" loading={isRecovering} onClick={handleRecoverQuery}>
-            {isRecovering ? '正在查询订单状态...' : '重新查询订单结果'}
-          </Button>
-        </div>
       ) : (
-        <div className="confirm-actions">
-          <Button onClick={handleReturnToSeats} disabled={orderLoading || isRecovering}>
-            返回修改
-          </Button>
-          <Button
-            type="primary"
-            size="large"
-            loading={orderLoading || isRecovering}
-            disabled={
-              hasInvalidSeats ||
-              availableSeats.length === 0 ||
-              seatLoading ||
-              showsLoading ||
-              !!showsError ||
-              !currentShow ||
-              currentShow.showId !== showId ||
-              currentShow.status !== 'ON_SALE'
-            }
-            onClick={handleSubmitOrder}
-          >
-            {isRecovering ? '正在同步查询订单...' : '确认并提交订单'}
-          </Button>
-        </div>
+        <OrderConfirmation
+          auditoriumName={seatMap?.auditoriumName ?? '影厅信息待确认'}
+          seatLabels={selectedLabels}
+          ticketCount={availableSeats.length}
+          totalAmount={totalAmount}
+          loading={seatLoading || showsLoading}
+          submitting={orderLoading}
+          recovering={isRecovering}
+          submitDisabled={submitDisabled}
+          error={confirmationError}
+          isConflict={isSeatConflict}
+          isNotAvailable={isNotAvailable}
+          isResultUnknown={isResultUnknown}
+          onSubmit={handleSubmitOrder}
+          onRetry={handleRecoverQuery}
+          onCancel={handleReturnToSeats}
+          onErrorAction={contextError ? handleReloadContext : handleReturnToSeats}
+          errorActionLabel={contextError ? '重新加载' : '返回修改'}
+        />
       )}
     </div>
   );

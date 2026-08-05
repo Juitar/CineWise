@@ -21,12 +21,19 @@ Redis TTL 只用于限制缓存空间和自然清理，不能表示资料真假�
 ## Data Flow
 
 ```text
+NetStart 城市列表（受控更新后写入本地 JSON）
+  -> D 城市目录加载器：启动时校验并构建只读城市名 -> ci 索引
+C/B 临时 locationText
+  -> D 城市解析服务：识别唯一城市名，不保存地点原文
+  -> 本地城市目录：取得 Provider ci
+  -> D 已同步影院索引：取得本地 cinemaIds
+  -> A 公开只读场次 API：以业务日期和 cinemaIds 查询可售场次快照
 NetStart 影片/影院响应
   -> D Provider Mapper：字段校验、HTTPS 海报规范化、城市标识转换、坐标/上映资料映射
   -> MovieContent / CinemaContent：不包含影评、用户数据和票务事实
   -> MySQL 内容表 + 标准化快照 + Redis 缓存
   -> D REST：影片、影院、来源状态和受控同步
-  -> C 模块 API/Hook：首页、影片页、影院页（默认长沙、手动选城）
+  -> C 模块 API/Hook：首页、影片页、影院页（默认长沙、手动选城或地点解析后的城市）
 ```
 
 ## Decisions
@@ -39,9 +46,19 @@ D 在 Mapper 内将 Provider 海报字段转换为绝对 HTTPS URL。不能解�
 
 `summary`、上映状态和上映日期必须在领域模型、持久化、缓存/快照编解码、REST DTO 和前端类型中一致。简介只接受短简介字段；影评、评论和原始富文本不进入模型。Provider 未提供的可选字段返回 `null`，不会为了完整卡片填造内容。
 
-### 3. 城市与坐标保持两个不同概念
+### 3. 地点字符串、城市目录和坐标保持三个不同概念
 
-增加受控城市映射：系统行政区划代码用于 REST 查询、缓存键和持久化；Provider 城市标识仅用于外部调用。首批支持城市、Provider 值和验证证据写入配置/测试夹具，未知城市拒绝同步而不是把错误代码写入真实快照。影院坐标仅映射 Provider 已给出的合法静态经纬度，不能通过地址猜测。
+NetStart `cities.json` 已实测返回 1151 条 `id/nm/py`，其中长沙为 `70`、杭州为 `50`。D 将经过人工核验的最小城市目录以版本化 JSON 放在应用资源中，记录来源、检查时间、城市名和 Provider `ci`；应用启动时一次性加载并校验城市名、`ci` 均唯一。日常用户请求、页面加载和影院查询绝不访问城市列表接口。
+
+C 的手动选择或浏览器侧已经得到的地点信息通过 `POST /api/v1/content/cities/resolve` 向 D 传临时 `{locationText}`，避免它进入 URL。D 按规范化后的地点字符串匹配本地城市名：唯一命中才返回 `RESOLVED + cityName` 并在内部取得 `ci`；零命中返回 `UNRECOGNIZED`，多命中返回 `SELECTION_REQUIRED`。公开响应不返回候选地点、`providerCityId` 或 `ci`；页面会话只能保存返回的城市名。
+
+B 的对话地点信息只作为该次 D 城市解析调用的内存参数，调用结束立即丢弃。Agent 会持久化用户消息，因此 B 必须在保存用户消息、事件、槽位快照、长期上下文、日志和缓存前剔除或替换原始地点文本；不能只依靠 D 的 DTO 不落库。地点原文、浏览器位置和候选列表不得写入 MySQL、Redis、日志、快照、URL、画像或 Agent 轨迹；允许保存城市名或标准 `cityCode`，但不保存经纬度或 NetStart 内部城市 ID。
+
+`ci` 仅用于 D 调用 NetStart，不能返回给 C/B。页面查询和展示只使用城市名；影院持久化与同步审计另存规范化 `city_name` 和 `provider_city_id`，不再把中国行政区划代码作为新城市资料的前置条件。影院坐标仅映射 Provider 已给出的合法静态经纬度，不能通过地点字符串或地址猜测。
+
+城市解析成功后，D 只从本地已同步且未删除的影院资料取得 `cinemaIds`。没有已同步影院是正常空结果，D 不请求 A、不用其他城市影院替代。A 新增的公开只读场次 API 只接收业务日期和 `cinemaIds`，不接收地点字符串、城市名、城市代码或 Provider `ci`；A 决定场次是否可售、返回数量、排序和查询错误，D 只消费其快照，建单时仍由 A 重查库存与状态。
+
+城市目录更新不是运行时自动任务：D 用受控离线步骤请求 NetStart 列表、核对新增/删除/改名和唯一性后更新 JSON、测试和版本号，再随应用发布。城市不在目录或本地未同步时，页面显示“当前城市暂无法查询影院”，不能把另一个城市的影院作为替代。
 
 ### 4. 首次目录回填、每日增量与本地查询分开
 
@@ -57,11 +74,11 @@ D 在 Mapper 内将 Provider 海报字段转换为绝对 HTTPS URL。不能解�
 
 开发环境的已确认 NetStart Provider 默认开启，并在 Asia/Shanghai 每天凌晨 3 点执行定时同步；启动同步保持关闭，避免开发重启反复请求外部服务。开发排障可用显式环境变量关闭 Provider。生产或商业 profile 必须拒绝启用该学习用途 Provider，即使错误配置了开关也不能发起外部调用。同步失败只写审计，绝不删除最近两份成功真实版本。
 
-### 5. 本期影院浏览只支持默认城市和手动选城
+### 5. 本期影院浏览支持默认城市、手动选择和临时地点解析
 
-当前没有常用城市或用户城市偏好能力，C 在没有手动选择时默认查询长沙 `430100`，并在页面显示“长沙”。该值只存在当前页面会话，不能写入用户资料、画像或服务端持久化。用户可以手动切换城市。
+当前没有常用城市或用户城市偏好能力，C 在没有城市输入时默认展示长沙。用户手动选择城市时直接提交城市名；C/B 已提供地点字符串时调用 D 解析，再以返回城市名查询影院。城市值只存在当前页面或会话，不能写入用户资料、画像或服务端持久化。
 
-本期影院浏览不请求浏览器定位、不接收精确坐标、不计算或展示距离；避免在影院 DTO 未提供坐标且 PRD 未授权浏览页定位时给出不可靠的“附近”结果。用户主动发起基础路线时，仍按路线模块既有规则一次性定位，精确坐标不传给内容接口、不写入 URL、日志或持久化。
+本期影院浏览不计算或展示距离。若 C 在用户授权后取得地点字符串，它只交给 D 做当次城市解析；用户主动发起基础路线时仍按路线模块既有规则处理，精确坐标不传给内容接口、不写入 URL、日志或持久化。
 
 ### 6. 公开身份解析只提供身份，不提供票务事实
 
@@ -73,9 +90,21 @@ D 在 Mapper 内将 Provider 海报字段转换为绝对 HTTPS URL。不能解�
 
 映射状态需要独立于内容缓存和两版本资料快照保存；具体表、索引、生命周期和前向迁移由 D 在 A 分配版本后实现。真实排期 Provider、`movie_show`、Mock 隔离和交易边界由 A 后续 `real-showtime-read-model`、`real-showtime-ticketing` 两个独立 change 决定。
 
-### 7. 管理同步为受控写操作
+### 6.1 公开批量影院摘要只提供展示资料
 
-来源状态是管理员只读接口。手动同步要使用 `clientRequestId` 查询结果恢复，不能因网络超时直接重复发起；具体路径、响应字段、错误码和 CSRF 要由 C 确认，并由 D 在 OpenAPI、测试和前端调用中同步。
+`ContentSummaryQueryPort` 是 A 调用 D 的同进程 Java Application API，不是 HTTP 接口。它以一组 `cinemaIds` 批量返回 `cinemaId/name/address/source/dataTime/expiresAt/isExpired`；不返回 D 的 Entity、Mapper、缓存键、Provider 原始 ID、坐标或地点原文。
+
+空输入返回空批量结果。部分不存在、逻辑删除或尚未同步的影院 ID 通过 `missingCinemaIds` 返回，其他有效影院继续返回；这不是整体失败。只有内容摘要存储不可读、结果无法安全构造等整体故障时，端口返回固定 `303004` 内容不可用错误，A 不得把它伪装成“没有可售影院”。`source` 是 D 已确认的固定来源标识，`dataTime` 是该影院资料最近一次成功同步时间；A 原样转发展示，不把它当作票务实时承诺。
+
+`movie_tag`、`recommendation_record` 不属于本次真实内容覆盖范围。推荐历史的输入快照、候选快照、结果快照、用户隐私、唯一键、CHECK、保留期和清理机制必须在独立推荐历史 change 完整确认后，才可以提出新迁移。
+
+### 7. 管理同步为按城市执行的受控写操作
+
+来源状态是管理员只读接口。管理员手动同步提交稳定 `clientRequestId` 和城市名，D 必须先在本地城市目录中解析 `ci`，再同步该城市资料；不接受地点原文、任意 `ci` 或任意 Provider URL。同步开始前先持久化 `RUNNING` 记录，以 `(provider, request_id)` 唯一键阻止重复请求；网络响应未知时只能按原 `clientRequestId` 查询，不得重新调用 Provider。
+
+公开同步结果固定为 `syncId/clientRequestId/cityName/status/startedAt/finishedAt/successCount/failureCount/failureCategory`；`finishedAt` 未完成时可为空，`failureCategory` 无失败时可为空。按请求查询复用同一结构。来源状态每条返回 `provider/resourceType/cityName/status/startedAt/finishedAt/lastSuccessAt/successCount/failureCount/failureCategory/dataTime/expiresAt/isExpired/licenseNotice`。Provider 城市 ID 仅可留在服务端审计数据，不得出现在任何公开响应。
+
+两个管理员 GET 不要求 CSRF，POST 必须带 `X-XSRF-TOKEN`。同一 `clientRequestId + cityName` 返回原任务；同一请求标识提交不同城市返回 `409/100409`；不存在的原任务返回 `404/100404`。Provider 已受理后的超时或失败通过任务状态 `PARTIAL/FAILED` 表示，不改写 POST 的 HTTP 返回；POST 超时或断网后，C 进入 `RESULT_UNKNOWN`，只查询原请求，不能重新 POST 或生成新请求标识。
 
 ### 8. C 页面只展示 D 内容和 A 公开票务查询的实际结果
 
@@ -86,8 +115,9 @@ C 负责移除首页/影院页的静态影片和影院数据，并用模块 API�
 - A 审核用冻结设计：`movie.poster_url VARCHAR(2048) NULL`，只保存 HTTPS 绝对地址；`summary VARCHAR(2000) NULL`，只保存短简介；`release_status VARCHAR(16) NULL`，仅 `NOW_SHOWING`、`COMING_SOON`；`release_date DATE NULL`，表示 Provider 的公映或计划公映日期，不能解析则为 `NULL`。
 - 新表固定命名为 `content_identity_mapping`：唯一键 `(provider, resource_type, external_id)`，普通索引 `(resource_type, internal_content_id, status)`；`ACTIVE` 时 `invalid_reason/invalidated_at` 必须为空，`INVALID` 时二者必须非空。映射不物理删除；`INVALID` 为终态，不重新激活、不静默改指向。
 - 同一 Provider、同一资源类型下，一个内部内容同时只允许一个 `ACTIVE` 外部 ID；旧 ID 标记 `INVALID` 后长期保留。V001 的 `source + source_movie_id/source_cinema_id` 继续作为影片/影院当前来源字段；映射表是跨模块身份解析和失效历史的权威记录。迁移先新增可空字段和映射表，再从 V001 的非空来源字段补写 ACTIVE 映射，冲突隔离不猜测，最后部署读取新字段/API 的代码。
-- V011 只是 A 提出的候选版本，未正式分配前 D 不创建或执行 Flyway SQL。
-- 影院已有 `longitude`、`latitude`，不因映射补齐而修改表；城市代码修正必须采用受控更新策略，不能误伤 Demo 或 A 的既有票务关联。
+- 为支持按城市持久化和恢复，迁移还须为 `cinema` 新增可空 `city_name`、`provider_city_id` 及查询索引，为 `data_sync_log` 新增可空 `city_name`、`provider_city_id`。新代码只写新列；现有 `city_code` 保留兼容，不重写历史记录。长沙已有真实资料可由受控数据维护补齐新列，其他旧行保持为空，不按地址猜测。
+- V011 只是候选。当前迁移目录最高 V010；A 已允许进入迁移准备，但仍须书面分配最终版本、确认上述列/索引和空 MySQL 验证窗口后，D 才能创建 SQL，A 才能执行 Flyway。
+- 影院已有 `longitude`、`latitude`，不因城市目录补齐而修改表；城市资料更新必须采用受控策略，不能误伤 Demo 或 A 的既有票务关联。
 - API 新增字段采用向后兼容的可空字段；既有 `posterUrl` 和 `summary` 保持字段名和类型。任何接口增量先由 C 确认并同步共享类型、OpenAPI、Mock 和测试。
 
 ## Verification

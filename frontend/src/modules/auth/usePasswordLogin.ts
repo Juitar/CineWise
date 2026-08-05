@@ -60,6 +60,11 @@ export function usePasswordLogin() {
   const [status, setStatus] = useState<LoginSubmissionStatus>('idle');
   const inFlight = useRef(false);
 
+  const clearFeedback = useCallback(() => {
+    setErrorMessage(null);
+    setStatus((current) => (current === 'error' ? 'idle' : current));
+  }, []);
+
   const recover = useCallback(async (): Promise<LoginSubmissionResult> => {
     setStatus('recovering');
     try {
@@ -123,6 +128,7 @@ export function usePasswordLogin() {
   }, [recover]);
 
   return {
+    clearFeedback,
     errorMessage,
     isSubmitDisabled:
       status === 'recovering' || status === 'result-unknown' || status === 'submitting',

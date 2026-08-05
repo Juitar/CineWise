@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /** 票务模块公开的场次校验和座位条件锁定能力。 */
 @Service
@@ -67,7 +68,28 @@ public class SeatLockService {
                                 seat.seatId(),
                                 seat.rowNo(),
                                 seat.seatNo()))
-                        .toList());
+                .toList());
+    }
+
+    /**
+     * 只读检查场次和座位当前是否满足建单前置条件。
+     *
+     * <p>该方法故意不调用 {@code lockSeat}；预检结果会在写事务开始前失效，最终可售性仍由条件更新决定。</p>
+     */
+    @Transactional(readOnly = true)
+    public void precheckSeats(long showId, List<Long> sortedSeatIds) {
+        validateSeatSelection(showId, sortedSeatIds);
+        SeatLockRepository.ShowForLock show = repository.findShow(showId)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
+        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
+        if (!ON_SALE.equals(show.status()) || !show.startTime().isAfter(now)) {
+            throw new BusinessException(TicketingErrorCode.SHOW_NOT_SALEABLE);
+        }
+        List<SeatLockRepository.SeatForLock> seats = repository.findSeats(showId, sortedSeatIds);
+        if (seats.size() != sortedSeatIds.size()
+                || seats.stream().anyMatch(seat -> !"AVAILABLE".equals(seat.status()))) {
+            throw new BusinessException(TicketingErrorCode.SEAT_NOT_LOCKABLE);
+        }
     }
 
     private void validateSeatSelection(long showId, List<Long> sortedSeatIds) {

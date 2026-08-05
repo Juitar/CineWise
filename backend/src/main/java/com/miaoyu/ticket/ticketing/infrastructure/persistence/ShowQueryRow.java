@@ -17,6 +17,7 @@ public record ShowQueryRow(
         int availableSeatCount,
         String status,
         String dataType,
+        String source,
         int version,
         LocalDateTime updatedAt) {
 }

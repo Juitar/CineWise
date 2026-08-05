@@ -12,6 +12,9 @@ public interface ShowQueryRepository {
     /** 查询满足全部售卖与时间条件的有界场次列表。 */
     List<ShowSnapshot> findSaleableShows(QueryCriteria criteria);
 
+    /** 按多个影院查询已排除售罄记录的有界可售场次。 */
+    List<ShowSnapshot> findSaleableShowsByCinemaIds(BatchQueryCriteria criteria);
+
     /** 查询座位图头部及场次售卖状态，不存在时返回空。 */
     Optional<ShowSeatHeader> findShowSeatHeader(long showId);
 
@@ -32,6 +35,14 @@ public interface ShowQueryRepository {
             LocalTime timeTo) {
     }
 
+    record BatchQueryCriteria(
+            List<Long> cinemaIds,
+            LocalDateTime startsAfter,
+            LocalDateTime dateStart,
+            LocalDateTime dateEnd,
+            int fetchLimit) {
+    }
+
     record ShowSnapshot(
             long showId,
             long movieId,
@@ -45,6 +56,7 @@ public interface ShowQueryRepository {
             int availableSeatCount,
             String status,
             String dataType,
+            String source,
             int version,
             LocalDateTime updatedAt) {
     }

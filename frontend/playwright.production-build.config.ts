@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /production-build\.spec\.ts/,
+  testMatch: /(?:auth|production-build)\.spec\.ts/,
   globalSetup: './scripts/production-e2e-global-setup.mjs',
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),

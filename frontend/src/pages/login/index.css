@@ -214,6 +214,38 @@
   line-height: 1.5;
 }
 
+.login-mode-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 20px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #f3f2ff;
+}
+
+.login-mode-tabs [role='tab'] {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 9px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.login-mode-tabs [role='tab'].active {
+  color: var(--color-primary);
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(99, 91, 255, 10%);
+  font-weight: 600;
+}
+
+.login-mode-tabs [role='tab'][aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 /* 输入框组合 */
 .login-form {
   display: flex;
@@ -259,6 +291,31 @@
 .login-input-icon-antd {
   color: var(--color-text-placeholder);
   margin-right: 8px;
+}
+
+.verify-code-group .ant-input-affix-wrapper {
+  padding-right: 8px;
+}
+
+.send-code-btn {
+  min-width: 92px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--color-primary);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.send-code-btn:hover:not(:disabled) {
+  background: rgba(99, 91, 255, 8%);
+}
+
+.send-code-btn:disabled {
+  color: var(--color-text-placeholder);
+  cursor: not-allowed;
 }
 
 /* antd 提交按钮覆盖样式 */

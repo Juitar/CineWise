@@ -11,9 +11,23 @@ const mocks = vi.hoisted(() => ({
     status: 'anonymous' as 'anonymous' | 'authenticated' | 'checking' | 'error',
   },
   login: {
+    clearFeedback: vi.fn(),
     errorMessage: null as string | null,
     isSubmitDisabled: false,
     retryRecovery: vi.fn(),
+    status: 'idle' as 'error' | 'idle' | 'recovering' | 'result-unknown' | 'submitting',
+    submit: vi.fn(),
+  },
+  emailCodeLogin: {
+    clearFeedback: vi.fn(),
+    cooldownSeconds: 0,
+    errorMessage: null as string | null,
+    isSendCodeDisabled: false,
+    isSubmitDisabled: false,
+    requestCode: vi.fn(),
+    retryRecovery: vi.fn(),
+    sendCodeMessage: null as string | null,
+    sendCodeStatus: 'idle' as 'error' | 'idle' | 'sending',
     status: 'idle' as 'error' | 'idle' | 'recovering' | 'result-unknown' | 'submitting',
     submit: vi.fn(),
   },
@@ -37,6 +51,10 @@ vi.mock('../../shared/auth/AuthProvider', () => ({
 
 vi.mock('../../modules/auth/usePasswordLogin', () => ({
   usePasswordLogin: () => mocks.login,
+}));
+
+vi.mock('../../modules/auth/useEmailCodeLogin', () => ({
+  useEmailCodeLogin: () => mocks.emailCodeLogin,
 }));
 
 Object.defineProperty(window, 'matchMedia', {
@@ -83,6 +101,7 @@ describe('LoginPage', () => {
     mocks.auth.status = 'anonymous';
     mocks.searchParams = new URLSearchParams();
     mocks.login.errorMessage = null;
+    mocks.login.clearFeedback.mockReset();
     mocks.login.isSubmitDisabled = false;
     mocks.login.status = 'idle';
     mocks.login.submit.mockReset().mockResolvedValue({ clearPassword: true, user: null });
@@ -90,6 +109,20 @@ describe('LoginPage', () => {
       clearPassword: false,
       user: null,
     });
+    mocks.emailCodeLogin.clearFeedback.mockReset();
+    mocks.emailCodeLogin.cooldownSeconds = 0;
+    mocks.emailCodeLogin.errorMessage = null;
+    mocks.emailCodeLogin.isSendCodeDisabled = false;
+    mocks.emailCodeLogin.isSubmitDisabled = false;
+    mocks.emailCodeLogin.requestCode.mockReset();
+    mocks.emailCodeLogin.retryRecovery.mockReset().mockResolvedValue({
+      clearCode: false,
+      user: null,
+    });
+    mocks.emailCodeLogin.sendCodeMessage = null;
+    mocks.emailCodeLogin.sendCodeStatus = 'idle';
+    mocks.emailCodeLogin.status = 'idle';
+    mocks.emailCodeLogin.submit.mockReset().mockResolvedValue({ clearCode: true, user: null });
     mocks.navigate.mockReset();
   });
 
@@ -153,6 +186,55 @@ describe('LoginPage', () => {
     );
     expect(mocks.navigate).toHaveBeenCalledWith('/profile', { replace: true });
     expect(screen.getByLabelText('密码')).toHaveValue('');
+  });
+
+  it('切换到邮箱验证码登录并提交后按安全回跳地址跳转', async () => {
+    mocks.searchParams = new URLSearchParams('returnUrl=%2Fprofile');
+    mocks.emailCodeLogin.submit.mockResolvedValue({ clearCode: true, user });
+    render(<LoginPage />);
+
+    fireEvent.click(screen.getByRole('tab', { name: '验证码登录' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '邮箱' }), {
+      target: { value: ' user@cinewise.test ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '获取验证码' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '邮箱验证码' }), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '验证码登录' }));
+
+    await waitFor(() =>
+      expect(mocks.emailCodeLogin.submit).toHaveBeenCalledWith('user@cinewise.test', '123456'),
+    );
+    expect(mocks.navigate).toHaveBeenCalledWith('/profile', { replace: true });
+    expect(screen.getByRole('textbox', { name: '邮箱验证码' })).toHaveValue('');
+  });
+
+  it('验证码登录提交前校验 6 位数字', () => {
+    render(<LoginPage />);
+    fireEvent.click(screen.getByRole('tab', { name: '验证码登录' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '邮箱' }), {
+      target: { value: 'user@cinewise.test' },
+    });
+    fireEvent.submit(screen.getByRole('button', { name: '验证码登录' }).closest('form')!);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('验证码必须为 6 位数字');
+    expect(mocks.emailCodeLogin.submit).not.toHaveBeenCalled();
+  });
+
+  it('切换登录方式时清空密码和验证码', () => {
+    render(<LoginPage />);
+    fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'Password1' } });
+
+    fireEvent.click(screen.getByRole('tab', { name: '验证码登录' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '邮箱验证码' }), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(screen.getByRole('tab', { name: '密码登录' }));
+
+    expect(screen.getByLabelText('密码')).toHaveValue('');
+    fireEvent.click(screen.getByRole('tab', { name: '验证码登录' }));
+    expect(screen.getByRole('textbox', { name: '邮箱验证码' })).toHaveValue('');
   });
 
   it('管理员通过同一表单登录后默认进入管理端', async () => {

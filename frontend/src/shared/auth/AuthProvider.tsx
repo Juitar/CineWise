@@ -3,14 +3,24 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 import { ApiError } from '../api/ApiError';
 import { setUnauthorizedHandler } from '../api/client';
-import { fetchCurrentUser, submitLogout, submitPasswordLogin } from '../../modules/auth/api';
-import type { CurrentUser, PasswordLoginRequest } from '../../modules/auth/types';
+import {
+  fetchCurrentUser,
+  submitEmailCodeLogin,
+  submitLogout,
+  submitPasswordLogin,
+} from '../../modules/auth/api';
+import type {
+  CurrentUser,
+  EmailCodeLoginRequest,
+  PasswordLoginRequest,
+} from '../../modules/auth/types';
 
 export type AuthSessionStatus = 'anonymous' | 'authenticated' | 'checking' | 'error';
 
 interface AuthContextValue {
   currentUser: CurrentUser | null;
   login(request: PasswordLoginRequest): Promise<CurrentUser>;
+  loginWithEmailCode(request: EmailCodeLoginRequest): Promise<CurrentUser>;
   logout(): Promise<void>;
   recoverSession(): Promise<CurrentUser | null>;
   retrySessionCheck(): Promise<void>;
@@ -94,6 +104,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return user;
   }, []);
 
+  const loginWithEmailCode = useCallback(
+    async (request: EmailCodeLoginRequest): Promise<CurrentUser> => {
+      await submitEmailCodeLogin(request);
+      const user = await fetchCurrentUser(false);
+      setCurrentUser(user);
+      setStatus('authenticated');
+      return user;
+    },
+    [],
+  );
+
   const logout = useCallback(async () => {
     try {
       await submitLogout();
@@ -106,12 +127,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
     () => ({
       currentUser,
       login,
+      loginWithEmailCode,
       logout,
       recoverSession,
       retrySessionCheck,
       status,
     }),
-    [currentUser, login, logout, recoverSession, retrySessionCheck, status],
+    [currentUser, login, loginWithEmailCode, logout, recoverSession, retrySessionCheck, status],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

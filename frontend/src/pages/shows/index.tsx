@@ -1,7 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { history, useSearchParams } from 'umi';
-import { Button, Spin, Alert } from 'antd';
+import { Alert } from 'antd';
+import { ErrorBlock } from 'antd-mobile';
+import { ShowList } from '../../features/show-list/ShowList';
+import type { ShowItemUI } from '../../features/show-list/ShowList';
 import { useShows } from '../../modules/ticketing/hooks';
+import { formatShowTime } from '../../modules/ticketing/formatters';
+import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 
 /**
@@ -12,18 +17,37 @@ export default function ShowsPage() {
   const [searchParams] = useSearchParams();
   const movieId = searchParams.get('movieId') || undefined;
   const cinemaId = searchParams.get('cinemaId') || undefined;
+  const isMobile = useMediaQuery('(max-width: 1023px)');
 
-  const { loading, shows, error, isEmpty, refetch } = useShows(movieId, cinemaId);
+  const { loading, shows, error, refetch } = useShows(movieId, cinemaId);
+
+  const showItems = useMemo<ShowItemUI[]>(
+    () =>
+      shows.map(({ startTime, endTime, ...show }) => ({
+        ...show,
+        startTimeText: formatShowTime(startTime),
+        endTimeText: formatShowTime(endTime),
+      })),
+    [shows],
+  );
 
   if (!movieId || !cinemaId) {
     return (
       <div className="shows-page-container">
-        <Alert
-          type="warning"
-          showIcon
-          message="参数错误"
-          description="请携带完整的 movieId 与 cinemaId 参数访问场次列表页。"
-        />
+        {isMobile ? (
+          <ErrorBlock
+            status="default"
+            title="参数错误"
+            description="请携带完整的 movieId 与 cinemaId 参数访问场次列表页。"
+          />
+        ) : (
+          <Alert
+            type="warning"
+            showIcon
+            message="参数错误"
+            description="请携带完整的 movieId 与 cinemaId 参数访问场次列表页。"
+          />
+        )}
       </div>
     );
   }
@@ -43,74 +67,13 @@ export default function ShowsPage() {
         <div className="shows-cinema-sub">{cinemaName}</div>
       </div>
 
-      {error && (
-        <Alert
-          type="error"
-          showIcon
-          message="查询可售场次发生异常"
-          description={error.message || '请检查网络配置或刷新重试'}
-          action={
-            <Button size="small" onClick={refetch}>
-              重试
-            </Button>
-          }
-          className="shows-alert"
-        />
-      )}
-
-      {loading ? (
-        <div className="shows-loading">
-          <Spin tip="拉取场次列表中..." />
-        </div>
-      ) : isEmpty ? (
-        <div className="shows-empty" role="status">
-          当前影片和影院暂无可售场次
-        </div>
-      ) : (
-        <div className="shows-list">
-          {shows.map((show) => (
-            <div key={show.showId} className="show-card">
-              <div className="show-time-group">
-                <span className="show-start-time">
-                  {new Date(show.startTime).toLocaleTimeString('zh-CN', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false,
-                  })}
-                </span>
-                <span className="show-end-time">
-                  散场{' '}
-                  {new Date(show.endTime).toLocaleTimeString('zh-CN', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false,
-                  })}
-                </span>
-              </div>
-
-              <div className="show-info-group">
-                <span className="show-auditorium">{show.auditoriumName}</span>
-                <span className="show-version">{show.languageVersion}</span>
-              </div>
-
-              <div className="show-price-group">
-                <div>
-                  <span className="show-price-unit">¥</span>
-                  <span className="show-price">{show.basePrice}</span>
-                </div>
-              </div>
-
-              <Button
-                type="primary"
-                onClick={() => handleSelectShow(show.showId)}
-                aria-label={`选择 ${show.auditoriumName} ${show.startTime} 场次去选座`}
-              >
-                去选座
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
+      <ShowList
+        shows={showItems}
+        loading={loading}
+        error={error}
+        onRetry={refetch}
+        onSelectShow={handleSelectShow}
+      />
     </div>
   );
 }
