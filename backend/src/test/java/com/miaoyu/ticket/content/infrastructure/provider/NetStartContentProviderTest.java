@@ -32,7 +32,8 @@ class NetStartContentProviderTest {
     void givenCurrentDetailShape_whenNormalize_thenOnlyCompleteMovieFieldsBecomeLiveContent() throws Exception {
         NetStartContentProvider provider = provider(query -> json("""
                 {"detailMovie":{"id":1525000,"nm":"年会不能停！2","cat":"剧情,喜剧","dur":"118分钟","sc":"9.6",
-                "showInfo":"今天282家影院放映1596场","commentedUsers":123}}"""));
+                "img":"https://p0.meituan.net/movie/test.jpg","dra":"合格短简介","rt":"2026-08-01",
+                "globalReleased":true,"showInfo":"今天282家影院放映1596场","commentedUsers":123}}"""));
 
         ContentResult<List<? extends ContentItem>> result = provider.query(movieDetail()).orElseThrow();
 
@@ -41,8 +42,39 @@ class NetStartContentProviderTest {
         assertThat(movie.sourceMovieId()).isEqualTo("1525000");
         assertThat(movie.genresJson()).isEqualTo("[\"剧情\",\"喜剧\"]");
         assertThat(movie.durationMinutes()).isEqualTo(118);
+        assertThat(movie.posterUrl()).isEqualTo("https://p0.meituan.net/movie/test.jpg");
+        assertThat(movie.summary()).isEqualTo("合格短简介");
+        assertThat(movie.releaseDate()).isEqualTo("2026-08-01");
+        assertThat(movie.releaseStatus()).isEqualTo("NOW_SHOWING");
         assertThat(result.source().type()).isEqualTo(ContentSourceType.LIVE);
         assertThat(result.degraded()).isFalse();
+    }
+
+    @Test
+    void givenHttpOrRelativePoster_whenNormalize_thenItIsDiscardedWithoutRejectingMovie() throws Exception {
+        NetStartContentProvider provider = provider(query -> json("""
+                {"detailMovie":{"id":1525002,"nm":"测试影片","cat":"剧情","dur":"90分钟","sc":"8.0",
+                "img":"http://example.test/poster.jpg","dra":"  ","rt":"2026-09-01"}}"""));
+
+        MovieContent movie = (MovieContent) provider.query(movieDetail()).orElseThrow().data().getFirst();
+
+        // 海报是可选资料，HTTP 地址只置空，不能让一部最低字段合格的影片整体丢失。
+        assertThat(movie.posterUrl()).isNull();
+        assertThat(movie.summary()).isNull();
+        assertThat(movie.releaseStatus()).isEqualTo("COMING_SOON");
+    }
+
+    @Test
+    void givenRelativeOrBlankPoster_whenNormalize_thenItIsDiscardedWithoutRejectingMovie() throws Exception {
+        NetStartContentProvider relative = provider(query -> json("""
+                {"detailMovie":{"id":1525003,"nm":"相对地址片","cat":"剧情","dur":"90分钟","sc":"8.0",
+                "img":"/movie/poster.jpg"}}"""));
+        NetStartContentProvider blank = provider(query -> json("""
+                {"detailMovie":{"id":1525004,"nm":"空海报片","cat":"剧情","dur":"90分钟","sc":"8.0",
+                "img":"  "}}"""));
+
+        assertThat(((MovieContent) relative.query(movieDetail()).orElseThrow().data().getFirst()).posterUrl()).isNull();
+        assertThat(((MovieContent) blank.query(movieDetail()).orElseThrow().data().getFirst()).posterUrl()).isNull();
     }
 
     @Test
@@ -92,6 +124,20 @@ class NetStartContentProviderTest {
         assertThat(cinema.address()).isEqualTo("大兴区康泰街26号");
         assertThat(cinema.longitude()).isNull();
         assertThat(cinema.latitude()).isNull();
+    }
+
+    @Test
+    void givenLegalStaticCoordinates_whenQuery_thenItKeepsCoordinatesWithoutUsingDistance() {
+        NetStartContentProvider provider = provider(query -> json("""
+                [{"id":41478,"lng":"112.9388","lat":"28.2282","distance":"100m",
+                "info":{"name":"长沙测试影城","address":"长沙市芙蓉区测试路1号"}}]"""));
+
+        CinemaContent cinema = (CinemaContent) provider.query(
+                new ContentQuery(ContentResourceType.CINEMA, null, "430100", "影城")).orElseThrow().data().getFirst();
+
+        // distance 是相对请求位置的临时值，不能进入内容模型；只保留上游明确给出的影院静态坐标。
+        assertThat(cinema.longitude()).isEqualByComparingTo("112.9388");
+        assertThat(cinema.latitude()).isEqualByComparingTo("28.2282");
     }
 
     @Test

@@ -7,8 +7,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * NetStart 学习 Provider 的运行开关和本地保护参数。
  *
- * <p>这些值是本项目对第三方的保守保护，不代表对方公布的配额。默认关闭，正式环境也必须由
- * {@link NetStartContentProvider} 再次拦截，避免仅靠部署约定误开学习接口。</p>
+ * <p>这些值是本项目对第三方的保守保护，不代表对方公布的配额。dev profile 默认开启，正式环境
+ * 仍会由 {@link NetStartContentProvider} 再次拦截，避免仅靠部署约定误开学习接口。</p>
  *
  * <p>一次性同步开关只用于受控验证窗口，不提供页面或公网调用入口。它必须与 enabled 同时为 true
  * 才会触发实际同步；任一开关关闭时，内容查询仍按缓存、快照和 Demo 回退。</p>
@@ -16,7 +16,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * <p>每日 cron 保持默认值，验证时可以关闭调度器并改用一次性同步，避免两个入口并发写入相同来源。</p>
  */
 /**
- * @param enabled 是否允许学习 Provider 发起网络调用，默认关闭
+ * @param enabled 是否允许学习 Provider 发起网络调用，dev profile 默认开启
  * @param syncOnStartup 是否在应用就绪后执行一次受控同步，默认关闭
  */
 @ConfigurationProperties("cinewise.content.netstart")

@@ -124,7 +124,8 @@ class ContentSyncServiceTest {
         ContentQuery providerMovieQuery = new ContentQuery(ContentResourceType.MOVIE, 7001L, null, null);
         ContentQuery providerCinemaQuery = new ContentQuery(ContentResourceType.CINEMA, null, "70", "影");
         ContentResult<List<? extends ContentItem>> movieResult = new ContentResult<>(List.of(
-                new MovieContent("7001", "真实影片", "[\"剧情\"]", 100, new BigDecimal("8.1"))),
+                new MovieContent(null, "7001", "真实影片", "[\"剧情\"]", 100, new BigDecimal("8.1"),
+                        "https://example.test/real-poster.jpg", "真实简介", "2026-08-01", "NOW_SHOWING")),
                 new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), LocalDateTime.of(2026, 8, 4, 9, 0),
                 LocalDateTime.of(2026, 8, 4, 15, 0), false, false, null);
         ContentResult<List<? extends ContentItem>> cinemaResult = new ContentResult<>(List.of(
@@ -147,6 +148,38 @@ class ContentSyncServiceTest {
                 new ContentQuery(ContentResourceType.CINEMA, 99L, null, null),
                 new ContentQuery(ContentResourceType.CINEMA, null, "70", null));
         assertThat(snapshots).doesNotContainKeys(providerMovieQuery, providerCinemaQuery);
+        // Provider 已规范化的展示资料要随内部 ID 一起写入公开列表、详情快照和后续 Redis 缓存。
+        MovieContent publicMovie = (MovieContent) snapshots.get(
+                new ContentQuery(ContentResourceType.MOVIE, null, null, null)).data().getFirst();
+        assertThat(publicMovie.posterUrl()).isEqualTo("https://example.test/real-poster.jpg");
+        assertThat(publicMovie.summary()).isEqualTo("真实简介");
+        assertThat(publicMovie.releaseDate()).isEqualTo("2026-08-01");
+        assertThat(publicMovie.releaseStatus()).isEqualTo("NOW_SHOWING");
+    }
+
+    @Test
+    void givenExistingMovieDirectory_whenSynchronizingLimitedBatch_thenItKeepsUnseenMovies() {
+        ContentQuery listQuery = new ContentQuery(ContentResourceType.MOVIE, null, null, null);
+        ContentResult<List<? extends ContentItem>> existing = new ContentResult<>(List.of(
+                new MovieContent(10L, "old-1", "已有影片", "[\"剧情\"]", 100, new BigDecimal("8.0"))),
+                new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), LocalDateTime.of(2026, 8, 3, 9, 0),
+                LocalDateTime.of(2026, 8, 3, 15, 0), false, false, null);
+        ContentResult<List<? extends ContentItem>> incoming = new ContentResult<>(List.of(
+                new MovieContent("new-1", "新增影片", "[\"喜剧\"]", 90, new BigDecimal("8.5"))),
+                new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), LocalDateTime.of(2026, 8, 4, 9, 0),
+                LocalDateTime.of(2026, 8, 4, 15, 0), false, false, null);
+        Map<ContentQuery, ContentResult<List<? extends ContentItem>>> snapshots = new LinkedHashMap<>();
+        snapshots.put(listQuery, existing);
+        ContentSyncService service = new ContentSyncService(
+                () -> batch(List.of(new LiveContentSyncPort.SynchronizedContent(
+                        new ContentQuery(ContentResourceType.MOVIE, 1L, null, null), incoming)), 1,
+                        LiveContentSyncPort.Outcome.SUCCESS, null), captureSnapshots(snapshots),
+                cachePort(new AtomicInteger()), persistence(new AtomicInteger(), new AtomicReference<>()), () -> 99L,
+                Clock.fixed(Instant.parse("2026-08-04T01:00:00Z"), ZoneId.of("Asia/Shanghai")));
+
+        assertThat(service.synchronizeDailyContent()).isEqualTo(1);
+        assertThat(snapshots.get(listQuery).data()).extracting(item -> ((MovieContent) item).sourceMovieId())
+                .containsExactly("old-1", "new-1");
     }
 
     @Test
@@ -202,7 +235,7 @@ class ContentSyncServiceTest {
     private ContentSnapshotPort captureSnapshots(Map<ContentQuery, ContentResult<List<? extends ContentItem>>> saved) {
         return new ContentSnapshotPort() {
             @Override public Optional<ContentResult<List<? extends ContentItem>>> findLatest(ContentQuery query) {
-                return Optional.empty();
+                return Optional.ofNullable(saved.get(query));
             }
             @Override public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) {
                 saved.put(query, result);
