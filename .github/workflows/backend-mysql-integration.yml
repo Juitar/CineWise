@@ -48,6 +48,9 @@ jobs:
       SPRING_FLYWAY_TARGET: latest
       JWT_SECRET: cinewise-ci-jwt-secret-at-least-32-bytes-long
       AUTH_AUDIT_HASH_SECRET: cinewise-ci-audit-secret-at-least-32-bytes-long
+      AUTH_VERIFICATION_HASH_SECRET: cinewise-ci-verification-secret-at-least-32-bytes
+      AUTH_INVITE_HASH_SECRET: cinewise-ci-invite-secret-at-least-32-bytes
+      AUTH_CURRENT_PRIVACY_POLICY_VERSION: 2026-08-03
       CINEWISE_MYSQL_IT: "true"
       CINEWISE_MYSQL_CONCURRENCY_IT: "true"
       CINEWISE_MYSQL_LIFECYCLE_IT: "true"

@@ -3,6 +3,7 @@ package com.miaoyu.ticket.auth.application;
 import com.miaoyu.ticket.auth.domain.AuthUser;
 import com.miaoyu.ticket.auth.domain.EmailAddress;
 import com.miaoyu.ticket.auth.domain.LoginType;
+import com.miaoyu.ticket.auth.domain.VerificationPurpose;
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import java.time.Clock;
@@ -24,6 +25,7 @@ public class AuthApplicationService {
     private final PasswordVerifier passwordVerifier;
     private final AccessTokenService accessTokenService;
     private final LoginAuditSanitizer auditSanitizer;
+    private final VerificationCodeVerifier verificationCodeVerifier;
     private final BusinessIdGenerator idGenerator;
     private final Clock clock;
 
@@ -33,6 +35,7 @@ public class AuthApplicationService {
             PasswordVerifier passwordVerifier,
             AccessTokenService accessTokenService,
             LoginAuditSanitizer auditSanitizer,
+            VerificationCodeVerifier verificationCodeVerifier,
             BusinessIdGenerator idGenerator,
             Clock clock) {
         this.userRepository = userRepository;
@@ -40,6 +43,7 @@ public class AuthApplicationService {
         this.passwordVerifier = passwordVerifier;
         this.accessTokenService = accessTokenService;
         this.auditSanitizer = auditSanitizer;
+        this.verificationCodeVerifier = verificationCodeVerifier;
         this.idGenerator = idGenerator;
         this.clock = clock;
     }
@@ -62,6 +66,42 @@ public class AuthApplicationService {
             // 使用与错误密码相同的返回，避免管理入口泄露某邮箱属于普通用户。
             audit(command, user.id(), false, AuthErrorCode.INVALID_CREDENTIALS);
             throw new BusinessException(AuthErrorCode.INVALID_CREDENTIALS);
+        }
+
+        String token = accessTokenService.issue(user);
+        audit(command, user.id(), true, null);
+        return new LoginResult(token, toView(user));
+    }
+
+    /** 普通用户可使用一次性 LOGIN 验证码登录；管理员仍必须使用独立密码入口。 */
+    public LoginResult loginWithEmailCode(EmailCodeLoginCommand command) {
+        String normalizedEmail;
+        try {
+            normalizedEmail = EmailAddress.normalize(command.email());
+        } catch (IllegalArgumentException exception) {
+            audit(command, null, false, AuthErrorCode.INVALID_PARAMETER);
+            throw new BusinessException(AuthErrorCode.INVALID_PARAMETER);
+        }
+
+        AuthUser user = userRepository.findByEmail(normalizedEmail).orElse(null);
+        if (user == null || user.role() != RoleCode.USER) {
+            audit(command, user == null ? null : user.id(), false, AuthErrorCode.VERIFICATION_CODE_INVALID);
+            throw new BusinessException(AuthErrorCode.VERIFICATION_CODE_INVALID);
+        }
+        if (!user.isActive()) {
+            audit(command, user.id(), false, AuthErrorCode.ACCOUNT_UNAVAILABLE);
+            throw new BusinessException(AuthErrorCode.ACCOUNT_UNAVAILABLE);
+        }
+        if (!user.emailVerified()) {
+            audit(command, user.id(), false, AuthErrorCode.VERIFICATION_CODE_INVALID);
+            throw new BusinessException(AuthErrorCode.VERIFICATION_CODE_INVALID);
+        }
+
+        try {
+            verificationCodeVerifier.verifyAndConsume(normalizedEmail, VerificationPurpose.LOGIN, command.code());
+        } catch (BusinessException exception) {
+            audit(command, user.id(), false, AuthErrorCode.VERIFICATION_CODE_INVALID);
+            throw exception;
         }
 
         String token = accessTokenService.issue(user);
@@ -109,19 +149,48 @@ public class AuthApplicationService {
 
     /** 审计采用独立事务；数据库或摘要失败只能告警，不能改变登录成败。 */
     private void audit(LoginCommand command, Long userId, boolean success, AuthErrorCode failureCode) {
+        audit(
+                command.loginType(),
+                command.remoteAddress(),
+                command.userAgent(),
+                command.traceId(),
+                userId,
+                success,
+                failureCode);
+    }
+
+    private void audit(EmailCodeLoginCommand command, Long userId, boolean success, AuthErrorCode failureCode) {
+        audit(
+                LoginType.EMAIL_CODE,
+                command.remoteAddress(),
+                command.userAgent(),
+                command.traceId(),
+                userId,
+                success,
+                failureCode);
+    }
+
+    private void audit(
+            LoginType loginType,
+            String remoteAddress,
+            String userAgent,
+            String traceId,
+            Long userId,
+            boolean success,
+            AuthErrorCode failureCode) {
         try {
             auditRepository.append(new LoginAuditRepository.LoginAuditRecord(
                     idGenerator.nextId(),
                     userId,
-                    command.loginType(),
+                    loginType,
                     success,
                     failureCode == null ? null : Integer.toString(failureCode.code()),
-                    auditSanitizer.hashIp(command.remoteAddress()),
-                    auditSanitizer.summarizeUserAgent(command.userAgent()),
-                    command.traceId(),
+                    auditSanitizer.hashIp(remoteAddress),
+                    auditSanitizer.summarizeUserAgent(userAgent),
+                    traceId,
                     LocalDateTime.now(clock)));
         } catch (RuntimeException exception) {
-            LOGGER.warn("登录审计写入失败, traceId={}", command.traceId(), exception);
+            LOGGER.warn("登录审计写入失败, traceId={}", traceId, exception);
         }
     }
 }

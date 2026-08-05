@@ -24,4 +24,10 @@ public record PasswordLoginRequest(
         clientRequestId = clientRequestId == null ? null : clientRequestId.strip();
         email = email == null ? null : email.strip();
     }
+
+    /** 邮箱和密码不能因 MVC 调试日志调用默认 toString 而泄露。 */
+    @Override
+    public String toString() {
+        return "PasswordLoginRequest[clientRequestId=" + clientRequestId + ", credentials=[REDACTED]]";
+    }
 }

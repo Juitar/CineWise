@@ -19,6 +19,33 @@ export interface PasswordLoginRequest {
   password: string;
 }
 
+export type VerificationPurpose = 'LOGIN' | 'REGISTER';
+
+export interface SendEmailCodeRequest {
+  email: string;
+  purpose: VerificationPurpose;
+}
+
+export interface SendEmailCodeResponse {
+  cooldownSeconds: number;
+  expiresInSeconds: number;
+}
+
+/** 注册请求只包含服务端已确认字段，不允许前端指定用户 ID、角色或账号状态。 */
+export interface RegisterRequest {
+  clientRequestId: string;
+  code: string;
+  email: string;
+  inviteCode: string;
+  nickname?: string;
+  password: string;
+  privacyAccepted: boolean;
+  privacyPolicyVersion: string;
+}
+
+/** 当前注册页面对应的已确认隐私政策版本，后端仍会做最终一致性校验。 */
+export const CURRENT_PRIVACY_POLICY_VERSION = '2026-08-03';
+
 export interface LogoutResult {
   loggedOut: boolean;
 }
