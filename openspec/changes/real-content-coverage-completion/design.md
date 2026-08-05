@@ -112,13 +112,18 @@ C 负责移除首页/影院页的静态影片和影院数据，并用模块 API�
 
 ## Migration and Compatibility
 
-- A 审核用冻结设计：`movie.poster_url VARCHAR(2048) NULL`，只保存 HTTPS 绝对地址；`summary VARCHAR(2000) NULL`，只保存短简介；`release_status VARCHAR(16) NULL`，仅 `NOW_SHOWING`、`COMING_SOON`；`release_date DATE NULL`，表示 Provider 的公映或计划公映日期，不能解析则为 `NULL`。
-- 新表固定命名为 `content_identity_mapping`：唯一键 `(provider, resource_type, external_id)`，普通索引 `(resource_type, internal_content_id, status)`；`ACTIVE` 时 `invalid_reason/invalidated_at` 必须为空，`INVALID` 时二者必须非空。映射不物理删除；`INVALID` 为终态，不重新激活、不静默改指向。
-- 同一 Provider、同一资源类型下，一个内部内容同时只允许一个 `ACTIVE` 外部 ID；旧 ID 标记 `INVALID` 后长期保留。V001 的 `source + source_movie_id/source_cinema_id` 继续作为影片/影院当前来源字段；映射表是跨模块身份解析和失效历史的权威记录。迁移先新增可空字段和映射表，再从 V001 的非空来源字段补写 ACTIVE 映射，冲突隔离不猜测，最后部署读取新字段/API 的代码。
-- 为支持按城市持久化和恢复，迁移还须为 `cinema` 新增可空 `city_name`、`provider_city_id` 及查询索引，为 `data_sync_log` 新增可空 `city_name`、`provider_city_id`。新代码只写新列；现有 `city_code` 保留兼容，不重写历史记录。长沙已有真实资料可由受控数据维护补齐新列，其他旧行保持为空，不按地址猜测。
-- V011 只是候选。当前迁移目录最高 V010；A 已允许进入迁移准备，但仍须书面分配最终版本、确认上述列/索引和空 MySQL 验证窗口后，D 才能创建 SQL，A 才能执行 Flyway。
-- 影院已有 `longitude`、`latitude`，不因城市目录补齐而修改表；城市资料更新必须采用受控策略，不能误伤 Demo 或 A 的既有票务关联。
-- API 新增字段采用向后兼容的可空字段；既有 `posterUrl` 和 `summary` 保持字段名和类型。任何接口增量先由 C 确认并同步共享类型、OpenAPI、Mock 和测试。
+本节是 D 提交 A 审查的完整结构设计，不是 Flyway SQL 或执行授权。A 已正式分配 V014；迁移只做向后兼容的新增列、新表、索引和 CHECK，不修改 V001～V012、不包含数据回填或演示种子、不建立物理外键。现有表和新增字符串列须在空 MySQL 验证中确认 `utf8mb4_0900_ai_ci`。
+
+| 对象 | 新增字段 | 约束与索引 | 保留、兼容和写入规则 |
+| --- | --- | --- | --- |
+| `movie` | `poster_url VARCHAR(2048) NULL`；`summary VARCHAR(2000) NULL`；`release_status VARCHAR(16) NULL`；`release_date DATE NULL` | `CHECK (release_status IS NULL OR release_status IN ('NOW_SHOWING','COMING_SOON'))`；新增 `INDEX(release_status, release_date, deleted_at)` 支撑本地上映状态与日期查询。HTTPS、摘要内容和日期格式由 D Mapper 校验，不把 URL 正则写进数据库 CHECK。 | 四列均可空，旧影片保持 `NULL`，下一次合格同步再写入；不把缺失字段当作删除，不回填虚构内容。公开 DTO 保持可空字段，旧客户端可忽略新增值。 |
+| `content_identity_mapping` 新表 | `id BIGINT NOT NULL`；`provider VARCHAR(64) NOT NULL`；`resource_type VARCHAR(16) NOT NULL`；`external_id VARCHAR(128) NOT NULL`；`internal_content_id BIGINT NOT NULL`；`status VARCHAR(16) NOT NULL`；`invalid_reason VARCHAR(32) NULL`；`invalidated_at DATETIME(3) NULL`；`active_internal_content_id BIGINT GENERATED ALWAYS AS (CASE WHEN status='ACTIVE' THEN internal_content_id ELSE NULL END) STORED`；`create_time/update_time DATETIME(3) NOT NULL`。 | PK(`id`)；UNIQUE(`provider`,`resource_type`,`external_id`)；UNIQUE(`provider`,`resource_type`,`active_internal_content_id`)；INDEX(`resource_type`,`internal_content_id`,`status`)；`resource_type` 仅 `MOVIE/CINEMA`；`status` 仅 `ACTIVE/INVALID`；`invalid_reason` 仅 `SOURCE_REPLACED/CONTENT_DELETED/IDENTITY_CONFLICT/MANUAL_CORRECTION`；CHECK：`ACTIVE` 的失效字段均为 NULL，`INVALID` 的失效字段均非 NULL。无物理外键，D 应用层验证内部内容存在且类型匹配。 | 映射不可物理删除；`INVALID` 为终态，不重新激活也不静默改指向。首次发布后的受控应用回填只依据 V001 的 `source + source_movie_id/source_cinema_id` 写 ACTIVE 映射；冲突隔离并记录失败分类，不按标题、名称或地址猜测。保留 ACTIVE 和 INVALID 记录，不设自动清理。 |
+| `cinema` | `city_name VARCHAR(64) NULL`；`provider_city_id VARCHAR(32) NULL`。 | 新增 `INDEX(city_name, deleted_at, id)` 供当前城市的未删除影院查询；新增 `INDEX(source, provider_city_id, deleted_at)` 供按 Provider 城市同步与核对。`provider_city_id` 仅是 D 的外部请求关联，不对 C/B/A 公开。 | 保留既有 `city_code`，不改写、不删除；新同步只写规范化 `city_name/provider_city_id`。历史行保持 NULL，不按地址、区域、坐标或旧 `city_code` 猜测回填；后续受控同步自然补齐。影院原有经纬度字段不变。 |
+| `data_sync_log` | `city_name VARCHAR(64) NULL`；`provider_city_id VARCHAR(32) NULL`；`failure_category VARCHAR(32) NULL`。 | 保留 UNIQUE(`provider`,`request_id`)；新增 `INDEX(city_name, resource_type, started_at)`；把状态 CHECK 扩展为 `PENDING/RUNNING/SUCCESS/PARTIAL/FAILED`。`failure_category` 仅 `NETWORK/RATE_LIMIT/PROVIDER_RESPONSE/DATA_VALIDATION/INTERNAL` 或 NULL；PENDING/RUNNING 必须 `finished_at IS NULL`，SUCCESS/PARTIAL/FAILED 必须有不早于 `started_at` 的 `finished_at`；无失败时 `failure_category IS NULL`，有失败时必须非空。既有非负计数和完成计数关系 CHECK 保留并扩展 PENDING。 | 仅存城市名、内部 Provider 城市 ID、数值错误码和脱敏失败分类；不存地点原文、Provider URL、原始异常或原始响应。按既有 `create_time` 清理索引保留 180 天，清理只处理终态记录，RUNNING 记录不得按时间自动删除。公开 API 绝不返回 `provider_city_id`。 |
+
+迁移发布顺序是：先新增全部可空列、新表、索引与 CHECK；随后发布能够兼容新旧字段的 D 代码；再由受控应用回填可确定的内容身份映射和后续真实同步。失败或冲突不通过 SQL 回滚历史数据，而是保留旧字段和最近成功快照；后续结构调整只能新增前向迁移。
+
+当前已发布迁移目录最高为 V012，A 已分配后续迁移版本 V014。上述四类结构设计和过期版本描述更新完成后，D 才可提交 `V014` SQL 草案给 A 静态复核；草案通过后，A 再明确授权使用 `cinewise_migration_check + cinewise_migrator` 执行首次 migrate、validate、重复 migrate、结构/索引/CHECK、历史兼容和清理规则验证。本次不执行。`movie_tag`、`recommendation_record` 不属于本次申请，推荐历史另建 change 后再设计。
 
 ## Verification
 

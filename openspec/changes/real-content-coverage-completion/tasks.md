@@ -2,7 +2,7 @@
 
 - [x] 1.1 D 汇总现有真实资料缺口和字段表：海报、简介、上映状态/日期、影院城市映射/坐标、热映/待映目录、同步状态、首页和影院页静态数据。验证：`coordination.md` 的“真实资料字段表”已标明 Provider 字段、内部字段、是否可空、Owner 和消费者。
 - [x] 1.2 C 确认 `posterUrl`、`summary`、上映字段、真实资料版本/同步时间及降级原因的前端 DTO/OpenAPI 增量；确认 `POST /api/v1/content/cities/resolve` 的受控城市解析结果、影院 `cityName` 查询、三个管理员同步接口、权限、CSRF、错误码和结果未知处理。验证：C 的书面结论已记录在 `coordination.md`；公开响应不含 `providerCityId/ci`，定位和距离优先不纳入本期影院浏览实现。
-- [ ] 1.3 A 已允许进入迁移准备；A 书面确认新增影片字段、`content_identity_mapping`、`cinema.city_name/provider_city_id`、`data_sync_log.city_name/provider_city_id` 的生命周期、索引、与 Mock 场次的展示边界，分配最终 Flyway 版本并给出空 MySQL 验证窗口。验证：迁移设计、最终版本号和 A 的验证责任写入本 change。当前迁移目录最高 V010，V011 仅为候选。
+- [ ] 1.3 D 已完成新增影片字段、`content_identity_mapping`、`cinema.city_name/provider_city_id`、`data_sync_log.city_name/provider_city_id/failure_category` 的完整列、索引、状态 CHECK、180 天清理和兼容设计；A 已正式分配 V014，待静态复核设计与后续 SQL 草案。验证：`design.md` 与 spec 包含字段/状态/冲突/历史兼容场景；静态复核通过后，A 再明确授权 `cinewise_migration_check + cinewise_migrator` 做首次 migrate、validate、重复 migrate、结构/索引/CHECK、历史兼容和清理规则验证。本次不创建或执行 SQL。
 - [x] 1.4 D 根据 A 已确认的需求，定义公开批量内容身份解析契约：校验 provider/resourceType/externalId、一次最多 100 个 ID、逐项 `100001/303005/303006/303007` 语义和映射失效规则。验证：`specs/real-content-coverage/spec.md` 与 `coordination.md` 已明确契约不暴露 D 的 Entity、Mapper、Repository、缓存或内容表，且不以名称/地址猜测。
 - [x] 1.5 B 复核新增字段、身份解析和地点解析结果不影响 `RankMoviePlanTool` 的既有输入输出和只读边界。验证：B 已书面确认 Tool 不新增 `locationText`，且 D 只返回受控城市结果，结论记录在 `coordination.md`。
 - [ ] 1.5a B 在 Agent 持久化边界实现地点文本剔除或替换：在保存用户消息、事件、槽位快照、长期上下文、日志和缓存前处理原始 `locationText`；调用结束立即丢弃。验证：B 的定向测试证明只允许保存城市名或标准 `cityCode`，不保存原始地点文本、精确位置、经纬度或 NetStart 内部城市 ID。

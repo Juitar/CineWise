@@ -245,6 +245,33 @@ POST 响应和按请求查询统一返回 `syncId/clientRequestId/cityName/statu
 - **THEN** D 返回 `303007`
 - **AND** A 只隔离未来真实排期候选，不修改已有 Mock 场次、座位、订单或电子票
 
+### Requirement: 真实内容迁移必须保持历史内容与同步记录兼容
+
+A 已正式分配 V014。迁移 SHALL 仅新增 `movie` 的可空资料字段、`content_identity_mapping`、`cinema.city_name/provider_city_id` 和 `data_sync_log.city_name/provider_city_id/failure_category`，不得修改 V001～V012、不得建立物理外键、不得写入演示种子或按地址、名称、区域、坐标猜测历史城市/身份。V014 SQL 草案必须先由 A 静态复核，本次不得执行。
+
+`content_identity_mapping` 必须以 `provider/resource_type/external_id` 唯一标识外部身份，以生成的 ACTIVE 内部内容 ID 约束同一 Provider、资源类型和内部内容最多一个 ACTIVE 外部 ID；`ACTIVE` 映射不得有失效字段，`INVALID` 映射必须有固定失效分类和失效时间。`movie.release_status` 只能为 `NOW_SHOWING`、`COMING_SOON` 或 `NULL`。`data_sync_log` 必须支持 `PENDING/RUNNING/SUCCESS/PARTIAL/FAILED`，只保存固定失败分类，且公开接口不得返回 Provider 城市 ID。
+
+#### Scenario: 迁移后读取 V001 历史内容
+
+- **GIVEN** V001 已存在没有真实资料增量字段、城市名或 Provider 城市 ID 的影片、影院和同步记录
+- **WHEN** 执行新的向前迁移并发布兼容代码
+- **THEN** 历史行保持可读取，新增可空字段为 NULL，不删除或重写 `city_code`
+- **AND** 系统不通过 SQL 或应用按标题、地址、区域、坐标猜测补齐身份或城市
+
+#### Scenario: 身份映射冲突
+
+- **GIVEN** 同一 Provider、资源类型和内部内容已存在 ACTIVE 外部身份
+- **WHEN** 受控回填或后续同步尝试写入第二个 ACTIVE 外部身份
+- **THEN** 唯一约束拒绝该写入，应用隔离该条并记录固定失败分类
+- **AND** 不改变既有 ACTIVE 映射或票务数据
+
+#### Scenario: 同步日志包含按城市状态
+
+- **GIVEN** 管理员按城市发起真实内容同步
+- **WHEN** D 创建或更新同步审计记录
+- **THEN** 记录规范化城市名、内部 Provider 城市 ID、状态和固定失败分类
+- **AND** 管理端只收到城市名和脱敏状态字段，不收到 Provider 城市 ID、地点原文或原始异常
+
 ### Requirement: 页面必须展示 API 内容且不得伪造票务事实
 
 影院页和首页的影片、影院区域 SHALL 通过 C 的模块 API、Hook 和公共请求层读取 D 的内容接口。页面不得继续将写死的影片、杭州影院、演示距离、场次数量、起价或影厅标签作为真实内容展示。真实内容没有 A 的可售场次时，只显示基础资料、来源和“暂无可售场次”，不得显示价格、余座或购票按钮。
