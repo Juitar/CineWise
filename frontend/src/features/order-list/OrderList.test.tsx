@@ -40,6 +40,23 @@ describe('OrderList 组件', () => {
     expect(screen.getAllByText('已出票').length).toBeGreaterThanOrEqual(1);
   });
 
+  it('PAYING 状态使用统一的支付确认中文文案', () => {
+    render(
+      <OrderList
+        orders={[
+          {
+            ...sampleOrders[0],
+            orderId: '10003',
+            orderNo: '202608050003',
+            status: 'PAYING',
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('支付确认中')).toBeInTheDocument();
+  });
+
   it('无数据时显示空状态 Empty 提示', () => {
     render(<OrderList orders={[]} />);
     expect(screen.getByText('暂无符合条件的购票订单')).toBeInTheDocument();

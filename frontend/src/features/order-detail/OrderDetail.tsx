@@ -1,8 +1,9 @@
 import React from 'react';
 import { Button, Alert, Spin, Tag, Descriptions } from 'antd';
 import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
+import { ORDER_STATUS_LABELS } from '../../modules/order/status-presentation';
+import type { OrderStatus } from '../../modules/order/types';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
-import type { OrderStatus } from '../order-list/OrderList';
 import './index.css';
 
 export interface OrderDetailProps {
@@ -91,19 +92,17 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
     switch (status) {
       case 'PENDING_PAYMENT':
       case 'PAYING':
-        return <Tag color="warning">待支付</Tag>;
+        return <Tag color="warning">{ORDER_STATUS_LABELS[status]}</Tag>;
       case 'PAID':
-        return <Tag color="success">已出票</Tag>;
+        return <Tag color="success">{ORDER_STATUS_LABELS[status]}</Tag>;
       case 'REFUNDING':
-        return <Tag color="processing">退款处理中</Tag>;
+        return <Tag color="processing">{ORDER_STATUS_LABELS[status]}</Tag>;
       case 'REFUNDED':
-        return <Tag color="default">已退款</Tag>;
+        return <Tag color="default">{ORDER_STATUS_LABELS[status]}</Tag>;
       case 'CANCELLED':
-        return <Tag color="default">已取消</Tag>;
+        return <Tag color="default">{ORDER_STATUS_LABELS[status]}</Tag>;
       case 'EXPIRED':
-        return <Tag color="error">已过期</Tag>;
-      default:
-        return <Tag>{status}</Tag>;
+        return <Tag color="error">{ORDER_STATUS_LABELS[status]}</Tag>;
     }
   };
 

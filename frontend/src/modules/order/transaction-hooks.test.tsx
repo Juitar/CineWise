@@ -1,9 +1,10 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../shared/api/ApiError';
-import { getPayment, payOrder } from './api';
+import { getAlternativeShows, getPayment, getRefund, getRefundImpact, payOrder } from './api';
 import { getOrders } from './api';
-import { useOrders, usePaymentAction, usePaymentResult } from './transaction-hooks';
+import { markWriteResultUnknown } from './operation-session';
+import { useOrders, usePaymentAction, usePaymentResult, useRefundPage } from './transaction-hooks';
 
 vi.mock('./api', () => ({
   cancelOrder: vi.fn(),
@@ -37,12 +38,40 @@ const successfulPayment = {
   stateVersion: 2,
 };
 
+const requestedRefund = {
+  refundId: '1',
+  refundNo: 'RF1',
+  orderId: '1',
+  orderNo: 'CW1',
+  refundStatus: 'REQUESTED' as const,
+  refundAmount: '39.00',
+  orderStatus: 'REFUNDING' as const,
+  ticketStatus: 'VALID' as const,
+  stateVersion: 1,
+  updatedAt: '2026-08-05T09:00:00+08:00',
+};
+
+const refundImpact = {
+  orderId: '1',
+  orderNo: 'CW1',
+  refundAmount: '39.00',
+  orderStatus: 'PAID' as const,
+  ticketStatus: 'VALID' as const,
+  showStartTime: '2026-08-10T14:30:00+08:00',
+  orderVersion: 1,
+  ticketVersion: 1,
+  impactText: '退款影响以服务端规则为准。',
+};
+
 describe('订单交易 Hook 的结果未知恢复', () => {
   beforeEach(() => {
     sessionStorage.clear();
     vi.mocked(payOrder).mockReset();
     vi.mocked(getPayment).mockReset();
     vi.mocked(getOrders).mockReset();
+    vi.mocked(getAlternativeShows).mockReset();
+    vi.mocked(getRefund).mockReset();
+    vi.mocked(getRefundImpact).mockReset();
     vi.stubGlobal('crypto', { randomUUID: () => 'stable-payment-key' });
   });
 
@@ -128,5 +157,40 @@ describe('订单交易 Hook 的结果未知恢复', () => {
       await pendingOrders;
     });
     expect(result.current.data).toEqual(paidOrders);
+  });
+
+  it('首次查询到 REQUESTED 退款记录后清除结果未知保护', async () => {
+    markWriteResultUnknown('refund', 'CW1');
+    vi.mocked(getRefundImpact).mockResolvedValue(refundImpact);
+    vi.mocked(getAlternativeShows).mockResolvedValue({ orderNo: 'CW1', shows: [] });
+    vi.mocked(getRefund).mockResolvedValue(requestedRefund);
+
+    const { result } = renderHook(() => useRefundPage('CW1'));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.refund?.refundStatus).toBe('REQUESTED');
+    expect(result.current.resultUnknown).toBe(false);
+    expect(sessionStorage.getItem('cinewise:refund:CW1')).toBeNull();
+  });
+
+  it('手动恢复查询到 PROCESSING 退款记录后清除结果未知保护', async () => {
+    markWriteResultUnknown('refund', 'CW1');
+    vi.mocked(getRefundImpact).mockResolvedValue(refundImpact);
+    vi.mocked(getAlternativeShows).mockResolvedValue({ orderNo: 'CW1', shows: [] });
+    vi.mocked(getRefund)
+      .mockRejectedValueOnce(new ApiError('暂不可用', { kind: 'NETWORK', status: 503 }))
+      .mockResolvedValueOnce({ ...requestedRefund, refundStatus: 'PROCESSING' });
+
+    const { result } = renderHook(() => useRefundPage('CW1'));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.resultUnknown).toBe(true);
+
+    await act(async () => {
+      await result.current.recover();
+    });
+    expect(result.current.refund?.refundStatus).toBe('PROCESSING');
+    expect(result.current.resultUnknown).toBe(false);
+    expect(sessionStorage.getItem('cinewise:refund:CW1')).toBeNull();
   });
 });

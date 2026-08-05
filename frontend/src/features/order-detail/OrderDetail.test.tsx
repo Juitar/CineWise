@@ -68,6 +68,7 @@ describe('OrderDetail 组件', () => {
 
   it('PAYING 状态只允许查询支付结果，不显示取消订单', () => {
     render(<OrderDetail {...defaultProps} status="PAYING" onPay={vi.fn()} />);
+    expect(screen.getByText('支付确认中')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '查询支付结果' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '取消订单' })).not.toBeInTheDocument();
   });
