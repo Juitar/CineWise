@@ -74,7 +74,7 @@ RESULT_UNKNOWN --原键查询明确失败--> FAILED
 | `version` | `BIGINT NOT NULL DEFAULT 0`，`CHECK (version >= 0)` | CAS 版本。 |
 | `create_time` / `update_time` | `DATETIME(3) NOT NULL` | 服务端审计时间；`update_time >= create_time`。 |
 
-除 `version DEFAULT 0` 外，以上字段均无数据库默认值，服务端必须显式写入。唯一键为 `action_id`、`(user_id, client_request_id)`、`(user_id, idempotency_key)` 和 action 创建去重键 `(user_id, agent_run_id, plan_id, plan_version, node_id, tool_name, parameter_hash)`；MySQL 的唯一键允许 NULL，因此未进入写执行状态的动作不会占用稳定键。索引为 `(user_id, action_id)`、`(agent_run_id, plan_id, plan_version, node_id)`、`(status, expire_at)`；不建立物理外键。SQL 还必须用 CHECK 保证：`status` 只能是八个枚举值；`command_snapshot` 的 JSON 类型为对象；`parameter_hash` 为 64 位小写十六进制；`client_request_id` 与 `idempotency_key` 同时为空或同时非空；`result_reference` 只允许 `SUCCEEDED` 非空；`result_unknown_at` 与 `recovery_until` 同时为空或同时非空，且后者恰为前者加 30 天；`RESULT_UNKNOWN` 必须有恢复时间和提示，其他状态不得伪造恢复窗口。
+除 `version DEFAULT 0` 外，以上字段均无数据库默认值，服务端必须显式写入。唯一键为 `action_id`、`(user_id, client_request_id)`、`(user_id, idempotency_key)` 和 action 创建去重键 `(user_id, agent_run_id, plan_id, plan_version, node_id, tool_name, parameter_hash)`；MySQL 的唯一键允许 NULL，因此未进入写执行状态的动作不会占用稳定键。索引为 `(user_id, action_id)`、`(agent_run_id, plan_id, plan_version, node_id)`、`(status, expire_at)`、`(status, recovery_until)`；不建立物理外键。SQL 还必须用 CHECK 保证：`status` 只能是八个枚举值；`command_snapshot` 的 JSON 类型为对象；`parameter_hash` 为 64 位小写十六进制；`client_request_id` 与 `idempotency_key` 同时为空或同时非空；`result_reference` 只允许 `SUCCEEDED` 非空；`RESULT_UNKNOWN` 必须有 `recovery_hint`、`result_unknown_at` 和 `recovery_until=result_unknown_at+30天`，其他状态三者必须均为空。
 
 创建 action 以已校验的 `(user_id, agent_run_id, plan_id, plan_version, node_id, tool_name, parameter_hash)` 查询或由唯一键取得原 action；存在时返回原 action，不生成新的 `action_id` 或稳定键。并发创建由该去重唯一键和创建事务保证；正式 SQL 前，`action_id` 全局唯一仍是必须项。
 
@@ -82,7 +82,7 @@ RESULT_UNKNOWN --原键查询明确失败--> FAILED
 
 确认有效期从 action 创建时的服务端 `expire_at` 开始，到 `now >= expire_at` 即不可确认；过期转换为 `EXPIRED`。A 调用出现超时、断流或响应丢失时，以结果保存短事务写入 `RESULT_UNKNOWN`、`result_unknown_at=now`、`recovery_until=now+30天` 和固定恢复提示。恢复窗口内只能按同一 action 的原 `client_request_id` 查询；查询到明确结果后转为 `SUCCEEDED` 或 `FAILED` 并清除恢复窗口字段。窗口外不再调用建单或生成新键，清理任务只能删除已过 `recovery_until` 且仍为 `RESULT_UNKNOWN` 的记录，清理前必须保留原键供恢复。
 
-`agent_action` 不能在 V011/V012 的归属、SQL 和发布顺序由 C 明确并由 A 确认前申请 V013。此前只实现领域类型、Repository port、内存 Mock 和测试；不把内存实现称为持久化实现。
+V011 已发布；原计划分配给邀请码种子的 V012 已取消，A 已将本表正式分配为 V012。B 只编写 `V012__create_agent_action_table.sql` 草稿供 A 静态审查；审查通过并获得 A 明确授权前不得执行、合入共享 `dev` 或连接数据库。此前的领域类型、Repository port、内存 Mock 和测试不等于持久化实现。
 
 ### 4. 事务与 A 调用方向
 
@@ -105,19 +105,18 @@ SSE 复用 `card` 与 `tool.result` 等持久化事件类型：新增的确认�
 ## Risks / Trade-offs
 
 - [A 尚未确认 Agent 建单公开接口] → 只完成 B 的端口、Mock、参数摘要、状态机和测试；任务保持未完成，不写生产调用。
-- [V011/V012 发布顺序、迁移版本或 SQL 静态审查未确认] → 不写 SQL、不连接共享数据库；记录待 C、A 处理，MySQL CI 不宣称通过。
+- [A 的 SQL 静态审查或执行授权未完成] → 只保留 V012 草稿，不连接共享数据库；记录待 A 处理，MySQL CI 不宣称通过。
 - [写结果丢失] → 固定原 action 的键并查询；查不到结论保持 `RESULT_UNKNOWN`，宁可提示处理中也不重复建单。
 - [并发确认] → CAS 和唯一约束作为最终保证，单机锁和 SSE 状态不作为正确性依据；在 CI MySQL 8.4 验证并发。
 - [A API 最终需要同步身份] → `ToolContext` 已预留 run/node/trace/稳定键；A 必须确认 userId 如何在公开 API 内安全获得，B 不传递前端用户字段。
 
 ## Migration Plan
 
-1. C 先明确 V011/V012 的归属、SQL 范围和发布顺序，A 确认该顺序后正式分配 V013。
+1. V011 已发布，原 V012 邀请码种子已取消；A 已分配 V012，B 生成 `V012__create_agent_action_table.sql` 草稿供 A 静态审查。
 2. A 静态审查已获分配的 `agent_action` SQL；B 和 A 在 GitHub Actions 的实际 MySQL job 对空 `cinewise_agent_it` 验证首次 Flyway、重复启动、CAS、并发和恢复。
 3. B 部署领域与适配器；确认卡只在服务端 action 持久化后发布。A 的生产适配器经接口测试后才启用。
 4. 回滚时停止创建新 action；已 `RESULT_UNKNOWN` 的 action 继续按原键查询，不删除记录、不生成替代键。
 
 ## Open Questions
 
-1. C：明确 V011、V012 各自 Owner、迁移文件名、字段范围、SQL 是否已写或进入远端、依赖关系和发布顺序，并确认与 `agent_action` 没有字段或版本冲突。
-2. A：在 C 的 V011/V012 顺序明确、远端 OpenSpec 可见并通过严格校验后，正式分配 V013，审查 SQL，并确认字段表中的 CHECK 是否符合 MySQL 8.4；`RESULT_UNKNOWN` 必须保留 30 天且仅允许原键查询恢复。
+1. A：审查 `V012__create_agent_action_table.sql` 的字段、索引和 MySQL 8.4 CHECK；审查通过前不得执行迁移。`RESULT_UNKNOWN` 必须保留 30 天且仅允许原键查询恢复。

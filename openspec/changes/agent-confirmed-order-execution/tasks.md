@@ -2,8 +2,8 @@
 
 - [x] 1.1 B：依据现有 Agent 运行、SSE、A 建单和 C 前端设计完成 proposal、spec、design、tasks 并严格校验；验证：`openspec validate agent-confirmed-order-execution --strict`。
 - [x] 1.2 A：确认 Agent 专用创建订单公开 Application API/类型化 Tool、DTO、调用身份、`actionId` 校验、稳定幂等键、结果查询、错误码、事务边界和结果未知语义；验证：A 书面确认与契约测试。
-- [ ] 1.3 C：明确 V011、V012 各自 Owner、迁移文件名、字段范围、SQL 是否已写或进入远端、依赖关系和发布顺序，并确认与 `agent_action` 无字段或版本冲突；验证：C 的书面确认。
-- [ ] 1.4 A：在 1.3 完成且本 change OpenSpec 已推送远端、严格校验通过后，正式分配 V013，审查 `agent_action` 字段表、索引、CHECK、生命周期和 MySQL 验证要求；验证：A 的书面确认。B 不得自行分配版本或写 SQL。
+- [x] 1.3 A：确认 V011 已进入最新 `dev`，正式将 `agent_action` 分配为 V012；验证：A 的书面确认。
+- [ ] 1.4 A：审查 `V012__create_agent_action_table.sql` 草稿的字段表、索引、CHECK、生命周期和 MySQL 验证要求；验证：A 的书面审查。审查通过并明确授权前，B 不得执行迁移或连接数据库。
 - [x] 1.5 C：确认确认 REST/SSE 的展示错误码映射、CSRF 和“结果确认中/已失效”消费语义；验证：C 的消费者确认。本 change 不实现前端。
 
 ## 2. B 自有领域模型与状态规则
@@ -22,7 +22,7 @@
 
 ## 4. 持久化与确认接口
 
-- [ ] 4.1 B/A：在 A 正式分配 V013 并完成 SQL 静态审查后实现 `agent_action` 迁移、MyBatis 映射、查询索引、唯一约束和 CAS SQL；验证：A 静态审查和空 MySQL 8.4 Flyway。
+- [ ] 4.1 B/A：先生成 `V012__create_agent_action_table.sql` 草稿并通过 A 静态审查；仅在 A 明确授权后实现 `agent_action` 迁移、MyBatis 映射、查询索引、唯一约束和 CAS SQL；验证：A 静态审查和空 MySQL 8.4 Flyway。
 - [ ] 4.2 B：在持久化实现可用后实现 `POST /api/v1/agent/actions/{actionId}/confirm`，只接受 `{confirmed}` 且经 `CurrentUserAccessor` 校验；验证：Controller/Service 成功、拒绝、越权、缺失、过期、206003、206004、206006、运行结束和版本变化测试。
 - [ ] 4.3 B/A：在 A 正式 Tool/API 确认后实现并注册生产 `CreateOrderToolAdapter`；验证：只经 A 公开 API 的契约测试、原键结果查询和无本机 HTTP/私有持久化访问扫描。
 
