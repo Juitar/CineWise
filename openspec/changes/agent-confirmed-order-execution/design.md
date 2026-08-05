@@ -26,6 +26,8 @@
 
 `ConfirmedOrderCommand` 是 B 内部不可变对象，包含仅建单所需的 `showId`、排序后的 `seatIds` 和 A 工具名；它不含 `userId`、`ticketCount`、金额、订单状态或前端传入的哈希。`AgentActionParameterHasher` 使用 UTF-8、显式字段顺序、字符串 ID、升序座位 ID 和 SHA-256 编码产生 `hash_version=v1 + parameter_hash=<64 位小写 hex>`。创建 action 时保存摘要；确认时重新从已保存 Command 计算并比较摘要，计划版本变化或业务候选失效时拒绝。
 
+`AgentConfirmationActionCreationService` 只接收 B 内部的 `CreateOrderConfirmationActionCommand`：先从 `CurrentUserAccessor` 读取用户，再读取本人仍在运行的 `AgentRun`、活动 `AgentSession` 和匹配的计划版本，并调用 A 的只读 `CreateOrderTool.validate`。通过后使用雪花 ID、服务端 UUID 和默认 10 分钟有效期（不晚于 run 的保留期）创建 action；创建去重键命中时返回原 action。写入 action 后才在同一提交单元写入安全 `card` 事件。当前最小运行时尚未保存 `CONFIRM_ACTION` 步骤或可恢复的建单 Command，因此由已校验计划执行器在获取到 Command 时调用该服务；不得由 HTTP 请求、模型原始输出或前端字段直接调用。
+
 不以 JSON 序列化字节直接做摘要，避免字段顺序、空值和库升级造成同一参数产生不同结果。
 
 ### 2. 动作状态机与恢复
@@ -82,7 +84,7 @@ RESULT_UNKNOWN --原键查询明确失败--> FAILED
 
 确认有效期从 action 创建时的服务端 `expire_at` 开始，到 `now >= expire_at` 即不可确认；过期转换为 `EXPIRED`。A 调用出现超时、断流或响应丢失时，以结果保存短事务写入 `RESULT_UNKNOWN`、`result_unknown_at=now`、`recovery_until=now+30天` 和固定恢复提示。恢复窗口内只能按同一 action 的原 `client_request_id` 查询；查询到明确结果后转为 `SUCCEEDED` 或 `FAILED` 并清除恢复窗口字段。窗口外不再调用建单或生成新键，清理任务只能删除已过 `recovery_until` 且仍为 `RESULT_UNKNOWN` 的记录，清理前必须保留原键供恢复。
 
-V011 已发布；原计划分配给邀请码种子的 V012 已取消，A 已将本表正式分配为 V012。B 只编写 `V012__create_agent_action_table.sql` 草稿供 A 静态审查；审查通过并获得 A 明确授权前不得执行、合入共享 `dev` 或连接数据库。此前的领域类型、Repository port、内存 Mock 和测试不等于持久化实现。
+V011 已发布；原计划分配给邀请码种子的 V012 已取消，A 已将本表正式分配为 V012。A 已完成静态审查与 MySQL 8.4 迁移验证，并以 `ddd4fcf` 发布该迁移。B 不修改已发布 SQL；领域类型、Repository port、内存 Mock 和测试之外的 CAS/并发行为仍须由本 change 的 GitHub Actions MySQL job 验证。
 
 ### 4. 事务与 A 调用方向
 
@@ -104,19 +106,19 @@ SSE 复用 `card` 与 `tool.result` 等持久化事件类型：新增的确认�
 
 ## Risks / Trade-offs
 
-- [A 的公开建单 Tool 尚未落地] → 底层 `OrderApplicationService` 不可被 B 直接依赖；只完成 B 的端口、Mock、参数摘要、状态机和测试，等待 A 独立 change 提供实际类型后再写生产调用。
-- [A 的 SQL 静态审查或执行授权未完成] → 只保留 V012 草稿，不连接共享数据库；记录待 A 处理，MySQL CI 不宣称通过。
+- [A 的公开建单 Tool 已落地但未调用 B 授权 Port] → B 的生产适配器已只依赖 `CreateOrderTool`，但当前 `CreateOrderTool.execute` 未注入或调用 `AgentActionAuthorizationPort`。A 必须在进入 `OrderApplicationService` 前补齐该调用；B 不改 A 的订单代码，也不把本 change 的 B 侧校验当作替代。
+- [本 change 的 MySQL CI 尚未运行] → V012 的迁移发布不等于 B 的确认 CAS/并发验证；未取得 workflow 运行记录前不宣称 MySQL 验证通过。
 - [写结果丢失] → 固定原 action 的键并查询；查不到结论保持 `RESULT_UNKNOWN`，宁可提示处理中也不重复建单。
 - [并发确认] → CAS 和唯一约束作为最终保证，单机锁和 SSE 状态不作为正确性依据；在 CI MySQL 8.4 验证并发。
 - [A API 最终需要同步身份] → `ToolContext` 已预留 run/node/trace/稳定键；A 必须确认 userId 如何在公开 API 内安全获得，B 不传递前端用户字段。
 
 ## Migration Plan
 
-1. V011 已发布，原 V012 邀请码种子已取消；A 已分配 V012，B 生成 `V012__create_agent_action_table.sql` 草稿供 A 静态审查。
-2. A 静态审查已获分配的 `agent_action` SQL；B 和 A 在 GitHub Actions 的实际 MySQL job 对空 `cinewise_agent_it` 验证首次 Flyway、重复启动、CAS、并发和恢复。
+1. V011 已发布，原 V012 邀请码种子已取消；A 已分配、审查并发布 V012（`ddd4fcf`）。B 不再修改该迁移。
+2. B 在 GitHub Actions 的 `Backend MySQL Integration / mysql-integration` job 对空 `cinewise_agent_it` 验证首次 Flyway、重复启动、CAS、并发和恢复，并记录运行编号与结果。
 3. B 部署领域与适配器；确认卡只在服务端 action 持久化后发布。A 的生产适配器经接口测试后才启用。
 4. 回滚时停止创建新 action；已 `RESULT_UNKNOWN` 的 action 继续按原键查询，不删除记录、不生成替代键。
 
 ## Open Questions
 
-1. A：提供独立 change 的提交号和包路径，落地 `com.miaoyu.ticket.order.api.CreateOrderTool`、`CreateOrderForAgentCommand`、`AgentOrderResult` 及按原请求查询入口；B 在该公开类型可用后接入生产适配器。
+1. A：在 `com.miaoyu.ticket.order.api.CreateOrderTool.execute` 中，在调用 `OrderApplicationService` 前调用 B 的 `AgentActionAuthorizationPort`；验证：A 的类型化 Tool 契约测试覆盖授权拒绝映射为 `205004`，且不创建订单。

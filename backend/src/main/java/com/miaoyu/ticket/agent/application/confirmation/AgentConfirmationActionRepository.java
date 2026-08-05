@@ -8,6 +8,25 @@ import java.util.Optional;
 public interface AgentConfirmationActionRepository {
     Optional<AgentConfirmationAction> findByActionId(String actionId);
 
+    Optional<AgentConfirmationAction> findByCreationKey(
+            long userId,
+            long agentRunId,
+            String planId,
+            int planVersion,
+            String nodeId,
+            String toolName,
+            String parameterHash);
+
+    /** 唯一键冲突后使用当前读取得提交的创建胜者，避免可重复读快照读不到它。 */
+    Optional<AgentConfirmationAction> findByCreationKeyForUpdate(
+            long userId,
+            long agentRunId,
+            String planId,
+            int planVersion,
+            String nodeId,
+            String toolName,
+            String parameterHash);
+
     void insert(AgentConfirmationAction action);
 
     boolean compareAndSet(

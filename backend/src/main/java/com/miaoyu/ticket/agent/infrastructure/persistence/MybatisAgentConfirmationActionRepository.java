@@ -26,6 +26,32 @@ public class MybatisAgentConfirmationActionRepository implements AgentConfirmati
     }
 
     @Override
+    public Optional<AgentConfirmationAction> findByCreationKey(
+            long userId,
+            long agentRunId,
+            String planId,
+            int planVersion,
+            String nodeId,
+            String toolName,
+            String parameterHash) {
+        return Optional.ofNullable(mapper.findActionByCreationKey(
+                userId, agentRunId, planId, planVersion, nodeId, toolName, parameterHash)).map(this::toDomain);
+    }
+
+    @Override
+    public Optional<AgentConfirmationAction> findByCreationKeyForUpdate(
+            long userId,
+            long agentRunId,
+            String planId,
+            int planVersion,
+            String nodeId,
+            String toolName,
+            String parameterHash) {
+        return Optional.ofNullable(mapper.findActionByCreationKeyForUpdate(
+                userId, agentRunId, planId, planVersion, nodeId, toolName, parameterHash)).map(this::toDomain);
+    }
+
+    @Override
     public void insert(AgentConfirmationAction action) {
         if (mapper.insertAction(toEntity(action)) != 1) {
             throw new IllegalStateException("确认动作写入行数异常");

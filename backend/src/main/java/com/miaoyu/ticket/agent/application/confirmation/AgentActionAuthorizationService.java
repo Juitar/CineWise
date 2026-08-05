@@ -5,8 +5,10 @@ import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationAction;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationActionStatus;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import java.util.Objects;
+import org.springframework.stereotype.Service;
 
 /** B 的公开授权实现，只校验 B 所拥有的确认、运行和计划事实。 */
+@Service
 public final class AgentActionAuthorizationService implements AgentActionAuthorizationPort {
     private final AgentConfirmationActionRepository repository;
     private final AgentActionAuthorizationFactsProvider factsProvider;

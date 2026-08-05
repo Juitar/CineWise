@@ -2,6 +2,9 @@ package com.miaoyu.ticket.agent;
 
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,11 +13,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.miaoyu.ticket.agent.api.AgentController;
 import com.miaoyu.ticket.agent.application.AgentFailurePersistedException;
 import com.miaoyu.ticket.agent.application.AgentInteractionRuntimeService;
+import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationService;
+import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationResult;
 import com.miaoyu.ticket.common.api.PageResult;
+import com.miaoyu.ticket.common.error.GlobalExceptionHandler;
+import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationAction;
+import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationValidationFailure;
+import com.miaoyu.ticket.agent.domain.confirmation.ConfirmedOrderCommand;
+import com.miaoyu.ticket.agent.domain.confirmation.AgentActionWriteIdentifiers;
 import java.time.OffsetDateTime;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.Executor;
 import org.springframework.beans.factory.ObjectProvider;
@@ -26,22 +38,31 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 
 /** Controller 只映射应用门面输出，不泄露内部运行 ID 或持久化对象。 */
 class AgentControllerTest {
     private AgentInteractionRuntimeService runtimeService;
+    private AgentConfirmationService confirmationService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         runtimeService = Mockito.mock(AgentInteractionRuntimeService.class);
+        confirmationService = Mockito.mock(AgentConfirmationService.class);
         Executor directExecutor = Runnable::run;
         TaskScheduler taskScheduler = Mockito.mock(TaskScheduler.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<TaskScheduler> taskSchedulerProvider = Mockito.mock(ObjectProvider.class);
         when(taskSchedulerProvider.getIfAvailable()).thenReturn(taskScheduler);
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules()
+                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mockMvc = MockMvcBuilders.standaloneSetup(
-                new AgentController(runtimeService, directExecutor, taskSchedulerProvider, new ObjectMapper())).build();
+                new AgentController(runtimeService, confirmationService, directExecutor, taskSchedulerProvider,
+                        objectMapper))
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .build();
     }
 
     @Test
@@ -56,6 +77,53 @@ class AgentControllerTest {
                 .andExpect(jsonPath("$.data.runId").value("run-1"))
                 .andExpect(jsonPath("$.data.sessionId").value("session-1"))
                 .andExpect(jsonPath("$.data.lastEventId").value("9"));
+    }
+
+    @Test
+    void shouldConfirmUsingOnlyTheBooleanRequestBody() throws Exception {
+        AgentConfirmationAction rejected = action().reject(LocalDateTime.of(2026, 8, 5, 10, 1));
+        when(confirmationService.confirm(eq("action-1"), eq(false), anyString()))
+                .thenReturn(new AgentConfirmationResult(rejected, null, false));
+
+        mockMvc.perform(post("/api/v1/agent/actions/action-1/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"confirmed\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.actionId").value("action-1"))
+                .andExpect(jsonPath("$.data.status").value("REJECTED"))
+                .andExpect(jsonPath("$.data.showId").doesNotExist());
+
+        verify(confirmationService).confirm(eq("action-1"), eq(false), anyString());
+    }
+
+    @Test
+    void shouldRejectAnyTransactionFieldOutsideConfirmed() throws Exception {
+        mockMvc.perform(post("/api/v1/agent/actions/action-1/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"confirmed":true,"showId":"70001","seatIds":["2","4"],
+                         "totalAmount":"999.99","idempotencyKey":"attacker-key"}
+                        """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(confirmationService);
+    }
+
+    @Test
+    void shouldReturnConfiguredSafeErrorForExpiredOrExecutingAction() throws Exception {
+        when(confirmationService.confirm(eq("expired"), eq(true), anyString()))
+                .thenReturn(new AgentConfirmationResult(action(), AgentConfirmationValidationFailure.EXPIRED, false));
+        when(confirmationService.confirm(eq("executing"), eq(true), anyString()))
+                .thenReturn(new AgentConfirmationResult(executingAction(), null, false));
+
+        mockMvc.perform(post("/api/v1/agent/actions/expired/confirm")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"confirmed\":true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(206003));
+        mockMvc.perform(post("/api/v1/agent/actions/executing/confirm")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"confirmed\":true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(206006));
     }
 
     @Test
@@ -179,5 +247,16 @@ class AgentControllerTest {
                 .contains("event:run.complete")
                 .doesNotContain("数据库故障详情");
         verify(runtimeService).replayPersistedEvents("session-1", 0L);
+    }
+
+    private static AgentConfirmationAction action() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 5, 10, 0);
+        return AgentConfirmationAction.pending(
+                1L, "action-1", 9L, 10L, 11L, "run-1", "plan-1", 2, "confirm-order",
+                new ConfirmedOrderCommand("createOrder", "70001", List.of("2", "4")), now.plusMinutes(5), now);
+    }
+
+    private static AgentConfirmationAction executingAction() {
+        return action().claim(AgentActionWriteIdentifiers.forAction("action-1"), LocalDateTime.of(2026, 8, 5, 10, 1));
     }
 }
