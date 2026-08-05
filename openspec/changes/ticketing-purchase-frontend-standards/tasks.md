@@ -7,4 +7,4 @@
 - [x] 2.2 接入订单成功展示组件，移除过期业务文案。（Owner: 前端展示 AI / A）
 - [x] 2.3 补齐组件、模块、页面和移动端分支测试。（Owner: A / 前端展示 AI）
 - [x] 3.1 执行 `pnpm check`、购票 P1 E2E、OpenSpec strict 和 `git diff --check`。（Owner: A）
-- [ ] 3.2 完成最终边界审查并提交独立 PR。（Owner: A）
+- [x] 3.2 已完成最终边界审查并提交独立 PR #79。（Owner: A）
