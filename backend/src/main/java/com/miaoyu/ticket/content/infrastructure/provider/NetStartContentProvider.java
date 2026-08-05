@@ -50,8 +50,6 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
     private static final String PROVIDER = "NETSTART_MAOYAN";
     // 对页面和快照使用国家行政区划代码，不能把 NetStart 的 ci 当成业务城市代码。
     private static final String CHANGSHA_CITY_CODE = "430100";
-    // 该值只用于本 Provider 的外部请求参数，不能返回给前端。
-    private static final String NETSTART_CHANGSHA_CITY_CODE = "70";
     private final NetStartProperties properties;
     private final Environment environment;
     private final Clock clock;
@@ -148,7 +146,8 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
     }
 
     /**
-     * 每日同步先从热映列表取得外部 ID，再逐部请求详情补齐最低字段；影院使用已验证的长沙 ci=70。
+     * 每日同步先从热映列表取得外部 ID，再逐部请求详情补齐最低字段；影院公开使用长沙行政代码
+     * 430100，HTTP 适配器再转换为已验证的 NetStart ci=70。
      *
      * <p>热映列表本身缺少类型和片长，因此绝不直接保存。单条失败只跳过该条，保留其余合格内容，
      * 由上层审计记录本轮统计。</p>
@@ -203,12 +202,10 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
                 if (normalized.isEmpty()) { rejectedItemCount++; }
                 else { synchronizedContent.add(new SynchronizedContent(query, normalized.get())); }
         }
-        // 对外请求仍使用 NetStart 的 ci；标准化结果和公开查询始终使用系统行政区划城市代码。
-        ContentQuery providerCinemas = new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA,
-                null, NETSTART_CHANGSHA_CITY_CODE, "影");
+        // Provider 和公开结果只使用行政区划代码；HTTP 适配器负责转换 NetStart 的 ci。
         ContentQuery cinemas = new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA,
                 null, CHANGSHA_CITY_CODE, "影");
-        RawFetchResult cinema = fetchWithPolicy(providerCinemas);
+        RawFetchResult cinema = fetchWithPolicy(cinemas);
         if (cinema.payload() == null) {
             rejectedItemCount++;
             failureOutcome = cinema.outcome();
