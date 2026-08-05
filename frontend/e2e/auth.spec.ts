@@ -118,7 +118,8 @@ test('用户登录后恢复目标页，刷新仍保持登录，普通用户不�
   await expect(page).toHaveURL(/\/login\?returnUrl=%2Fprofile$/);
   await submitLogin(page, 'user@cinewise.test');
   await expect(page).toHaveURL('/profile');
-  await expect(page.getByRole('heading', { level: 1, name: '妙语用户' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '个人中心' })).toBeVisible();
+  await expect(page.getByText('u***@cinewise.test')).toBeVisible();
 
   await page.reload();
   await expect(page).toHaveURL('/profile');
@@ -143,20 +144,16 @@ test('管理员从统一入口登录后进入管理工作台', async ({ page }) 
   await expect(page.getByText('退出登录')).toBeVisible();
 });
 
-test('桌面端退出后旧会话不能再访问个人中心', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'desktop-chromium', '移动壳层暂未提供退出菜单');
-
+test('桌面端和移动端从个人中心退出后不能再访问个人中心', async ({ page }) => {
   const state = await installAuthApi(page);
   await page.goto('/login');
   await submitLogin(page, 'user@cinewise.test');
   await expect(page).toHaveURL('/');
 
-  const userMenuButton = page.getByRole('button', { name: /演示用户/ });
-  await userMenuButton.focus();
-  await page.keyboard.press('Enter');
-  const logoutMenuItem = page.getByText('退出登录');
-  await expect(logoutMenuItem).toBeVisible();
-  await logoutMenuItem.click();
+  await page.goto('/profile');
+  const logoutButton = page.getByRole('button', { name: '退出登录' });
+  await expect(logoutButton).toBeVisible();
+  await logoutButton.click();
   await expect(page).toHaveURL('/login');
   expect(state.authenticated).toBe(false);
 
