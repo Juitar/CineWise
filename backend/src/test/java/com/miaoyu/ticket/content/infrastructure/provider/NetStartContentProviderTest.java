@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.web.client.ResourceAccessException;
@@ -86,9 +87,10 @@ class NetStartContentProviderTest {
                 "distance":"1836km","price":"33","tags":["座"]}]"""));
 
         ContentResult<List<? extends ContentItem>> result = provider.query(
-                new ContentQuery(ContentResourceType.CINEMA, null, "1", "影城")).orElseThrow();
+                new ContentQuery(ContentResourceType.CINEMA, null, "430100", "影城")).orElseThrow();
         CinemaContent cinema = (CinemaContent) result.data().getFirst();
         assertThat(cinema.sourceCinemaId()).isEqualTo("41478");
+        assertThat(cinema.cityCode()).isEqualTo("430100");
         assertThat(cinema.address()).isEqualTo("大兴区康泰街26号");
         assertThat(cinema.longitude()).isNull();
         assertThat(cinema.latitude()).isNull();
@@ -125,9 +127,11 @@ class NetStartContentProviderTest {
     @Test
     void givenDailySync_whenHotListDetailsAndCinemaAreFetched_thenEveryRequestUsesTheSameLimit() throws Exception {
         AtomicInteger calls = new AtomicInteger();
+        AtomicReference<String> cinemaCityCode = new AtomicReference<>();
         NetStartContentProvider provider = provider(query -> {
             calls.incrementAndGet();
             if (query.resourceType() == ContentResourceType.CINEMA) {
+                cinemaCityCode.set(query.cityCode());
                 return json("[{\"id\":41478,\"info\":{\"name\":\"测试影城一号\",\"address\":\"测试一区\"}},"
                         + "{\"id\":41479,\"info\":{\"name\":\"测试影城二号\",\"address\":\"测试二区\"}}]");
             }
@@ -143,6 +147,7 @@ class NetStartContentProviderTest {
 
         // 一轮保留热映列表、八部详情和影院共十次额度，不能因十部详情挤掉影院或越过本地限制。
         assertThat(calls).hasValue(10);
+        assertThat(cinemaCityCode).hasValue("430100");
         assertThat(batch.contents()).hasSize(9);
         // 八部影片和两家影院都合格时，成功内容总数为十；不能因影院来自同一查询被误判字段不合格。
         assertThat(batch.attemptedCount()).isEqualTo(10);

@@ -144,7 +144,8 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
     }
 
     /**
-     * 每日同步先从热映列表取得外部 ID，再逐部请求详情补齐最低字段；影院使用已验证的长沙 ci=70。
+     * 每日同步先从热映列表取得外部 ID，再逐部请求详情补齐最低字段；影院公开使用长沙行政代码
+     * 430100，HTTP 适配器再转换为已验证的 NetStart ci=70。
      *
      * <p>热映列表本身缺少类型和片长，因此绝不直接保存。单条失败只跳过该条，保留其余合格内容，
      * 由上层审计记录本轮统计。</p>
@@ -200,7 +201,7 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
                 else { synchronizedContent.add(new SynchronizedContent(query, normalized.get())); }
         }
         ContentQuery cinemas = new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA,
-                null, "70", "影");
+                null, "430100", "影");
         RawFetchResult cinema = fetchWithPolicy(cinemas);
         if (cinema.payload() == null) {
             rejectedItemCount++;

@@ -1,5 +1,31 @@
 import { apiRequest } from '../../shared/api/client';
-import type { ContentPageResponse, MovieListQuery, MovieSummary } from '../../shared/types/api';
+import type {
+  CinemaListQuery,
+  CinemaSummary,
+  ContentPageResponse,
+  MovieListQuery,
+  MovieSummary,
+} from '../../shared/types/api';
+
+/**
+ * 查询公开影院列表。
+ *
+ * location 使用六位行政代码；长沙为 430100，第三方城市 ID 不得传到前端。
+ */
+export function queryCinemas(
+  query: Required<Pick<CinemaListQuery, 'location' | 'page' | 'size'>> & CinemaListQuery,
+  signal?: AbortSignal,
+): Promise<ContentPageResponse<CinemaSummary>> {
+  return apiRequest<ContentPageResponse<CinemaSummary>>('/api/v1/cinemas', {
+    query: {
+      keyword: query.keyword,
+      location: query.location,
+      page: query.page,
+      size: query.size,
+    },
+    signal,
+  });
+}
 
 /**
  * 查询公开影片列表。
