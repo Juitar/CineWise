@@ -139,6 +139,7 @@ class AgentConfirmationServiceTest {
             var second = executor.submit(() -> service.confirm("action-1", true, "trace-2"));
 
             assertTrue(tool.executionStarted.await(3, TimeUnit.SECONDS));
+            assertTrue(repository.loserReadWinner.await(3, TimeUnit.SECONDS));
             assertEquals(1, tool.executeCalls);
             tool.allowExecutionToFinish.countDown();
 
@@ -327,6 +328,7 @@ class AgentConfirmationServiceTest {
     private static final class StaleReadRaceRepository implements AgentConfirmationActionRepository {
         private final AgentConfirmationAction initial;
         private final CountDownLatch initialReads = new CountDownLatch(2);
+        private final CountDownLatch loserReadWinner = new CountDownLatch(1);
         private final java.util.concurrent.atomic.AtomicInteger readCount =
                 new java.util.concurrent.atomic.AtomicInteger();
         private AgentConfirmationAction stored;
@@ -351,6 +353,7 @@ class AgentConfirmationServiceTest {
                 return Optional.of(initial);
             }
             synchronized (this) {
+                loserReadWinner.countDown();
                 return Optional.of(stored);
             }
         }
