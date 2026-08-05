@@ -19,6 +19,13 @@ export interface PasswordLoginRequest {
   password: string;
 }
 
+/** 邮箱验证码登录只提交服务端确认的幂等标识、邮箱和 6 位验证码。 */
+export interface EmailCodeLoginRequest {
+  clientRequestId: string;
+  code: string;
+  email: string;
+}
+
 export type VerificationPurpose = 'LOGIN' | 'REGISTER';
 
 export interface SendEmailCodeRequest {

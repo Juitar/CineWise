@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../../shared/api/ApiError';
-import type { CurrentUser, RegisterRequest } from './types';
-import { sendEmailCode, submitRegistration } from './api';
+import type { CurrentUser, EmailCodeLoginRequest, RegisterRequest } from './types';
+import { sendEmailCode, submitEmailCodeLogin, submitRegistration } from './api';
 
 const clientMocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
@@ -31,6 +31,12 @@ const registrationRequest: RegisterRequest = {
   privacyPolicyVersion: '2026-08-03',
 };
 
+const emailCodeLoginRequest: EmailCodeLoginRequest = {
+  clientRequestId: 'email-login-1',
+  code: '123456',
+  email: 'user@cinewise.test',
+};
+
 describe('auth api', () => {
   beforeEach(() => {
     clientMocks.apiRequest.mockReset();
@@ -57,6 +63,26 @@ describe('auth api', () => {
       body: registrationRequest,
       method: 'POST',
     });
+    expect(clientMocks.clearCsrfToken).toHaveBeenCalledOnce();
+  });
+
+  it('提交邮箱验证码登录成功后调用正确接口并清除匿名阶段 CSRF Token', async () => {
+    clientMocks.apiRequest.mockResolvedValue(user);
+
+    await expect(submitEmailCodeLogin(emailCodeLoginRequest)).resolves.toEqual(user);
+
+    expect(clientMocks.apiRequest).toHaveBeenCalledWith('/api/v1/auth/login/email', {
+      body: emailCodeLoginRequest,
+      method: 'POST',
+    });
+    expect(clientMocks.clearCsrfToken).toHaveBeenCalledOnce();
+  });
+
+  it('邮箱验证码登录结果未知时清除旧 CSRF Token 并保留结构化错误', async () => {
+    const error = new ApiError('timeout', { kind: 'TIMEOUT', isResultUnknown: true });
+    clientMocks.apiRequest.mockRejectedValue(error);
+
+    await expect(submitEmailCodeLogin(emailCodeLoginRequest)).rejects.toBe(error);
     expect(clientMocks.clearCsrfToken).toHaveBeenCalledOnce();
   });
 
