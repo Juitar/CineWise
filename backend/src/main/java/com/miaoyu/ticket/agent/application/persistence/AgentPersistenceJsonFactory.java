@@ -49,6 +49,11 @@ public class AgentPersistenceJsonFactory {
         return write(reply.payload());
     }
 
+    /** 将固定事件摘要序列化为 JSON 对象，避免手工拼接字符串破坏事件载荷。 */
+    public AgentStoredJson eventPayload(Object value) {
+        return write(value);
+    }
+
     private AgentStoredJson write(Object value) {
         try {
             return new AgentStoredJson(objectMapper.writeValueAsString(value));

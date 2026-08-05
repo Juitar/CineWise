@@ -11,4 +11,6 @@ public interface AgentMessageRepository {
     List<AgentMessage> findBySessionIdAndUserId(long sessionId, long userId, int limit);
 
     List<AgentMessage> findByRunIdAndUserId(long runId, long userId);
+
+    int deleteByRunId(long runId);
 }

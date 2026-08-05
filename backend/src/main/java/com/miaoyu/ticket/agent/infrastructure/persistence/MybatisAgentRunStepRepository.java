@@ -31,4 +31,9 @@ public class MybatisAgentRunStepRepository implements AgentRunStepRepository {
                         AgentPersistenceMappings.toEntity(nextStep), expectedVersion, expectedStatus.name())
                 == 1;
     }
+
+    @Override
+    public int deleteByRunId(long runId) {
+        return mapper.deleteRunStepsByRunId(runId);
+    }
 }

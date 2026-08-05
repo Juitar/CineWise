@@ -32,4 +32,9 @@ public class MybatisAgentMessageRepository implements AgentMessageRepository {
                 .map(AgentPersistenceMappings::toDomain)
                 .toList();
     }
+
+    @Override
+    public int deleteByRunId(long runId) {
+        return mapper.deleteMessagesByRunId(runId);
+    }
 }

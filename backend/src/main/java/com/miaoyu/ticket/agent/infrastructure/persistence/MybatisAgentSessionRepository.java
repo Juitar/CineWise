@@ -22,6 +22,17 @@ public class MybatisAgentSessionRepository implements AgentSessionRepository {
     }
 
     @Override
+    public Optional<AgentSession> findBySessionIdAndUserIdForUpdate(String sessionId, long userId) {
+        return Optional.ofNullable(mapper.findSessionBySessionIdAndUserIdForUpdate(sessionId, userId))
+                .map(AgentPersistenceMappings::toDomain);
+    }
+
+    @Override
+    public Optional<AgentSession> findByIdAndUserId(long id, long userId) {
+        return Optional.ofNullable(mapper.findSessionByIdAndUserId(id, userId)).map(AgentPersistenceMappings::toDomain);
+    }
+
+    @Override
     public void insert(AgentSession session) {
         mapper.insertSession(AgentPersistenceMappings.toEntity(session));
     }
@@ -34,5 +45,10 @@ public class MybatisAgentSessionRepository implements AgentSessionRepository {
     @Override
     public boolean releaseActiveRun(long sessionId, long runId) {
         return mapper.releaseActiveRun(sessionId, runId) == 1;
+    }
+
+    @Override
+    public boolean deleteIfEmptyAndInactive(long sessionId) {
+        return mapper.deleteSessionIfEmptyAndInactive(sessionId) == 1;
     }
 }

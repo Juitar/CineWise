@@ -10,14 +10,18 @@ import com.miaoyu.ticket.agent.application.persistence.AgentInitialRunTransactio
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionCommand;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionResult;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionService;
+import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeEventService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.application.reply.ErrorReplyFacts;
 import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentResult;
 import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentService;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
+import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
+import com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEvent;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSessionStatus;
+import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlan;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationContext;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationIssue;
@@ -55,6 +59,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 
 /** 只允许在 CI 的一次性 MySQL 8.4 库中验证 Agent 表约束、并发占用和事务边界。 */
 @EnabledIfEnvironmentVariable(named = "CINEWISE_MYSQL_AGENT_PERSISTENCE_IT", matches = "true")
@@ -91,6 +97,12 @@ class AgentPersistenceMySqlIntegrationTest {
     private AgentMessageSubmissionService messageSubmissionService;
 
     @Autowired
+    private AgentRuntimeEventService runtimeEventService;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    @Autowired
     private MinimalReadOnlyAgentService minimalReadOnlyAgentService;
 
     private AtomicBoolean toolCalledInsideTransaction;
@@ -103,8 +115,13 @@ class AgentPersistenceMySqlIntegrationTest {
         assertThat(jdbcTemplate.queryForObject("SELECT VERSION()", String.class)).startsWith("8.4.");
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
-                  FROM flyway_schema_history
+                 FROM flyway_schema_history
                  WHERE version = '008' AND success = 1
+                """, Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM flyway_schema_history
+                 WHERE version = '009' AND success = 1
                 """, Integer.class)).isEqualTo(1);
         cleanupFixtures();
         toolCalledInsideTransaction = new AtomicBoolean(true);
@@ -131,6 +148,13 @@ class AgentPersistenceMySqlIntegrationTest {
                 .isEqualTo(AgentErrorCode.ACTIVE_RUN_CONFLICT);
         assertThat(count("SELECT COUNT(*) FROM agent_run WHERE user_id = ?", USER_ID)).isEqualTo(1);
         assertThat(count("SELECT COUNT(*) FROM agent_message WHERE user_id = ?", USER_ID)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM agent_event WHERE session_id = ?", Integer.class, FIRST_SESSION)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT last_committed_event_id
+                  FROM agent_event_stream_cursor
+                 WHERE session_id = ?
+                """, Long.class, FIRST_SESSION)).isGreaterThan(0L);
     }
 
     @Test
@@ -198,6 +222,51 @@ class AgentPersistenceMySqlIntegrationTest {
                 .isNull();
     }
 
+    @Test
+    void shouldWaitForSameSessionLockBeforeAllocatingSecondEventId() throws Exception {
+        insertSession(FIRST_SESSION_ID, FIRST_SESSION);
+        AgentInitialRunResult initial = initialRunTransaction.submit(USER_ID, command(FIRST_SESSION, "request-lock"));
+        AgentSession sourceSession = sessionRepository.findBySessionIdAndUserId(FIRST_SESSION, USER_ID).orElseThrow();
+        CountDownLatch firstLockHeld = new CountDownLatch(1);
+        CountDownLatch allowFirstCommit = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<AgentRuntimeEvent> first = executor.submit(() -> new TransactionTemplate(transactionManager).execute(
+                    status -> {
+                        AgentSession locked = sessionRepository
+                                .findBySessionIdAndUserIdForUpdate(FIRST_SESSION, USER_ID).orElseThrow();
+                        firstLockHeld.countDown();
+                        try {
+                            allowFirstCommit.await();
+                        } catch (InterruptedException exception) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException("等待会话锁测试被中断", exception);
+                        }
+                        return runtimeEventService.append(locked, initial.run(), AgentEventType.PLAN_CREATED,
+                                new AgentStoredJson("{\"planVersion\":1}"));
+                    }));
+            assertThat(firstLockHeld.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            Future<AgentRuntimeEvent> second = executor.submit(() -> runtimeEventService.append(sourceSession,
+                    initial.run(), AgentEventType.MESSAGE_COMPLETE, new AgentStoredJson("{\"messageType\":\"TEXT\"}")));
+
+            Thread.sleep(150L);
+            assertThat(second.isDone()).as("第二个事务必须在会话行锁释放前等待").isFalse();
+            allowFirstCommit.countDown();
+
+            AgentRuntimeEvent firstEvent = first.get();
+            AgentRuntimeEvent secondEvent = second.get();
+            assertThat(firstEvent.eventId()).isLessThan(secondEvent.eventId());
+            assertThat(jdbcTemplate.queryForObject("""
+                    SELECT last_committed_event_id
+                      FROM agent_event_stream_cursor
+                     WHERE session_id = ?
+                    """, Long.class, FIRST_SESSION)).isEqualTo(secondEvent.eventId());
+        } finally {
+            allowFirstCommit.countDown();
+            executor.shutdownNow();
+        }
+    }
+
     private Callable<Attempt> submitAfterSignal(CountDownLatch start, String requestId) {
         return () -> {
             start.await();
@@ -238,6 +307,9 @@ class AgentPersistenceMySqlIntegrationTest {
     }
 
     private void cleanupFixtures() {
+        jdbcTemplate.update("DELETE FROM agent_event WHERE session_id IN (?, ?)", FIRST_SESSION, SECOND_SESSION);
+        jdbcTemplate.update("DELETE FROM agent_event_stream_cursor WHERE session_id IN (?, ?)", FIRST_SESSION,
+                SECOND_SESSION);
         jdbcTemplate.update("""
                 DELETE FROM agent_run_step
                  WHERE run_id IN (SELECT id FROM agent_run WHERE user_id = ?)
