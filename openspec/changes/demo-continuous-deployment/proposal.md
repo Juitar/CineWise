@@ -10,6 +10,7 @@
 - 使用 Docker Compose 构建并等待健康检查，失败时恢复部署前提交。
 - 在质量门中使用真实生产前端镜像验证 SPA 回退、静态资源 404、API 代理和资源 MIME，避免 Nginx 把缺失脚本伪装成 HTML 200。
 - 演示应用通过服务器 `.env` 连接独立基础服务 ECS 上的 MySQL、Redis 和可选 MinIO，不在应用 Compose 中重复启动基础服务。
+- 保持一份公共 `compose.yaml`，显式传递后端实际使用的认证、票务时限和内容同步运行变量；以本地与服务器两份无密钥环境模板消除配置漂移。
 - 文档、OpenSpec、迁移记录和仅 Flyway SQL 的变更不触发应用部署。
 - CD 不执行 Flyway、种子初始化、数据库修数或共享数据库权限变更。
 
@@ -28,7 +29,7 @@
 - `.github/workflows/`：新增演示环境 CD；复用现有 CI 已覆盖 `dev` push 的集成基线。
 - `frontend/nginx.conf` 与前端 E2E：明确 API、静态资源和 SPA 路由边界，并增加生产镜像浏览器冒烟。
 - `docs/`：新增服务器准备、Secrets、触发边界和恢复说明。
-- `compose.yaml` 与 `.env.example`：Redis 改为显式外部连接，MinIO 应用变量透传给后端容器。
+- `compose.yaml` 与环境模板：Redis、MinIO、认证和运行开关显式传递给后端容器；新增本地和服务器无密钥环境模板。
 - 演示服务器：需要预装 Git、Docker、Compose，准备只读仓库访问和被 Git 忽略的 `.env`；不再运行重复的 Redis 容器。
 - 基础服务 ECS：继续运行 MySQL、Redis 和可选 MinIO，并仅对白名单应用服务器开放对应端口。
 - 数据库：无自动结构或数据变更；Flyway 保持关闭。
