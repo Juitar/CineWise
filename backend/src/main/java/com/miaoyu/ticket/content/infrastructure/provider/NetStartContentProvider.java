@@ -171,7 +171,9 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
                 com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE, null, null, null);
         RawFetchResult hotListResult = fetchWithPolicy(hotMovieList);
         if (hotListResult.payload() == null) {
-            return new DailySyncBatch(List.of(), 0, hotListResult.outcome(), hotListResult.errorCode());
+            // 热映目录请求本身已经发生且失败，审计必须按一条失败内容项记账；否则 V004 会把连接失败误判为
+            // total=0 的 SUCCESS，排障人员只能从摘要反推真实结果，无法按结构化状态筛选失败批次。
+            return new DailySyncBatch(List.of(), 1, hotListResult.outcome(), hotListResult.errorCode());
         }
         // 热映列表与影院各预留一个请求额度，避免十部详情把本地 10 req/min 用尽后跳过影院。
         int movieDetailLimit = Math.max(0, properties.requestsPerMinute() - 2);

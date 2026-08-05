@@ -59,7 +59,8 @@ cinewise:
       enabled: ${CINEWISE_CONTENT_NETSTART_ENABLED:false}
       # 受控验证时显式开启；应用就绪后只调用一次同步，不提供公网刷新接口。
       sync-on-startup: ${CINEWISE_CONTENT_NETSTART_SYNC_ON_STARTUP:false}
-      base-url: https://apis.netstart.cn/maoyan
+      # 受控验证可替换为不可路由地址验证超时和回退；默认仍是学习来源，不进入生产环境。
+      base-url: ${CINEWISE_CONTENT_NETSTART_BASE_URL:https://apis.netstart.cn/maoyan}
       daily-sync-cron: "${CINEWISE_CONTENT_NETSTART_DAILY_SYNC_CRON:0 0 3 * * *}"
       connect-timeout: 500ms
       read-timeout: 1500ms
