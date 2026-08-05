@@ -42,17 +42,19 @@ Redis 缓存键为 `profile:{userId}:v:{version}`。标签、开关、软删除�
 
 为兑现“相同 `Idempotency-Key` 返回首次 200/201 响应”的接口要求，新增 `profile_write_request` 记录：包含内部 ID、`user_id`、操作类型、幂等键、请求摘要哈希、固定为 `COMPLETED` 的结果状态、首次 HTTP 状态、首次公开响应 JSON、完成时间、创建和过期时间，唯一键为 `(user_id, operation, idempotency_key)`。同键但摘要哈希不同返回 HTTP 409 / `202004 PROFILE_IDEMPOTENCY_KEY_CONFLICT`，不能将不同请求误认为重放。该表保留 30 天并定向清理；它不作为通用审计表，不保存完整请求体、Cookie、JWT、原始行为或其他接口未公开的数据。
 
-同一 MySQL 本地事务必须同时完成幂等记录插入、画像写入、版本递增、缓存失效和原始公开响应记录；事务成功后结果即为 `COMPLETED`。同键并发由唯一键和事务串行化处理：已提交的同键同摘要请求读取并返回原 200/201 结果；事务失败则整体回滚，不留下可见的处理中记录。当前不持久化 `PROCESSING`，不新增 `202005`；若未来出现真正异步或跨事务写入，必须另建 change 定义租约、CAS 接管、崩溃恢复和客户端重试规则。公开响应 JSON 只保存首次接口实际返回的 `PreferenceResponse`、`TagResponse` 或删除结果字段，以支持恢复；不得保存原始请求、行为 payload、认证信息或额外隐私字段。
+写入顺序固定为：先完成当前用户身份和操作范围校验，计算请求摘要哈希，并按 `(userId, operation, idempotencyKey)` 查询已提交的 `profile_write_request`；同键同摘要直接返回首次 200/201 响应，同键不同摘要返回 HTTP 409 / `202004`。只有不存在已提交记录时，才校验 `If-Match` 并执行业务写入。这样首次请求成功后即使其他写入已推进版本，携带旧 `If-Match` 的原请求重放仍能恢复首次响应，而不是错误返回 `202002`。
+
+同一 MySQL 本地事务必须同时完成幂等记录插入、画像写入、版本递增、缓存失效和原始公开响应记录；事务成功后结果即为 `COMPLETED`。同键并发由唯一键和事务串行化处理：唯一键冲突后重新读取已提交记录，同摘要返回原结果、不同摘要返回 `202004`；事务失败则整体回滚，不留下可见的处理中记录。当前不持久化 `PROCESSING`，不新增 `202005`；若未来出现真正异步或跨事务写入，必须另建 change 定义租约、CAS 接管、崩溃恢复和客户端重试规则。公开响应 JSON 只保存首次接口实际返回的 `PreferenceResponse`、`TagResponse` 或删除结果字段，以支持恢复；不得保存原始请求、行为 payload、认证信息或额外隐私字段。
 
 用户可直接修改 `MANUAL` 标签的极性、权重和状态，不得把来源改写为其他来源；对 `CONVERSATION`、`BEHAVIOR` 标签，用户可停用或删除，但其来源、置信度和行为计算结果只能由受控服务更新。标签重新启用时仍需满足未过期条件。
 
 ### 4. 行为事件只记录最小信息并独立于主流程
 
-内部入口 `POST /internal/profile/events` 只接受已由调用方鉴权后的 `eventId`、事件类型、目标类型、目标 ID、可选会话 ID 和发生时间。`eventId` 是全局幂等键；同一用户与同一目标的同类事件 24 小时最多计一次。允许的事件为 `CLICK`、`FAVORITE`、`ACCEPT_PLAN`、`REJECT_PLAN`、`PAID_ORDER`、`NOT_INTERESTED`。
+行为写入不提供 `POST /internal/profile/events` 或其他本机 HTTP 入口，只允许模块内的类型化 Application API 或已确认的内部事件调用。`eventId` 是全局幂等键；同一用户与同一目标的同类事件 24 小时最多计一次。允许的事件为 `CLICK`、`FAVORITE`、`ACCEPT_PLAN`、`REJECT_PLAN`、`PAID_ORDER`、`NOT_INTERESTED`。
 
 事件仅在累计绝对权重达到 0.30 时创建或更新 `BEHAVIOR` 标签；单次行为和无效事件不会形成强偏好。`BEHAVIOR` 标签权重不得超过 0.800，且必须有 `expires_at`；`MANUAL` 标签权重必须在 0.100 到 1.000 之间。应用服务在写入前校验这两条来源条件，V010 同时以 CHECK 防止绕过应用层的直接写入。调用失败只记录可脱敏诊断，不回滚或阻塞上游业务。
 
-内部行为入口不是公网接口。A 的 `PAID_ORDER`、B 的已确认方案选择及 C 的已鉴权用户动作只能通过类型化 Application API 或已确认的内部事件调用，调用方必须提供经过自身权限校验的用户与目标事实；D 不查询 A/B/C 的 Entity、Mapper、Repository 或 Controller 来补齐数据。`CLICK`、`FAVORITE`、`NOT_INTERESTED` 仅作用于 `MOVIE`，`ACCEPT_PLAN`、`REJECT_PLAN` 仅作用于 `PLAN`，`PAID_ORDER` 仅作用于 `SHOW`。其中 `PLAN` 的 `target_id` 必须是 B 提供的稳定 `planId`，不能是模型文本或临时槽位；B 未提供前不得写入这两类事件。
+行为调用方必须提供已由自身权限和业务规则校验的事实，D 不查询 A/B/C 的 Entity、Mapper、Repository 或 Controller 来补齐数据。A 只能通过已提交的 `PaymentSucceededEvent` 写入 `PAID_ORDER`；B 只能通过 D 的 `ProfileBehaviorRecorder` 写入已确认方案的 `ACCEPT_PLAN/REJECT_PLAN`；C 的本人页面行为只能通过其已认证线程调用 D 的类型化 Application API，并由 D 从 `CurrentUserAccessor` 取得用户。`CLICK`、`FAVORITE`、`NOT_INTERESTED` 仅作用于 `MOVIE`，`ACCEPT_PLAN`、`REJECT_PLAN` 仅作用于 `PLAN`，`PAID_ORDER` 仅作用于 `SHOW`。其中 `PLAN` 的 `target_id` 必须是 B 提供的稳定 `planId`，不能是模型文本或临时槽位；B 未提供前不得写入这两类事件。
 
 `PAID_ORDER` 仅消费 A 已确认且已提交的 `PaymentSucceededEvent`，最小字段映射为 `event_id=eventId`、`user_id=userId`、`target_type=SHOW`、`target_id=showId`、`order_id=orderId`、`order_version=orderVersion`、`occurred_at=occurredAt`。D 以 `eventId` 去重并归一化写入行为事件，不持久化 `cinemaArea`、`startAt` 等出行字段，也不得仅凭 `showId` 推导影片类型、影院等标签。
 

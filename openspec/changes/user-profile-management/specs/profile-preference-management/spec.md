@@ -61,7 +61,7 @@
 
 ### Requirement: 写入必须防止并发覆盖和重复提交
 
-系统 SHALL 要求标签和开关写请求携带 `If-Match: <version>` 与 `Idempotency-Key`。版本不匹配时返回 HTTP 409 / `202002` 和服务端最新资源；相同幂等键重放时返回首次成功响应，不重复增加版本或写入记录。
+系统 SHALL 要求标签和开关写请求携带 `If-Match: <version>` 与 `Idempotency-Key`。系统在完成当前用户身份和操作范围校验后，MUST 先按 `(userId, operation, idempotencyKey)` 查询已提交幂等记录：同键同请求摘要直接返回首次 200/201 响应，同键不同摘要返回 HTTP 409 / `202004`；仅在不存在记录时才校验 `If-Match`。版本不匹配时返回 HTTP 409 / `202002` 和服务端最新资源；相同幂等键重放时不重复增加版本或写入记录。
 
 #### Scenario: 两个页面同时修改开关
 - **GIVEN** 两个客户端读到同一画像版本
@@ -75,6 +75,13 @@
 - **THEN** 系统返回首次创建的标签响应
 - **AND** 数据库中没有第二条标签或额外版本更新
 
+#### Scenario: 后续写入推进版本后重放首次请求
+- **GIVEN** 用户使用版本 3 和某个 `Idempotency-Key` 成功创建标签，并保存了 201 响应
+- **AND** 后续其他写入已将画像版本推进到 4
+- **WHEN** 原客户端使用同一幂等键、同一请求摘要和旧 `If-Match: 3` 重放
+- **THEN** 系统返回首次 201 响应
+- **AND** 不返回 `202002`，不再次修改标签、版本或缓存
+
 #### Scenario: 同一幂等键提交不同内容
 - **GIVEN** 当前用户已使用一个 `Idempotency-Key` 成功提交标签写入
 - **WHEN** 用户以同一键提交不同的请求摘要
@@ -83,7 +90,7 @@
 
 ### Requirement: 行为事件必须去重且不干扰上游业务
 
-系统 SHALL 仅通过 A、B、C 已确认的类型化 Application API 或内部事件接收 `CLICK`、`FAVORITE`、`ACCEPT_PLAN`、`REJECT_PLAN`、`PAID_ORDER` 和 `NOT_INTERESTED`。`CLICK`、`FAVORITE`、`NOT_INTERESTED` 的目标必须为 `MOVIE`；`ACCEPT_PLAN`、`REJECT_PLAN` 的目标必须为 B 提供稳定 `planId` 的 `PLAN`；`PAID_ORDER` 的目标必须为 A 的 `showId` 对应的 `SHOW`，并只使用 `PaymentSucceededEvent` 的 `eventId`、`userId`、`orderId`、`showId`、`orderVersion`、`occurredAt`。`eventId` 是全局幂等键；同一用户、事件类型、目标类型和目标 ID 在 24 小时内最多计一次。D 必须在短事务内锁定该用户的画像设置、查询 24 小时窗口并记录最小事件摘要，窗口内事件不得再次累计权重。无效事件返回 HTTP 400 / `102002`，处理失败不得回滚订单、支付或推荐主流程。公网请求、未经身份校验的 userId、完整对话、支付明细和位置数据不得进入行为入口。
+系统 SHALL 仅通过模块内类型化 Application API 或已确认内部事件接收 `CLICK`、`FAVORITE`、`ACCEPT_PLAN`、`REJECT_PLAN`、`PAID_ORDER` 和 `NOT_INTERESTED`，不得提供 `POST /internal/profile/events` 或其他本机 HTTP 行为入口。A 只能用已提交的 `PaymentSucceededEvent` 写入 `PAID_ORDER`；B 只能用 D 的 `ProfileBehaviorRecorder` 写入已确认方案；C 的本人页面行为只能在已认证线程内调用 D 的类型化 API，用户身份由 D 的 `CurrentUserAccessor` 获取。`CLICK`、`FAVORITE`、`NOT_INTERESTED` 的目标必须为 `MOVIE`；`ACCEPT_PLAN`、`REJECT_PLAN` 的目标必须为 B 提供稳定 `planId` 的 `PLAN`；`PAID_ORDER` 的目标必须为 A 的 `showId` 对应的 `SHOW`，并只使用 `PaymentSucceededEvent` 的 `eventId`、`userId`、`orderId`、`showId`、`orderVersion`、`occurredAt`。`eventId` 是全局幂等键；同一用户、事件类型、目标类型和目标 ID 在 24 小时内最多计一次。D 必须在短事务内锁定该用户的画像设置、查询 24 小时窗口并记录最小事件摘要，窗口内事件不得再次累计权重。无效事件返回 HTTP 400 / `102002`，处理失败不得回滚订单、支付或推荐主流程。未经身份校验的 userId、完整对话、支付明细和位置数据不得进入行为调用。
 
 #### Scenario: 重复行为事件
 - **GIVEN** 某个 `eventId` 已被成功接收
