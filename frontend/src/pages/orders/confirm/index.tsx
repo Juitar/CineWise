@@ -3,6 +3,8 @@ import { history, useSearchParams } from 'umi';
 import { Button, Spin, Alert, message } from 'antd';
 import { useShows, useSeatMap } from '../../../modules/ticketing/hooks';
 import { useCreateOrder } from '../../../modules/order/hooks';
+import { buildOrderDetailPath, buildPaymentPath } from '../../../modules/order/routes';
+import { OrderCreateSuccess } from '../../../features/order-create-success/OrderCreateSuccess';
 import { ApiError } from '../../../shared/api/ApiError';
 import './index.css';
 
@@ -179,6 +181,19 @@ export default function OrderConfirmPage() {
     );
   };
 
+  const handleViewOrder = () => {
+    if (order) {
+      history.push(buildOrderDetailPath(order.orderNo));
+    }
+  };
+
+  const handlePayOrder = () => {
+    if (order?.status === 'PENDING_PAYMENT') {
+      // 支付必须由用户在支付页主动确认，建单成功页仅提供安全导航出口。
+      history.push(buildPaymentPath(order.orderNo));
+    }
+  };
+
   const handleSubmitOrder = async () => {
     if (
       hasInvalidSeats ||
@@ -350,23 +365,18 @@ export default function OrderConfirmPage() {
       )}
 
       {order ? (
-        <div className="confirm-success-card" role="status">
-          <div className="confirm-success-title">订单创建成功！</div>
-          <div className="confirm-success-order-id">
-            订单编号：<strong>{order.orderNo}</strong>
-          </div>
-          <div className="confirm-success-req-id">
-            应付总计：¥ {order.totalAmount} | 截至时间：
-            {new Date(order.expireTime).toLocaleTimeString('zh-CN', {
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: false,
-            })}
-          </div>
-          <div className="confirm-success-notice">
-            注：第一批次落地购票与建单全闭环；模拟支付等功能将于下一迭代正式接入。
-          </div>
-        </div>
+        <OrderCreateSuccess
+          orderNo={order.orderNo}
+          totalAmount={order.totalAmount}
+          expireTimeText={new Date(order.expireTime).toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          })}
+          onPay={order.status === 'PENDING_PAYMENT' ? handlePayOrder : undefined}
+          onViewOrder={handleViewOrder}
+          loading={orderLoading || isRecovering}
+        />
       ) : isResultUnknown ? (
         <div className="confirm-actions">
           <Button type="primary" size="large" loading={isRecovering} onClick={handleRecoverQuery}>

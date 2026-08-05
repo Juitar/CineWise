@@ -141,6 +141,8 @@ test('本地校验模拟密码后以空业务请求体完成支付并进入结�
   await page.getByRole('button', { name: '确认支付' }).click();
   await expect(page).toHaveURL(`/payments/${orderNo}/result`);
   await expect(page.getByText('支付成功')).toBeVisible();
+  await page.getByRole('button', { name: '查看电子票' }).click();
+  await expect(page).toHaveURL(`/tickets/${ticketId}`);
 });
 
 test('支付响应未知时只查询原支付结果，不重复发送支付 POST', async ({ page }) => {

@@ -28,6 +28,8 @@ export interface PaymentResultProps {
   onRetryQuery?: () => void;
   onRetryPay?: () => void;
   onBackToHome?: () => void;
+  ticketId?: string | null;
+  onViewTicket?: () => void;
 }
 
 /**
@@ -44,6 +46,8 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
   onRetryQuery,
   onRetryPay,
   onBackToHome,
+  ticketId,
+  onViewTicket,
 }) => {
   const isMobile = useMediaQuery('(max-width: 1023px)');
 
@@ -92,10 +96,12 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
           <div className="payment-result-state">
             <div className="payment-result-badge success">{PAYMENT_STATUS_LABELS.SUCCESS}</div>
             <p className="payment-result-desc">
-              订单已完成支付，金额 ¥ {amount}，您的电子票已生成。
+              订单已完成支付，金额 ¥ {amount}
+              {ticketId ? '，您的电子票已生成。' : '。'}
             </p>
             <div className="payment-result-actions">
-              {renderPrimaryBtn('查看订单', onViewOrder)}
+              {ticketId && onViewTicket && renderPrimaryBtn('查看电子票', onViewTicket)}
+              {renderDefaultBtn('查看订单', onViewOrder)}
               {renderDefaultBtn('返回首页', onBackToHome)}
             </div>
           </div>

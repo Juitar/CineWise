@@ -54,4 +54,30 @@ describe('PaymentResult 组件', () => {
     expect(container.querySelector('.adm-error-block')).toBeInTheDocument();
     expect(container.querySelector('.adm-button')).toBeInTheDocument();
   });
+
+  it('支付成功且有 ticketId 时显示电子票入口', () => {
+    const handleViewTicket = vi.fn();
+    render(
+      <PaymentResult
+        orderNo="1"
+        amount="1.00"
+        status="SUCCESS"
+        ticketId="T123"
+        onViewTicket={handleViewTicket}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '查看电子票' }));
+    expect(handleViewTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it('支付成功但缺少 ticketId 或入口回调时不显示电子票入口', () => {
+    const { rerender } = render(
+      <PaymentResult orderNo="1" amount="1.00" status="SUCCESS" ticketId="T123" />,
+    );
+    expect(screen.queryByRole('button', { name: '查看电子票' })).not.toBeInTheDocument();
+
+    rerender(<PaymentResult orderNo="1" amount="1.00" status="SUCCESS" />);
+    expect(screen.queryByRole('button', { name: '查看电子票' })).not.toBeInTheDocument();
+  });
 });
