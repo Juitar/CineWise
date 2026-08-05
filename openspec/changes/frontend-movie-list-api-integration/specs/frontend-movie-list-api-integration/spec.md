@@ -64,6 +64,14 @@
 - **THEN** 页面显示“当前为降级数据”
 - **AND** `fallbackType=MOCK/CACHE/SNAPSHOT` 分别显示“演示数据/缓存数据/历史快照”
 
+#### Scenario: 返回真实来源的缓存或快照
+
+- **GIVEN** 响应为 `sourceType=LIVE`、`degraded=true`、`fallbackType=CACHE` 或 `SNAPSHOT`
+- **WHEN** 页面展示影片列表
+- **THEN** 页面显示原始来源和更新时间
+- **AND** 同时显示“当前为降级数据”及“缓存数据”或“历史快照”
+- **AND** 不把缓存或快照表述为实时数据
+
 #### Scenario: 返回过期或无法验证的来源
 
 - **GIVEN** 响应 `isExpired=true`，或来源字段缺失、无法识别、未通过运行时校验

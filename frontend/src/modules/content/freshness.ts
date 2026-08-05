@@ -128,14 +128,16 @@ export function getFreshnessNotices(
   if (
     sourceVerified &&
     freshness.sourceType === 'LIVE' &&
-    freshness.degraded === false &&
-    freshness.fallbackType === null &&
     typeof freshness.source === 'string' &&
     isValidDateTime(freshness.dataTime)
   ) {
+    const sourceText =
+      freshness.degraded === true
+        ? `原始来源：${freshness.source}，更新时间：${formatDataTime(freshness.dataTime)}`
+        : `来源：${freshness.source}，更新于 ${formatDataTime(freshness.dataTime)}`;
     notices.push({
       id: 'source',
-      text: `来源：${freshness.source}，更新于 ${formatDataTime(freshness.dataTime)}`,
+      text: sourceText,
       tone: 'info',
     });
   }

@@ -56,15 +56,23 @@ describe('getFreshnessNotices', () => {
     expect(notices.some((notice) => notice.id === 'source')).toBe(false);
   });
 
-  it('LIVE 从缓存降级时不显示为实时来源', () => {
+  it.each([
+    ['CACHE', '缓存数据'],
+    ['SNAPSHOT', '历史快照'],
+  ] as const)('LIVE + %s 保留原始来源和更新时间并明确降级', (fallbackType, label) => {
     const notices = getFreshnessNotices({
       ...liveFreshness,
       degraded: true,
-      fallbackType: 'CACHE',
+      fallbackType,
     });
 
-    expect(notices.map((notice) => notice.text)).toEqual(['当前为降级数据', '缓存数据']);
-    expect(notices.some((notice) => notice.id === 'source')).toBe(false);
+    expect(notices.map((notice) => notice.text)).toEqual([
+      expect.stringContaining('原始来源：NETSTART'),
+      '当前为降级数据',
+      label,
+    ]);
+    expect(notices[0].text).toContain('更新时间');
+    expect(notices.every((notice) => !notice.text.includes('实时'))).toBe(true);
   });
 
   it('LIVE 的 degraded 与 fallbackType 矛盾时拒绝显示实时来源', () => {
