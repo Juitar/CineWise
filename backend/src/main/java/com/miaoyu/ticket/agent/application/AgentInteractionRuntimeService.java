@@ -19,10 +19,12 @@ import com.miaoyu.ticket.common.api.PageResult;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationContext;
 import com.miaoyu.ticket.agent.domain.plan.SlotSnapshot;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
+import com.miaoyu.ticket.common.observability.TraceIdHolder;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 /** Agent 交互应用门面；HTTP 层不直接依赖持久化用例或持久化领域模型。 */
@@ -134,7 +136,8 @@ public class AgentInteractionRuntimeService {
                 || !payload.path("actionId").isTextual()) {
             return payload;
         }
-        return confirmationService.refreshForCurrentUser(payload.path("actionId").asText())
+        String actionId = payload.path("actionId").asText();
+        return currentAction(actionId)
                 .<JsonNode>map(action -> {
                     ObjectNode refreshed = (ObjectNode) payload.deepCopy();
                     refreshed.put("status", com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationCardStatus
@@ -143,6 +146,22 @@ public class AgentInteractionRuntimeService {
                     return refreshed;
                 })
                 .orElse(payload);
+    }
+
+    /** 重连只按原请求键查询结果未知 action，绝不确认或重发建单。 */
+    private java.util.Optional<com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationAction> currentAction(
+            String actionId) {
+        var action = confirmationService.refreshForCurrentUser(actionId);
+        if (action.isEmpty() || action.get().status()
+                != com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationActionStatus.RESULT_UNKNOWN) {
+            return action;
+        }
+        return java.util.Optional.of(confirmationService.recover(actionId, traceId()).action());
+    }
+
+    private static String traceId() {
+        String traceId = TraceIdHolder.currentTraceId();
+        return traceId.isBlank() ? UUID.randomUUID().toString().replace("-", "") : traceId;
     }
 
     private static String nodeId(JsonNode payload) {
