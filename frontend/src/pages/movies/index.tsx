@@ -96,6 +96,8 @@ export default function MoviesPage() {
   const { query } = parsedQuery;
   const { data, error, isLoading, isOfflineSnapshot, isRefreshing, retry } = useMovieList(query);
   const [keywordDraft, setKeywordDraft] = useState(query.keyword ?? '');
+  // Hook 保留旧结果用于刷新失败恢复；请求进行中先隐藏旧内容，避免新筛选条件配上一次的影片。
+  const showSkeleton = isLoading || isRefreshing;
 
   useEffect(() => {
     setKeywordDraft(query.keyword ?? '');
@@ -108,7 +110,7 @@ export default function MoviesPage() {
   };
 
   // 来源属于整次分页查询，不复制到每张卡片，避免同一页出现互相矛盾的来源提示。
-  const freshnessNotices = data ? getFreshnessNotices(data) : [];
+  const freshnessNotices = data && !showSkeleton ? getFreshnessNotices(data) : [];
 
   return (
     <div className="movies-page-container">
@@ -206,7 +208,7 @@ export default function MoviesPage() {
 
           {isRefreshing ? <div className="movies-refreshing">正在更新影片列表…</div> : null}
 
-          {isLoading ? (
+          {showSkeleton ? (
             <div className="movies-grid-view" aria-label="影片加载中">
               {SKELETON_KEYS.map((key) => (
                 <div className="movie-grid-card movie-grid-card--skeleton" key={key}>
@@ -217,7 +219,7 @@ export default function MoviesPage() {
             </div>
           ) : null}
 
-          {!isLoading && !error && data?.records.length === 0 ? (
+          {!showSkeleton && !error && data?.records.length === 0 ? (
             <Empty description="没有找到符合条件的影片">
               {data.total > 0 && query.page > 1 ? (
                 <Button onClick={() => updateQuery({ page: 1 })}>返回第一页</Button>
@@ -225,7 +227,7 @@ export default function MoviesPage() {
             </Empty>
           ) : null}
 
-          {data && data.records.length > 0 ? (
+          {!showSkeleton && data && data.records.length > 0 ? (
             <div className="movies-grid-view" aria-live="polite">
               {data.records.map((movie) => (
                 <MovieCard key={movie.movieId} movie={movie} />
@@ -233,7 +235,7 @@ export default function MoviesPage() {
             </div>
           ) : null}
 
-          {data && data.total > 0 ? (
+          {!showSkeleton && data && data.total > 0 ? (
             <div className="movies-pagination">
               <span>共 {data.total} 部影片</span>
               <Pagination

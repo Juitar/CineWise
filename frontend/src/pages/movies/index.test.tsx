@@ -130,6 +130,30 @@ describe('MoviesPage', () => {
     expect(screen.getByText('没有找到符合条件的影片')).toBeInTheDocument();
   });
 
+  it('切换查询条件时用骨架屏替换旧影片和分页', () => {
+    pageMocks.useMovieList.mockReturnValue(movieListState({ isRefreshing: true }));
+    const { rerender } = render(<MoviesPage />);
+
+    expect(screen.getByLabelText('影片加载中')).toBeInTheDocument();
+    expect(screen.getByText('正在更新影片列表…')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: '星河远征' })).not.toBeInTheDocument();
+    expect(screen.queryByText('共 1 部影片')).not.toBeInTheDocument();
+    expect(screen.queryByText('演示数据')).not.toBeInTheDocument();
+
+    pageMocks.useMovieList.mockReturnValue(
+      movieListState({
+        data: {
+          ...response,
+          records: [{ ...response.records[0], movieId: '8100002', title: '山海新篇' }],
+        },
+      }),
+    );
+    rerender(<MoviesPage />);
+
+    expect(screen.queryByLabelText('影片加载中')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: '山海新篇' })).toBeInTheDocument();
+  });
+
   it('当前页为空但仍有总记录时保留分页并可返回第一页', () => {
     pageMocks.search = 'page=999';
     pageMocks.useMovieList.mockReturnValue(
