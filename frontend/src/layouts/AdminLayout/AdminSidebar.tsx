@@ -6,7 +6,7 @@ import './index.css';
 
 export function AdminSidebar() {
   const location = useLocation();
-  const selectedKey = location.pathname;
+  const selectedKey = location.pathname === '/admin' ? '/admin/content' : location.pathname;
 
   const menuItems = [
     {

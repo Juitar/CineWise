@@ -18,9 +18,10 @@ export default defineConfig({
       component: '@/layouts/AdminLayout',
       wrappers: ['@/shared/auth/RequireAdmin'],
       routes: [
-        { path: '/admin/', component: '@/pages/admin/dashboard' },
+        { path: '/admin/', component: '@/pages/admin' },
+        { path: '/admin/content', component: '@/pages/admin/dashboard' },
         { path: '/admin/orders', component: '@/pages/admin/orders' },
-        { path: '/admin/agent-logs', component: '@/pages/admin/agent-logs' },
+        { path: '/admin/agent-runs', component: '@/pages/admin/agent-logs' },
         { path: '*', component: '@/pages/not-found' },
       ],
     },
