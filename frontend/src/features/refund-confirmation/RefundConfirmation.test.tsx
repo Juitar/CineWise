@@ -65,6 +65,13 @@ describe('RefundConfirmation 组件', () => {
     expect(screen.getByText('退款已申请...')).toBeInTheDocument();
   });
 
+  it('在 SUCCESS 状态下使用统一退款成功文案，避免重复前缀', () => {
+    render(<RefundConfirmation {...defaultProps} status="SUCCESS" />);
+
+    expect(screen.getByText('退款成功')).toBeInTheDocument();
+    expect(screen.queryByText('退款退款成功')).not.toBeInTheDocument();
+  });
+
   it('在移动端 REQUESTED 状态下渲染 SpinLoading', () => {
     setMobileView(true);
     const { container } = render(<RefundConfirmation {...defaultProps} status="REQUESTED" />);

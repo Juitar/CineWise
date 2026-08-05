@@ -177,7 +177,7 @@ export const RefundConfirmation: React.FC<RefundConfirmationProps> = ({
           <Alert
             type="success"
             showIcon
-            message={`退款${REFUND_STATUS_LABELS.SUCCESS}`}
+            message={REFUND_STATUS_LABELS.SUCCESS}
             description={`退款 ¥ ${refundAmount} 申请成功。`}
           />
         </div>
