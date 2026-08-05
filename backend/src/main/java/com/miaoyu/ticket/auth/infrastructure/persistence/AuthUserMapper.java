@@ -2,6 +2,8 @@ package com.miaoyu.ticket.auth.infrastructure.persistence;
 
 import com.miaoyu.ticket.auth.domain.AuthUser;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Set;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -22,6 +24,39 @@ public interface AuthUserMapper {
 
     @Select("SELECT " + AUTH_COLUMNS + " FROM sys_user WHERE id = #{userId} LIMIT 1")
     AuthUserRow findById(@Param("userId") long userId);
+
+    /** 管理端数字关键字只按主键精确匹配，不回退为邮箱包含查询。 */
+    @Select("SELECT id FROM sys_user WHERE id = #{userId} LIMIT 1")
+    Long findExistingUserId(@Param("userId") long userId);
+
+    /**
+     * 邮箱关键字使用显式转义字符做包含匹配，limit 固定由 C 的端口实现传入 101。
+     * escapedKeyword 已将感叹号、百分号和下划线转义，反斜杠不是转义字符，因此按普通字符查询。
+     */
+    @Select("""
+            SELECT id
+              FROM sys_user
+             WHERE LOWER(email) LIKE CONCAT('%', #{escapedKeyword}, '%') ESCAPE '!'
+             ORDER BY id
+             LIMIT #{limit}
+            """)
+    List<Long> findUserIdsByEmailKeyword(
+            @Param("escapedKeyword") String escapedKeyword,
+            @Param("limit") int limit);
+
+    /** 一次批量读取公开摘要所需的最小列，不读取密码摘要、状态或 tokenVersion。 */
+    @Select("""
+            <script>
+            SELECT id, email
+              FROM sys_user
+             WHERE id IN
+              <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+                #{userId}
+              </foreach>
+             ORDER BY id
+            </script>
+            """)
+    List<AdminUserSummaryRow> findAdminUserSummaries(@Param("userIds") Set<Long> userIds);
 
     @Select("SELECT COUNT(*) FROM sys_user WHERE email = #{email}")
     int countByEmail(@Param("email") String normalizedEmail);
@@ -51,4 +86,8 @@ public interface AuthUserMapper {
             )
             """)
     void insert(@Param("user") AuthUser user, @Param("createTime") LocalDateTime createTime);
+
+    /** C 内部持久化投影，只包含跨模块公开摘要生成所需字段。 */
+    record AdminUserSummaryRow(long id, String email) {
+    }
 }
