@@ -86,4 +86,43 @@ describe('退款页面时间展示', () => {
     expect(screen.queryByText('¥ 0.00')).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   });
+
+  it.each([
+    ['SUCCESS', '退款成功'],
+    ['PROCESSING', '退款处理中...'],
+    ['REQUESTED', '退款已申请...'],
+  ] as const)('已有 %s 退款记录时不被 205006 覆盖', (refundStatus, expectedText) => {
+    vi.mocked(useRefundPage).mockReturnValue({
+      impact: null,
+      alternatives: null,
+      refund: {
+        refundId: 'refund-1',
+        refundNo: 'RF-1',
+        orderId: '1',
+        orderNo: 'CW1',
+        refundStatus,
+        refundAmount: '39.90',
+        orderStatus: refundStatus === 'SUCCESS' ? 'REFUNDED' : 'REFUNDING',
+        ticketStatus: refundStatus === 'SUCCESS' ? 'REFUNDED' : 'VALID',
+        stateVersion: 2,
+        updatedAt: '2026-08-10T14:30:00+08:00',
+      },
+      loading: false,
+      submitting: false,
+      resultUnknown: false,
+      error: new ApiError('订单不可退', {
+        kind: 'HTTP',
+        code: 205006,
+        status: 409,
+      }),
+      alternativeError: null,
+      submit: vi.fn(),
+      recover: vi.fn(),
+    });
+
+    render(<RefundPage />);
+
+    expect(screen.getByText(expectedText)).toBeInTheDocument();
+    expect(screen.queryByText('当前订单不可退票')).not.toBeInTheDocument();
+  });
 });

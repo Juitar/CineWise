@@ -15,21 +15,25 @@ import './index.css';
 export default function RefundPage() {
   const { orderNo = '' } = useParams<{ orderNo: string }>();
   const state = useRefundPage(orderNo);
+  const refundStatus = state.refund?.refundStatus;
   const status = state.loading
     ? 'LOADING'
     : state.resultUnknown
       ? 'RESULT_UNKNOWN'
-      : state.error?.code === 205006
-        ? 'NOT_REFUNDABLE'
-        : state.refund?.refundStatus === 'SUCCESS'
-          ? 'SUCCESS'
-          : state.refund?.refundStatus === 'REQUESTED'
-            ? 'REQUESTED'
-            : state.submitting || state.refund?.refundStatus === 'PROCESSING'
-              ? 'PROCESSING'
+      : refundStatus === 'SUCCESS'
+        ? 'SUCCESS'
+        : refundStatus === 'REQUESTED'
+          ? 'REQUESTED'
+          : state.submitting || refundStatus === 'PROCESSING'
+            ? 'PROCESSING'
+            : state.error?.code === 205006
+              ? 'NOT_REFUNDABLE'
               : state.error
                 ? 'ERROR'
                 : 'NORMAL';
+  // 影响查询可能因订单状态变化返回 205006，但已有退款记录仍是服务端更具体的结果。
+  const visibleError =
+    state.error?.code === 205006 && state.refund ? undefined : state.error?.message;
   const impact = state.impact;
   const alternativeShows = (state.alternatives?.shows ?? []).map((show) => ({
     ...show,
@@ -50,7 +54,7 @@ export default function RefundPage() {
           showStartTime={formatOrderDateTime(impact?.showStartTime)}
           impactText={impact?.impactText ?? '正在读取服务端退票影响说明。'}
           status={status}
-          error={state.error?.message}
+          error={visibleError}
           onConfirmRefund={(reason) => void state.submit(reason)}
           onQueryRefundResult={() => void state.recover()}
           onCancel={() => history.push(`/orders/${encodeURIComponent(orderNo)}`)}
