@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 class AuthApplicationServiceTest {
 
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-08-03T08:00:00Z"), ZoneOffset.UTC);
+    private static final Instant TOKEN_EXPIRES_AT = Instant.parse("2026-08-03T08:30:00Z");
     private final AuthUserRepository userRepository = mock(AuthUserRepository.class);
     private final LoginAuditRepository auditRepository = mock(LoginAuditRepository.class);
     private final PasswordVerifier passwordVerifier = mock(PasswordVerifier.class);
@@ -52,11 +53,11 @@ class AuthApplicationServiceTest {
         AuthUser user = user(RoleCode.USER, AccountStatus.NORMAL);
         when(userRepository.findByEmail("user@cinewise.test")).thenReturn(Optional.of(user));
         when(passwordVerifier.matches("Password1", user.passwordHash())).thenReturn(true);
-        when(tokenService.issue(user)).thenReturn("signed-token");
+        when(tokenService.issue(user)).thenReturn(token("signed-token"));
 
         LoginResult result = service.login(command(LoginType.PASSWORD));
 
-        assertThat(result.accessToken()).isEqualTo("signed-token");
+        assertThat(result.accessToken().value()).isEqualTo("signed-token");
         assertThat(result.currentUser().id()).isEqualTo("1001");
         assertThat(result.currentUser().emailMasked()).isEqualTo("u***@cinewise.test");
         assertThat(result.currentUser().role()).isEqualTo(RoleCode.USER);
@@ -90,22 +91,22 @@ class AuthApplicationServiceTest {
         AuthUser user = user(RoleCode.USER, AccountStatus.NORMAL);
         when(userRepository.findByEmail("user@cinewise.test")).thenReturn(Optional.of(user));
         when(passwordVerifier.matches("Password1", user.passwordHash())).thenReturn(true);
-        when(tokenService.issue(user)).thenReturn("signed-token");
+        when(tokenService.issue(user)).thenReturn(token("signed-token"));
         doThrow(new IllegalStateException("audit unavailable"))
                 .when(auditRepository).append(any(LoginAuditRepository.LoginAuditRecord.class));
 
-        assertThat(service.login(command(LoginType.PASSWORD)).accessToken()).isEqualTo("signed-token");
+        assertThat(service.login(command(LoginType.PASSWORD)).accessToken().value()).isEqualTo("signed-token");
     }
 
     @Test
     void shouldLoginNormalUserWithEmailCode() {
         AuthUser user = user(RoleCode.USER, AccountStatus.NORMAL);
         when(userRepository.findByEmail("user@cinewise.test")).thenReturn(Optional.of(user));
-        when(tokenService.issue(user)).thenReturn("email-code-token");
+        when(tokenService.issue(user)).thenReturn(token("email-code-token"));
 
         LoginResult result = service.loginWithEmailCode(emailCodeCommand());
 
-        assertThat(result.accessToken()).isEqualTo("email-code-token");
+        assertThat(result.accessToken().value()).isEqualTo("email-code-token");
         verify(verificationCodeVerifier)
                 .verifyAndConsume("user@cinewise.test", VerificationPurpose.LOGIN, "123456");
         verify(auditRepository).append(any(LoginAuditRepository.LoginAuditRecord.class));
@@ -146,5 +147,9 @@ class AuthApplicationServiceTest {
     private EmailCodeLoginCommand emailCodeCommand() {
         return new EmailCodeLoginCommand(
                 "request-email-1", " User@CineWise.Test ", "123456", "127.0.0.1", "JUnit", "trace-email-1");
+    }
+
+    private IssuedAccessToken token(String value) {
+        return new IssuedAccessToken(value, CLOCK.instant(), TOKEN_EXPIRES_AT);
     }
 }

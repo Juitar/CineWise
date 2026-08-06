@@ -1,0 +1,36 @@
+.password-reset-page .login-card {
+  min-height: 600px;
+}
+
+.password-reset-form {
+  gap: 14px;
+}
+
+.password-reset-passwords {
+  display: grid;
+  gap: 12px;
+}
+
+.password-reset-unknown-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.password-reset-unknown-actions .ant-btn {
+  min-height: 44px;
+}
+
+@media (max-width: 1023px) {
+  .password-reset-page .login-card {
+    min-height: auto;
+  }
+
+  .password-reset-page .login-form-section {
+    padding-bottom: 32px;
+  }
+
+  .password-reset-unknown-actions {
+    grid-template-columns: 1fr;
+  }
+}

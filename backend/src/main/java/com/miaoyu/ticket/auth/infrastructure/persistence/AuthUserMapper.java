@@ -75,6 +75,24 @@ public interface AuthUserMapper {
             @Param("expectedTokenVersion") long expectedTokenVersion,
             @Param("updateTime") LocalDateTime updateTime);
 
+    /** 密码和会话版本一次更新，事务回滚时两者均恢复。 */
+    @Update("""
+            UPDATE sys_user
+               SET password_hash = #{passwordHash},
+                   token_version = token_version + 1,
+                   version = version + 1,
+                   update_time = #{updateTime}
+             WHERE id = #{userId}
+               AND token_version = #{expectedTokenVersion}
+               AND status = 'NORMAL'
+               AND email_verified = 1
+            """)
+    int resetPassword(
+            @Param("userId") long userId,
+            @Param("expectedTokenVersion") long expectedTokenVersion,
+            @Param("passwordHash") String passwordHash,
+            @Param("updateTime") LocalDateTime updateTime);
+
     @Insert("""
             INSERT INTO sys_user (
                 id, email, password_hash, nickname, role_code, status, email_verified,

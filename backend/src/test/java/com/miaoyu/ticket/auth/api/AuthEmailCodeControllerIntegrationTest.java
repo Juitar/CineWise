@@ -211,7 +211,7 @@ class AuthEmailCodeControllerIntegrationTest {
                         .cookie(csrf.cookie())
                         .header(CSRF_HEADER, csrf.token())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"user@cinewise.test\",\"purpose\":\"RESET_PASSWORD\"}"))
+                        .content("{\"email\":\"user@cinewise.test\",\"purpose\":\"UNSUPPORTED\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(101001));
     }

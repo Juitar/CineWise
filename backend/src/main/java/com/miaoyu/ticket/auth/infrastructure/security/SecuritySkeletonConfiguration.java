@@ -2,6 +2,7 @@ package com.miaoyu.ticket.auth.infrastructure.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.auth.application.AuthErrorCode;
+import com.miaoyu.ticket.auth.application.AccessTokenService;
 import com.miaoyu.ticket.auth.application.AuthUserRepository;
 import com.miaoyu.ticket.auth.infrastructure.config.AuthProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -68,6 +69,7 @@ public class SecuritySkeletonConfiguration {
                                 HttpMethod.POST,
                                 "/api/v1/auth/email-codes",
                                 "/api/v1/auth/register",
+                                "/api/v1/auth/password/reset",
                                 "/api/v1/auth/login/email",
                                 "/api/v1/auth/login/password",
                                 "/api/v1/admin/auth/login")
@@ -89,8 +91,14 @@ public class SecuritySkeletonConfiguration {
 
     @Bean
     public JwtCookieAuthenticationFilter jwtCookieAuthenticationFilter(
-            JwtDecoder jwtDecoder, AuthUserRepository userRepository, AuthProperties properties) {
-        return new JwtCookieAuthenticationFilter(jwtDecoder, userRepository, properties);
+            JwtDecoder jwtDecoder,
+            AuthUserRepository userRepository,
+            AccessTokenService accessTokenService,
+            AuthCookieManager cookieManager,
+            AuthProperties properties,
+            java.time.Clock clock) {
+        return new JwtCookieAuthenticationFilter(
+                jwtDecoder, userRepository, accessTokenService, cookieManager, properties, clock);
     }
 
     /** 该过滤器只属于 Spring Security 链，禁止 Servlet 容器再自动注册并执行一次。 */

@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miaoyu.ticket.auth.application.AccessTokenService;
+import com.miaoyu.ticket.auth.application.AuthUserRepository;
 import jakarta.servlet.http.Cookie;
 import java.time.LocalDateTime;
 import java.time.Instant;
@@ -32,6 +34,7 @@ import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -60,6 +63,15 @@ class AuthControllerIntegrationTest {
 
     @Autowired
     private JwtEncoder jwtEncoder;
+
+    @Autowired
+    private JwtDecoder jwtDecoder;
+
+    @Autowired
+    private AccessTokenService accessTokenService;
+
+    @Autowired
+    private AuthUserRepository authUserRepository;
 
     @BeforeEach
     void setUpAccounts() {
@@ -135,7 +147,7 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
-    void shouldLoginRestoreCurrentUserLogoutAndRejectOldJwt() throws Exception {
+    void shouldLoginRestoreCurrentUserLogoutAndRejectOldAndRenewedJwt() throws Exception {
         CsrfSession anonymousCsrf = getCsrf();
         MvcResult login = mockMvc.perform(post("/api/v1/auth/login/password")
                         .cookie(anonymousCsrf.cookie())
@@ -151,6 +163,12 @@ class AuthControllerIntegrationTest {
                 .andExpect(cookie().httpOnly(ACCESS_COOKIE, true))
                 .andReturn();
         Cookie accessCookie = requireCookie(login, ACCESS_COOKIE);
+        var issuedJwt = jwtDecoder.decode(accessCookie.getValue());
+        var renewed = accessTokenService.renew(
+                        authUserRepository.findById(1001L).orElseThrow(),
+                        issuedJwt.getClaimAsInstant("sessionStartedAt"))
+                .orElseThrow();
+        Cookie renewedCookie = new Cookie(ACCESS_COOKIE, renewed.value());
 
         mockMvc.perform(get("/api/v1/auth/me").cookie(accessCookie))
                 .andExpect(status().isOk())
@@ -165,6 +183,9 @@ class AuthControllerIntegrationTest {
                 .andExpect(cookie().maxAge(ACCESS_COOKIE, 0));
 
         mockMvc.perform(get("/api/v1/auth/me").cookie(accessCookie))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(201006));
+        mockMvc.perform(get("/api/v1/auth/me").cookie(renewedCookie))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(201006));
         assertThat(jdbcTemplate.queryForObject(
