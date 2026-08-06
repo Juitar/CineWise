@@ -54,14 +54,22 @@ public class PersistentAgentConfirmationEventPublisher implements AgentConfirmat
     }
 
     private String payload(AgentConfirmationAction action) {
-        Map<String, Object> payload = Map.of(
-                "actionId", action.actionId(),
-                "actionType", "CREATE_ORDER",
-                "expireAt", action.expireAt().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime()
-                        .toString(),
-                "status", AgentConfirmationCardStatus.fromActionStatus(action.status()).name(),
-                "displayTitle", DISPLAY_TITLE,
-                "displayLines", DISPLAY_LINES);
+        String dataAt = action.updateTime().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime().toString();
+        Map<String, Object> payload = Map.ofEntries(
+                Map.entry("type", "PLAN_CARD"),
+                Map.entry("actionId", action.actionId()),
+                Map.entry("actionType", "CREATE_ORDER"),
+                Map.entry("expireAt", action.expireAt().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime()
+                        .toString()),
+                Map.entry("status", AgentConfirmationCardStatus.fromActionStatus(action.status()).name()),
+                Map.entry("title", DISPLAY_TITLE),
+                Map.entry("displayLines", DISPLAY_LINES),
+                Map.entry("plans", List.of()),
+                Map.entry("source", "agent_confirmation"),
+                Map.entry("dataAt", dataAt),
+                Map.entry("expiresAt", action.expireAt().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime()
+                        .toString()),
+                Map.entry("degraded", false));
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (JsonProcessingException exception) {
