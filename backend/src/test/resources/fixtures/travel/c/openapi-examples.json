@@ -1,0 +1,6 @@
+{
+  "taskDetail": "task-detail-success.json",
+  "cancelledTaskDetail": "task-detail-cancelled.json",
+  "advice": [ "advice-weather-normal.json", "advice-weather-unavailable.json", "advice-weather-demo.json", "advice-expired.json", "advice-not-generated.json" ],
+  "errors": "errors.json"
+}

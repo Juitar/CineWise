@@ -1,0 +1,7 @@
+{
+  "207001": { "httpStatus": 404, "code": 207001 },
+  "207002": { "httpStatus": 409, "code": 207002 },
+  "207003": { "httpStatus": 409, "code": 207003 },
+  "107001": { "httpStatus": 429, "code": 107001 },
+  "207004": { "httpStatus": 503, "code": 207004 }
+}

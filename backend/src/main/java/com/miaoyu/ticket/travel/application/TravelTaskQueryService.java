@@ -3,10 +3,16 @@ package com.miaoyu.ticket.travel.application;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.content.application.ContentPurchaseQueryPort;
+import com.miaoyu.ticket.content.application.ContentSummaryQueryPort;
+import com.miaoyu.ticket.order.application.TravelOrderSummaryQueryPort;
 import com.miaoyu.ticket.travel.domain.TravelTaskStatus;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,23 +30,86 @@ public class TravelTaskQueryService {
     private final TravelAdviceRepository travelAdviceRepository;
     private final TravelAdviceService travelAdviceService;
     private final Clock clock;
+    private final TravelOrderSummaryQueryPort travelOrderSummaryQueryPort;
+    private final ContentPurchaseQueryPort contentPurchaseQueryPort;
+    private final ContentSummaryQueryPort contentSummaryQueryPort;
 
+    @Autowired
+    public TravelTaskQueryService(
+            TravelTaskRepository travelTaskRepository,
+            CurrentUserAccessor currentUserAccessor,
+            TravelAdviceRepository travelAdviceRepository,
+            TravelAdviceService travelAdviceService,
+            Clock clock,
+            TravelOrderSummaryQueryPort travelOrderSummaryQueryPort,
+            ContentPurchaseQueryPort contentPurchaseQueryPort,
+            ContentSummaryQueryPort contentSummaryQueryPort) {
+        this.travelTaskRepository = travelTaskRepository;
+        this.currentUserAccessor = currentUserAccessor;
+        this.travelAdviceRepository = travelAdviceRepository;
+        this.travelAdviceService = travelAdviceService;
+        this.clock = clock;
+        this.travelOrderSummaryQueryPort = travelOrderSummaryQueryPort;
+        this.contentPurchaseQueryPort = contentPurchaseQueryPort;
+        this.contentSummaryQueryPort = contentSummaryQueryPort;
+    }
+
+    /** 保留单元测试的最小构造方式；正式 Spring Bean 使用包含三个公开查询端口的构造器。 */
     public TravelTaskQueryService(
             TravelTaskRepository travelTaskRepository,
             CurrentUserAccessor currentUserAccessor,
             TravelAdviceRepository travelAdviceRepository,
             TravelAdviceService travelAdviceService,
             Clock clock) {
-        this.travelTaskRepository = travelTaskRepository;
-        this.currentUserAccessor = currentUserAccessor;
-        this.travelAdviceRepository = travelAdviceRepository;
-        this.travelAdviceService = travelAdviceService;
-        this.clock = clock;
+        this(travelTaskRepository, currentUserAccessor, travelAdviceRepository, travelAdviceService, clock,
+                null, null, null);
     }
 
     @Transactional(readOnly = true)
     public TravelTaskView getMyTask(String taskId) {
         return toView(requireMyTask(taskId));
+    }
+
+    /**
+     * 聚合页面真正需要的摘要。所有跨模块数据都通过公开 Application Port 读取，依赖失败统一转成 D 的 503。
+     */
+    @Transactional(readOnly = true)
+    public TravelTaskDetails getMyTaskDetails(String taskId) {
+        TravelTaskRepository.TravelTaskSnapshot task = requireMyTask(taskId);
+        if (travelOrderSummaryQueryPort == null || contentPurchaseQueryPort == null
+                || contentSummaryQueryPort == null) {
+            throw new BusinessException(TravelErrorCode.DEPENDENCY_UNAVAILABLE);
+        }
+        try {
+            TravelOrderSummaryQueryPort.TravelOrderSummary order =
+                    travelOrderSummaryQueryPort.queryMyOrder(Long.toString(task.orderId()));
+            long movieId = parseDependencyId(order.movieId());
+            long cinemaId = parseDependencyId(order.cinemaId());
+            Map<Long, ContentPurchaseQueryPort.MovieSummary> movies =
+                    contentPurchaseQueryPort.findMovieSummaries(Set.of(movieId));
+            ContentPurchaseQueryPort.MovieSummary movie = movies.get(movieId);
+            ContentSummaryQueryPort.CinemaSummaryBatch cinemas =
+                    contentSummaryQueryPort.findCinemaSummaries(Set.of(cinemaId));
+            ContentSummaryQueryPort.CinemaSummary cinema = cinemas.findByCinemaId(cinemaId).orElse(null);
+            if (movie == null || cinema == null) {
+                throw new BusinessException(TravelErrorCode.DEPENDENCY_UNAVAILABLE);
+            }
+            return new TravelTaskDetails(
+                    task.taskId(), task.status(), task.triggerAt().atZone(ClockConfiguration.BUSINESS_ZONE_ID)
+                            .toOffsetDateTime(), task.version(),
+                    new OrderSummary(order.orderId(), order.orderNo(), order.showId(), order.showStartTime()),
+                    new MovieSummary(Long.toString(movie.movieId()), movie.title(), movie.posterUrl(),
+                            movie.contentSource(), movie.contentDataTime()),
+                    new CinemaSummary(Long.toString(cinema.cinemaId()), cinema.name(), cinema.area(),
+                            cinema.address(), cinema.source(), cinema.dataTime(), cinema.expiresAt(), cinema.expired()));
+        } catch (BusinessException exception) {
+            if (exception.getErrorCode() == TravelErrorCode.DEPENDENCY_UNAVAILABLE) {
+                throw exception;
+            }
+            throw new BusinessException(TravelErrorCode.DEPENDENCY_UNAVAILABLE);
+        } catch (RuntimeException exception) {
+            throw new BusinessException(TravelErrorCode.DEPENDENCY_UNAVAILABLE);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -123,7 +192,7 @@ public class TravelTaskQueryService {
                 .orElseThrow(() -> new BusinessException(TravelErrorCode.TASK_NOT_FOUND));
     }
 
-    private long parsePositiveId(String value) {
+    private long parseDependencyId(String value) {
         if (value == null || !value.matches("[1-9][0-9]*")) {
             throw new BusinessException(TravelErrorCode.TASK_NOT_FOUND);
         }
@@ -131,6 +200,17 @@ public class TravelTaskQueryService {
             return Long.parseLong(value);
         } catch (NumberFormatException exception) {
             throw new BusinessException(TravelErrorCode.TASK_NOT_FOUND);
+        }
+    }
+
+    private long parsePositiveId(String value) {
+        if (value == null || !value.matches("[1-9][0-9]*")) {
+            throw new IllegalArgumentException("business id is invalid");
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("business id is invalid", exception);
         }
     }
 
@@ -169,5 +249,28 @@ public class TravelTaskQueryService {
             LocalDateTime expiresAt,
             boolean degraded,
             String fallbackType) {
+    }
+
+    public record TravelTaskDetails(
+            String taskId,
+            TravelTaskStatus status,
+            java.time.OffsetDateTime triggerAt,
+            long version,
+            OrderSummary order,
+            MovieSummary movie,
+            CinemaSummary cinema) {
+    }
+
+    public record OrderSummary(String orderId, String orderNo, String showId,
+                               java.time.OffsetDateTime showStartTime) {
+    }
+
+    public record MovieSummary(String movieId, String title, String posterUrl,
+                               String source, LocalDateTime dataTime) {
+    }
+
+    public record CinemaSummary(String cinemaId, String name, String area, String address,
+                                String source, LocalDateTime dataTime, LocalDateTime expiresAt,
+                                boolean isExpired) {
     }
 }

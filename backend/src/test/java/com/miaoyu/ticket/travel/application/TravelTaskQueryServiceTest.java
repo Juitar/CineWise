@@ -7,12 +7,19 @@ import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.auth.application.RoleCode;
 import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.content.application.ContentPurchaseQueryPort;
+import com.miaoyu.ticket.content.application.ContentSeedCatalog;
+import com.miaoyu.ticket.content.application.ContentSummaryQueryPort;
+import com.miaoyu.ticket.order.application.TravelOrderSummaryQueryPort;
 import com.miaoyu.ticket.travel.domain.TravelTaskStatus;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import java.util.Map;
+import java.util.Set;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class TravelTaskQueryServiceTest {
@@ -63,6 +70,67 @@ class TravelTaskQueryServiceTest {
         assertThat(advice.available()).isTrue();
         assertThat(advice.adviceJson()).contains("交通");
         assertThat(advice.weatherJson()).contains("多云");
+    }
+
+    @Test
+    void givenCancelledTaskAndAvailablePublicSummaries_whenReadingDetails_thenKeepCancelledStatus() {
+        StubRepository repository = new StubRepository(task(1L, TravelTaskStatus.CANCELLED));
+        TravelTaskQueryService service = detailedService(repository, availableOrder(), availableMovies(), availableCinemas());
+
+        TravelTaskQueryService.TravelTaskDetails details = service.getMyTaskDetails("90001");
+
+        assertThat(details.status()).isEqualTo(TravelTaskStatus.CANCELLED);
+        assertThat(details.order().orderNo()).isEqualTo("ORD-80001");
+        assertThat(details.movie().title()).isEqualTo("测试影片");
+        assertThat(details.cinema().address()).isEqualTo("测试路 1 号");
+    }
+
+    @Test
+    void givenContentSummaryUnavailable_whenReadingDetails_thenHideDependencyErrorBehindDCode() {
+        StubRepository repository = new StubRepository(task(1L, TravelTaskStatus.READY));
+        ContentPurchaseQueryPort unavailableMovies = new ContentPurchaseQueryPort() {
+            @Override public Map<Long, MovieSummary> findMovieSummaries(Set<Long> movieIds) {
+                throw new BusinessException(TravelErrorCode.TASK_NOT_FOUND);
+            }
+            @Override public Optional<ContentSeedCatalog> findChangshaLivePurchaseCatalog() { return Optional.empty(); }
+        };
+        TravelTaskQueryService service = detailedService(repository, availableOrder(), unavailableMovies, availableCinemas());
+
+        assertThatThrownBy(() -> service.getMyTaskDetails("90001"))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(TravelErrorCode.DEPENDENCY_UNAVAILABLE));
+    }
+
+    private TravelTaskQueryService detailedService(
+            StubRepository repository, TravelOrderSummaryQueryPort orderPort, ContentPurchaseQueryPort moviePort,
+            ContentSummaryQueryPort cinemaPort) {
+        CurrentUserAccessor accessor = () -> new CurrentUser(1L, RoleCode.USER, 0L);
+        return new TravelTaskQueryService(repository, accessor, new StubAdviceRepository(null), null,
+                Clock.fixed(Instant.parse("2026-08-04T00:00:00Z"), ZoneOffset.UTC), orderPort, moviePort, cinemaPort);
+    }
+
+    private TravelOrderSummaryQueryPort availableOrder() {
+        return orderId -> new TravelOrderSummaryQueryPort.TravelOrderSummary(
+                orderId, "ORD-80001", "70001", "10001", "20001",
+                java.time.OffsetDateTime.parse("2026-08-05T19:00:00+08:00"));
+    }
+
+    private ContentPurchaseQueryPort availableMovies() {
+        return new ContentPurchaseQueryPort() {
+            @Override public Map<Long, MovieSummary> findMovieSummaries(Set<Long> movieIds) {
+                return Map.of(10001L, new MovieSummary(10001L, "测试影片", null,
+                        "DEMO_CONTENT_V1", LocalDateTime.of(2026, 8, 4, 8, 0)));
+            }
+            @Override public Optional<ContentSeedCatalog> findChangshaLivePurchaseCatalog() { return Optional.empty(); }
+        };
+    }
+
+    private ContentSummaryQueryPort availableCinemas() {
+        return cinemaIds -> new ContentSummaryQueryPort.CinemaSummaryBatch(List.of(
+                new ContentSummaryQueryPort.CinemaSummary(20001L, "测试影院", null, "测试路 1 号",
+                        "DEMO_CONTENT_V1", LocalDateTime.of(2026, 8, 4, 8, 0),
+                        LocalDateTime.of(2026, 8, 4, 8, 15), false)), Set.of());
     }
 
     private TravelTaskQueryService service(StubRepository repository, long userId) {
