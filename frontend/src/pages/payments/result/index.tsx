@@ -8,6 +8,7 @@ import {
   buildOrderDetailPath,
   buildPaymentPath,
 } from '../../../modules/order/routes';
+import { TransactionBackButton } from '../../../features/transaction-back-button/TransactionBackButton';
 import './index.css';
 
 /**
@@ -26,23 +27,26 @@ export default function PaymentResultPage() {
 
   return (
     <div className="payment-result-page-wrapper">
-      <PaymentResult
-        orderNo={orderNo}
-        amount={orderQuery.data?.totalAmount ?? '0.00'}
-        status={status}
-        error={paymentAction.error?.message}
-        ticketId={paymentAction.payment?.ticketId}
-        onViewTicket={() => {
-          const ticketId = paymentAction.payment?.ticketId;
-          if (status === 'SUCCESS' && ticketId) {
-            history.push(buildElectronicTicketPath(ticketId));
-          }
-        }}
-        onViewOrder={() => history.push(buildOrderDetailPath(orderNo))}
-        onRetryQuery={() => void paymentAction.query()}
-        onRetryPay={() => history.push(buildPaymentPath(orderNo))}
-        onBackToHome={() => history.push('/')}
-      />
+      <div className="payment-result-page-content">
+        <TransactionBackButton onBack={() => history.push('/orders')} label="返回订单列表" />
+        <PaymentResult
+          orderNo={orderNo}
+          amount={orderQuery.data?.totalAmount ?? '0.00'}
+          status={status}
+          error={paymentAction.error?.message}
+          ticketId={paymentAction.payment?.ticketId}
+          onViewTicket={() => {
+            const ticketId = paymentAction.payment?.ticketId;
+            if (status === 'SUCCESS' && ticketId) {
+              history.push(buildElectronicTicketPath(ticketId));
+            }
+          }}
+          onViewOrder={() => history.push(buildOrderDetailPath(orderNo))}
+          onRetryQuery={() => void paymentAction.query()}
+          onRetryPay={() => history.push(buildPaymentPath(orderNo))}
+          onBackToHome={() => history.push('/')}
+        />
+      </div>
     </div>
   );
 }

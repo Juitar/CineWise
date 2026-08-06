@@ -208,6 +208,7 @@ public class TravelTaskApplicationService {
                 throw new IllegalArgumentException(fieldName + " 必须是十进制业务ID", exception);
             }
         }
+
     }
 
     /** 将退款事件校验为任务取消所需的内部数据，字段规则与支付事件保持一致。 */
@@ -239,5 +240,6 @@ public class TravelTaskApplicationService {
                             .toLocalDateTime(),
                     event.orderVersion());
         }
+
     }
 }

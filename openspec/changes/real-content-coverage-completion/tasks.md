@@ -2,7 +2,8 @@
 
 - [x] 1.1 D 汇总现有真实资料缺口和字段表：海报、简介、上映状态/日期、影院城市映射/坐标、热映/待映目录、同步状态、首页和影院页静态数据。验证：`coordination.md` 的“真实资料字段表”已标明 Provider 字段、内部字段、是否可空、Owner 和消费者。
 - [x] 1.2 C 确认 `posterUrl`、`summary`、上映字段、真实资料版本/同步时间及降级原因的前端 DTO/OpenAPI 增量；确认 `POST /api/v1/content/cities/resolve` 的受控城市解析结果、影院 `cityName` 查询、三个管理员同步接口、权限、CSRF、错误码和结果未知处理。验证：C 的书面结论已记录在 `coordination.md`；公开响应不含 `providerCityId/ci`，定位和距离优先不纳入本期影院浏览实现。
-- [ ] 1.3 D 已完成新增影片字段、`content_identity_mapping`、`cinema.city_name/provider_city_id`、`data_sync_log.city_name/provider_city_id/failure_category/lease_owner/lease_until` 的完整列、索引、五种状态 CHECK、持有者续租与恢复、180 天清理和兼容设计；A 已正式分配 V014，待静态复核设计与后续 SQL 草案。验证：`design.md` 与 spec 包含字段/状态/冲突/历史兼容、PENDING 租约竞争、慢 Provider 存活续租、RUNNING 进程中断后真正到期恢复，以及 SUCCESS/FAILED/PARTIAL/RUNNING/PENDING 的合法和非法计数组合；静态复核通过后，A 再明确授权 `cinewise_migration_check + cinewise_migrator` 做首次 migrate、validate、重复 migrate、结构/索引/CHECK、历史兼容和清理规则验证。本次不创建或执行 SQL。
+- [ ] 1.3 D 已完成新增影片字段、`content_identity_mapping`、`cinema.city_name/provider_city_id`、`data_sync_log.city_name/provider_city_id/failure_category/lease_owner/lease_until` 的完整列、索引、180 天清理和兼容设计；A 已正式分配 V014，待静态复核设计与 SQL 草案。V014 只新增 PENDING 与兼容 CHECK：保留当前 RUNNING、SUCCESS、FAILED、PARTIAL 的旧写入形态，且 PENDING 必须是零计数和全空字段。验证：`design.md` 与 spec 包含字段/状态/冲突/历史兼容、旧 RUNNING 无租约、旧 FAILED/PARTIAL 无失败分类或错误码仍可读取/写入，以及 PENDING 合法和非法字段组合；身份映射由迁移后的受控应用回填。静态复核通过后，A 再明确授权 `cinewise_migration_check + cinewise_migrator` 做首次 migrate、validate、重复 migrate、结构/索引/CHECK、历史兼容和清理规则验证。本次不执行 SQL。
+- [ ] 1.3a D 在新同步 Writer 发布、受控兼容处理完成且共享库只读预检确认旧日志满足条件后，另行申请并完成 V015 严格状态 CHECK：RUNNING 必须持有租约；FAILED/PARTIAL 必须有错误码和失败分类；SUCCESS 不得有错误字段；终态清空持有者和租约。验证：PENDING 租约竞争、慢 Provider 存活续租、RUNNING 进程中断后真正到期恢复，以及 V015 的 SUCCESS/FAILED/PARTIAL/RUNNING/PENDING 合法和非法计数组合；FAILED 的零总数外部失败仍必须有错误码和失败分类。V015 不属于 V014 已完成内容。
 - [x] 1.4 D 根据 A 已确认的需求，定义公开批量内容身份解析契约：校验 provider/resourceType/externalId、一次最多 100 个 ID、逐项 `100001/303005/303006/303007` 语义和映射失效规则。验证：`specs/real-content-coverage/spec.md` 与 `coordination.md` 已明确契约不暴露 D 的 Entity、Mapper、Repository、缓存或内容表，且不以名称/地址猜测。
 - [x] 1.5 B 复核新增字段、身份解析和地点解析结果不影响 `RankMoviePlanTool` 的既有输入输出和只读边界。验证：B 已书面确认 Tool 不新增 `locationText`，且 D 只返回受控城市结果，结论记录在 `coordination.md`。
 - [ ] 1.5a B 在 Agent 持久化边界实现地点文本剔除或替换：在保存用户消息、事件、槽位快照、长期上下文、日志和缓存前处理原始 `locationText`；调用结束立即丢弃。验证：B 的定向测试证明只允许保存城市名或标准 `cityCode`，不保存原始地点文本、精确位置、经纬度或 NetStart 内部城市 ID。
@@ -14,24 +15,27 @@
 - [x] 2.1 D 扩展影片标准化模型、Provider Mapper、字段质量规则和 HTTPS 海报规范化；拒绝或置空不合格可选字段，不保存影评正文。验证：`NetStartContentProviderTest` 覆盖 HTTPS、HTTP、空简介、上映字段和缺失资料；2026-08-05 与 `ContentSyncServiceTest`、`ContentResultCodecTest` 共 21 个定向测试通过。
 - [x] 2.2a D 完成已存在快照/缓存链路中的影片字段编解码、查询和 REST 映射：列表和详情返回真实 HTTPS 海报、简介、上映日期和上映状态；当前完整真实 Redis/快照版本不误报降级。验证：2026-08-05 `ContentControllerIntegrationTest`、`ContentQueryServiceTest`、`RedisContentCacheAdapterTest`、`NetStartContentProviderTest` 共 31 个定向测试通过。
 - [ ] 2.2b D 在 A 分配迁移版本后完成影片字段持久化、两版本真实快照和兼容处理。验证：MySQL 集成测试覆盖最新版本、上一版本、版本损坏和 Demo 极端回退。
-- [ ] 2.3 D 将经核验的 NetStart 城市列表整理为版本化本地 JSON，启动时加载并校验城市名/`ci` 唯一；实现 `POST /api/v1/content/cities/resolve` 的 `locationText -> RESOLVED|UNRECOGNIZED|SELECTION_REQUIRED + cityName -> Provider ci`，不在用户请求中查询第三方城市列表、不保存地点原文或公开 `ci`。验证：长沙、杭州解析；零命中、多城市候选、目录损坏、目录中不存在的城市和 NetStart 城市列表不可用时的定向测试。
+- [x] 2.3 D 将经核验的 NetStart 城市列表整理为版本化本地 JSON，启动时加载并校验城市名/`ci` 唯一；实现 `POST /api/v1/content/cities/resolve` 的 `locationText -> RESOLVED|UNRECOGNIZED|SELECTION_REQUIRED + cityName -> Provider ci`，不在用户请求中查询第三方城市列表、不保存地点原文或公开 `ci`。验证：2026-08-06 `CityResolutionServiceTest` 与 `ContentCityResolutionControllerIntegrationTest` 共 8 个定向测试覆盖长沙、杭州、零命中、多城市候选、目录损坏、重复目录、内部 `ci` 映射、OpenAPI 和固定 C 夹具；`backend/mvnw.cmd verify` 通过。
 - [ ] 2.3a D 将已解析城市映射为本地已同步、未删除的 `cinemaIds`；无本地影院返回正常空结果，不调用 A、不替代其他城市。验证：长沙/杭州、本地无影院、已删除影院和未解析城市测试通过。
-- [ ] 2.3b D 扩展 `ContentSummaryQueryPort` 为批量影院摘要：新增 `address`、批量 `missingCinemaIds` 和整体不可用 `303004` 规则；保持 A 只调用公开 Application API。验证：空输入、全命中、部分缺失、全缺失、逻辑删除、地址、来源/时间和内容存储不可用测试通过。
+- [x] 2.3b D 扩展 `ContentSummaryQueryPort` 为批量影院摘要：新增 `address`、批量 `missingCinemaIds` 和整体不可用 `303004` 规则；保持 A 只调用公开 Application API。验证：2026-08-06 `ContentSummaryQueryPortIntegrationTest` 和 `JdbcContentSummaryQueryAdapterTest` 覆盖空输入、全命中、部分缺失、全缺失、逻辑删除、地址、来源/时间和内容存储不可用；`backend/mvnw.cmd verify` 通过。A 对 `TravelEventContextResolver`、`ShowQueryService` 的调用适配仍待 PR 审查。
 - [ ] 2.4 D 在 1.6 能力验证通过后，实现首次“近一年已上映 + 可取得待映”目录回填、断点恢复和上映资料校验；删除由 10 req/min 保护值导致的固定 8 部详情上限。已同步历史影片不因离开热映而删除。验证：多页/多批回填、中断恢复、成功、部分失败、重复、字段不合格、429、断网和历史保留测试。
 - [ ] 2.5 D 实现每日增量同步：仅发现新上映、待映状态/上映日期变化及已有资料变更；按已同步或受控配置的城市分别同步影院，开发环境默认启用 Provider，并在 Asia/Shanghai 每天凌晨 3 点自动同步，启动同步默认关闭；保持限流、超时、一次短重试、身份隔离和按城市审计。验证：新增、状态变化、资料变更、无变化、多城市、开发环境 03:00 自动执行、生产 profile 拒绝启用、最新版本和上一版本回退测试。
 - [ ] 2.6 D 将 `GET /api/v1/movies` 改为仅查询本地完整目录，支持上映日期倒序分页、关键字、类型和上映状态筛选，不在普通用户请求中调用 Provider。验证：多页、搜索、筛选、排序及外部 Provider 不可用时仍能浏览已同步目录的 Controller/MySQL 集成测试通过。
 - [ ] 2.7 D 将固定 Demo 的时间语义改为目录版本/检查时间，移除 Demo 每次查询重新生成有效期的行为；仅在首次无真实版本、显式演示模式或两份真实版本均不可恢复时回退 Demo。验证：已存在半年真实版本、首次启动、显式演示、最新/上一版本损坏和 Demo 目录缺失测试。
-- [ ] 2.8 D 在 2.2b 的迁移完成后实现 `GET /api/v1/admin/content/sources`、`POST /api/v1/admin/content/sync` 和按请求查询的 Application/API 层：请求只含 `clientRequestId/cityName`，服务端由本地城市目录解析 `ci`；先写 PENDING 审计记录，以随机 `leaseOwner` 条件取得 RUNNING 租约后才调用 Provider；每 20 秒续租，Provider 调用含短重试总超时不超过 60 秒；重复、超时或断网后只按原请求查询。验证：长沙/杭州成功、目录中不存在的城市拒绝、`201006/201007/201009/100001/100409/100404/303004`、PENDING 多实例租约竞争、慢 Provider 下存活持有者续租与结果保存、RUNNING 进程中断真正到期后 FAILED+INTERNAL 且不重调 Provider、持有者不匹配时不得写资料或覆盖终态、五种状态的合法与非法计数组合、城市状态查询、无地点原文/Provider 城市 ID/Key/原始响应泄露测试。
+- [ ] 2.8 D 在 2.2b 的迁移完成后实现 `GET /api/v1/admin/content/sources`、`POST /api/v1/admin/content/sync` 和按请求查询的 Application/API 层：请求只含 `clientRequestId/cityName`，服务端由本地城市目录解析 `ci`；先写 PENDING 审计记录，以随机 `leaseOwner` 条件取得 RUNNING 租约后才调用 Provider；每 20 秒续租，Provider 调用含短重试总超时不超过 60 秒；重复、超时或断网后只按原请求查询。验证：长沙/杭州成功、目录中不存在的城市拒绝、`201006/201007/201009/100001/100409/100404/303004`、城市状态查询、无地点原文/Provider 城市 ID/Key/原始响应泄露测试。V014 阶段仅验证旧日志兼容和 PENDING，不将严格五态 CHECK 作为完成条件。
+- [ ] 2.8a D 在 2.8 的新 Writer 发布、受控兼容处理和共享库只读预检通过后，提交 V015 严格 CHECK 并完成同步恢复验证。验证：PENDING 多实例租约竞争、慢 Provider 下存活持有者续租与结果保存、RUNNING 进程中断真正到期后 FAILED+INTERNAL 且不重调 Provider、持有者不匹配时不得写资料或覆盖终态，以及五种状态的合法与非法计数组合。
 - [ ] 2.9 D 实现公开批量内容身份解析 Application API、ACTIVE/INVALID 映射状态和测试；只按稳定外部身份返回唯一内部 ID。验证：影片/影院唯一命中、同批重复、未匹配 `303005`、歧义 `303006`、失效 `303007`、空输入、来源类型不一致、长度和 100 条上限测试通过。
 
 ## 3. C 完成页面真实展示
 
 - [ ] 3.1 C 用模块 API、Hook 替换影院页静态杭州影院和首页静态影片/影院；覆盖加载、空态、失败、刷新、来源、同步时间、资料版本和降级提示。验证：前端单测与生产构建通过。
-- [ ] 3.2 C 展示真实影片 HTTPS 海报和加载失败占位；无海报时明确显示占位。验证：HTTPS、HTTP/非法 URL、图片加载失败和空值测试通过。
-- [ ] 3.3 C 删除真实内容区域中的演示距离、场次、价格、库存和购票暗示；只有 A 的公开查询确认可售时才显示相应票务信息。验证：无本地场次的真实内容页面测试通过。
+  - 2026-08-06 C 已将首页影片、影院改为复用现有 `modules/content` API 和 Hook，并覆盖加载、正常、空数据、网络失败、来源、同步时间和降级提示；影院页此前已完成同类替换。由于 D 尚未提供本 change 约定的资料版本字段和城市名查询接口，本项保持未完成，不伪造字段或勾选。
+- [x] 3.2 C 展示真实影片 HTTPS 海报和加载失败占位；无海报时明确显示占位。验证：HTTPS、HTTP/非法 URL、图片加载失败和空值测试通过。
+- [x] 3.3 C 删除真实内容区域中的演示距离、场次、价格、库存和购票暗示；只有 A 的公开查询确认可售时才显示相应票务信息。验证：无本地场次的真实内容页面测试通过。
 - [ ] 3.4 C 实现管理员内容来源状态与按城市受控同步页面，展示 C 已确认的字段，不展示 Provider 城市 ID；按 `RESULT_UNKNOWN` 规则只查询原请求结果。验证：权限、CSRF、重复点击、未知城市、`100409/100404` 和失败恢复测试通过。
 - [ ] 3.5 C 实现手动城市选择，并以 `POST /api/v1/content/cities/resolve` 将 C 已得到的临时地点字符串交给 D 解析；当前会话只保留城市名。影院浏览页不计算距离或距离优先。验证：手动选城、地点解析成功/失败/需选择、刷新恢复默认长沙和无地点原文持久化测试通过。
 - [ ] 3.6 C 将无地点、无手动选择时的城市设为长沙，并将顶栏现有硬编码杭州城市菜单替换为当前会话城市状态。验证：首次加载长沙、地点解析/手动切城覆盖、刷新恢复长沙、无用户偏好或地点原文持久化测试通过。
+  - 2026-08-06 C 已删除顶栏硬编码杭州和假的城市菜单，首页及顶栏在无城市接口时显示默认长沙，且不保存地点原文。地点解析和手动切城仍依赖 D 的 `POST /api/v1/content/cities/resolve`，本次明确不实现，因此本项保持未完成。
 
 ## 4. 联调与交付
 

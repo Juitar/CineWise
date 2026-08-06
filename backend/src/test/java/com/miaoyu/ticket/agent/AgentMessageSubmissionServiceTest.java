@@ -16,7 +16,8 @@ import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionSer
 import com.miaoyu.ticket.agent.application.persistence.AgentRunResultTransaction;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunStaleRecoveryService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunStepRepository;
-import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentService;
+import com.miaoyu.ticket.agent.application.confirmation.CreateOrderConfirmationActionOrchestrator;
+import com.miaoyu.ticket.agent.application.run.MultiToolSupervisor;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRequestHash;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
@@ -40,7 +41,9 @@ class AgentMessageSubmissionServiceTest {
         AgentConcurrentRequestLookupTransaction concurrentRequestLookupTransaction =
                 mock(AgentConcurrentRequestLookupTransaction.class);
         AgentRunResultTransaction runResultTransaction = mock(AgentRunResultTransaction.class);
-        MinimalReadOnlyAgentService minimalReadOnlyAgentService = mock(MinimalReadOnlyAgentService.class);
+        MultiToolSupervisor multiToolSupervisor = mock(MultiToolSupervisor.class);
+        CreateOrderConfirmationActionOrchestrator confirmationActionOrchestrator =
+                mock(CreateOrderConfirmationActionOrchestrator.class);
         AgentMessageRepository messageRepository = mock(AgentMessageRepository.class);
         AgentRunStepRepository stepRepository = mock(AgentRunStepRepository.class);
         AgentRunStaleRecoveryService staleRecoveryService = mock(AgentRunStaleRecoveryService.class);
@@ -51,7 +54,8 @@ class AgentMessageSubmissionServiceTest {
                 initialRunTransaction,
                 concurrentRequestLookupTransaction,
                 runResultTransaction,
-                minimalReadOnlyAgentService,
+                multiToolSupervisor,
+                confirmationActionOrchestrator,
                 messageRepository,
                 stepRepository,
                 staleRecoveryService);
@@ -72,7 +76,9 @@ class AgentMessageSubmissionServiceTest {
         AgentConcurrentRequestLookupTransaction concurrentRequestLookupTransaction =
                 mock(AgentConcurrentRequestLookupTransaction.class);
         AgentRunResultTransaction runResultTransaction = mock(AgentRunResultTransaction.class);
-        MinimalReadOnlyAgentService minimalReadOnlyAgentService = mock(MinimalReadOnlyAgentService.class);
+        MultiToolSupervisor multiToolSupervisor = mock(MultiToolSupervisor.class);
+        CreateOrderConfirmationActionOrchestrator confirmationActionOrchestrator =
+                mock(CreateOrderConfirmationActionOrchestrator.class);
         AgentMessageRepository messageRepository = mock(AgentMessageRepository.class);
         AgentRunStepRepository stepRepository = mock(AgentRunStepRepository.class);
         AgentRunStaleRecoveryService staleRecoveryService = mock(AgentRunStaleRecoveryService.class);
@@ -86,7 +92,8 @@ class AgentMessageSubmissionServiceTest {
                 initialRunTransaction,
                 concurrentRequestLookupTransaction,
                 runResultTransaction,
-                minimalReadOnlyAgentService,
+                multiToolSupervisor,
+                confirmationActionOrchestrator,
                 messageRepository,
                 stepRepository,
                 staleRecoveryService);
@@ -96,9 +103,11 @@ class AgentMessageSubmissionServiceTest {
         assertTrue(result.reused());
         verify(staleRecoveryService).recoverStaleRuns();
         verify(messageRepository).findByRunIdAndUserId(100L, 7L);
-        verify(minimalReadOnlyAgentService, never()).run(org.mockito.ArgumentMatchers.any());
+        verify(multiToolSupervisor, never()).run(org.mockito.ArgumentMatchers.any());
         verify(runResultTransaction, never()).record(
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(
+                        com.miaoyu.ticket.agent.application.run.MultiToolSupervisorResult.class));
     }
 
     private static AgentMessageSubmissionCommand command() {

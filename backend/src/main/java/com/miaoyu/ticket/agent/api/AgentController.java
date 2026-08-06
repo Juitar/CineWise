@@ -2,8 +2,16 @@ package com.miaoyu.ticket.agent.api;
 
 import com.miaoyu.ticket.agent.application.AgentInteractionRuntimeService;
 import com.miaoyu.ticket.agent.application.AgentFailurePersistedException;
+import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationService;
+import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.api.Result;
 import com.miaoyu.ticket.common.api.PageResult;
+import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.common.observability.TraceIdHolder;
+import com.miaoyu.ticket.agent.application.AgentErrorCode;
+import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationResult;
+import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationActionStatus;
+import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationValidationFailure;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -11,6 +19,7 @@ import java.time.Duration;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.UUID;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -38,15 +47,18 @@ import org.springframework.validation.annotation.Validated;
 public class AgentController {
     private static final Duration HEARTBEAT_INTERVAL = Duration.ofSeconds(10);
     private final AgentInteractionRuntimeService runtimeService;
+    private final AgentConfirmationService confirmationService;
     private final Executor applicationTaskExecutor;
     private final ObjectProvider<TaskScheduler> taskSchedulerProvider;
     private final ObjectMapper objectMapper;
 
     public AgentController(AgentInteractionRuntimeService runtimeService,
+            AgentConfirmationService confirmationService,
             @Qualifier("applicationTaskExecutor") Executor applicationTaskExecutor,
             @Qualifier("taskScheduler") ObjectProvider<TaskScheduler> taskSchedulerProvider,
             ObjectMapper objectMapper) {
         this.runtimeService = runtimeService;
+        this.confirmationService = confirmationService;
         this.applicationTaskExecutor = applicationTaskExecutor;
         this.taskSchedulerProvider = taskSchedulerProvider;
         this.objectMapper = objectMapper;
@@ -97,6 +109,14 @@ public class AgentController {
         return Result.success(new AgentRunCancelResponse(result.runId(), result.status(), result.finishedAt()));
     }
 
+    @PostMapping("/actions/{actionId}/confirm")
+    public Result<AgentActionResponse> confirmAction(
+            @PathVariable String actionId, @Valid @RequestBody AgentActionConfirmRequest request) {
+        AgentConfirmationResult result = confirmationService.confirm(actionId, request.confirmed(), traceId());
+        throwIfConfirmationFailed(result, request.confirmed());
+        return Result.success(actionResponse(result));
+    }
+
     @GetMapping("/runs/{runId}")
     public Result<AgentRunResponse> getMyRun(@PathVariable String runId) {
         var view = runtimeService.queryMyRun(runId);
@@ -117,8 +137,9 @@ public class AgentController {
         SseEmitter emitter = new SseEmitter(30_000L);
         AtomicReference<ScheduledFuture<?>> heartbeat = new AtomicReference<>();
         Runnable cancelHeartbeat = () -> cancelHeartbeat(heartbeat);
+        SseDisconnectHandler disconnectHandler = new SseDisconnectHandler(cancelHeartbeat);
         emitter.onCompletion(cancelHeartbeat);
-        emitter.onError(error -> cancelHeartbeat.run());
+        emitter.onError(error -> disconnectHandler.onDisconnected());
         emitter.onTimeout(() -> {
             cancelHeartbeat.run();
             emitter.complete();
@@ -165,7 +186,7 @@ public class AgentController {
             if (replay.reset()) {
                 emitter.send(SseEmitter.event().id(Long.toString(replay.watermark())).name("stream.reset")
                         .data(new AgentRunResponse.EventSummary(Long.toString(replay.watermark()), replay.sessionId(),
-                                replay.runId(), null, null, "stream.reset", "已清理的事件不可续传",
+                                replay.runId(), null, null, null, "stream.reset", "已清理的事件不可续传",
                                 payload("{\"watermark\":\"" + replay.watermark() + "\"}"), null)));
             }
             for (var event : replay.events()) {
@@ -193,13 +214,54 @@ public class AgentController {
     }
 
     private AgentRunResponse.EventSummary eventSummary(AgentInteractionRuntimeService.EventView event) {
-        return new AgentRunResponse.EventSummary(event.eventId(), event.sessionId(), event.runId(), event.planVersion(),
-                event.nodeId(), event.eventType(), event.displayText(), event.payload(), event.occurredAt());
+        return new AgentRunResponse.EventSummary(event.eventId(), event.sessionId(), event.runId(), event.planId(),
+                event.planVersion(), event.nodeId(), event.eventType(), event.displayText(), event.payload(),
+                event.occurredAt());
     }
 
     private AgentSessionResponse session(AgentInteractionRuntimeService.SessionView view) {
         return new AgentSessionResponse(view.sessionId(), view.summary(), view.status(), view.createdAt(),
                 view.updatedAt());
+    }
+
+    private AgentActionResponse actionResponse(AgentConfirmationResult result) {
+        var action = result.action();
+        return new AgentActionResponse(action.actionId(), action.runId(), action.planVersion(),
+                com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationCardStatus.fromActionStatus(
+                        action.status()),
+                action.updateTime().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime());
+    }
+
+    private static void throwIfConfirmationFailed(AgentConfirmationResult result, boolean confirmed) {
+        AgentConfirmationValidationFailure failure = result.validationFailure();
+        if (failure == null && !(confirmed && !result.writeToolInvoked()
+                && (result.action().status() == AgentConfirmationActionStatus.EXECUTING
+                || result.action().status() == AgentConfirmationActionStatus.RESULT_UNKNOWN))) {
+            return;
+        }
+        if (failure == AgentConfirmationValidationFailure.ACTION_NOT_CONFIRMABLE
+                && result.action().status().isTerminal()) {
+            return;
+        }
+        if (failure == AgentConfirmationValidationFailure.EXPIRED) {
+            throw new BusinessException(AgentErrorCode.ACTION_EXPIRED);
+        }
+        if (failure == AgentConfirmationValidationFailure.PARAMETERS_CHANGED
+                || failure == AgentConfirmationValidationFailure.PLAN_CHANGED
+                || failure == AgentConfirmationValidationFailure.NODE_NOT_WAITING_CONFIRMATION
+                || failure == AgentConfirmationValidationFailure.BUSINESS_DATA_INVALID) {
+            throw new BusinessException(AgentErrorCode.ACTION_PARAMETER_CHANGED);
+        }
+        if (failure == AgentConfirmationValidationFailure.NOT_OWNER
+                || failure == AgentConfirmationValidationFailure.RUN_ENDED) {
+            throw new BusinessException(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND, "操作不可用或已失效");
+        }
+        throw new BusinessException(AgentErrorCode.ACTION_CONFIRMING);
+    }
+
+    private static String traceId() {
+        String traceId = TraceIdHolder.currentTraceId();
+        return traceId.isBlank() ? UUID.randomUUID().toString().replace("-", "") : traceId;
     }
 
     private AgentMessageResponse message(AgentInteractionRuntimeService.MessageView view) {

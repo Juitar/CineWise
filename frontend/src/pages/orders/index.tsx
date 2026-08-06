@@ -5,6 +5,7 @@ import type { OrderSummaryItem } from '../../features/order-list/OrderList';
 import { useOrders } from '../../modules/order/transaction-hooks';
 import { formatOrderDateTime } from '../../modules/order/formatters';
 import type { OrderStatus } from '../../modules/order/types';
+import { TransactionBackButton } from '../../features/transaction-back-button/TransactionBackButton';
 import './index.css';
 
 /**
@@ -40,25 +41,28 @@ export default function OrdersPage() {
 
   return (
     <div className="orders-page-wrapper">
-      <OrderList
-        orders={orders}
-        loading={ordersQuery.loading}
-        error={ordersQuery.error?.message}
-        selectedStatus={selectedStatus}
-        selectedDate={selectedDate}
-        currentPage={currentPage}
-        totalCount={ordersQuery.data?.total ?? 0}
-        onStatusChange={(status) => {
-          setSelectedStatus(status);
-          setCurrentPage(1);
-        }}
-        onDateFilterChange={(date) => {
-          setSelectedDate(date);
-          setCurrentPage(1);
-        }}
-        onPageChange={(page) => setCurrentPage(page)}
-        onOrderClick={(orderNo) => history.push(`/orders/${encodeURIComponent(orderNo)}`)}
-      />
+      <div className="orders-page-content">
+        <TransactionBackButton onBack={() => history.push('/')} label="返回首页" />
+        <OrderList
+          orders={orders}
+          loading={ordersQuery.loading}
+          error={ordersQuery.error?.message}
+          selectedStatus={selectedStatus}
+          selectedDate={selectedDate}
+          currentPage={currentPage}
+          totalCount={ordersQuery.data?.total ?? 0}
+          onStatusChange={(status) => {
+            setSelectedStatus(status);
+            setCurrentPage(1);
+          }}
+          onDateFilterChange={(date) => {
+            setSelectedDate(date);
+            setCurrentPage(1);
+          }}
+          onPageChange={(page) => setCurrentPage(page)}
+          onOrderClick={(orderNo) => history.push(`/orders/${encodeURIComponent(orderNo)}`)}
+        />
+      </div>
     </div>
   );
 }

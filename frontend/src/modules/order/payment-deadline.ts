@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { parseOrderDateTime } from './formatters';
 
 export const PAYMENT_DEADLINE_FALLBACK = '支付期限以订单信息为准';
@@ -64,8 +64,10 @@ export function resolvePaymentDeadline(
 export function usePaymentDeadline(
   expireTime: string | null | undefined,
   enabled = true,
+  onReached?: () => void,
 ): PaymentDeadlineView {
   const [nowMillis, setNowMillis] = useState(() => Date.now());
+  const notifiedExpireTime = useRef<string | null>(null);
   const deadlineView = useMemo(
     () => resolvePaymentDeadline(expireTime, nowMillis),
     [expireTime, nowMillis],
@@ -78,6 +80,14 @@ export function usePaymentDeadline(
     const timer = window.setTimeout(() => setNowMillis(Date.now()), 1000);
     return () => window.clearTimeout(timer);
   }, [deadlineView.hasReachedDeadline, deadlineView.remainingSeconds, enabled, expireTime]);
+
+  useEffect(() => {
+    if (!enabled || !deadlineView.hasReachedDeadline || notifiedExpireTime.current === expireTime) {
+      return;
+    }
+    notifiedExpireTime.current = expireTime ?? null;
+    onReached?.();
+  }, [deadlineView.hasReachedDeadline, enabled, expireTime, onReached]);
 
   return deadlineView;
 }

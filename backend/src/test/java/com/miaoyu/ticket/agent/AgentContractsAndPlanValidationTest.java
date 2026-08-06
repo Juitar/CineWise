@@ -259,7 +259,7 @@ class AgentContractsAndPlanValidationTest {
     }
 
     @Test
-    void shouldRejectWritePlanEvenWhenItContainsValidateAndConfirmationNodes() {
+    void shouldAcceptWritePlanOnlyAsConfirmationGatedNode() {
         PlanSchemaValidator validator = new PlanSchemaValidator(new ToolRegistry(List.of(writeTool())));
         CandidatePlan candidatePlan = new CandidatePlan(
                 "plan-4",
@@ -291,9 +291,8 @@ class AgentContractsAndPlanValidationTest {
                 candidatePlan,
                 new PlanValidationContext(Map.of("showId", String.class), Map.of(), new SlotSnapshot(1L, Map.of())));
 
-        assertFalse(result.isValid());
-        assertTrue(hasIssue(result, PlanValidationIssueCode.WRITE_TOOL_NOT_SUPPORTED));
-        assertTrue(result.executionPlan().isEmpty());
+        assertTrue(result.isValid());
+        assertTrue(result.executionPlan().orElseThrow().nodes().getLast().requiresConfirmation());
     }
 
     @Test
@@ -315,7 +314,7 @@ class AgentContractsAndPlanValidationTest {
                 new PlanValidationContext(Map.of("showId", String.class), Map.of(), new SlotSnapshot(1L, Map.of())));
 
         assertFalse(result.isValid());
-        assertTrue(hasIssue(result, PlanValidationIssueCode.WRITE_TOOL_NOT_SUPPORTED));
+        assertTrue(hasIssue(result, PlanValidationIssueCode.WRITE_TOOL_CONFIRMATION_REQUIRED));
         assertTrue(result.executionPlan().isEmpty());
     }
 

@@ -97,6 +97,28 @@ class AgentRunResultTransactionTest {
     }
 
     @Test
+    void shouldPersistWaitingConfirmationWithoutExecutionTimestamps() {
+        Fixture fixture = fixture();
+        ExecutionPlan plan = new ExecutionPlan("plan-confirm", 1, List.of(new ExecutionPlanNode(
+                "confirm", PlanNodeType.CONFIRM_ACTION, null, List.of(), List.of(), FailurePolicy.FAIL,
+                PlanNodeStatus.PENDING, true, false, null, null, new SlotSnapshot(3L, Map.of()))));
+        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(new ToolRegistry(List.of()));
+        when(fixture.runRepository().updateRunningPlanWithCas(any(), eq(0L))).thenReturn(true);
+
+        AgentRun recorded = fixture.transaction().record(run(), result(plan, stateMachine.initialize(plan)));
+
+        assertEquals(AgentRunStatus.RUNNING, recorded.status());
+        ArgumentCaptor<List<AgentRunStep>> steps = ArgumentCaptor.forClass(List.class);
+        verify(fixture.stepRepository()).insertAll(steps.capture());
+        AgentRunStep step = steps.getValue().getFirst();
+        assertEquals(PlanNodeStatus.WAITING_CONFIRMATION, step.status());
+        assertEquals(0, step.attemptCount());
+        assertEquals(0, step.retryCount());
+        assertEquals(null, step.startedAt());
+        assertEquals(null, step.finishedAt());
+    }
+
+    @Test
     void shouldReleaseSessionOnlyAfterTerminalCasSucceeds() {
         Fixture fixture = fixture();
         when(fixture.runRepository().updateTerminalWithCas(any(), eq(0L))).thenReturn(false);

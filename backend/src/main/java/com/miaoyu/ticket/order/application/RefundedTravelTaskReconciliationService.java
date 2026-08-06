@@ -144,6 +144,7 @@ public class RefundedTravelTaskReconciliationService {
                 UUID.randomUUID().toString(),
                 Long.toString(order.orderId()),
                 Long.toString(order.showId()),
+                Long.toString(context.cinemaId()),
                 Long.toString(order.userId()),
                 context.cinemaArea(),
                 context.startAt().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime(),

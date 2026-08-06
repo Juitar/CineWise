@@ -1,0 +1,8 @@
+{
+  "status": "PROCESSING",
+  "data": null,
+  "errorCode": null,
+  "retryable": false,
+  "replanSuggested": false,
+  "suggestedNextAction": "结果确认中"
+}

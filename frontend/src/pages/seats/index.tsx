@@ -5,6 +5,7 @@ import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
 import { useSeatMap } from '../../modules/ticketing/hooks';
 import { SeatMap } from '../../features/seat-map/SeatMap';
 import { SeatSelectionSummary } from '../../features/seat-selection-summary/SeatSelectionSummary';
+import { TransactionBackButton } from '../../features/transaction-back-button/TransactionBackButton';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 
@@ -52,6 +53,12 @@ export default function SeatsPage() {
     history.push(`/orders/confirm?${query.toString()}`);
   };
 
+  const handleReturnToShows = () => {
+    history.push(
+      `/shows?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`,
+    );
+  };
+
   const selectedSeats = useMemo(
     () =>
       seatMap?.seats
@@ -74,6 +81,7 @@ export default function SeatsPage() {
 
   return (
     <div className="seats-page-container">
+      <TransactionBackButton onBack={handleReturnToShows} label="返回场次" />
       <div className="seats-page-header">
         <div>
           <h1 className="seats-title">{seatMap ? seatMap.auditoriumName : '选择座位'}</h1>
@@ -81,13 +89,6 @@ export default function SeatsPage() {
             {seatMap ? `共有可用座位 ${seatMap.availableSeatCount} 个` : ''}
           </span>
         </div>
-        {isMobile ? (
-          <MobileButton onClick={() => history.back()} className="seats-back-button">
-            返回场次
-          </MobileButton>
-        ) : (
-          <Button onClick={() => history.back()}>返回场次</Button>
-        )}
       </div>
 
       {error &&

@@ -6,6 +6,9 @@ import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanCommand;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
+import com.miaoyu.ticket.agent.domain.confirmation.ConfirmedOrderCommand;
+import com.miaoyu.ticket.agent.application.confirmation.CreateOrderToolResult;
+import com.miaoyu.ticket.order.api.CreateOrderTool;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -40,6 +43,21 @@ public final class AgentToolDefinitions {
                         new ToolInputDefinition("date", LocalDate.class, true),
                         new ToolInputDefinition("timeFrom", LocalTime.class, false),
                         new ToolInputDefinition("timeTo", LocalTime.class, false)),
+                Set.of(CommonErrorCode.INVALID_PARAMETER.code()));
+    }
+
+    /** A 已合入的建单能力只登记为写工具；实际调用仍由确认动作服务独占。 */
+    public static ToolDefinition createOrder() {
+        return new ToolDefinition(
+                CreateOrderTool.TARGET_NAME,
+                ConfirmedOrderCommand.class,
+                CreateOrderToolResult.class,
+                false,
+                Duration.ofSeconds(3L),
+                true,
+                List.of(
+                        new ToolInputDefinition("showId", String.class, true),
+                        new ToolInputDefinition("seatIds", List.class, true)),
                 Set.of(CommonErrorCode.INVALID_PARAMETER.code()));
     }
 }

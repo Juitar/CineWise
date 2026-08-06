@@ -6,6 +6,7 @@ import com.miaoyu.ticket.content.application.DemoContentCatalogProvider;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import org.springframework.core.io.Resource;
@@ -75,6 +76,11 @@ public class ClasspathDemoContentCatalogProvider implements DemoContentCatalogPr
     private void validate(DemoContentCatalog catalog) {
         if (!CATALOG_VERSION.equals(catalog.version())) {
             throw new IllegalStateException("Unexpected demo content catalog version");
+        }
+        try {
+            LocalDateTime.parse(catalog.checkedAt());
+        } catch (Exception exception) {
+            throw new IllegalStateException("Demo content catalog checkedAt is invalid", exception);
         }
         if (!CONTENT_SOURCE.equals(catalog.source()) || catalog.sourceType() != ContentSourceType.MOCK) {
             throw new IllegalStateException("Demo content catalog source is invalid");

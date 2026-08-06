@@ -1,0 +1,114 @@
+import type { PageResult } from '../../shared/types/api';
+
+export const AGENT_EVENT_TYPES = [
+  'message.start',
+  'message.delta',
+  'plan.created',
+  'plan.replanned',
+  'step.start',
+  'step.complete',
+  'step.failed',
+  'tool.start',
+  'tool.result',
+  'card',
+  'message.complete',
+  'message.error',
+  'run.complete',
+  'stream.reset',
+] as const;
+
+export type AgentEventType = (typeof AGENT_EVENT_TYPES)[number];
+export type AgentWorkspaceStatus =
+  'IDLE' | 'CONNECTING' | 'STREAMING' | 'COMPLETED' | 'FAILED' | 'RESULT_UNKNOWN' | 'CANCELLED';
+export type AgentRunStatus = 'CANCELLED' | 'COMPLETED' | 'FAILED' | 'RUNNING';
+
+export interface AgentSession {
+  sessionId: string;
+  summary: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentMessage {
+  messageId: string;
+  role: string;
+  type: string;
+  text: string;
+  payload: Readonly<Record<string, unknown>>;
+  status: string;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface AgentEvent {
+  eventId: string;
+  sessionId: string;
+  runId: string;
+  planId: string | null;
+  planVersion: number | null;
+  nodeId: string | null;
+  eventType: string;
+  displayText: string;
+  payload: Readonly<Record<string, unknown>>;
+  occurredAt: string | null;
+}
+
+export type AgentCardPayloadType =
+  'TEXT' | 'QUESTION' | 'MOVIE_CARD' | 'PLAN_CARD' | 'PROGRESS' | 'ERROR';
+
+export interface AgentRunMessage {
+  messageId: string;
+  role: string;
+  type: string;
+  text: string;
+  completedAt: string | null;
+}
+
+export interface AgentRunStep {
+  nodeId: string;
+  nodeType: string;
+  status: string;
+  attemptCount: number;
+  autoSkipped: boolean;
+  recoveryHint: string | null;
+}
+
+export interface AgentRunSnapshot {
+  runId: string;
+  sessionId: string;
+  status: AgentRunStatus;
+  planId: string | null;
+  planVersion: number | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  lastEventId: string;
+  messages: readonly AgentRunMessage[];
+  steps: readonly AgentRunStep[];
+  events: readonly AgentEvent[];
+}
+
+export interface AgentRunCancelResult {
+  runId: string;
+  status: AgentRunStatus;
+  finishedAt: string | null;
+}
+
+export interface AgentSessionClearResult {
+  sessionId: string;
+  cleared: boolean;
+}
+
+export interface AgentSessionBulkClearResult {
+  clearedCount: number;
+  skippedCount: number;
+}
+
+export type AgentSessionPage = PageResult<AgentSession>;
+export type AgentMessagePage = PageResult<AgentMessage>;
+
+export interface AgentStreamRequest {
+  clientRequestId: string;
+  content: string;
+  context: { entry: string };
+}

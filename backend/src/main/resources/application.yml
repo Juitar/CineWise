@@ -91,6 +91,18 @@ cinewise:
       retry-count: 1
       retry-backoff: 200ms
   travel:
+    weather:
+      amap:
+        # 启用且 key 存在时才查询高德；key 仅从环境变量读取，禁止提交到仓库。
+        enabled: ${AMAP_WEATHER_ENABLED:false}
+        key: ${AMAP_WEATHER_KEY:}
+        cache-ttl: 15m
+        # 高德天气按行政区码查询；这里只登记当前 Demo 影院所在区域，不接收用户位置。
+        area-adcodes:
+          "[西湖区]": "330106"
+          "[滨江区]": "330108"
+          "[拱墅区]": "330105"
+          "[上城区]": "330102"
     food:
       radius-default-meters: ${TRAVEL_FOOD_RADIUS_DEFAULT_METERS:1000}
       radius-min-meters: ${TRAVEL_FOOD_RADIUS_MIN_METERS:300}
@@ -130,6 +142,8 @@ cinewise:
     jwt-secret: ${JWT_SECRET:}
     audit-hash-secret: ${AUTH_AUDIT_HASH_SECRET:${JWT_SECRET:}}
     access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:30m}
+    renewal-threshold: ${AUTH_RENEWAL_THRESHOLD:10m}
+    absolute-session-ttl: ${AUTH_ABSOLUTE_SESSION_TTL:8h}
     access-cookie-name: ${AUTH_ACCESS_COOKIE_NAME:cinewise_access_token}
     csrf-cookie-name: ${AUTH_CSRF_COOKIE_NAME:cinewise_csrf}
     csrf-header-name: X-XSRF-TOKEN
@@ -158,6 +172,14 @@ cinewise:
         smtp-enabled: ${AUTH_VERIFICATION_SMTP_ENABLED:false}
         from: ${AUTH_VERIFICATION_MAIL_FROM:}
         subject: ${AUTH_VERIFICATION_MAIL_SUBJECT:妙语购票邮箱验证码}
+    mail-delivery:
+      enabled: ${AUTH_MAIL_DELIVERY_ENABLED:false}
+      # mock 仅用于开发/演示，不代表真实邮箱已收到邮件。
+      provider: ${AUTH_MAIL_DELIVERY_PROVIDER:smtp}
+      from: ${AUTH_MAIL_DELIVERY_FROM:${AUTH_VERIFICATION_MAIL_FROM:}}
+      viewing-reminder:
+        subject: ${AUTH_VIEWING_REMINDER_MAIL_SUBJECT:}
+        body: ${AUTH_VIEWING_REMINDER_MAIL_BODY:}
     demo-seed:
       enabled: ${AUTH_DEMO_SEED_ENABLED:false}
       user-email: ${AUTH_DEMO_USER_EMAIL:}

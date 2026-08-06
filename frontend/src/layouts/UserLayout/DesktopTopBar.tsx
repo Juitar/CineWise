@@ -32,24 +32,13 @@ export const DesktopTopBar: React.FC = () => {
     void handleLogout();
   };
 
-  const cityMenu: MenuProps['items'] = [
-    { key: 'hz', label: '杭州' },
-    { key: 'sh', label: '上海' },
-    { key: 'bj', label: '北京' },
-    { key: 'sz', label: '深圳' },
-  ];
-
   return (
     <header className="desktop-top-bar">
       <div className="desktop-top-bar-left">
-        {/* 城市定位 */}
-        <Dropdown menu={{ items: cityMenu }} placement="bottomLeft" arrow>
-          <div className="desktop-location-selector">
-            <MapPinIcon size={16} />
-            <span>杭州</span>
-            <span className="desktop-location-arrow">▼</span>
-          </div>
-        </Dropdown>
+        <div className="desktop-location-selector" aria-label="当前城市：长沙">
+          <MapPinIcon size={16} />
+          <span>长沙</span>
+        </div>
 
         {/* 全局搜索框 */}
         <Input

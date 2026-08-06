@@ -1,13 +1,6 @@
 {
-  "eventId": "42",
-  "sessionId": "session-example-1",
-  "runId": "run-example-1",
-  "planVersion": 1,
-  "nodeId": null,
-  "eventType": "card",
-  "displayText": "已生成推荐卡片",
-  "payload": {
-    "messageType": "MOVIE_CARD"
-  },
-  "occurredAt": "2026-08-05T10:00:02+08:00"
+  "eventId": "42", "eventType": "card", "sessionId": "session-example-1", "runId": "run-example-1",
+  "occurredAt": "2026-08-05T10:00:02+08:00", "planId": "plan-example-1", "planVersion": 1,
+  "nodeId": "render-recommendation", "displayText": "已生成推荐卡片",
+  "payload": {"type": "MOVIE_CARD", "title": "暂未找到可购场次", "movies": [{"movieId": "1001", "title": "示例影片"}], "source": "recommendation", "dataAt": "2026-08-05T10:00:00+08:00", "expiresAt": "2026-08-05T10:05:00+08:00", "degraded": true, "fallbackType": "SHOWTIME_UNAVAILABLE"}
 }

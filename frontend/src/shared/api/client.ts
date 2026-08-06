@@ -1,4 +1,3 @@
-import type { ApiResult } from '../types/api';
 import { ApiError } from './ApiError';
 
 type QueryPrimitive = boolean | number | string;
@@ -17,6 +16,14 @@ interface CsrfTokenPayload {
   token: string;
 }
 
+interface ApiEnvelopeMetadata {
+  code: number;
+  message: string;
+  traceId: string;
+}
+
+type ApiEnvelope<T> = ApiEnvelopeMetadata & ({ data: T } | { data?: never });
+
 type UnauthorizedHandler = () => Promise<void> | void;
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -30,14 +37,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function isApiResult(value: unknown): value is ApiResult<unknown> {
+function isApiEnvelope<T>(value: unknown): value is ApiEnvelope<T> {
   return (
     isRecord(value) &&
     typeof value.code === 'number' &&
     typeof value.message === 'string' &&
-    'data' in value &&
     typeof value.traceId === 'string'
   );
+}
+
+function hasRequiredResponseData<T>(
+  result: ApiEnvelope<T>,
+): result is ApiEnvelopeMetadata & { data: Exclude<T, null> } {
+  return 'data' in result && result.data !== null;
+}
+
+function getSafeErrorMessage(message: string, fallback: string): string {
+  const trimmedMessage = message.trim();
+  return trimmedMessage.length > 0 && trimmedMessage.length <= 500 ? trimmedMessage : fallback;
 }
 
 function isAbortError(error: unknown): boolean {
@@ -71,7 +88,7 @@ function buildApiUrl(path: string, query?: Record<string, QueryValue>): string {
   return queryString.length > 0 ? `${path}?${queryString}` : path;
 }
 
-async function readApiResult(response: Response): Promise<ApiResult<unknown>> {
+async function readApiEnvelope<T>(response: Response): Promise<ApiEnvelope<T>> {
   const traceId = response.headers.get('X-Trace-Id') ?? undefined;
   let payload: unknown;
 
@@ -85,7 +102,7 @@ async function readApiResult(response: Response): Promise<ApiResult<unknown>> {
     });
   }
 
-  if (!isApiResult(payload)) {
+  if (!isApiEnvelope<T>(payload)) {
     throw new ApiError('服务返回的数据格式不正确', {
       kind: 'INVALID_RESPONSE',
       status: response.status,
@@ -141,6 +158,21 @@ async function runUnauthorizedHandler(): Promise<void> {
   }
 
   await unauthorizedHandling;
+}
+
+/**
+ * 为不能使用普通 REST 解包的同源流请求提供当前 CSRF Header。
+ *
+ * Agent POST SSE 只读取 Header 名和值，不维护第二份 Token 缓存。
+ */
+export async function getCsrfRequestHeaders(): Promise<Headers> {
+  const currentCsrfToken = await getCsrfToken();
+  return new Headers({ [currentCsrfToken.headerName]: currentCsrfToken.token });
+}
+
+/** 让流式客户端复用公共客户端的并发 401 单次清理。 */
+export async function handleUnauthorizedResponse(): Promise<void> {
+  await runUnauthorizedHandler();
 }
 
 /** 清除仅存在于运行内存中的 CSRF Token。登录、登出或会话切换后调用。 */
@@ -213,14 +245,20 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
       method,
       signal: controller.signal,
     });
-    // 服务端会在写请求后更新 HttpOnly CSRF Cookie；内存中的旧 Token 不能用于下一次写请求。
-    if (isWriteRequest) {
+    const result = await readApiEnvelope<T>(response);
+
+    const isPermissionDenied = response.status === 403 && result.code === 201007;
+    // 服务端通常会在写响应后更新 CSRF Cookie；201007 仅表示权限不足，保留当前 Token。
+    if (isWriteRequest && !isPermissionDenied) {
       clearCsrfToken();
     }
-    const result = await readApiResult(response);
 
     if (response.status === 401 && handleUnauthorized) {
-      await runUnauthorizedHandler();
+      try {
+        await runUnauthorizedHandler();
+      } catch {
+        // 会话清理失败不能替换后端返回的 401 结构化错误。
+      }
     }
 
     if (isWriteRequest && response.status === 403 && result.code === 201009) {
@@ -233,7 +271,7 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     }
 
     if (!response.ok) {
-      throw new ApiError('请求未成功，请稍后重试', {
+      throw new ApiError(getSafeErrorMessage(result.message, '请求未成功，请稍后重试'), {
         kind: 'HTTP',
         code: result.code,
         status: response.status,
@@ -242,7 +280,7 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     }
 
     if (result.code !== 0) {
-      throw new ApiError('业务处理未成功', {
+      throw new ApiError(getSafeErrorMessage(result.message, '业务处理未成功'), {
         kind: 'BUSINESS',
         code: result.code,
         status: response.status,
@@ -250,9 +288,17 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
       });
     }
 
-    return result.data as T;
+    if (!hasRequiredResponseData(result)) {
+      throw new ApiError('服务返回的数据格式不正确', {
+        kind: 'INVALID_RESPONSE',
+        status: response.status,
+        traceId: result.traceId,
+      });
+    }
+
+    return result.data;
   } catch (error) {
-    if (isWriteRequest && !(error instanceof ApiError)) {
+    if (isWriteRequest && (!(error instanceof ApiError) || error.kind === 'INVALID_RESPONSE')) {
       clearCsrfToken();
     }
     if (error instanceof ApiError) {

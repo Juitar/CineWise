@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeEventRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeEventService;
+import com.miaoyu.ticket.agent.application.persistence.AgentRunRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
 import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
 import com.miaoyu.ticket.agent.domain.persistence.AgentEventStreamCursor;
@@ -32,9 +33,10 @@ class AgentRuntimeEventServiceTest {
     @Test
     void shouldRejectNonObjectAndOversizedPayloadBeforeRepositoryAccess() {
         AgentSessionRepository sessionRepository = Mockito.mock(AgentSessionRepository.class);
+        AgentRunRepository runRepository = Mockito.mock(AgentRunRepository.class);
         AgentRuntimeEventRepository eventRepository = Mockito.mock(AgentRuntimeEventRepository.class);
         AgentRuntimeEventService service = new AgentRuntimeEventService(
-                sessionRepository, eventRepository, new ObjectMapper());
+                sessionRepository, runRepository, eventRepository, new ObjectMapper());
 
         assertThatThrownBy(() -> service.append(null, null, AgentEventType.MESSAGE_START, new AgentStoredJson("[]")))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -49,16 +51,17 @@ class AgentRuntimeEventServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("禁止字段");
 
-        verifyNoInteractions(sessionRepository, eventRepository);
+        verifyNoInteractions(sessionRepository, runRepository, eventRepository);
     }
 
     @Test
     void shouldKeepCursorUntilTheLatestSessionOrRunExpiry() {
         LocalDateTime now = LocalDateTime.of(2026, 8, 5, 10, 0);
         AgentSessionRepository sessionRepository = Mockito.mock(AgentSessionRepository.class);
+        AgentRunRepository runRepository = Mockito.mock(AgentRunRepository.class);
         AgentRuntimeEventRepository eventRepository = Mockito.mock(AgentRuntimeEventRepository.class);
         AgentRuntimeEventService service = new AgentRuntimeEventService(
-                sessionRepository, eventRepository, new ObjectMapper());
+                sessionRepository, runRepository, eventRepository, new ObjectMapper());
         AgentSession session = new AgentSession(1L, "session-1", 9L, null, AgentSessionStatus.ACTIVE, 2L,
                 0L, now.minusDays(1), now, now.plusDays(1));
         AgentRun run = new AgentRun(2L, "run-1", 1L, 9L, "request-1", new AgentRequestHash("v1",
@@ -69,6 +72,7 @@ class AgentRuntimeEventServiceTest {
         AgentRuntimeEvent event = new AgentRuntimeEvent(7L, "session-1", "run-1", AgentEventType.MESSAGE_START,
                 new AgentStoredJson("{\"phase\":\"accepted\"}"), now.plusDays(30), now);
         when(sessionRepository.findBySessionIdAndUserIdForUpdate("session-1", 9L)).thenReturn(Optional.of(session));
+        when(runRepository.findByRunIdAndUserId("run-1", 9L)).thenReturn(Optional.of(run));
         when(eventRepository.findCursorForUpdate("session-1"))
                 .thenReturn(Optional.empty(), Optional.of(persistedCursor));
         when(eventRepository.append(any())).thenReturn(event);
@@ -86,9 +90,10 @@ class AgentRuntimeEventServiceTest {
         LocalDateTime runTime = LocalDateTime.of(2026, 8, 5, 10, 0);
         LocalDateTime cursorTime = runTime.plusNanos(1_000_000);
         AgentSessionRepository sessionRepository = Mockito.mock(AgentSessionRepository.class);
+        AgentRunRepository runRepository = Mockito.mock(AgentRunRepository.class);
         AgentRuntimeEventRepository eventRepository = Mockito.mock(AgentRuntimeEventRepository.class);
         AgentRuntimeEventService service = new AgentRuntimeEventService(
-                sessionRepository, eventRepository, new ObjectMapper());
+                sessionRepository, runRepository, eventRepository, new ObjectMapper());
         AgentSession session = new AgentSession(1L, "session-1", 9L, null, AgentSessionStatus.ACTIVE, 2L,
                 0L, runTime.minusDays(1), cursorTime, runTime.plusDays(30));
         AgentRun run = new AgentRun(2L, "run-1", 1L, 9L, "request-1", new AgentRequestHash("v1",
@@ -99,6 +104,7 @@ class AgentRuntimeEventServiceTest {
         AgentRuntimeEvent event = new AgentRuntimeEvent(9L, "session-1", "run-1", AgentEventType.MESSAGE_START,
                 new AgentStoredJson("{\"phase\":\"accepted\"}"), runTime.plusDays(30), cursorTime);
         when(sessionRepository.findBySessionIdAndUserIdForUpdate("session-1", 9L)).thenReturn(Optional.of(session));
+        when(runRepository.findByRunIdAndUserId("run-1", 9L)).thenReturn(Optional.of(run));
         when(eventRepository.findCursorForUpdate("session-1")).thenReturn(Optional.of(cursor));
         when(eventRepository.append(any())).thenReturn(event);
         when(eventRepository.updateCursor(any(), Mockito.eq(2L))).thenReturn(true);
@@ -111,5 +117,29 @@ class AgentRuntimeEventServiceTest {
         Mockito.verify(eventRepository).updateCursor(cursorCaptor.capture(), Mockito.eq(2L));
         assertThat(draftCaptor.getValue().createTime()).isEqualTo(cursorTime);
         assertThat(cursorCaptor.getValue().updateTime()).isEqualTo(cursorTime);
+    }
+
+    @Test
+    void shouldRejectLateEventFromSupersededPlanBeforeWritingEvent() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 5, 10, 0);
+        AgentSessionRepository sessionRepository = Mockito.mock(AgentSessionRepository.class);
+        AgentRunRepository runRepository = Mockito.mock(AgentRunRepository.class);
+        AgentRuntimeEventRepository eventRepository = Mockito.mock(AgentRuntimeEventRepository.class);
+        AgentRuntimeEventService service = new AgentRuntimeEventService(
+                sessionRepository, runRepository, eventRepository, new ObjectMapper());
+        AgentRun stale = new AgentRun(2L, "run-1", 1L, 9L, "request-1", new AgentRequestHash("v1",
+                "0".repeat(64)), "plan-1", 1, AgentRunStatus.RUNNING, "trace", now, null, 0L,
+                now, now, now.plusDays(30));
+        AgentRun current = new AgentRun(2L, "run-1", 1L, 9L, "request-1", new AgentRequestHash("v1",
+                "0".repeat(64)), "plan-2", 2, AgentRunStatus.RUNNING, "trace", now, null, 1L,
+                now, now, now.plusDays(30));
+        when(runRepository.findByRunIdAndUserId("run-1", 9L)).thenReturn(Optional.of(current));
+
+        assertThatThrownBy(() -> service.append(null, stale, AgentEventType.TOOL_RESULT,
+                new AgentStoredJson("{\"status\":\"SUCCESS\"}")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("计划已更新");
+
+        verifyNoInteractions(sessionRepository, eventRepository);
     }
 }

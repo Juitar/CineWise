@@ -12,7 +12,7 @@ import org.apache.ibatis.annotations.Select;
  * <ul>
  *   <li>不查询movie或cinema内容表，保持A与D模块边界；</li>
  *   <li>ON_SALE和当前时间过滤在数据库侧完成；</li>
- *   <li>原场次ID显式排除，避免退款后推荐同一场次；</li>
+ *   <li>原影院条件和原场次ID显式排除，避免跨影院或退款后推荐同一场次；</li>
  *   <li>日期上界使用半开区间，避免跨日边界重复；</li>
  *   <li>排序固定为start_time、id，保证页面和测试稳定。</li>
  * </ul>
@@ -24,6 +24,7 @@ public interface RefundShowMapper {
     @Select("""
             SELECT id AS show_id,
                    movie_id,
+                   cinema_id,
                    start_time
               FROM movie_show
              WHERE id = #{showId}
@@ -44,6 +45,7 @@ public interface RefundShowMapper {
               FROM movie_show ms
               LEFT JOIN show_seat ss ON ss.show_id = ms.id
              WHERE ms.movie_id = #{criteria.movieId}
+               AND ms.cinema_id = #{criteria.cinemaId}
                AND ms.id <> #{criteria.excludedShowId}
                AND ms.status = 'ON_SALE'
                AND ms.start_time > #{criteria.startsAfter}

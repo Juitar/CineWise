@@ -1,7 +1,7 @@
 package com.miaoyu.ticket.agent.application.tool;
 
 import com.miaoyu.ticket.agent.application.model.ModelGateway;
-import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentService;
+import com.miaoyu.ticket.agent.application.run.MultiToolSupervisor;
 import com.miaoyu.ticket.agent.domain.plan.PlanSchemaValidator;
 import com.miaoyu.ticket.agent.domain.run.ExecutionPlanStateMachine;
 import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
@@ -28,7 +28,7 @@ public class AgentToolConfiguration {
      */
     @Bean
     public ToolRegistry agentToolRegistry() {
-        return new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan()));
+        return new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan(), AgentToolDefinitions.createOrder()));
     }
 
     /**
@@ -74,24 +74,20 @@ public class AgentToolConfiguration {
         return new RankMoviePlanExecutionAdapter(rankMoviePlanTool, executionPlanStateMachine);
     }
 
-    /**
-     * 最小主控只组合 B 已有组件，不通过字符串或 Bean 名选择工具。
-     *
-     * <p>构造器依赖使每个参与者的职责可见：模型端口产生候选、校验器审核候选、状态机推进节点，
-     * 适配器执行唯一的已登记工具。
-     */
+    /** 提交入口只使用该主控，模型候选计划必须经过服务端校验和白名单选择。 */
     @Bean
-    public MinimalReadOnlyAgentService minimalReadOnlyAgentService(
+    public MultiToolSupervisor multiToolSupervisor(
             ModelGateway modelGateway,
             ToolRegistry agentToolRegistry,
             PlanSchemaValidator planSchemaValidator,
             ExecutionPlanStateMachine executionPlanStateMachine,
             RankMoviePlanExecutionAdapter rankMoviePlanExecutionAdapter) {
-        return new MinimalReadOnlyAgentService(
+        return new MultiToolSupervisor(
                 modelGateway,
                 agentToolRegistry,
                 planSchemaValidator,
                 executionPlanStateMachine,
-                rankMoviePlanExecutionAdapter);
+                List.of(rankMoviePlanExecutionAdapter));
     }
+
 }

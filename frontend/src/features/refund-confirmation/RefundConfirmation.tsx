@@ -11,7 +11,14 @@ import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 
 export type RefundVisualStatus =
-  'NORMAL' | 'REQUESTED' | 'PROCESSING' | 'SUCCESS' | 'RESULT_UNKNOWN' | 'ERROR' | 'LOADING';
+  | 'NORMAL'
+  | 'REQUESTED'
+  | 'PROCESSING'
+  | 'SUCCESS'
+  | 'RESULT_UNKNOWN'
+  | 'NOT_REFUNDABLE'
+  | 'ERROR'
+  | 'LOADING';
 
 export interface RefundConfirmationProps {
   orderNo: string;
@@ -62,6 +69,35 @@ export const RefundConfirmation: React.FC<RefundConfirmationProps> = ({
         ) : (
           <Spin tip="正在处理退款申请..." />
         )}
+      </div>
+    );
+  }
+
+  if (status === 'NOT_REFUNDABLE') {
+    return (
+      <div className="refund-container">
+        <div className="refund-header">
+          <h1 className="refund-title">申请退票</h1>
+          <div className="refund-orderno">关联订单号：{orderNo}</div>
+        </div>
+        <Alert
+          className="refund-alert"
+          type="warning"
+          showIcon
+          message="当前订单不可退票"
+          description={error || '该订单当前不满足退票条件，场次开始后不可退票。'}
+        />
+        <div className="refund-actions">
+          {isMobile ? (
+            <MobileButton onClick={onCancel} className="refund-btn">
+              返回订单详情
+            </MobileButton>
+          ) : (
+            <Button onClick={onCancel} className="refund-btn">
+              返回订单详情
+            </Button>
+          )}
+        </div>
       </div>
     );
   }

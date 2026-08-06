@@ -134,6 +134,10 @@ describe('LoginPage', () => {
     expect(screen.getByRole('heading', { name: '登录' })).toBeInTheDocument();
     expect(screen.getByText('登录后继续购票、查看订单与个性化观影服务')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '立即注册' })).toHaveAttribute('href', '/register');
+    expect(screen.getByRole('link', { name: '忘记密码？' })).toHaveAttribute(
+      'href',
+      '/password/reset',
+    );
     expect(screen.getByRole('link', { name: '查看隐私政策' })).toHaveAttribute('href', '/privacy');
     expect(screen.queryByText(/ICP备|公网安备/)).not.toBeInTheDocument();
   });

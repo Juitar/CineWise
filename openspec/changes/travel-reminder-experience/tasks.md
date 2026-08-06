@@ -18,9 +18,10 @@
 
 ## 3. 天气建议、快照与提醒投递
 
-- [x] 3.1 D 定义天气 Provider、缓存、标准 DTO 与版本化 Demo 数据；验证：`WeatherQueryServiceTest` 在固定时钟下覆盖真实、缓存、Demo、不可用四种来源及来源、时效、降级字段。
+- [x] 3.1 D 已接入高德实时天气 Provider，按影院区域对应的行政区码查询；保留缓存、标准 DTO 与版本化 Demo 回退。验证：`AmapWeatherProviderTest` 覆盖高德成功、缺 key、缺行政区码和接口失败，`WeatherQueryServiceTest` 覆盖缓存、Demo 和不可用路径；结果均包含来源、时效和降级字段，请求与日志不含用户位置或密钥。
 - [x] 3.2 D 实现天气风险和通用交通建议的确定性规则及建议快照；验证：`TravelAdviceServiceTest` 覆盖天气不可用仍保留通用建议及同版本竞争不覆盖，`TravelTaskPaymentEventIntegrationTest` 覆盖 H2 中 Demo 回退、快照追加和任务进入 `READY`，均通过。
-- [ ] 3.3 D 实现提醒调度、任务版本抢占和状态转换；验证：重复调度或并发执行不重复生成有效快照，订单失效和到期状态正确。
+- [ ] 3.2.1 D 将建议 REST 响应改为类型化 `TravelAdviceResponse`，保留旧字符串字段的兼容期，并提供 OpenAPI 示例和固定夹具；验证：正常天气、天气不可用、Demo 降级、过期建议、尚未生成建议及 `207001/207002/207003/107001` 均按本 change 的字段和状态码返回，C 不解析内部 JSON。
+- [x] 3.3 D 实现提醒调度、任务版本抢占和状态转换；验证：`TravelReminderSchedulingServiceTest` 覆盖失败隔离和到期关闭，`TravelTaskPaymentEventIntegrationTest` 覆盖重复调度只生成一条建议快照、取消任务不生成建议和到期任务关闭；共 11 个相关用例通过。
 - [ ] 3.4 D 接入 C 的 `EmailDeliveryPort`，实现 `deliveryKey` 唯一投递、`PENDING/SENDING/SENT/FAILED/UNKNOWN` 状态和结果查询恢复；验证：重复调用只投递一次，`UNKNOWN` 只查询恢复、不自动重发，只有 `SENT` 后任务进入 `NOTIFIED`。
 - [ ] 3.5 D 建立版本化提醒 Mock、回归用例和缺陷清单；验证：关闭真实天气和邮件 Provider 后，支付→任务→建议→Mock 提醒仍可演示且不把 Mock 显示为实时数据。
 
@@ -33,7 +34,7 @@
 
 ## 5. 工具、接口与跨模块联调
 
-- [ ] 5.1 D 实现 `GetWeatherTool`、`GetTravelAdviceTool`、`PlanBasicRouteTool`、`SearchNearbyFoodTool`，仅调用 D Application Service；验证：工具使用公共 `ToolContext` 和 `ToolResult<T>`，不调用模型、不发布 SSE、不访问 Mapper。
+- [x] 5.1 D 实现 `GetWeatherTool`、`GetTravelAdviceTool`、`PlanBasicRouteTool`、`SearchNearbyFoodTool`，仅调用 D Application Service；验证：`TravelReadOnlyToolsTest` 4 个用例覆盖四个工具的公开 `ToolContext`/`ToolResult<T>` 适配、只读调用和错误映射，不调用模型、不发布 SSE、不访问 Mapper。
 - [ ] 5.2 A、D 联调支付事件实际发布、任务创建、订单失效和补偿；验证：支付回滚不建任务，重复支付事件和补偿均只保留一个任务。
 - [ ] 5.3 B、D 联调对话中的只读建议摘要；验证：调用不产生 `agent_*`、任务、建议、通知或位置写入。
 - [ ] 5.4 C、D 联调本人任务、建议、刷新、路线和餐饮接口；验证：401、403、404、409、422、429、503 与约定错误码、来源时效和降级展示一致。

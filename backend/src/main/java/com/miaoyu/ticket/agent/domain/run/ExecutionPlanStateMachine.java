@@ -9,7 +9,10 @@ import com.miaoyu.ticket.agent.domain.tool.ToolDefinition;
 import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
+import java.util.Map;
+import java.util.Set;
 import java.util.List;
 import java.util.Objects;
 
@@ -141,6 +144,55 @@ public final class ExecutionPlanStateMachine {
         return new ReplanRequestResult(true, currentState.withNextReplanCount());
     }
 
+    /**
+     * 接受已重新校验的更高版本计划，并仅保留当前已经成功的节点。
+     *
+     * <p>成功节点由旧计划定义优先保留，候选计划不能借同名节点替换其输入或目标。已成功写节点同样
+     * 保留，因此新计划没有路径可以再次把它置为 PENDING 后执行。</p>
+     */
+    public ExecutionRunState acceptReplan(ExecutionRunState state, ExecutionPlan candidatePlan) {
+        ExecutionRunState currentState = Objects.requireNonNull(state, "运行状态不能为空");
+        ExecutionPlan candidate = Objects.requireNonNull(candidatePlan, "重规划候选不能为空");
+        if (candidate.version() <= currentState.plan().version()) {
+            throw new IllegalArgumentException("重规划版本必须提升");
+        }
+        ReplanRequestResult quota = requestReplan(currentState);
+        if (!quota.approved()) {
+            throw new IllegalStateException("重规划次数已达上限");
+        }
+        Map<String, ExecutionPlanNode> oldNodes = currentState.plan().nodes().stream()
+                .collect(java.util.stream.Collectors.toMap(ExecutionPlanNode::nodeId, node -> node));
+        Set<String> successfulIds = currentState.nodeStates().values().stream()
+                .filter(node -> node.status() == PlanNodeStatus.SUCCESS)
+                .map(ExecutionNodeState::nodeId)
+                .collect(java.util.stream.Collectors.toSet());
+        Set<String> candidateIds = candidate.nodes().stream()
+                .map(ExecutionPlanNode::nodeId)
+                .collect(java.util.stream.Collectors.toSet());
+        if (!java.util.Collections.disjoint(successfulIds, candidateIds)) {
+            // 候选中同名节点可能指向不同工具或不同引用，不能把成功事实重解释为新节点。
+            throw new IllegalArgumentException("重规划不能覆盖已成功节点");
+        }
+        List<ExecutionPlanNode> mergedNodes = new ArrayList<>();
+        Map<String, ExecutionNodeState> preserved = new java.util.LinkedHashMap<>();
+        for (ExecutionPlanNode oldNode : currentState.plan().nodes()) {
+            if (successfulIds.contains(oldNode.nodeId())) {
+                mergedNodes.add(oldNode);
+                preserved.put(oldNode.nodeId(), currentState.nodeState(oldNode.nodeId()));
+            }
+        }
+        for (ExecutionPlanNode candidateNode : candidate.nodes()) {
+            if (oldNodes.containsKey(candidateNode.nodeId()) && successfulIds.contains(candidateNode.nodeId())) {
+                throw new IllegalArgumentException("重规划不能覆盖已成功节点");
+            }
+            mergedNodes.add(candidateNode);
+        }
+        return ExecutionRunState.replanned(
+                new ExecutionPlan(candidate.planId(), candidate.version(), mergedNodes),
+                preserved,
+                quota.state().replanCount());
+    }
+
     private ExecutionRunState recordFailedToolResult(
             ExecutionRunState state,
             ExecutionPlanNode node,
@@ -159,7 +211,8 @@ public final class ExecutionPlanStateMachine {
         ExecutionRunState resolvedState = state;
         for (ExecutionPlanNode node : state.plan().nodes()) {
             ExecutionNodeState nodeState = resolvedState.nodeState(node.nodeId());
-            if (nodeState.status() != PlanNodeStatus.PENDING) {
+            if (nodeState.status() != PlanNodeStatus.PENDING
+                    && nodeState.status() != PlanNodeStatus.WAITING_CONFIRMATION) {
                 // 已运行、成功、失败或已跳过的节点不回退，状态机只向前推进。
                 continue;
             }
@@ -196,7 +249,8 @@ public final class ExecutionPlanStateMachine {
         while (!pendingNodeIds.isEmpty()) {
             String nodeId = pendingNodeIds.removeFirst();
             ExecutionNodeState nodeState = updatedState.nodeState(nodeId);
-            if (nodeState.status() == PlanNodeStatus.PENDING) {
+            if (nodeState.status() == PlanNodeStatus.PENDING
+                    || nodeState.status() == PlanNodeStatus.WAITING_CONFIRMATION) {
                 // 只跳过尚未开始节点，绝不覆盖可能已由并行调用完成的节点状态。
                 updatedState = updatedState.withNodeState(nodeState.skipForUpstreamFailure(sourceNodeId));
             }

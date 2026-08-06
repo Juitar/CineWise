@@ -34,6 +34,12 @@ public class MybatisAuthUserRepository implements AuthUserRepository {
     }
 
     @Override
+    public boolean resetPassword(
+            long userId, long expectedTokenVersion, String passwordHash, LocalDateTime updateTime) {
+        return mapper.resetPassword(userId, expectedTokenVersion, passwordHash, updateTime) == 1;
+    }
+
+    @Override
     public boolean existsByEmail(String normalizedEmail) {
         return mapper.countByEmail(normalizedEmail) > 0;
     }

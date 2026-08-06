@@ -84,6 +84,43 @@ class AgentRunStateMachineTest {
     }
 
     @Test
+    void shouldPreserveSuccessfulNodeAndRaisePlanVersionOnReplan() {
+        ExecutionPlanStateMachine stateMachine = stateMachine();
+        ExecutionRunState state = stateMachine.initialize(plan(
+                node("read", PlanNodeType.CALL_TOOL, "readTool", List.of(), FailurePolicy.REPLAN),
+                node("failed", PlanNodeType.CALL_TOOL, "readTool", List.of(), FailurePolicy.REPLAN)));
+        state = stateMachine.startNode(state, "read");
+        state = stateMachine.recordToolResult(state, "read", toolResult(ToolStatus.SUCCESS, false));
+        state = stateMachine.startNode(state, "failed");
+        state = stateMachine.recordToolResult(state, "failed", toolResult(ToolStatus.FAILED, false));
+
+        ExecutionPlan replannedPlan = new ExecutionPlan("plan-2", 2, List.of(
+                node("replacement", PlanNodeType.CALL_TOOL, "readTool", List.of(), FailurePolicy.FAIL)));
+        ExecutionRunState replanned = stateMachine.acceptReplan(state, replannedPlan);
+
+        assertEquals(2, replanned.plan().version());
+        assertEquals(1, replanned.replanCount());
+        assertEquals(PlanNodeStatus.SUCCESS, replanned.nodeState("read").status());
+        assertEquals(PlanNodeStatus.PENDING, replanned.nodeState("replacement").status());
+        assertThrows(IllegalArgumentException.class, () -> stateMachine.acceptReplan(
+                replanned, new ExecutionPlan("plan-2", 2, List.of())));
+    }
+
+    @Test
+    void shouldRejectCandidateThatOverwritesSuccessfulNode() {
+        ExecutionPlanStateMachine stateMachine = stateMachine();
+        ExecutionRunState state = stateMachine.initialize(
+                plan(node("read", PlanNodeType.CALL_TOOL, "readTool", List.of(), FailurePolicy.REPLAN)));
+        state = stateMachine.startNode(state, "read");
+        state = stateMachine.recordToolResult(state, "read", toolResult(ToolStatus.SUCCESS, false));
+
+        ExecutionRunState successful = state;
+        assertThrows(IllegalArgumentException.class, () -> stateMachine.acceptReplan(
+                successful, new ExecutionPlan("plan-2", 2, List.of(
+                        node("read", PlanNodeType.CALL_TOOL, "readTool", List.of(), FailurePolicy.FAIL)))));
+    }
+
+    @Test
     void shouldSkipTransitiveDownstreamNodesWithoutAffectingIndependentBranch() {
         ExecutionPlanStateMachine stateMachine = stateMachine();
         ExecutionRunState state = stateMachine.initialize(plan(

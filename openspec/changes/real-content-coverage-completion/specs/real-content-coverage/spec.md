@@ -20,7 +20,7 @@
 
 ### Requirement: 地点字符串必须经本地城市目录解析为 Provider 城市标识
 
-系统 SHALL 将 NetStart `cities.json` 的经核验最小城市目录作为版本化本地 JSON 随应用发布。应用启动时必须校验每条城市名和 Provider `ci` 非空且唯一，并构建只读索引；地点解析、页面查询和同步不得在用户请求中访问 NetStart 城市列表。C 使用 `POST /api/v1/content/cities/resolve` 提交 `{locationText:string}`，响应固定为 `{status:"RESOLVED"|"UNRECOGNIZED"|"SELECTION_REQUIRED", cityName:string|null}`；只有 `RESOLVED` 返回 `cityName`。D 只能在唯一城市名匹配时得到 Provider `ci`。公开结果不返回候选地点、`providerCityId` 或 `ci`，地点原文不能持久化。
+系统 SHALL 将 NetStart `cities.json` 的经核验最小城市目录作为版本化本地 JSON 随应用发布。应用启动时必须校验每条城市名和 Provider `ci` 非空且唯一，并构建只读索引；地点解析、页面查询和同步不得在用户请求中访问 NetStart 城市列表。C 使用 `POST /api/v1/content/cities/resolve` 提交 `{locationText:string}`，响应固定为 `{status:"RESOLVED"|"UNRECOGNIZED"|"SELECTION_REQUIRED", cityName:string|null}`；只有 `RESOLVED` 返回 `cityName`。D 只能在唯一城市名匹配时得到 Provider `ci`。公开结果不返回候选地点、`providerCityId` 或 `ci`，地点原文不能持久化。目录损坏或无法读取时返回 `503/303004`，与正常的 `UNRECOGNIZED` 区分。
 
 #### Scenario: 地点字符串解析为长沙
 
@@ -35,6 +35,13 @@
 - **WHEN** C 或 B 请求城市解析
 - **THEN** D 返回明确的不可用或需选择结果
 - **AND** 不调用影院 Provider，不以相近名称、地址或坐标猜测城市
+
+#### Scenario: 城市目录不可用
+
+- **GIVEN** 随应用发布的城市目录损坏、缺少元数据或城市名、`ci` 存在重复
+- **WHEN** C 或 B 请求城市解析
+- **THEN** D 返回 `503/303004`，不将其表示为 `UNRECOGNIZED`
+- **AND** 响应和日志不包含地点原文、候选列表或 Provider 原始内容
 
 #### Scenario: 用户查询已同步城市的真实影院
 
@@ -247,9 +254,9 @@ POST 响应和按请求查询统一返回 `syncId/clientRequestId/cityName/statu
 
 ### Requirement: 真实内容迁移必须保持历史内容与同步记录兼容
 
-A 已正式分配 V014。迁移 SHALL 仅新增 `movie` 的可空资料字段、`content_identity_mapping`、`cinema.city_name/provider_city_id` 和 `data_sync_log.city_name/provider_city_id/failure_category/lease_owner/lease_until`，不得修改 V001～V012、不得建立物理外键、不得写入演示种子或按地址、名称、区域、坐标猜测历史城市/身份。V014 SQL 草案必须先由 A 静态复核，本次不得执行。
+A 已正式分配 V014。`V013__add_travel_task_cinema_id.sql` 已进入 `dev`；A 在授权 V014 验证或发布前，必须确认 V013 的最终验证结果、checksum 与执行顺序，且 V014 必须在 V013 之后执行。迁移 SHALL 仅新增 `movie` 的可空资料字段、`content_identity_mapping`、`cinema.city_name/provider_city_id` 和 `data_sync_log.city_name/provider_city_id/failure_category/lease_owner/lease_until`，不得修改 V001～V013、不得建立物理外键、不得写入演示种子或按地址、名称、区域、坐标猜测历史城市/身份。V014 SQL 草案必须先由 A 静态复核，本次不得执行。
 
-`content_identity_mapping` 必须以 `provider/resource_type/external_id` 唯一标识外部身份，以生成的 ACTIVE 内部内容 ID 约束同一 Provider、资源类型和内部内容最多一个 ACTIVE 外部 ID；`ACTIVE` 映射不得有失效字段，`INVALID` 映射必须有固定失效分类和失效时间。`movie.release_status` 只能为 `NOW_SHOWING`、`COMING_SOON` 或 `NULL`。`data_sync_log` 必须保留 V004 的计数约束：三个计数非负，且 `success_count+failure_count<=total_count`；并支持 `PENDING/RUNNING/SUCCESS/PARTIAL/FAILED`、`lease_owner` 和 `lease_until`：PENDING 三个计数为 0，错误字段、完成时间、持有者和租约均为空；RUNNING 的持有者和租约均非空且计数仍不超过总数；SUCCESS 必须 `success_count=total_count/failure_count=0` 且错误字段为空；FAILED 必须 `success_count=0/failure_count=total_count>0` 且错误码、固定失败分类非空；PARTIAL 必须成功、失败计数均大于 0 且之和等于总数，并有错误码、固定失败分类；终态持有者和租约均为空。RUNNING 租约为 90 秒，存活持有者每 20 秒按持有者续租，续租及资料/终态写入均须命中当前未到期持有者；真正过期的 RUNNING 才可转为 `FAILED + INTERNAL`，且不重调 Provider。公开接口不得返回 Provider 城市 ID 或持有者。
+`content_identity_mapping` 必须以 `provider/resource_type/external_id` 唯一标识外部身份，以生成的 ACTIVE 内部内容 ID 约束同一 Provider、资源类型和内部内容最多一个 ACTIVE 外部 ID；`ACTIVE` 映射不得有失效字段，`INVALID` 映射必须有固定失效分类和失效时间。V014 只建表，不做 SQL 回填；D 在迁移后以 V001 的 `source + source_movie_id/source_cinema_id` 运行受控、可重复的应用回填，并将批次、成功数和冲突数记入同步审计。`movie.release_status` 只能为 `NOW_SHOWING`、`COMING_SOON` 或 `NULL`。`data_sync_log` 必须保留 V004 的计数约束：三个计数非负，且 `success_count+failure_count<=total_count`。V014 仅增加 PENDING 的零计数和全空字段规则，并允许 `lease_owner/lease_until` 成对为空或非空；它保留当前 RUNNING、FAILED/PARTIAL 的写入形态，避免未升级的同步代码被 CHECK 拒绝。D 发布新同步写入器、完成共享库只读预检和历史兼容处理后，V015 才收紧为：RUNNING 必须有 90 秒租约且每 20 秒按持有者续租；FAILED/PARTIAL 必须有错误码和固定失败分类；SUCCESS 不得有错误字段；终态持有者和租约均为空。FAILED 允许 `total_count=0/success_count=0/failure_count=0`，用于尚未获得候选项即失败的外部请求，但仍必须有错误码和失败分类。续租及资料/终态写入均须命中当前未到期持有者；真正过期的 RUNNING 才可转为 `FAILED + INTERNAL`，且不重调 Provider。公开接口不得返回 Provider 城市 ID 或持有者。
 
 #### Scenario: 迁移后读取 V001 历史内容
 
@@ -261,7 +268,7 @@ A 已正式分配 V014。迁移 SHALL 仅新增 `movie` 的可空资料字段、
 #### Scenario: 身份映射冲突
 
 - **GIVEN** 同一 Provider、资源类型和内部内容已存在 ACTIVE 外部身份
-- **WHEN** 受控回填或后续同步尝试写入第二个 ACTIVE 外部身份
+- **WHEN** 迁移后的受控应用回填或后续同步尝试写入第二个 ACTIVE 外部身份
 - **THEN** 唯一约束拒绝该写入，应用隔离该条并记录固定失败分类
 - **AND** 不改变既有 ACTIVE 映射或票务数据
 
@@ -272,30 +279,37 @@ A 已正式分配 V014。迁移 SHALL 仅新增 `movie` 的可空资料字段、
 - **THEN** 记录规范化城市名、内部 Provider 城市 ID、状态和固定失败分类
 - **AND** 管理端只收到城市名和脱敏状态字段，不收到 Provider 城市 ID、地点原文或原始异常
 
-#### Scenario: PENDING 请求取得唯一执行租约
+#### Scenario: V014 保持旧同步日志兼容并允许 PENDING
 
-- **GIVEN** 管理员已登记 PENDING 同步请求，三个计数为 0，错误字段、完成时间、持有者和租约均为空
+- **GIVEN** V004 已有未写入 `lease_owner/lease_until` 的 RUNNING 日志，或未写入 `failure_category`、`error_code` 的 FAILED/PARTIAL 日志
+- **WHEN** A 授权执行 V014 并由未升级的同步代码继续写入相同形态的日志
+- **THEN** 旧记录和新写入均不被 V014 的 CHECK 拒绝
+- **AND** 新建 PENDING 仅在三个计数均为 0、错误字段和租约字段均为空时可写入
+
+#### Scenario: V015 的 PENDING 请求取得唯一执行租约
+
+- **GIVEN** V015 已在新同步 Writer 发布和受控兼容处理完成后收紧状态 CHECK，管理员已登记 PENDING 同步请求，三个计数为 0，错误字段、完成时间、持有者和租约均为空
 - **WHEN** 多个实例同时尝试执行该请求
 - **THEN** 只有一个实例条件更新为 RUNNING 并写入随机 `lease_owner` 和非空 `lease_until`
 - **AND** 只有取得租约的实例调用 Provider，其他实例只返回原请求状态
 
-#### Scenario: 慢 Provider 下的存活实例续租
+#### Scenario: V015 下慢 Provider 的存活实例续租
 
-- **GIVEN** 同步已处于 RUNNING，实例仍存活且 Provider 响应较慢但仍在 60 秒总超时内
+- **GIVEN** V015 已启用严格租约 CHECK，同步已处于 RUNNING，实例仍存活且 Provider 响应较慢但仍在 60 秒总超时内
 - **WHEN** Provider I/O 仍在进行，持有者每 20 秒续租
 - **THEN** 只有匹配 `lease_owner` 且租约未到期的续租更新可以延长租约，恢复任务不得把该记录改为 FAILED
 - **AND** Provider 返回后，只有匹配同一持有者和未到期租约的资料及终态写入可以成功
 
-#### Scenario: RUNNING 租约因进程中断而真正到期
+#### Scenario: V015 的 RUNNING 租约因进程中断而真正到期
 
-- **GIVEN** 同步已处于 RUNNING，Provider 调用期间实例退出，续租停止且 `lease_until` 到期
+- **GIVEN** V015 已启用严格租约 CHECK，同步已处于 RUNNING，Provider 调用期间实例退出，续租停止且 `lease_until` 到期
 - **WHEN** 恢复任务扫描该记录
 - **THEN** 恢复任务条件更新为 `FAILED`、`failure_category=INTERNAL`，写入固定 `303004`、终态时间并清空持有者和租约
 - **AND** 不再次调用 Provider；同一 `clientRequestId` 的查询只能返回该终态，管理员需要新请求标识才能发起新同步
 
 #### Scenario: 五种状态拒绝统计不一致的记录
 
-- **GIVEN** V014 迁移替换 V004 的同步状态计数 CHECK
+- **GIVEN** V015 在 D 的新同步写入器发布并完成历史兼容处理后收紧同步状态计数 CHECK
 - **WHEN** 尝试写入 SUCCESS 的 `success_count<total_count`、FAILED 的 `success_count>0`、PARTIAL 的成功失败之和不等于总数，或 RUNNING 的成功失败之和大于总数
 - **THEN** 数据库必须拒绝这些记录
 - **AND** PENDING 只允许三个计数均为 0；合法的 SUCCESS、FAILED、PARTIAL 和未完成 RUNNING 记录仍可写入

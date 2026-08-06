@@ -265,6 +265,17 @@
   text-decoration: none;
 }
 
+.login-forgot-row {
+  margin-top: 8px;
+  text-align: right;
+}
+
+.login-forgot-row a {
+  color: var(--color-primary);
+  font-size: 14px;
+  text-decoration: none;
+}
+
 /* antd 输入框覆盖样式 */
 .login-input-antd {
   height: 48px;
