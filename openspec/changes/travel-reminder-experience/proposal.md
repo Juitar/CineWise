@@ -1,29 +1,29 @@
 ## Why
 
-C 需要稳定的出行任务详情和建议响应，当前 REST 仍暴露 D 内部 JSON，无法直接开发页面。
+支付后的电子票目前没有可恢复的出行提醒任务，天气、通用交通建议、基础路线和周边餐饮也没有统一的离线演示与失败处理方式。PRD 要求第 5 天交付轻量出行和工具失败兜底；本变更把 D 负责的任务、建议、提醒和查询能力定为可实现、可联调的范围。
 
 ## What Changes
 
-- D 新增任务详情聚合 DTO：任务、订单、影片、影院公开摘要。
-- D 将天气建议映射为类型化 `TravelAdviceResponse`，旧 JSON 仅作短期兼容字段。
-- D 固定公开错误码、OpenAPI 示例和 JSON 夹具。
-- 保留已有路线设计，但本 change 不接入真实路线 Provider。
+- 在支付事务提交后的 `PaymentSucceededEvent` 消费端，按事件和订单双重幂等创建或恢复 `travel_task`；A 已确认 `PaymentSucceededEvent`、`OrderInvalidated` 增加 `String cinemaId`，A 只产生完整匹配 `^[1-9][0-9]*$` 且不超过 Java `long` 正数上限 `9223372036854775807` 的值，D 仍做防御校验后写入拟由 V013 增加的 `travel_task.cinema_id`；订单失效时按版本取消任务。
+- 提供天气、确定性通用交通建议、建议快照和 EMAIL 提醒调度；外部数据失败时明确使用缓存、版本化 Demo 或省略天气事实，不影响电子票展示。
+- 提供用户主动发起的单条基础路线和简单周边餐饮查询；路线仅使用一次性位置或手动地点，不保存精确位置和路线几何。
+- 建立 `travel_task`、`travel_advice_snapshot`、`travel_notification_log` 的迁移、任务状态、通知恢复、Mock 与回归测试方案。
+- 明确 A、C、B 的协作边界：A 在交易事务内登记事件、由 D 在提交后消费，并每 5 分钟分别扫描最近 24 小时的 `PAID`、`REFUNDED` 订单进行补偿；C 提供公共邮件端口和路线展示，B 只能读取任务或建议摘要，不通过对话创建、刷新或发送提醒。
 
-## Non-Goals
+## Capabilities
 
-- 不接入邮件提醒、餐饮、真实路线 Provider、支付、订单、内容、认证和前端页面。
-- 不修改 A、B、C 的代码、Controller、Repository、Mapper 或数据库表。
+### New Capabilities
 
-## Owners and Dependencies
+- `travel-task-reminder`: 支付后出行任务、建议快照与 EMAIL 提醒的创建、取消、调度、幂等和结果恢复。
+- `travel-advice-query`: 天气、通用交通建议、基础路线和简单周边餐饮的只读查询、来源时效、隐私和降级规则。
 
-- D 负责 REST/Application DTO、映射、错误码、测试和夹具。
-- A 只通过 `TravelOrderSummaryQueryPort` 提供订单摘要；D 不访问 A 持久化层。
-- D 的 `ContentPurchaseQueryPort` 和 `ContentSummaryQueryPort` 提供影片、影院摘要。
-- C 负责消费新响应和夹具；本 change 不改 C 代码。
+### Modified Capabilities
 
-## Acceptance
+- 无。
 
-- 任务不存在或非本人返回 404/`207001`；取消任务详情仍返回 `CANCELLED`。
-- 订单或内容摘要不可用返回 503/`207004`，不透传内部错误。
-- 建议响应提供 `weather`、`advice`、来源、时间、过期和降级字段，天气不可用时仍保留交通建议。
-- `backend\\mvnw.cmd verify`、严格 OpenSpec 校验和 `git diff --check` 通过。
+## Impact
+
+- 代码范围：`backend` 下新增 `travel` 模块的 api、application、domain、infrastructure 和对应测试；D 的 Provider、缓存、定时任务、Demo 资源和回归清单。
+- 数据范围：在已发布 V007 的 `travel_task` 上，以 V013 增加 `cinema_id BIGINT NULL`。该字段不建物理外键、不设默认值、不回填历史任务，并使用 `CHECK (cinema_id IS NULL OR cinema_id > 0)`；历史任务和退款先到且影院 ID 非法的取消墓碑可保留 `NULL`，路线查询明确不可用。
+- 跨模块：A 的 `PaymentSucceededEvent`、`OrderInvalidated` 和补偿调用；C 的 `EmailDeliveryPort`、当前用户和路线展示；B 的 `ToolContext`、`ToolResult<T>` 与只读工具注册。
+- 外部依赖：天气、餐饮 POI、高德路线服务未确认时使用版本化 Demo Provider；路线的精确起点与几何不写 MySQL、Redis、日志、画像、快照、URL 或 Agent 轨迹。
