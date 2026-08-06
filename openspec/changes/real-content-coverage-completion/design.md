@@ -100,11 +100,17 @@ B 的对话地点信息只作为该次 D 城市解析调用的内存参数，调
 
 ### 7. 管理同步为按城市执行的受控写操作
 
-来源状态是管理员只读接口。管理员手动同步提交稳定 `clientRequestId` 和城市名，D 必须先在本地城市目录中解析 `ci`，再同步该城市资料；不接受地点原文、任意 `ci` 或任意 Provider URL。同步开始前先持久化 `RUNNING` 记录，以 `(provider, request_id)` 唯一键阻止重复请求；网络响应未知时只能按原 `clientRequestId` 查询，不得重新调用 Provider。
+来源状态是管理员只读接口。管理员手动同步提交稳定 `clientRequestId` 和城市名，D 必须先在本地城市目录中解析 `ci`，再同步该城市资料；不接受地点原文、任意 `ci` 或任意 Provider URL。同步开始先持久化 `PENDING` 记录，以 `(provider, request_id)` 唯一键阻止重复请求；获得租约的实例再条件更新为 `RUNNING` 并调用 Provider。网络响应未知时只能按原 `clientRequestId` 查询，不得重新调用 Provider。
 
 公开同步结果固定为 `syncId/clientRequestId/cityName/status/startedAt/finishedAt/successCount/failureCount/failureCategory`；`finishedAt` 未完成时可为空，`failureCategory` 无失败时可为空。按请求查询复用同一结构。来源状态每条返回 `provider/resourceType/cityName/status/startedAt/finishedAt/lastSuccessAt/successCount/failureCount/failureCategory/dataTime/expiresAt/isExpired/licenseNotice`。Provider 城市 ID 仅可留在服务端审计数据，不得出现在任何公开响应。
 
 两个管理员 GET 不要求 CSRF，POST 必须带 `X-XSRF-TOKEN`。同一 `clientRequestId + cityName` 返回原任务；同一请求标识提交不同城市返回 `409/100409`；不存在的原任务返回 `404/100404`。Provider 已受理后的超时或失败通过任务状态 `PARTIAL/FAILED` 表示，不改写 POST 的 HTTP 返回；POST 超时或断网后，C 进入 `RESULT_UNKNOWN`，只查询原请求，不能重新 POST 或生成新请求标识。
+
+`data_sync_log` 的状态和恢复规则固定如下：所有状态始终满足三个计数非负，且 `success_count + failure_count <= total_count`。`PENDING` 表示请求已登记、尚未取得执行租约，三个计数均为 0，`error_code/error_summary/failure_category/finished_at/lease_owner/lease_until` 全为 NULL；获得租约后才转为 `RUNNING`，此时 `finished_at` 和三个错误字段均为 NULL，`lease_owner` 和 `lease_until` 必须非空，计数可表示已处理的子集但仍须满足 `success_count + failure_count <= total_count`。`lease_owner` 是本次执行实例生成的随机执行标识，不对外返回、不含用户信息，也不得写入日志。`SUCCESS/PARTIAL/FAILED` 都是终态，`lease_owner/lease_until` 必须清空，`finished_at` 必须非空且不早于 `started_at`：`SUCCESS` 必须 `success_count=total_count`、`failure_count=0` 且三个错误字段均为 NULL；`FAILED` 必须 `success_count=0`、`failure_count=total_count>0`，且 `error_code/failure_category` 非空；`PARTIAL` 必须 `success_count>0`、`failure_count>0`、两者之和等于 `total_count`，且 `error_code/failure_category` 非空。`error_summary` 只能是脱敏固定摘要或 NULL，绝不记录原始异常。
+
+取得租约时按数据库当前时间设置 `lease_until=now+90 秒`；执行实例独立于 Provider I/O 每 20 秒续租一次。Provider 的一次同步调用（包含允许的一次短重试）必须有不超过 60 秒的总超时；因此正常存活实例即使 Provider 较慢，也会在租约到期前续租。续租、写入同步资料和写入终态结果都必须使用 `status=RUNNING AND lease_owner=当前执行标识 AND lease_until>数据库当前时间` 的条件更新，并要求影响一行；续租或结果保存未命中时，实例立即丢弃本次 Provider 响应，不得写入内容资料或覆盖已有终态。
+
+恢复任务每分钟扫描 `PENDING` 和租约过期的 `RUNNING`：多实例只能通过状态、版本和新的 `lease_owner` 条件更新取得同一条 PENDING 的租约，取得者才可调用一次 Provider；PENDING 不会产生重复调用。对租约过期的 RUNNING，恢复任务只在 `lease_until<数据库当前时间` 时条件更新为 `FAILED + INTERNAL`，设置 `total_count=1/success_count=0/failure_count=1`、固定 `303004` 错误码、脱敏摘要、`finished_at` 并清空持有者和租约，绝不重新调用 Provider。这样进程在 Provider 调用中退出时，原请求最终可查询；慢 Provider 的存活实例会续租且能保存结果，同一请求标识永不触发第二次 Provider 调用；管理员只有使用新的 `clientRequestId` 才能发起新的同步。
 
 ### 8. C 页面只展示 D 内容和 A 公开票务查询的实际结果
 
@@ -112,13 +118,18 @@ C 负责移除首页/影院页的静态影片和影院数据，并用模块 API�
 
 ## Migration and Compatibility
 
-- A 审核用冻结设计：`movie.poster_url VARCHAR(2048) NULL`，只保存 HTTPS 绝对地址；`summary VARCHAR(2000) NULL`，只保存短简介；`release_status VARCHAR(16) NULL`，仅 `NOW_SHOWING`、`COMING_SOON`；`release_date DATE NULL`，表示 Provider 的公映或计划公映日期，不能解析则为 `NULL`。
-- 新表固定命名为 `content_identity_mapping`：唯一键 `(provider, resource_type, external_id)`，普通索引 `(resource_type, internal_content_id, status)`；`ACTIVE` 时 `invalid_reason/invalidated_at` 必须为空，`INVALID` 时二者必须非空。映射不物理删除；`INVALID` 为终态，不重新激活、不静默改指向。
-- 同一 Provider、同一资源类型下，一个内部内容同时只允许一个 `ACTIVE` 外部 ID；旧 ID 标记 `INVALID` 后长期保留。V001 的 `source + source_movie_id/source_cinema_id` 继续作为影片/影院当前来源字段；映射表是跨模块身份解析和失效历史的权威记录。迁移先新增可空字段和映射表，再从 V001 的非空来源字段补写 ACTIVE 映射，冲突隔离不猜测，最后部署读取新字段/API 的代码。
-- 为支持按城市持久化和恢复，迁移还须为 `cinema` 新增可空 `city_name`、`provider_city_id` 及查询索引，为 `data_sync_log` 新增可空 `city_name`、`provider_city_id`。新代码只写新列；现有 `city_code` 保留兼容，不重写历史记录。长沙已有真实资料可由受控数据维护补齐新列，其他旧行保持为空，不按地址猜测。
-- V011 只是候选。当前迁移目录最高 V010；A 已允许进入迁移准备，但仍须书面分配最终版本、确认上述列/索引和空 MySQL 验证窗口后，D 才能创建 SQL，A 才能执行 Flyway。
-- 影院已有 `longitude`、`latitude`，不因城市目录补齐而修改表；城市资料更新必须采用受控策略，不能误伤 Demo 或 A 的既有票务关联。
-- API 新增字段采用向后兼容的可空字段；既有 `posterUrl` 和 `summary` 保持字段名和类型。任何接口增量先由 C 确认并同步共享类型、OpenAPI、Mock 和测试。
+本节是 D 提交 A 审查的完整结构设计，不是 Flyway SQL 或执行授权。A 已正式分配 V014；迁移只做向后兼容的新增列、新表、索引和 CHECK，不修改 V001～V012、不包含数据回填或演示种子、不建立物理外键。现有表和新增字符串列须在空 MySQL 验证中确认 `utf8mb4_0900_ai_ci`。
+
+| 对象 | 新增字段 | 约束与索引 | 保留、兼容和写入规则 |
+| --- | --- | --- | --- |
+| `movie` | `poster_url VARCHAR(2048) NULL`；`summary VARCHAR(2000) NULL`；`release_status VARCHAR(16) NULL`；`release_date DATE NULL` | `CHECK (release_status IS NULL OR release_status IN ('NOW_SHOWING','COMING_SOON'))`；新增 `INDEX(release_status, release_date, deleted_at)` 支撑本地上映状态与日期查询。HTTPS、摘要内容和日期格式由 D Mapper 校验，不把 URL 正则写进数据库 CHECK。 | 四列均可空，旧影片保持 `NULL`，下一次合格同步再写入；不把缺失字段当作删除，不回填虚构内容。公开 DTO 保持可空字段，旧客户端可忽略新增值。 |
+| `content_identity_mapping` 新表 | `id BIGINT NOT NULL`；`provider VARCHAR(64) NOT NULL`；`resource_type VARCHAR(16) NOT NULL`；`external_id VARCHAR(128) NOT NULL`；`internal_content_id BIGINT NOT NULL`；`status VARCHAR(16) NOT NULL`；`invalid_reason VARCHAR(32) NULL`；`invalidated_at DATETIME(3) NULL`；`active_internal_content_id BIGINT GENERATED ALWAYS AS (CASE WHEN status='ACTIVE' THEN internal_content_id ELSE NULL END) STORED`；`create_time/update_time DATETIME(3) NOT NULL`。 | PK(`id`)；UNIQUE(`provider`,`resource_type`,`external_id`)；UNIQUE(`provider`,`resource_type`,`active_internal_content_id`)；INDEX(`resource_type`,`internal_content_id`,`status`)；`resource_type` 仅 `MOVIE/CINEMA`；`status` 仅 `ACTIVE/INVALID`；`invalid_reason` 仅 `SOURCE_REPLACED/CONTENT_DELETED/IDENTITY_CONFLICT/MANUAL_CORRECTION`；CHECK：`ACTIVE` 的失效字段均为 NULL，`INVALID` 的失效字段均非 NULL。无物理外键，D 应用层验证内部内容存在且类型匹配。 | 映射不可物理删除；`INVALID` 为终态，不重新激活也不静默改指向。首次发布后的受控应用回填只依据 V001 的 `source + source_movie_id/source_cinema_id` 写 ACTIVE 映射；冲突隔离并记录失败分类，不按标题、名称或地址猜测。保留 ACTIVE 和 INVALID 记录，不设自动清理。 |
+| `cinema` | `city_name VARCHAR(64) NULL`；`provider_city_id VARCHAR(32) NULL`。 | 新增 `INDEX(city_name, deleted_at, id)` 供当前城市的未删除影院查询；新增 `INDEX(source, provider_city_id, deleted_at)` 供按 Provider 城市同步与核对。`provider_city_id` 仅是 D 的外部请求关联，不对 C/B/A 公开。 | 保留既有 `city_code`，不改写、不删除；新同步只写规范化 `city_name/provider_city_id`。历史行保持 NULL，不按地址、区域、坐标或旧 `city_code` 猜测回填；后续受控同步自然补齐。影院原有经纬度字段不变。 |
+| `data_sync_log` | `city_name VARCHAR(64) NULL`；`provider_city_id VARCHAR(32) NULL`；`failure_category VARCHAR(32) NULL`；`lease_owner VARCHAR(64) NULL`；`lease_until DATETIME(3) NULL`。 | 保留 `uk_sync_request(provider, request_id)`；新增 `idx_sync_city_resource_started(city_name, resource_type, started_at)` 与 `idx_sync_recovery(status, lease_until)`。保留 V004 的非负 CHECK 和 `success_count + failure_count <= total_count`，并替换状态/计数关系 CHECK 为五种状态：PENDING 三个计数均 0，错误字段、完成时间、持有者和租约均 NULL；RUNNING 的错误字段和完成时间均 NULL、`lease_owner/lease_until` 均非空且仍受未完成计数上限约束；SUCCESS 必须 `success_count=total_count/failure_count=0` 且错误字段为 NULL；FAILED 必须 `success_count=0/failure_count=total_count>0` 且 `error_code/failure_category` 非空；PARTIAL 必须两类计数均大于 0、之和等于 `total_count` 且 `error_code/failure_category` 非空；所有终态有完成时间且持有者、租约均为 NULL。`failure_category` 仅 `NETWORK/RATE_LIMIT/PROVIDER_RESPONSE/DATA_VALIDATION/INTERNAL` 或 NULL。 | 仅存城市名、内部 Provider 城市 ID、数值错误码、脱敏失败分类和不对外的随机执行标识；不存地点原文、Provider URL、原始异常或原始响应。持有者每 20 秒在数据库条件更新下续租至当前时间后 90 秒；恢复任务只把真正过期的 RUNNING 条件更新为 `FAILED + INTERNAL`，不重新调用 Provider。按既有 `create_time` 清理索引保留 180 天，清理只处理终态记录，PENDING/RUNNING 不得按时间自动删除。公开 API 绝不返回 `provider_city_id` 或 `lease_owner`。 |
+
+迁移发布顺序是：先新增全部可空列、新表、索引与 CHECK；随后发布能够兼容新旧字段的 D 代码；再由受控应用回填可确定的内容身份映射和后续真实同步。失败或冲突不通过 SQL 回滚历史数据，而是保留旧字段和最近成功快照；后续结构调整只能新增前向迁移。
+
+当前已发布迁移目录最高为 V012，A 已分配后续迁移版本 V014。上述四类结构设计和过期版本描述更新完成后，D 才可提交 `V014` SQL 草案给 A 静态复核；草案通过后，A 再明确授权使用 `cinewise_migration_check + cinewise_migrator` 执行首次 migrate、validate、重复 migrate、结构/索引/CHECK、历史兼容和清理规则验证。本次不执行。`movie_tag`、`recommendation_record` 不属于本次申请，推荐历史另建 change 后再设计。
 
 ## Verification
 
