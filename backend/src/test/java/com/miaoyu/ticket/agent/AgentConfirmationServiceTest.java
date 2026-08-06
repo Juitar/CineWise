@@ -107,7 +107,8 @@ class AgentConfirmationServiceTest {
     void shouldRecoverUnknownOnlyWithOriginalIdentifiersWithoutExecutingAgain() {
         InMemoryRepository repository = new InMemoryRepository(action());
         CountingTool tool = new CountingTool(processing());
-        AgentConfirmationService service = service(repository, tool, true);
+        ProfileBehaviorRecorder recorder = Mockito.mock(ProfileBehaviorRecorder.class);
+        AgentConfirmationService service = service(repository, tool, true, recorder);
 
         AgentConfirmationResult unknown = service.confirm("action-1", true, "trace-1");
         tool.queryResult = success("order-1");
@@ -119,6 +120,11 @@ class AgentConfirmationServiceTest {
         assertEquals(1, tool.queryCalls);
         assertEquals(tool.firstContext.clientRequestId(), tool.queryContext.clientRequestId());
         assertEquals(tool.firstContext.idempotencyKey(), tool.queryContext.idempotencyKey());
+        Mockito.verify(recorder).recordPlanAccepted("action-1", "plan-1",
+                LocalDateTime.of(2026, 8, 5, 2, 0, 2));
+
+        service.recover("action-1", "trace-1");
+        Mockito.verifyNoMoreInteractions(recorder);
     }
 
     @Test

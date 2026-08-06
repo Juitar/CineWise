@@ -136,9 +136,11 @@ public final class AgentConfirmationService {
             return new AgentConfirmationResult(action, null, false);
         }
         AgentConfirmationAction completed = resultAction(action, queryResult, now());
-        AgentConfirmationAction result = transactionRunner.execute(
-                () -> updateOrReadWinner(action, completed).action());
-        return new AgentConfirmationResult(result, null, false);
+        CasUpdateResult saved = transactionRunner.execute(() -> updateOrReadWinner(action, completed));
+        if (saved.applied() && saved.action().status() == AgentConfirmationActionStatus.SUCCEEDED) {
+            recordAccepted(saved.action());
+        }
+        return new AgentConfirmationResult(saved.action(), null, false);
     }
 
     /** SSE 回放和运行查询只刷新本人的 action 事实，绝不进入写工具。 */
