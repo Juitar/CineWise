@@ -95,6 +95,19 @@ B 已确认方案反馈通过 D 在 `profile/application` 定义并实现的 `Pr
 
 C 在撤回事务提交后发送 `ProfileDataConsentWithdrawnEvent(eventId, userId, consentVersion, consentRecordVersion, occurredAt, traceId)`，其中 `occurredAt` 为 UTC `Instant`。D 以 `eventId` 去重；收到后立即关闭个性化、删除 Redis 画像缓存、停止后续标签/偏好/行为写入，并按画像数据保留规则清理已有数据。重复通知不得重复创建清理任务或延长清理时间。C 的发送重试为第 1、5、15、60、360 分钟，之后每 6 小时一次，最多 10 次；人工恢复必须复用原 `eventId`。
 
+#### 7.1 C 的同意记录和撤回事件投递迁移
+
+A 已分配 `V017__create_profile_data_consent_tables.sql`。该迁移只新增认证侧表，不修改已发布脚本，也不建立到 `sys_user` 或 D 的画像表的物理外键；`user_id` 只作逻辑关联。所有时间使用 UTC `DATETIME(3)`，由 C 注入 `Clock` 写入。
+
+| 表 | 完整字段和约束 | 状态、重试和保留规则 |
+| --- | --- | --- |
+| `sys_profile_data_consent` | `id BIGINT NOT NULL` 主键；`user_id BIGINT NOT NULL` 唯一；`status VARCHAR(16) NOT NULL`，仅 `GRANTED/WITHDRAWN`；`consent_version BIGINT NOT NULL`；`privacy_policy_version VARCHAR(32) NOT NULL`；`granted_at DATETIME(3) NULL`；`withdrawn_at DATETIME(3) NULL`；`version BIGINT NOT NULL DEFAULT 0`；`create_time`、`update_time DATETIME(3) NOT NULL`。CHECK：`id/user_id > 0`，`consent_version >= 1`、`version >= 0`，隐私政策版本去除首尾空格后非空；`GRANTED` 必须有 `granted_at` 且 `withdrawn_at` 为空，`WITHDRAWN` 必须同时有两类时间并满足 `withdrawn_at >= granted_at`。 | 首次授权创建记录，`consentVersion=1`、记录 `version=0`；撤回通过 `WHERE version = :expectedVersion` 的条件更新递增记录版本，保留 `consentVersion` 和最近 `grantedAt`，写入 `withdrawnAt`；再次授权才递增 `consentVersion`，同时递增记录版本、更新隐私政策版本和授权时间、清空撤回时间。记录保留至账户生命周期结束；当前版本不实现账户删除或清理任务。 |
+| `sys_profile_data_consent_outbox` | `id BIGINT NOT NULL` 主键；`event_id VARCHAR(64) NOT NULL` 唯一且去除首尾空格后非空；`user_id BIGINT NOT NULL`；`consent_version BIGINT NOT NULL`；`consent_record_version BIGINT NOT NULL`；`occurred_at DATETIME(3) NOT NULL`；`trace_id VARCHAR(64) NOT NULL` 且去除首尾空格后非空；`status VARCHAR(16) NOT NULL DEFAULT 'PENDING'`；`retry_count INT NOT NULL DEFAULT 0`；`next_attempt_at DATETIME(3) NULL`；`delivered_at DATETIME(3) NULL`；`create_time`、`update_time DATETIME(3) NOT NULL`。唯一键 `(event_id)`、`(user_id, consent_record_version)`；扫描索引 `(status, next_attempt_at, id)`。CHECK：两个 ID 为正数、`consent_version >= 1`、`consent_record_version >= 0`、状态仅 `PENDING/DELIVERED/EXHAUSTED`、`retry_count` 为 0 至 10；仅 `PENDING` 保留 `next_attempt_at`，仅 `DELIVERED` 写 `delivered_at`，终态 `DELIVERED/EXHAUSTED` 的 `next_attempt_at` 必须为空。 | 撤回与 outbox 插入必须在同一事务提交，`(user_id, consent_record_version)` 防止同一次撤回生成不同 `eventId`。事务提交后立即投递；失败后按第 1、5、15、60、360 分钟、后续每 6 小时调度，自动重试最多 10 次；达到上限标记 `EXHAUSTED` 并清空 `next_attempt_at`。自动重试只累计 `retry_count`，不重置；人工恢复直接投递同一 outbox 行，不重置或增加 `retry_count`，成功改为 `DELIVERED`，失败保持 `EXHAUSTED`。两种恢复都复用原 `eventId`，不得新建事件。outbox 为支持事件去重和人工恢复，保留至账户生命周期结束；当前版本不做清理。 |
+
+`consentVersion` 和记录 `version` 的递增正确性由 C 的应用层 CAS 条件更新、唯一键与本地事务保证，普通 CHECK 只校验取值范围，不能代替并发控制。D 只通过公开查询和撤回事件使用该数据，不能访问这些表或 C 的持久化实现。
+
+V017 的验收场景包括：首次授权创建唯一同意记录；并发或重复撤回只生成一条 `(user_id, consent_record_version)` outbox；撤回和 outbox 插入任一步失败时整体回滚；再次授权只增加 `consentVersion`；空隐私政策版本、空 `eventId`、空 `traceId`、撤回时间早于授权时间均被数据库拒绝；`DELIVERED/EXHAUSTED` 记录不会被 `PENDING` 扫描索引选中；十次自动重试后仅可人工使用原 `eventId` 做单次恢复，不能生成新事件。
+
 用户关闭个性化但尚未撤回同意时，C 不提交画像行为；D 仍必须检查开关并拒绝采集、写入、补采或回放关闭期间发生的行为。重新开启后仍须先取得 `granted=true` 才允许后续采集；撤回同意优先于开关状态。
 
 画像写入、开关变更、摘要读取、同意撤回和行为拒绝仅记录用户内部 ID、操作类型、结果、错误码和 traceId 等最小审计信息；日志不得出现标签完整值、原始 payload、会话内容、Cookie、JWT、邮箱、支付数据或位置。监控仅统计开关关闭率、摘要命中率、标签冲突率、过期率、行为拒绝率和清理失败数。
@@ -118,6 +131,10 @@ C 在撤回事务提交后发送 `ProfileDataConsentWithdrawnEvent(eventId, user
 
 ## Open Questions
 
+- D 已于 2026-08-06 确认 `ProfileDataConsentSnapshot` 的消费语义：`version` 是同意记录的乐观锁版本；没有记录时固定返回 `granted=false`、`consentVersion=0`、`version=0`、`grantedAt=null`、`withdrawnAt=null`；撤回后保留原 `consentVersion` 和 `withdrawnAt`。D 只依赖 `ProfileDataConsentQuery` 与 `ProfileDataConsentWithdrawnEvent`，不读取认证表或 C 的持久化层。
+- D 已于 2026-08-06 确认撤回处理：同一 `eventId` 只处理一次，不重复清理或延长清理时间；没有同意或已撤回时画像 REST 返回 HTTP 403 / `202004`，前端清空本地画像缓存；撤回事件到达后关闭画像、删除 Redis 缓存并拒绝后续写入；`GetProfileSummaryTool` 仅返回 `enabled=false`，不将 `202004` 传递为 B 的推荐失败。D 不提供同意撤回接口。
+- C、D 已确认画像页面不新增专门的同意状态 REST。个人数据同意由 C 的认证/隐私设置管理；D 的画像页面仅按画像 REST 的成功结果或 `202004` 渲染，不能把个性化开关当成同意状态。
+- C 已按 A 分配的 `V017` 完成私有 SQL 草案和字段、版本、状态、重试、保留规则记录，详见“7.1 C 的同意记录和撤回事件投递迁移”。下一步仅等待 A 静态审查；未获 MySQL 验证授权前不得执行 SQL。
 - A：已确认四表范围、正式版本 V010、D 创建 SQL 草案/A 静态审查与授权验证的职责、UTC 时间规则、`profile_write_request` 的唯一键/字段/30 天保留期/无 `PROCESSING` 规则，以及 `PaymentSucceededEvent` 的最小使用字段。
 - B：已确认 `GetProfileSummaryTool` 通过 D 的 `CurrentUserAccessor` 取得认证用户，并确认 `ProfileBehaviorRecorder`、服务端 UUID `planId`、重放和不调用边界；实际接入由 B 的 `agent-plan-feedback-events` change 完成。
 - C：已确认 `ProfileDataConsentQuery`、`ProfileDataConsentWithdrawnEvent`、未同意 HTTP 403 / `202004 PROFILE_DATA_CONSENT_REQUIRED`、撤回通知重试和关闭个性化后的不采集规则；接口和可靠通知尚未实现。

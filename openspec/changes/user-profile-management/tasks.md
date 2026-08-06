@@ -2,7 +2,7 @@
 
 - [x] 1.1 D 复核画像设计、推荐设计、现有 `CurrentUserAccessor`、`ToolContext`、`ToolResult<T>` 和错误码实现；验证：实际类型、调用方向和差异已记录在 `design.md` 的“当前实现基线”，未修改公共契约。
 - [x] 1.2 D 向 A 提交 `user_preference`、`user_profile_tag`、`user_behavior_event`、`profile_write_request` 的字段、类型、可空性、默认值、索引、UNIQUE、CHECK、软删除、幂等状态和清理申请，并创建 `V010__create_profile_tables.sql` 草案；A 静态审查后明确授权迁移验证。验证：V010 已完成隔离 MySQL 和共享库发布验证并冻结；详见 `docs/database-migrations/V010_*_2026-08-05.md`。
-- [ ] 1.3 B 已确认 `GetProfileSummaryTool` 的注册、当前用户注入、`ProfileBehaviorRecorder`、稳定 UUID `planId` 和长期对话偏好确认输入；C 确认 `CurrentUserAccessor` 和前端错误展示边界。当前版本已取消账户删除，不实现账户删除通知。验证：确认的字段和未确认项写入 design，不把待确认接口写成已完成。
+- [ ] 1.3 B 已确认 `GetProfileSummaryTool` 的注册、当前用户注入、`ProfileBehaviorRecorder`、稳定 UUID `planId` 和长期对话偏好确认输入；C、D 已确认 `CurrentUserAccessor`、画像错误展示和同意撤回边界。C 已按 A 分配的 `V017` 补齐同意记录、版本递增、可靠投递与保留规则，并准备私有 SQL 草案，等待 A 静态审核；撤回记录的 CAS 条件更新与 `(user_id, consent_record_version)` outbox 插入必须在同一 MySQL 本地事务内提交，任一步失败整体回滚。已执行 `openspec validate user-profile-management --strict`，结果通过；未经后续 MySQL 验证授权不得执行 SQL。D 已确认快照与撤回事件字段的消费规则。当前版本已取消账户删除，不实现账户删除通知。验证：确认的字段和未确认项写入 design，不把待确认接口写成已完成。
 - [ ] 1.4 D 确认标签类型、来源、状态、极性、行为与目标类型的唯一映射：`DIALOG -> CONVERSATION`、`ORDER -> BEHAVIOR`、`GENRE -> MOVIE_GENRE`；A 审查 V010 的对应 CHECK，B 在 `agent-plan-feedback-events` 接入已确认的稳定 `PLAN` UUID，C 仅发送已鉴权的 `MOVIE` 行为。验证：表 CHECK、Java 枚举、REST DTO、工具夹具和推荐消费者使用同一套值。
 - [x] 1.5 C 已确认个人数据保存同意的类型化查询 `ProfileDataConsentQuery` 和撤回通知 `ProfileDataConsentWithdrawnEvent`；A/B/C 确认各类行为事件的可信来源、目标校验和关闭开关后的采集规则。验证：无同意和撤回同意统一为 HTTP 403 / `202004 PROFILE_DATA_CONSENT_REQUIRED`；关闭后的行为不采集、不提交、不写入、不补采或回放。C 的接口和可靠通知尚未实现，D 的生产写入在此之前默认按未同意处理。
 
