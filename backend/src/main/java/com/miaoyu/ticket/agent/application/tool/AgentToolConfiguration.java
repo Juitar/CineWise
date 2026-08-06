@@ -109,6 +109,6 @@ public class AgentToolConfiguration {
                 agentToolRegistry,
                 planSchemaValidator,
                 executionPlanStateMachine,
-                rankMoviePlanExecutionAdapter);
+                List.of(rankMoviePlanExecutionAdapter));
     }
 }

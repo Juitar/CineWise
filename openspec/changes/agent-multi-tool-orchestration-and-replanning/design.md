@@ -58,3 +58,9 @@ V015 只替换 V008 的三条 `agent_run_step` CHECK：新增 `CONFIRM_ACTION` �
 
 - C：`agent-card-event-payload` 合入后确认卡如何携带版本和安全摘要；本 change 不阻塞其余 B 实现。
 - A/D：没有新的工具接口确认，因此本 change 不登记额外工具或字段。
+# D 工具接入确认（2026-08-06）
+
+当前生产白名单只启用 `rankMoviePlan`。D 确认 `getTravelAdvice`、`getWeather`、`planBasicRoute` 和
+`searchNearbyFood` 尚未完成 B 所需的公开 Command、可信输入来源、错误码或用户确认规则，不能接入。
+其中 `getTravelAdvice` 可以作为后续独立 change：仅读取当前登录用户已有任务的建议摘要，待 D 与 B 确认
+`taskId` 可信来源、Command、错误码和重试规则后再登记。

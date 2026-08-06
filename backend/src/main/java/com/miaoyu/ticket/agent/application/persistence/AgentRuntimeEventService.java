@@ -24,14 +24,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class AgentRuntimeEventService {
     private static final int MAX_PAYLOAD_BYTES = 16 * 1024;
     private final AgentSessionRepository sessionRepository;
+    private final AgentRunRepository runRepository;
     private final AgentRuntimeEventRepository eventRepository;
     private final ObjectMapper objectMapper;
 
     public AgentRuntimeEventService(
-            AgentSessionRepository sessionRepository,
+            AgentSessionRepository sessionRepository, AgentRunRepository runRepository,
             AgentRuntimeEventRepository eventRepository,
             ObjectMapper objectMapper) {
         this.sessionRepository = sessionRepository;
+        this.runRepository = runRepository;
         this.eventRepository = eventRepository;
         this.objectMapper = objectMapper;
     }
@@ -40,9 +42,15 @@ public class AgentRuntimeEventService {
     public AgentRuntimeEvent append(
             AgentSession sourceSession, AgentRun run, AgentEventType type, AgentStoredJson payload) {
         validatePayload(payload);
-        Objects.requireNonNull(sourceSession, "事件来源会话不能为空");
         Objects.requireNonNull(run, "事件所属运行不能为空");
         Objects.requireNonNull(type, "事件类型不能为空");
+        AgentRun currentRun = runRepository.findByRunIdAndUserId(run.runId(), run.userId())
+                .orElseThrow(() -> new BusinessException(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND));
+        if (currentRun.version() != run.version()
+                || !Objects.equals(currentRun.planVersion(), run.planVersion())) {
+            throw new IllegalStateException("Agent 运行计划已更新，拒绝写入旧事件");
+        }
+        Objects.requireNonNull(sourceSession, "事件来源会话不能为空");
         AgentSession session = sessionRepository
                 .findBySessionIdAndUserIdForUpdate(sourceSession.sessionId(), run.userId())
                 .orElseThrow(() -> new BusinessException(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND));

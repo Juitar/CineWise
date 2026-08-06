@@ -2,9 +2,7 @@ package com.miaoyu.ticket.agent.application.run;
 
 import com.miaoyu.ticket.agent.application.model.ModelGateway;
 import com.miaoyu.ticket.agent.application.model.PlanGenerationRequest;
-import com.miaoyu.ticket.agent.application.tool.RankMoviePlanExecutionAdapter;
-import com.miaoyu.ticket.agent.application.tool.RankMoviePlanExecutionRequest;
-import com.miaoyu.ticket.agent.application.tool.RankMoviePlanExecutionResult;
+import com.miaoyu.ticket.agent.application.tool.ReadOnlyToolExecutionAdapter;
 import com.miaoyu.ticket.agent.domain.plan.ExecutionPlanNode;
 import com.miaoyu.ticket.agent.domain.plan.PlanSchemaValidator;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationResult;
@@ -13,7 +11,6 @@ import com.miaoyu.ticket.agent.domain.run.ExecutionRunState;
 import com.miaoyu.ticket.agent.domain.run.RunnableNodeSelection;
 import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
-import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -33,19 +30,20 @@ public final class MultiToolSupervisor {
     private final ToolRegistry toolRegistry;
     private final PlanSchemaValidator planSchemaValidator;
     private final ExecutionPlanStateMachine stateMachine;
-    private final RankMoviePlanExecutionAdapter rankMoviePlanExecutionAdapter;
+    private final java.util.Map<String, ReadOnlyToolExecutionAdapter> readOnlyAdapters;
 
     public MultiToolSupervisor(
             ModelGateway modelGateway,
             ToolRegistry toolRegistry,
             PlanSchemaValidator planSchemaValidator,
             ExecutionPlanStateMachine stateMachine,
-            RankMoviePlanExecutionAdapter rankMoviePlanExecutionAdapter) {
+            List<ReadOnlyToolExecutionAdapter> readOnlyAdapters) {
         this.modelGateway = Objects.requireNonNull(modelGateway, "模型网关不能为空");
         this.toolRegistry = Objects.requireNonNull(toolRegistry, "工具白名单不能为空");
         this.planSchemaValidator = Objects.requireNonNull(planSchemaValidator, "计划校验器不能为空");
         this.stateMachine = Objects.requireNonNull(stateMachine, "状态机不能为空");
-        this.rankMoviePlanExecutionAdapter = Objects.requireNonNull(rankMoviePlanExecutionAdapter, "推荐工具适配器不能为空");
+        this.readOnlyAdapters = readOnlyAdapters.stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
+                ReadOnlyToolExecutionAdapter::targetName, adapter -> adapter));
     }
 
     /** 生成、校验并执行本轮可运行的只读节点；写节点始终保留给既有确认动作服务。 */
@@ -73,14 +71,16 @@ public final class MultiToolSupervisor {
             }
             // 每轮从快照选择一个节点；下一轮重新计算可运行集合，避免使用旧 selection 重复执行。
             ExecutionPlanNode node = selection.nodes().getFirst();
-            if (!RankMoviePlanTool.TARGET_NAME.equals(node.targetName())) {
+            ReadOnlyToolExecutionAdapter adapter = readOnlyAdapters.get(node.targetName());
+            if (adapter == null) {
                 throw new IllegalStateException(
                         "缺少已登记的只读工具适配器: " + node.targetName());
             }
-            RankMoviePlanExecutionRequest executionRequest = new RankMoviePlanExecutionRequest(
+            ReadOnlyToolExecutionAdapter.ExecutionRequest executionRequest =
+                    new ReadOnlyToolExecutionAdapter.ExecutionRequest(
                     state, node.nodeId(), supervisorRequest.runId(), supervisorRequest.traceId(),
                     supervisorRequest.remainingDeadlineMs());
-            RankMoviePlanExecutionResult executed = rankMoviePlanExecutionAdapter.execute(executionRequest);
+            ReadOnlyToolExecutionAdapter.ExecutionResult executed = adapter.execute(executionRequest);
             state = executed.state();
             results.add(new MultiToolSupervisorResult.NodeToolResult(node.nodeId(), executed.toolResult()));
             if (executed.toolResult().status() == ToolStatus.PROCESSING) {
