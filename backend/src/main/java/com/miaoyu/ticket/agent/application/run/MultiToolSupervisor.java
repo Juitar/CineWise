@@ -3,6 +3,8 @@ package com.miaoyu.ticket.agent.application.run;
 import com.miaoyu.ticket.agent.application.model.ModelGateway;
 import com.miaoyu.ticket.agent.application.model.PlanGenerationRequest;
 import com.miaoyu.ticket.agent.application.tool.ReadOnlyToolExecutionAdapter;
+import com.miaoyu.ticket.agent.application.tool.AgentToolExecutor;
+import com.miaoyu.ticket.agent.application.tool.AgentToolExecutorRegistry;
 import com.miaoyu.ticket.agent.domain.plan.ExecutionPlanNode;
 import com.miaoyu.ticket.agent.domain.plan.PlanSchemaValidator;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationResult;
@@ -25,25 +27,25 @@ public final class MultiToolSupervisor {
     private static final String SAFE_PLAN_REJECTED = "PLAN_REJECTED";
     private static final String SAFE_AWAITING_CONFIRMATION = "AWAITING_CONFIRMATION";
     private static final String SAFE_PROCESSING = "RESULT_PROCESSING";
+    private static final String SAFE_QUESTION_PREFIX = "QUESTION:";
 
     private final ModelGateway modelGateway;
     private final ToolRegistry toolRegistry;
     private final PlanSchemaValidator planSchemaValidator;
     private final ExecutionPlanStateMachine stateMachine;
-    private final java.util.Map<String, ReadOnlyToolExecutionAdapter> readOnlyAdapters;
+    private final AgentToolExecutorRegistry toolExecutorRegistry;
 
     public MultiToolSupervisor(
             ModelGateway modelGateway,
             ToolRegistry toolRegistry,
             PlanSchemaValidator planSchemaValidator,
             ExecutionPlanStateMachine stateMachine,
-            List<ReadOnlyToolExecutionAdapter> readOnlyAdapters) {
+            List<? extends AgentToolExecutor<?, ?>> readOnlyAdapters) {
         this.modelGateway = Objects.requireNonNull(modelGateway, "模型网关不能为空");
         this.toolRegistry = Objects.requireNonNull(toolRegistry, "工具白名单不能为空");
         this.planSchemaValidator = Objects.requireNonNull(planSchemaValidator, "计划校验器不能为空");
         this.stateMachine = Objects.requireNonNull(stateMachine, "状态机不能为空");
-        this.readOnlyAdapters = readOnlyAdapters.stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
-                ReadOnlyToolExecutionAdapter::targetName, adapter -> adapter));
+        this.toolExecutorRegistry = new AgentToolExecutorRegistry(toolRegistry, readOnlyAdapters);
     }
 
     /** 生成、校验并执行本轮可运行的只读节点；写节点始终保留给既有确认动作服务。 */
@@ -60,32 +62,74 @@ public final class MultiToolSupervisor {
             return new MultiToolSupervisorResult(
                     generated.candidatePlan(), validation, null, List.of(), false, SAFE_PLAN_REJECTED);
         }
-        ExecutionRunState state = stateMachine.initialize(validation.executionPlan().orElseThrow());
-        List<MultiToolSupervisorResult.NodeToolResult> results = new ArrayList<>();
+        return execute(
+                supervisorRequest,
+                generated.candidatePlan(),
+                validation,
+                stateMachine.initialize(validation.executionPlan().orElseThrow()),
+                new ArrayList<>());
+    }
+
+    /**
+     * 执行一个已校验计划；只有只读工具明确建议重规划时才进入下一版计划。
+     *
+     * <p>写节点由状态机保持等待确认，因此这里没有任何路径会因为模型、断线或超时再次调用
+     * {@code createOrder}。重规划仅复用原运行标识和请求标识，持久化层仍须以 CAS 接收返回快照。</p>
+     */
+    private MultiToolSupervisorResult execute(
+            MultiToolSupervisorRequest request,
+            com.miaoyu.ticket.agent.domain.plan.CandidatePlan candidatePlan,
+            PlanValidationResult validation,
+            ExecutionRunState initialState,
+            List<MultiToolSupervisorResult.NodeToolResult> initialResults) {
+        ExecutionRunState state = initialState;
+        List<MultiToolSupervisorResult.NodeToolResult> results = new ArrayList<>(initialResults);
         int limit = Math.max(1, state.plan().nodes().size() * 2);
         for (int handled = 0; handled < limit; handled++) {
             RunnableNodeSelection selection = stateMachine.selectRunnableNodes(state);
             state = selection.state();
             if (selection.nodes().isEmpty()) {
-                return completed(generated.candidatePlan(), validation, state, results);
+                return completed(candidatePlan, validation, state, results);
             }
             // 每轮从快照选择一个节点；下一轮重新计算可运行集合，避免使用旧 selection 重复执行。
             ExecutionPlanNode node = selection.nodes().getFirst();
-            ReadOnlyToolExecutionAdapter adapter = readOnlyAdapters.get(node.targetName());
-            if (adapter == null) {
-                throw new IllegalStateException(
-                        "缺少已登记的只读工具适配器: " + node.targetName());
+            if (node.type() == com.miaoyu.ticket.agent.domain.plan.PlanNodeType.ASK_USER) {
+                String missingInput = firstMissingRequiredInput(request.validationContext());
+                if (missingInput == null) {
+                    return new MultiToolSupervisorResult(
+                            candidatePlan, validation, state, results, false, SAFE_PLAN_REJECTED);
+                }
+                // 追问本身是本轮已完成的安全输出；用户补充信息后由提交入口创建下一版计划。
+                state = stateMachine.succeedNode(stateMachine.startNode(state, node.nodeId()), node.nodeId());
+                // ASK_USER 不能由模型自由指定字段；缺失字段由服务端白名单定义推导。
+                return new MultiToolSupervisorResult(
+                        candidatePlan, validation, state, results, false, SAFE_QUESTION_PREFIX + missingInput);
             }
+            if (node.type() == com.miaoyu.ticket.agent.domain.plan.PlanNodeType.VALIDATE
+                    || node.type() == com.miaoyu.ticket.agent.domain.plan.PlanNodeType.RENDER_RESULT) {
+                // 计划校验已在进入状态机前完成；这些节点只记录安全的阶段推进，不调用业务模块。
+                state = stateMachine.succeedNode(stateMachine.startNode(state, node.nodeId()), node.nodeId());
+                continue;
+            }
+            ReadOnlyToolExecutionAdapter adapter = toolExecutorRegistry.require(node.targetName());
             ReadOnlyToolExecutionAdapter.ExecutionRequest executionRequest =
                     new ReadOnlyToolExecutionAdapter.ExecutionRequest(
-                    state, node.nodeId(), supervisorRequest.runId(), supervisorRequest.traceId(),
-                    supervisorRequest.remainingDeadlineMs());
+                    state, node.nodeId(), request.runId(), request.traceId(), request.remainingDeadlineMs());
             ReadOnlyToolExecutionAdapter.ExecutionResult executed = adapter.execute(executionRequest);
             state = executed.state();
-            results.add(new MultiToolSupervisorResult.NodeToolResult(node.nodeId(), executed.toolResult()));
+            results.add(new MultiToolSupervisorResult.NodeToolResult(
+                    node.nodeId(), node.targetName(), executed.toolResult()));
+            if (executed.toolResult().status() == ToolStatus.FAILED && executed.toolResult().replanSuggested()) {
+                MultiToolSupervisorResult replanned = replan(request,
+                        new MultiToolSupervisorResult(candidatePlan, validation, state, results, false, null));
+                if (replanned.validation().isValid() && replanned.state() != state) {
+                    return execute(request, replanned.candidatePlan(), replanned.validation(), replanned.state(),
+                            replanned.toolResults());
+                }
+            }
             if (executed.toolResult().status() == ToolStatus.PROCESSING) {
                 return new MultiToolSupervisorResult(
-                        generated.candidatePlan(), validation, state, results, false, SAFE_PROCESSING);
+                        candidatePlan, validation, state, results, false, SAFE_PROCESSING);
             }
         }
         throw new IllegalStateException("计划调度超过节点重试上限");
@@ -132,5 +176,19 @@ public final class MultiToolSupervisor {
         return new MultiToolSupervisorResult(
                 candidatePlan, validation, state, results, awaitingConfirmation,
                 awaitingConfirmation ? SAFE_AWAITING_CONFIRMATION : null);
+    }
+
+    private String firstMissingRequiredInput(
+            com.miaoyu.ticket.agent.domain.plan.PlanValidationContext validationContext) {
+        return toolRegistry.definitions().values().stream()
+                .filter(com.miaoyu.ticket.agent.domain.tool.ToolDefinition::readOnly)
+                .flatMap(definition -> definition.requiredInputs().stream())
+                .map(com.miaoyu.ticket.agent.domain.tool.ToolInputDefinition::name)
+                .filter(name -> {
+                    String value = validationContext.slotSnapshot().values().get(name);
+                    return value == null || value.isBlank();
+                })
+                .findFirst()
+                .orElse(null);
     }
 }

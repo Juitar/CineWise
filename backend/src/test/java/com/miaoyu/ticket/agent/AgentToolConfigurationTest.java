@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import com.miaoyu.ticket.agent.application.model.ModelGateway;
 import com.miaoyu.ticket.agent.application.run.MultiToolSupervisor;
 import com.miaoyu.ticket.agent.application.tool.AgentToolConfiguration;
+import com.miaoyu.ticket.agent.application.tool.AgentToolDefinitions;
 import com.miaoyu.ticket.agent.domain.plan.PlanSchemaValidator;
 import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
@@ -30,6 +31,10 @@ class AgentToolConfigurationTest {
             assertThat(context.getBeansOfType(PlanSchemaValidator.class)).hasSize(1);
             assertThat(context.getBeansOfType(ModelGateway.class)).hasSize(1);
             assertThat(context.getBeansOfType(MultiToolSupervisor.class)).hasSize(1);
+            ToolRegistry registry = context.getBean(ToolRegistry.class);
+            assertThat(registry.find(AgentToolDefinitions.QUERY_AVAILABLE_DATES)).isPresent();
+            assertThat(registry.find(AgentToolDefinitions.QUERY_SHOWS)).isPresent();
+            assertThat(registry.find(AgentToolDefinitions.QUERY_SEATS)).isEmpty();
         }
     }
 }

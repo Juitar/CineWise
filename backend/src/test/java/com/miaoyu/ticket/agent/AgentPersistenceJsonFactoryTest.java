@@ -9,6 +9,7 @@ import com.miaoyu.ticket.agent.application.persistence.AgentPersistenceJsonFacto
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.application.reply.RecommendationReplyCandidate;
 import com.miaoyu.ticket.agent.application.reply.RecommendationReplyFacts;
+import com.miaoyu.ticket.agent.application.reply.SelectSeatsReplyFacts;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -32,5 +33,20 @@ class AgentPersistenceJsonFactoryTest {
         assertThat(payload.path("title").asText()).isEqualTo("推荐场次");
         assertThat(payload.path("plans")).hasSize(1);
         assertThat(payload.toString()).doesNotContain("seat", "actionId", "parameterHash", "token");
+    }
+
+    @Test
+    void shouldBuildSelectSeatsBusinessIntentCardWithValidatedShowId() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        AgentPersistenceJsonFactory factory = new AgentPersistenceJsonFactory(mapper);
+
+        JsonNode payload = mapper.readTree(factory.cardPayload(new ReplyGenerationResponse(
+                "已确认场次，可选座", AgentReplyMessageType.SELECT_SEATS,
+                new SelectSeatsReplyFacts("show-70001"))).value());
+
+        assertThat(payload.path("type").asText()).isEqualTo("BUSINESS_INTENT");
+        assertThat(payload.path("payload").path("intent").asText()).isEqualTo("SELECT_SEATS");
+        assertThat(payload.path("payload").path("businessRef").path("showId").asText())
+                .isEqualTo("show-70001");
     }
 }
