@@ -12,7 +12,11 @@
     "type": "BUSINESS_INTENT",
     "payload": {
       "intent": "SELECT_SEATS",
-      "businessRef": { "showId": "70001", "movieId": "10001", "cinemaId": "20001" }
+      "businessRef": {
+        "showId": "9223372036854775807",
+        "movieId": "9007199254740993",
+        "cinemaId": "8000000000000001"
+      }
     }
   }
 }

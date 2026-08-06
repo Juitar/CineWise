@@ -57,25 +57,29 @@ describe('Agent reducer 新 SSE 协议', () => {
       expect.objectContaining({ kind: 'business-intent', text: '已确认场次，可选座' }),
     );
     expect(result.projection.items[0].fields).toEqual([
-      { label: '场次 ID', value: '70001' },
-      { label: '影片 ID', value: '10001' },
-      { label: '影院 ID', value: '20001' },
+      { label: '场次 ID', value: '9223372036854775807' },
+      { label: '影片 ID', value: '9007199254740993' },
+      { label: '影院 ID', value: '8000000000000001' },
     ]);
     expect(result.projection.items[0].selectSeatsPath).toBe(
-      '/shows/70001/seats?movieId=10001&cinemaId=20001',
+      '/shows/9223372036854775807/seats?movieId=9007199254740993&cinemaId=8000000000000001',
     );
   });
 
   it('只使用已校验的十进制 ID，不补齐其他交易参数', () => {
-    expect(buildAgentSelectSeatsPath('70001', '10001', '20001')).toBe(
-      '/shows/70001/seats?movieId=10001&cinemaId=20001',
-    );
+    expect(
+      buildAgentSelectSeatsPath('9223372036854775807', '9007199254740993', '8000000000000001'),
+    ).toBe('/shows/9223372036854775807/seats?movieId=9007199254740993&cinemaId=8000000000000001');
   });
 
   it.each(['showId', 'movieId', 'cinemaId'])(
     'SELECT_SEATS 缺少 %s 时拒绝且不推进游标',
     (missingKey) => {
-      const businessRef = { showId: '70001', movieId: '10001', cinemaId: '20001' };
+      const businessRef = {
+        showId: '9223372036854775807',
+        movieId: '9007199254740993',
+        cinemaId: '8000000000000001',
+      };
       delete businessRef[missingKey as keyof typeof businessRef];
       const invalid = consumeAgentEvent(
         createAgentProjection('session-1'),
@@ -92,7 +96,11 @@ describe('Agent reducer 新 SSE 协议', () => {
   it.each(['showId', 'movieId', 'cinemaId'])(
     'SELECT_SEATS 使用非法 %s 时拒绝、不显示入口且不推进游标',
     (invalidKey) => {
-      const businessRef = { showId: '70001', movieId: '10001', cinemaId: '20001' };
+      const businessRef = {
+        showId: '9223372036854775807',
+        movieId: '9007199254740993',
+        cinemaId: '8000000000000001',
+      };
       businessRef[invalidKey as keyof typeof businessRef] = 'show-70001';
       const invalid = consumeAgentEvent(
         createAgentProjection('session-1'),
@@ -106,6 +114,108 @@ describe('Agent reducer 新 SSE 协议', () => {
       expect(invalid.projection.lastEventId).toBe('0');
     },
   );
+
+  it.each(['showId', 'movieId', 'cinemaId'])(
+    'SELECT_SEATS 的 %s 超过 Java long 上限时拒绝且不推进游标',
+    (invalidKey) => {
+      const businessRef = {
+        showId: '9223372036854775807',
+        movieId: '9007199254740993',
+        cinemaId: '8000000000000001',
+      };
+      businessRef[invalidKey as keyof typeof businessRef] = '9223372036854775808';
+      const invalid = consumeAgentEvent(
+        createAgentProjection('session-1'),
+        parseAgentEvent({
+          ...selectSeatsCard,
+          payload: {
+            type: 'BUSINESS_INTENT',
+            payload: {
+              intent: 'SELECT_SEATS',
+              businessRef,
+            },
+          },
+        }),
+      );
+      expect(invalid.outcome).toBe('rejected');
+      expect(invalid.projection.lastEventId).toBe('0');
+    },
+  );
+
+  it.each(['0', '-1', '001', 'not-a-number'])(
+    'SELECT_SEATS 非正 Java long 十进制字符串 %s 时拒绝且不推进游标',
+    (invalidId) => {
+      const invalid = consumeAgentEvent(
+        createAgentProjection('session-1'),
+        parseAgentEvent({
+          ...selectSeatsCard,
+          payload: {
+            type: 'BUSINESS_INTENT',
+            payload: {
+              intent: 'SELECT_SEATS',
+              businessRef: {
+                showId: invalidId,
+                movieId: '9007199254740993',
+                cinemaId: '8000000000000001',
+              },
+            },
+          },
+        }),
+      );
+      expect(invalid.outcome).toBe('rejected');
+      expect(invalid.projection.lastEventId).toBe('0');
+    },
+  );
+
+  it.each(['showId', 'movieId', 'cinemaId'])(
+    'SELECT_SEATS 的 %s 不是 JSON string 时拒绝且不推进游标',
+    (invalidKey) => {
+      const businessRef: Record<string, unknown> = {
+        showId: '9223372036854775807',
+        movieId: '9007199254740993',
+        cinemaId: '8000000000000001',
+      };
+      businessRef[invalidKey] = 9223372036854775807;
+      const invalid = consumeAgentEvent(
+        createAgentProjection('session-1'),
+        parseAgentEvent({
+          ...selectSeatsCard,
+          payload: {
+            type: 'BUSINESS_INTENT',
+            payload: {
+              intent: 'SELECT_SEATS',
+              businessRef,
+            },
+          },
+        }),
+      );
+      expect(invalid.outcome).toBe('rejected');
+      expect(invalid.projection.lastEventId).toBe('0');
+    },
+  );
+
+  it('真正完成消息与合法 run.complete 分别进入完成状态和对应终态', () => {
+    const messageComplete = consumeAgentEvent(
+      createAgentProjection('session-1'),
+      parseAgentEvent({
+        ...toolStart,
+        eventType: 'message.complete',
+        payload: { messageType: 'TEXT' },
+      }),
+    );
+    expect(messageComplete.projection.status).toBe('COMPLETED');
+
+    const cancelled = consumeAgentEvent(
+      createAgentProjection('session-1'),
+      parseAgentEvent({
+        ...toolStart,
+        eventId: '41',
+        eventType: 'run.complete',
+        payload: { status: 'CANCELLED' },
+      }),
+    );
+    expect(cancelled.projection.status).toBe('CANCELLED');
+  });
 
   it('重复事件和旧计划迟到事件不推进游标', () => {
     const first = consumeAgentEvent(createAgentProjection('session-1'), parseAgentEvent(planCard));

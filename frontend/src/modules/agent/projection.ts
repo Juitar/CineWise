@@ -243,9 +243,6 @@ function displayItem(event: AgentEvent): AgentDisplayItem | null {
     return { key, kind: 'error', text: event.displayText || '本次请求未完成' };
   }
   if (event.eventType === 'run.complete' || event.eventType === 'message.complete') {
-    if (event.payload.messageType === 'PROGRESS') {
-      return { key, kind: 'progress', text: event.displayText || '正在处理' };
-    }
     return { key, kind: 'completed', text: event.displayText || '运行已完成' };
   }
   if (event.eventType === 'message.delta') {
@@ -277,11 +274,7 @@ function nextStatus(event: AgentEvent, current: AgentWorkspaceStatus): AgentWork
         ? 'FAILED'
         : 'COMPLETED';
   }
-  // B 的 PROCESSING 正式事件是 message.start + PROGRESS。若旧服务错误写成
-  // message.complete，仍按其 payload 保持流式，不能把工作区提前置为完成。
-  if (event.eventType === 'message.complete' && event.payload.messageType !== 'PROGRESS') {
-    return 'COMPLETED';
-  }
+  if (event.eventType === 'message.complete') return 'COMPLETED';
   return current === 'CONNECTING' || current === 'IDLE' ? 'STREAMING' : current;
 }
 

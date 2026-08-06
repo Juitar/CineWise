@@ -2,7 +2,7 @@
 
 ### Requirement: 已确认场次可进入选座页
 
-前端 SHALL 仅在 `card + BUSINESS_INTENT + SELECT_SEATS` 已通过外层计划字段和无前导零正十进制 `businessRef.showId`、`movieId`、`cinemaId` 校验时显示选座入口。
+前端 SHALL 仅在 `card + BUSINESS_INTENT + SELECT_SEATS` 已通过外层计划字段和 `businessRef.showId`、`movieId`、`cinemaId` 校验时显示选座入口。三个业务 ID 必须是 JSON string、无前导零的正十进制字符串，且不超过 `9223372036854775807`；前端始终按字符串保存，不转换为 JavaScript `number`。
 
 #### Scenario: 合法选座卡片
 
@@ -12,7 +12,7 @@
 
 #### Scenario: 字段缺失或非法
 
-- **WHEN** 选座卡片缺少 `planId`、`planVersion`、`nodeId`、任一 `businessRef` ID，或任一 ID 不是无前导零正十进制字符串
+- **WHEN** 选座卡片缺少 `planId`、`planVersion`、`nodeId`、任一 `businessRef` ID，或任一 ID 不是 JSON string、无前导零正十进制字符串、正数或超过 Java `long` 上限
 - **THEN** 前端不显示选座入口
 - **AND** 不推进事件游标
 
