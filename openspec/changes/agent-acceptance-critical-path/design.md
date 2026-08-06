@@ -44,7 +44,7 @@ B 已有候选计划、服务端计划校验、运行状态机、`ToolContext + 
 
 ### 4. SSE 事件使用既有持久化事件流
 
-工具执行前后写入 `TOOL_START`、`TOOL_COMPLETE` 或 `TOOL_ERROR`；历史 `TOOL_RESULT` 只保留读取兼容。回复映射为 `QUESTION`、`PLAN_CARD`、`PROGRESS`、`ERROR`；选座映射为 `card` 事件中的 `BUSINESS_INTENT` 卡片，内层 `intent=SELECT_SEATS`，`businessRef` 必须包含来自同一已校验场次结果的 `showId`、`movieId`、`cinemaId`。持久化 JSON 工厂和 SSE 校验器都按 `^[1-9]\\d*$` 与正 Java `long` 范围拒绝非法值，不能只校验非空。每个卡片保留 `planId`、`planVersion`、`nodeId` 和已过滤 payload，旧版本及未知类型沿用现有客户端安全降级。
+工具执行前后写入 `TOOL_START`、`TOOL_COMPLETE` 或 `TOOL_ERROR`；历史 `TOOL_RESULT` 只保留读取兼容。`PROCESSING` 只写进行中的 `tool.start` 和 `message.start`，绝不写 `tool.complete`、`message.complete` 或 `run.complete`，直到后续有终态结果。回复映射为 `QUESTION`、`PLAN_CARD`、`PROGRESS`、`ERROR`；选座映射为 `card` 事件中的 `BUSINESS_INTENT` 卡片，内层 `intent=SELECT_SEATS`，`businessRef` 必须包含来自同一已校验场次结果的 `showId`、`movieId`、`cinemaId`。持久化 JSON 工厂和 SSE 校验器都按 `^[1-9]\\d*$` 与正 Java `long` 范围拒绝非法值，不能只校验非空。每个卡片保留 `planId`、`planVersion`、`nodeId` 和已过滤 payload，旧版本及未知类型沿用现有客户端安全降级。
 
 `MultiToolSupervisorResult.NodeToolResult` 同时保留节点 ID 和目标名，持久化层按节点关联工具事件，不按重规划后的列表位置猜测旧结果属于哪个节点。
 

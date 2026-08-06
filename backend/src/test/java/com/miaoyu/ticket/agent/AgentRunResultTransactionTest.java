@@ -107,6 +107,35 @@ class AgentRunResultTransactionTest {
     }
 
     @Test
+    void shouldKeepProcessingToolAndProgressReplyStreaming() {
+        Fixture fixture = fixture();
+        ExecutionPlan plan = new ExecutionPlan("plan-processing", 1, List.of(new ExecutionPlanNode(
+                "rank", PlanNodeType.CALL_TOOL, "rankMoviePlan", List.of(), List.of(), FailurePolicy.FAIL,
+                PlanNodeStatus.PENDING, false, false, null, null, new SlotSnapshot(3L, Map.of()))));
+        ExecutionPlanStateMachine machine = new ExecutionPlanStateMachine(
+                new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan())));
+        var running = machine.startNode(machine.initialize(plan), "rank");
+        ToolResult<RecommendationPlanResult> processing = new ToolResult<>(
+                ToolStatus.PROCESSING, null, null, false, false, null, false, null, 1L, null, null);
+        MinimalReadOnlyAgentResult result = new MinimalReadOnlyAgentResult(
+                new CandidatePlan("plan-processing", 1, List.of()), PlanValidationResult.valid(plan), running,
+                List.of(processing), new ReplyGenerationResponse(
+                        "推荐节点仍在处理中。", AgentReplyMessageType.PROGRESS, new ProgressReplyFacts("rank")));
+        when(fixture.runRepository().updateRunningPlanWithCas(any(), eq(0L))).thenReturn(true);
+
+        AgentRun recorded = fixture.transaction().record(run(), result);
+
+        assertEquals(AgentRunStatus.RUNNING, recorded.status());
+        ArgumentCaptor<AgentEventType> eventTypes = ArgumentCaptor.forClass(AgentEventType.class);
+        verify(fixture.runtimeEventService(), Mockito.atLeastOnce()).append(any(), any(), eventTypes.capture(), any());
+        assertEquals(true, eventTypes.getAllValues().contains(AgentEventType.TOOL_START));
+        assertEquals(true, eventTypes.getAllValues().contains(AgentEventType.MESSAGE_START));
+        assertEquals(false, eventTypes.getAllValues().contains(AgentEventType.TOOL_COMPLETE));
+        assertEquals(false, eventTypes.getAllValues().contains(AgentEventType.MESSAGE_COMPLETE));
+        assertEquals(false, eventTypes.getAllValues().contains(AgentEventType.RUN_COMPLETE));
+    }
+
+    @Test
     void shouldPersistWaitingConfirmationWithoutExecutionTimestamps() {
         Fixture fixture = fixture();
         ExecutionPlan plan = new ExecutionPlan("plan-confirm", 1, List.of(new ExecutionPlanNode(

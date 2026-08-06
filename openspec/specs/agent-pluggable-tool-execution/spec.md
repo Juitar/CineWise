@@ -1,7 +1,7 @@
 # agent-pluggable-tool-execution Specification
 
 ## Purpose
-TBD - created by archiving change agent-acceptance-critical-path. Update Purpose after archive.
+定义 Agent 只执行已注册工具、处理工具失败和将工具状态映射为安全事件的规则。
 ## Requirements
 ### Requirement: 仅执行已注册的类型化工具
 系统 SHALL 通过 `ToolRegistry` 和类型化 executor 注册项选择工具；计划中的工具名、Command 类型、输入引用和白名单任一不匹配时，不得调用业务模块或反射目标。

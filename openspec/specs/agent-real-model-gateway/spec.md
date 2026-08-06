@@ -1,7 +1,7 @@
 # agent-real-model-gateway Specification
 
 ## Purpose
-TBD - created by archiving change agent-acceptance-critical-path. Update Purpose after archive.
+定义 Agent 通过运行环境配置安全调用 DeepSeek，并在测试和默认开发中使用确定性 Mock 的规则。
 ## Requirements
 ### Requirement: 真实模型调用仅使用运行环境密钥
 系统 SHALL 在显式启用真实模型时，通过 `DEEPSEEK_API_KEY`、`DEEPSEEK_MODEL` 和 `DEEPSEEK_BASE_URL` 调用 DeepSeek 的非流式 `/chat/completions`；API Key 不得写入源码、配置样例的值、日志、SSE 或持久化数据。
