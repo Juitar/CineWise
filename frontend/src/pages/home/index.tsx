@@ -1,6 +1,8 @@
 import { Alert, Button, Empty, Skeleton } from 'antd';
 import React, { useState } from 'react';
-import { Link } from 'umi';
+import { Link, useNavigate } from 'umi';
+
+import { setPendingAgentDraft } from '../../modules/agent/entryDraft';
 
 import { getFreshnessNotices } from '../../modules/content/freshness';
 import { safePosterUrl } from '../../modules/content/poster';
@@ -79,10 +81,17 @@ function HomeCinemaCard({ cinema }: { cinema: CinemaSummary }) {
 }
 
 export default function HomePage() {
+  const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 1023px)');
   const [showPlans, setShowPlans] = useState(false);
+  const [mobileAgentDraft, setMobileAgentDraft] = useState('');
   const movies = useMovieList({ page: 1, size: 5 });
   const cinemas = useCinemaList({ location: DEFAULT_CITY_CODE, page: 1, size: 3 });
+
+  const openAssistant = (draft: string) => {
+    setPendingAgentDraft(draft);
+    navigate('/assistant');
+  };
 
   return (
     <div className="home-page-container">
@@ -103,9 +112,18 @@ export default function HomePage() {
             <div className="home-mobile-agent-input-container">
               <input
                 className="home-mobile-agent-input"
+                aria-label="首页 Agent 输入"
+                maxLength={2000}
+                value={mobileAgentDraft}
+                onChange={(event) => setMobileAgentDraft(event.target.value)}
                 placeholder="例如：周末有什么好看的动作片？"
               />
-              <button type="button" className="home-mobile-agent-send-btn">
+              <button
+                type="button"
+                className="home-mobile-agent-send-btn"
+                disabled={!mobileAgentDraft.trim()}
+                onClick={() => openAssistant(mobileAgentDraft)}
+              >
                 发送
               </button>
             </div>
@@ -266,7 +284,7 @@ export default function HomePage() {
 
         {!isMobile && (
           <aside className="home-page-agent-sidebar">
-            <AgentCard onViewPlan={() => setShowPlans(true)} />
+            <AgentCard onSubmit={openAssistant} onViewPlan={() => setShowPlans(true)} />
           </aside>
         )}
       </div>

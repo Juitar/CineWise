@@ -1,11 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { RobotIcon } from '../../shared/components/icons/layout-icons';
 
 interface AgentCardProps {
   onViewPlan: () => void;
+  onSubmit(draft: string): void;
 }
 
-export const AgentCard: React.FC<AgentCardProps> = ({ onViewPlan }) => {
+export const AgentCard: React.FC<AgentCardProps> = ({ onSubmit, onViewPlan }) => {
+  const [draft, setDraft] = useState('');
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (draft.trim()) onSubmit(draft);
+  };
   return (
     <div className="home-agent-panel">
       {/* 头部 */}
@@ -126,10 +133,22 @@ export const AgentCard: React.FC<AgentCardProps> = ({ onViewPlan }) => {
       </div>
 
       {/* 底部输入区 */}
-      <div className="home-agent-footer">
+      <form className="home-agent-footer" onSubmit={submit}>
         <div className="agent-input-wrapper">
-          <input className="agent-input-field" placeholder="继续输入你的观影需求吧..." />
-          <button type="button" className="agent-send-btn">
+          <input
+            className="agent-input-field"
+            aria-label="首页 Agent 输入"
+            maxLength={2000}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="继续输入你的观影需求吧..."
+          />
+          <button
+            type="submit"
+            className="agent-send-btn"
+            aria-label="发送"
+            disabled={!draft.trim()}
+          >
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
               <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
             </svg>
@@ -140,7 +159,7 @@ export const AgentCard: React.FC<AgentCardProps> = ({ onViewPlan }) => {
           <span className="suggestion-chip">IMAX电影有哪些？</span>
           <span className="suggestion-chip">带孩子看什么电影好？</span>
         </div>
-      </div>
+      </form>
     </div>
   );
 };

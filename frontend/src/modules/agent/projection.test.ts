@@ -1,0 +1,306 @@
+import { describe, expect, it } from 'vitest';
+
+import duplicateEvent from '../../../../backend/src/test/resources/fixtures/agent/c/duplicate-event.json';
+import errorEvent from '../../../../backend/src/test/resources/fixtures/agent/c/error-event.json';
+import errorCard from '../../../../backend/src/test/resources/fixtures/agent/c/error-card.json';
+import locationPermissionQuestion from '../../../../backend/src/test/resources/fixtures/agent/c/location-permission-question.json';
+import orderConfirmCard from '../../../../backend/src/test/resources/fixtures/agent/c/order-confirm-card.json';
+import movieCard from '../../../../backend/src/test/resources/fixtures/agent/c/recommendation-card.json';
+import planCard from '../../../../backend/src/test/resources/fixtures/agent/c/plan-card.json';
+import processingEvent from '../../../../backend/src/test/resources/fixtures/agent/c/processing-event.json';
+import progressCard from '../../../../backend/src/test/resources/fixtures/agent/c/progress-card.json';
+import questionCard from '../../../../backend/src/test/resources/fixtures/agent/c/question-card.json';
+import textCard from '../../../../backend/src/test/resources/fixtures/agent/c/text-card.json';
+import unknownEventType from '../../../../backend/src/test/resources/fixtures/agent/c/unknown-event-type.json';
+import unknownPayloadType from '../../../../backend/src/test/resources/fixtures/agent/c/unknown-payload-type.json';
+import { parseAgentEvent } from './contract';
+import {
+  compareDecimalStrings,
+  consumeAgentEvent,
+  createAgentProjection,
+  safeConfirmationStatusText,
+} from './projection';
+
+describe('Agent 事件投影', () => {
+  it('按任意长度十进制字符串比较游标', () => {
+    expect(compareDecimalStrings('9007199254740993', '9007199254740992')).toBe(1);
+    expect(compareDecimalStrings('00043', '43')).toBe(0);
+    expect(compareDecimalStrings('9', '10')).toBe(-1);
+  });
+
+  it('忽略其他会话、其他运行和重复事件且不推进游标', () => {
+    const initial = createAgentProjection('session-example-1');
+    const first = consumeAgentEvent(initial, parseAgentEvent(processingEvent));
+    expect(first.outcome).toBe('applied');
+    if (first.outcome !== 'applied') throw new Error();
+    const otherSession = consumeAgentEvent(
+      first.projection,
+      parseAgentEvent({ ...duplicateEvent, sessionId: 'session-example-2' }),
+    );
+    const otherRun = consumeAgentEvent(
+      first.projection,
+      parseAgentEvent({ ...duplicateEvent, runId: 'run-example-2' }),
+    );
+    const duplicate = consumeAgentEvent(first.projection, parseAgentEvent(processingEvent));
+    expect(otherSession.outcome).toBe('ignored');
+    expect(otherRun.outcome).toBe('ignored');
+    expect(duplicate.outcome).toBe('ignored');
+    expect(otherSession.projection.lastEventId).toBe('40');
+  });
+
+  it('旧 planVersion 事件不能覆盖新计划', () => {
+    const current = consumeAgentEvent(
+      createAgentProjection('session-example-1'),
+      parseAgentEvent({ ...processingEvent, planVersion: 2 }),
+    );
+    if (current.outcome !== 'applied') throw new Error();
+    const stale = consumeAgentEvent(
+      current.projection,
+      parseAgentEvent({ ...duplicateEvent, eventId: '44', planVersion: 1 }),
+    );
+    expect(stale.outcome).toBe('ignored');
+    expect(stale.projection.planVersion).toBe(2);
+    expect(stale.projection.lastEventId).toBe('40');
+  });
+
+  it('正常 MOVIE_CARD 只展示实际字段，后续失败不清空成功内容', () => {
+    const card = consumeAgentEvent(
+      createAgentProjection('session-example-1'),
+      parseAgentEvent(movieCard),
+    );
+    if (card.outcome !== 'applied') throw new Error();
+    const failed = consumeAgentEvent(
+      card.projection,
+      parseAgentEvent({ ...errorEvent, eventId: '43' }),
+    );
+    if (failed.outcome !== 'applied') throw new Error();
+    expect(failed.projection.status).toBe('FAILED');
+    expect(failed.projection.items).toEqual([
+      expect.objectContaining({
+        kind: 'movie-card',
+        title: '暂未找到可购场次',
+        text: expect.stringContaining('降级数据'),
+      }),
+      expect.objectContaining({ kind: 'error', text: '本次请求未完成' }),
+    ]);
+    expect(JSON.stringify(failed.projection)).not.toContain('RUN_FAILED');
+  });
+
+  it('正常 PLAN_CARD 展示服务端给出的字符串 ID，不补造价格和时间', () => {
+    const result = consumeAgentEvent(
+      createAgentProjection('session-example-1'),
+      parseAgentEvent(planCard),
+    );
+    expect(result.outcome).toBe('applied');
+    expect(result.projection.items[0]).toEqual(
+      expect.objectContaining({ kind: 'plan-card', title: '推荐方案' }),
+    );
+    expect(result.projection.items[0].fields).toEqual(
+      expect.arrayContaining([
+        { label: '方案 1 · 影片 ID', value: '1001' },
+        { label: '方案 1 · 影院 ID', value: '2001' },
+        { label: '方案 1 · 场次 ID', value: '3001' },
+      ]),
+    );
+    expect(JSON.stringify(result.projection)).not.toMatch(/价格|开场时间/);
+  });
+
+  it('TEXT 使用纯文本投影，过期空方案卡仍明确显示过期且不生成业务按钮', () => {
+    const text = consumeAgentEvent(
+      createAgentProjection('session-example-1'),
+      parseAgentEvent({
+        ...textCard,
+        payload: { ...textCard.payload, text: '<strong>请告诉我想看的影片</strong>' },
+      }),
+    );
+    expect(text.projection.items[0]).toEqual(
+      expect.objectContaining({
+        kind: 'assistant-text',
+        text: '<strong>请告诉我想看的影片</strong>',
+      }),
+    );
+    const expired = consumeAgentEvent(
+      text.projection,
+      parseAgentEvent({
+        ...planCard,
+        eventId: '9007199254740993',
+        payload: {
+          ...planCard.payload,
+          title: '已过期',
+          plans: [],
+          expiresAt: '2026-08-05T09:05:00+08:00',
+        },
+      }),
+    );
+    expect(expired.projection.lastEventId).toBe('9007199254740993');
+    expect(expired.projection.items[1].fields).toContainEqual({ label: '状态', value: '已过期' });
+    expect(JSON.stringify(expired.projection)).not.toMatch(/确认|支付|购票按钮/);
+  });
+
+  it('QUESTION、PROGRESS 和 ERROR 使用类型化安全投影', () => {
+    const question = consumeAgentEvent(
+      createAgentProjection('session-example-1'),
+      parseAgentEvent(questionCard),
+    );
+    expect(question.projection.items[0]).toEqual(
+      expect.objectContaining({ kind: 'question', text: '想在哪天观看？' }),
+    );
+    const progress = consumeAgentEvent(question.projection, parseAgentEvent(progressCard));
+    const error = consumeAgentEvent(progress.projection, parseAgentEvent(errorCard));
+    expect(error.projection.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'progress', text: progressCard.displayText }),
+        expect.objectContaining({ kind: 'error', text: '暂时无法完成' }),
+      ]),
+    );
+    expect(JSON.stringify(error.projection)).not.toContain('内部详情');
+  });
+
+  it.each([
+    ['NOT_REQUESTED', '等待位置授权'],
+    ['GRANTED', '已授权当前位置'],
+    ['DENIED', '可手动输入地点'],
+    ['EXPIRED', '位置授权已过期'],
+  ])('LOCATION_PERMISSION 状态 %s 只展示固定安全说明', (authorizationState, expected) => {
+    const result = consumeAgentEvent(
+      createAgentProjection('session-example-1'),
+      parseAgentEvent({
+        ...locationPermissionQuestion,
+        payload: {
+          ...locationPermissionQuestion.payload,
+          locationAuthorization: {
+            ...locationPermissionQuestion.payload.locationAuthorization,
+            authorizationState,
+          },
+        },
+      }),
+    );
+    expect(result.projection.items[0].text).toContain(expected);
+    expect(JSON.stringify(result.projection)).not.toMatch(/经度|纬度|坐标/);
+  });
+
+  it('已知卡片缺字段时不更新内容、不推进游标并保留成功结果', () => {
+    const current = consumeAgentEvent(
+      createAgentProjection('session-example-1'),
+      parseAgentEvent(movieCard),
+    );
+    const rejected = consumeAgentEvent(
+      current.projection,
+      parseAgentEvent({
+        ...planCard,
+        eventId: '52',
+        payload: { ...planCard.payload, title: undefined },
+      }),
+    );
+    expect(rejected.outcome).toBe('rejected');
+    expect(rejected.projection.lastEventId).toBe('42');
+    expect(rejected.projection.items).toEqual(current.projection.items);
+    expect(rejected.projection.safeError).toBe('收到的 Agent 内容不完整，已保留当前结果');
+  });
+
+  it.each([unknownEventType, unknownPayloadType])(
+    '未知事件或 payload 类型安全降级并推进游标',
+    (value) => {
+      const result = consumeAgentEvent(
+        createAgentProjection('session-example-1'),
+        parseAgentEvent(value),
+      );
+      expect(result.outcome).toBe('applied');
+      expect(result.projection.lastEventId).toBe(value.eventId);
+      expect(result.projection.items[0]).toEqual(
+        expect.objectContaining({
+          kind: 'card-placeholder',
+          text: expect.stringContaining('安全隐藏'),
+        }),
+      );
+      expect(JSON.stringify(result.projection)).not.toMatch(/unsafe|<b>/);
+    },
+  );
+
+  it('最新确认卡夹具只显示固定占位，不读取动作字段或生成按钮', () => {
+    const result = consumeAgentEvent(
+      createAgentProjection('session-1'),
+      parseAgentEvent(orderConfirmCard),
+    );
+    expect(result.outcome).toBe('applied');
+    expect(result.projection.items).toEqual([
+      expect.objectContaining({
+        kind: 'card-placeholder',
+        text: '确认操作待处理（只读）',
+      }),
+    ]);
+    expect(JSON.stringify(result.projection)).not.toContain('action-1');
+    expect(JSON.stringify(result.projection)).not.toContain('A1');
+  });
+
+  it('B 后续补齐为 PLAN_CARD 的确认卡仍只读显示，不暴露 actionId 和订单行', () => {
+    const result = consumeAgentEvent(
+      createAgentProjection('session-1'),
+      parseAgentEvent({
+        ...orderConfirmCard,
+        planId: 'plan-1',
+        payload: {
+          ...orderConfirmCard.payload,
+          type: 'PLAN_CARD',
+          title: '确认建单',
+          plans: [],
+          source: 'agent_confirmation',
+          dataAt: '2026-08-05T16:30:00+08:00',
+          expiresAt: '2026-08-05T16:35:00+08:00',
+          degraded: false,
+        },
+      }),
+    );
+    expect(result.projection.items).toEqual([
+      expect.objectContaining({ kind: 'card-placeholder', text: '确认操作待处理（只读）' }),
+    ]);
+    expect(JSON.stringify(result.projection)).not.toMatch(/action-1|A1|A2/);
+  });
+
+  it.each([
+    ['SUCCEEDED', '确认操作已完成（只读）'],
+    ['REJECTED', '确认操作已拒绝（只读）'],
+    ['RESULT_UNKNOWN', '确认结果暂时无法确定，请等待状态恢复'],
+    ['EXPIRED', '确认操作已过期（只读）'],
+    ['INVALIDATED', '确认内容已失效（只读）'],
+  ])('确认结果 %s 只映射固定状态文案', (status, expected) => {
+    expect(safeConfirmationStatusText(status)).toBe(expected);
+  });
+
+  it.each([
+    [
+      'COMPLETED',
+      {
+        ...duplicateEvent,
+        eventId: '50',
+        eventType: 'run.complete',
+        payload: { status: 'COMPLETED' },
+      },
+    ],
+    [
+      'FAILED',
+      {
+        ...duplicateEvent,
+        eventId: '50',
+        eventType: 'run.complete',
+        payload: { status: 'FAILED' },
+      },
+    ],
+    [
+      'CANCELLED',
+      {
+        ...duplicateEvent,
+        eventId: '50',
+        eventType: 'run.complete',
+        payload: { status: 'CANCELLED' },
+      },
+    ],
+  ] as const)('运行终态投影为 %s', (status, value) => {
+    const result = consumeAgentEvent(
+      createAgentProjection('session-example-1'),
+      parseAgentEvent(value),
+    );
+    expect(result.outcome).toBe('applied');
+    expect(result.projection.status).toBe(status);
+  });
+});

@@ -35,6 +35,16 @@ export default defineConfig({
         { path: '/cinemas/:cinemaId', component: '@/pages/cinemas/detail' },
         { path: '/shows', component: '@/pages/shows' },
         {
+          path: '/assistant',
+          component: '@/pages/assistant',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
+          path: '/assistant/:sessionId',
+          component: '@/pages/assistant',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
           path: '/shows/:showId/seats',
           component: '@/pages/seats',
           wrappers: ['@/shared/auth/RequireAuth'],

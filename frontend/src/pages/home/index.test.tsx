@@ -9,6 +9,7 @@ import type { CinemaSummary, ContentPageResponse, MovieSummary } from '../../sha
 
 const pageMocks = vi.hoisted(() => ({
   isMobile: true,
+  navigate: vi.fn(),
   useCinemaList: vi.fn(),
   useMovieList: vi.fn(),
 }));
@@ -19,6 +20,7 @@ vi.mock('umi', () => ({
       {children}
     </a>
   ),
+  useNavigate: () => pageMocks.navigate,
 }));
 
 vi.mock('../../shared/hooks/useMediaQuery', () => ({
@@ -113,6 +115,7 @@ describe('HomePage', () => {
     pageMocks.isMobile = true;
     pageMocks.useMovieList.mockReset();
     pageMocks.useCinemaList.mockReset();
+    pageMocks.navigate.mockReset();
     pageMocks.useMovieList.mockReturnValue(movieState());
     pageMocks.useCinemaList.mockReturnValue(cinemaState());
   });
@@ -251,5 +254,14 @@ describe('HomePage', () => {
 
     expect(screen.getByTestId('home-movie-8100001')).toBeInTheDocument();
     expect(screen.getByTestId('home-cinema-8200001')).toBeInTheDocument();
+  });
+
+  it('首页 Agent 输入只保存内存草稿并跳转受保护工作区', () => {
+    render(<HomePage />);
+    fireEvent.change(screen.getByLabelText('首页 Agent 输入'), {
+      target: { value: '推荐一部电影' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    expect(pageMocks.navigate).toHaveBeenCalledWith('/assistant');
   });
 });

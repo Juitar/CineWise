@@ -160,6 +160,21 @@ async function runUnauthorizedHandler(): Promise<void> {
   await unauthorizedHandling;
 }
 
+/**
+ * 为不能使用普通 REST 解包的同源流请求提供当前 CSRF Header。
+ *
+ * Agent POST SSE 只读取 Header 名和值，不维护第二份 Token 缓存。
+ */
+export async function getCsrfRequestHeaders(): Promise<Headers> {
+  const currentCsrfToken = await getCsrfToken();
+  return new Headers({ [currentCsrfToken.headerName]: currentCsrfToken.token });
+}
+
+/** 让流式客户端复用公共客户端的并发 401 单次清理。 */
+export async function handleUnauthorizedResponse(): Promise<void> {
+  await runUnauthorizedHandler();
+}
+
 /** 清除仅存在于运行内存中的 CSRF Token。登录、登出或会话切换后调用。 */
 export function clearCsrfToken(): void {
   csrfToken = null;
