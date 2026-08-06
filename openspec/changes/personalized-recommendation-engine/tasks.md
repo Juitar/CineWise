@@ -30,4 +30,4 @@
 
 - [ ] 5.1 D 在 A 批准的 MySQL、Redis 环境完成限定验证；验证：使用测试专属业务 ID 与缓存键、Flyway 关闭、限定清理和无残留检查。
 - [x] 5.2 D 执行 `backend\mvnw.cmd verify`、`openspec validate personalized-recommendation-engine --strict`、`git diff --check` 和变更范围核对；验证：`verify`、严格 OpenSpec 校验和 `git diff --check` 均通过，未验证的真实环境与跨负责人事项明确到 A、B、C。
-- [ ] 5.3 D 准备独立分支 PR 说明；验证：列出 Owner 确认、迁移版本、验证结果、未确认项和不伪造票务事实的边界；用户明确要求后才提交、推送或创建 PR。
+- [x] 5.3 D 准备独立分支 PR 说明；验证：草稿 PR #107 已列出 Owner 确认、无迁移、验证结果、未确认项和不伪造票务事实的边界。
