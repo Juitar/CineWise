@@ -3,6 +3,7 @@
   "algorithmVersion": "rec-mvp-1",
   "plans": [],
   "missingFactors": ["SHOWTIME"],
+  "relaxationSuggestion": null,
   "usedProfile": false,
   "source": "TICKETING:MOCK",
   "dataAt": "2026-08-03T00:00:00Z",
