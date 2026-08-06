@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'umi';
 
 import { getFreshnessNotices } from '../../modules/content/freshness';
+import { safePosterUrl } from '../../modules/content/poster';
 import {
   buildMovieListSearchParams,
   parseMovieListQuery,
@@ -17,27 +18,6 @@ const { Search } = Input;
 // 不从当前分页 records 临时汇总类型，否则用户会误以为其他页不存在更多类型。
 const MOVIE_GENRES = ['动作', '喜剧', '爱情', '科幻', '动画', '悬疑', '剧情'] as const;
 const SKELETON_KEYS = Array.from({ length: 10 }, (_, index) => `movie-skeleton-${index + 1}`);
-
-/**
- * 只允许同源图片或 HTTPS 海报。
- *
- * Provider 返回的 URL 属于外部输入；HTTP 外链会造成混合内容风险，非法地址统一使用本地占位，不尝试加载。
- */
-function safePosterUrl(posterUrl: string | null): string | null {
-  if (!posterUrl) {
-    return null;
-  }
-
-  try {
-    const url = new URL(posterUrl, window.location.origin);
-    if (url.protocol !== 'https:' && url.origin !== window.location.origin) {
-      return null;
-    }
-    return url.href;
-  } catch {
-    return null;
-  }
-}
 
 /** 渲染后端影片摘要；卡片本期不承担详情跳转，避免把尚未实现的详情路由做成可点击入口。 */
 function MovieCard({ movie }: { movie: MovieSummary }) {

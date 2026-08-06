@@ -1,19 +1,92 @@
+import { Alert, Button, Empty, Skeleton } from 'antd';
 import React, { useState } from 'react';
 import { Link } from 'umi';
-import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
-import { AgentCard } from './AgentCard';
-import { PlanRecommendation } from './PlanRecommendation';
-import './index.css';
+
+import { getFreshnessNotices } from '../../modules/content/freshness';
+import { safePosterUrl } from '../../modules/content/poster';
+import { useCinemaList } from '../../modules/content/useCinemaList';
+import { useMovieList } from '../../modules/content/useMovieList';
 import { RobotIcon } from '../../shared/components/icons/layout-icons';
+import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
+import type { CinemaSummary, ContentFreshness, MovieSummary } from '../../shared/types/api';
+import { AgentCard } from './AgentCard';
+import './index.css';
+import { PlanRecommendation } from './PlanRecommendation';
+
+const MOVIE_SKELETON_KEYS = ['movie-loading-1', 'movie-loading-2', 'movie-loading-3'];
+const CINEMA_SKELETON_KEYS = ['cinema-loading-1', 'cinema-loading-2', 'cinema-loading-3'];
+const DEFAULT_CITY_NAME = '长沙';
+const DEFAULT_CITY_CODE = '430100';
+
+function FreshnessNotice({ freshness }: { freshness: ContentFreshness }) {
+  const notices = getFreshnessNotices(freshness);
+  return (
+    <div className="home-freshness" aria-label="数据来源说明">
+      {notices.map((notice) => (
+        <span className={`home-freshness-item home-freshness-item--${notice.tone}`} key={notice.id}>
+          {notice.text}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function HomeMovieCard({ movie }: { movie: MovieSummary }) {
+  const [posterFailed, setPosterFailed] = useState(false);
+  const posterUrl = safePosterUrl(movie.posterUrl);
+
+  return (
+    <article className="movie-card" data-testid={`home-movie-${movie.movieId}`}>
+      {posterUrl && !posterFailed ? (
+        <img
+          alt={`${movie.title}海报`}
+          className="movie-poster-large"
+          loading="lazy"
+          onError={() => setPosterFailed(true)}
+          src={posterUrl}
+        />
+      ) : (
+        <div
+          className="movie-poster-large movie-poster-placeholder"
+          aria-label={`${movie.title}暂无海报`}
+        >
+          暂无海报
+        </div>
+      )}
+      <div className="movie-card-info">
+        <h3 className="movie-card-name">{movie.title}</h3>
+        <div className="movie-card-meta">
+          {movie.genres.length > 0 ? movie.genres.join(' / ') : '类型待更新'}
+        </div>
+        <div className="home-sale-unavailable">票务信息暂不可用</div>
+      </div>
+    </article>
+  );
+}
+
+function HomeCinemaCard({ cinema }: { cinema: CinemaSummary }) {
+  return (
+    <article className="cinema-card" data-testid={`home-cinema-${cinema.cinemaId}`}>
+      <div className="cinema-title-wrap">
+        <div className="cinema-icon-placeholder" aria-hidden="true" />
+        <h3 className="cinema-name">{cinema.name}</h3>
+      </div>
+      <div className="cinema-address">{cinema.address?.trim() || '地址待更新'}</div>
+      <div className="cinema-area">{cinema.area?.trim() || '区域待更新'}</div>
+      <div className="home-sale-unavailable">票务信息暂不可用</div>
+    </article>
+  );
+}
 
 export default function HomePage() {
   const isMobile = useMediaQuery('(max-width: 1023px)');
   const [showPlans, setShowPlans] = useState(false);
+  const movies = useMovieList({ page: 1, size: 5 });
+  const cinemas = useCinemaList({ location: DEFAULT_CITY_CODE, page: 1, size: 3 });
 
   return (
     <div className="home-page-container">
       <h1 className="visually-hidden">妙语购票</h1>
-      {/* 移动端 Agent 顶部横幅（仅在移动端首页出现） */}
       {isMobile && (
         <div className="home-mobile-agent-banner">
           <div className="home-mobile-agent-banner-inner">
@@ -41,164 +114,137 @@ export default function HomePage() {
       )}
 
       <div className="home-page-main">
-        {/* 左侧主体内容（影片列表、影院列表） */}
         <section className="home-page-content">
           <div className="home-main-content">
             {showPlans ? (
               <PlanRecommendation onBack={() => setShowPlans(false)} />
             ) : (
               <>
-                {/* 筛选条件栏 */}
-                <div className="home-filter-bar">
-                  <div className="filter-chip">
-                    📅 今天 <span className="arrow">v</span>
-                  </div>
-                  <div className="filter-chip">
-                    🕒 19:00以后 <span className="arrow">v</span>
-                  </div>
-                  <div className="filter-chip">
-                    👥 2人 <span className="arrow">v</span>
-                  </div>
-                  <div className="filter-chip">
-                    💰 ≤ ¥150 <span className="arrow">v</span>
-                  </div>
-                  <div className="filter-chip">
-                    📍 离我最近 <span className="arrow">v</span>
-                  </div>
-                  <div className="filter-chip">
-                    ··· 类型 <span className="arrow">v</span>
-                  </div>
-                  <div className="filter-chip more-filter">
-                    更多筛选 <span>▽</span>
-                  </div>
-                </div>
-
-                {/* 正在热映 */}
-                <div className="home-section">
+                <section className="home-section" aria-labelledby="home-movies-title">
                   <div className="section-header">
-                    <h2 className="home-section-title">正在热映</h2>
+                    <div>
+                      <h2 className="home-section-title" id="home-movies-title">
+                        正在热映
+                      </h2>
+                      <p className="home-section-description">仅展示内容服务返回的影片基础资料</p>
+                    </div>
                     <Link className="section-link" to="/movies">
-                      全部 28 部
+                      查看全部影片
                     </Link>
                   </div>
-                  <div className="movies-list">
-                    {[
-                      {
-                        id: 'kowloon',
-                        name: '九龙城寨之围城',
-                        score: '9.2',
-                        posterClass: 'poster--navy',
-                      },
-                      {
-                        id: 'apes',
-                        name: '猩球崛起：新世界',
-                        score: '8.6',
-                        posterClass: 'poster--blue-gray',
-                      },
-                      {
-                        id: 'spy-family',
-                        name: '间谍过家家 代号：白',
-                        score: '8.8',
-                        posterClass: 'poster--pink',
-                      },
-                      {
-                        id: 'moments',
-                        name: '云边有个小卖部',
-                        score: '8.5',
-                        posterClass: 'poster--peach',
-                      },
-                      {
-                        id: 'last-frenzy',
-                        name: '末路狂花钱',
-                        score: '8.1',
-                        posterClass: 'poster--sky',
-                      },
-                    ].map((movie) => (
-                      <div className="movie-card" key={movie.id}>
-                        <div className={`movie-poster-large ${movie.posterClass}`} />
-                        <div className="movie-card-info">
-                          <div className="movie-card-name">{movie.name}</div>
-                          <div className="movie-card-score">{movie.score}</div>
-                          <button type="button" className="buy-ticket-btn">
-                            购票
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="scroll-arrow-right">&gt;</div>
-                  </div>
-                </div>
 
-                {/* 附近影院 */}
-                <div className="home-section">
+                  {movies.data ? <FreshnessNotice freshness={movies.data} /> : null}
+                  {movies.isOfflineSnapshot ? (
+                    <Alert
+                      message="当前已离线，正在显示本页面内存中的影片只读快照"
+                      showIcon
+                      type="warning"
+                    />
+                  ) : null}
+                  {movies.error ? (
+                    <Alert
+                      action={
+                        <Button size="small" onClick={movies.retry}>
+                          重试
+                        </Button>
+                      }
+                      description={
+                        movies.error.traceId ? `问题编号：${movies.error.traceId}` : undefined
+                      }
+                      message={movies.data ? '影片更新失败，已保留上次结果' : '影片加载失败'}
+                      showIcon
+                      type="error"
+                    />
+                  ) : null}
+                  {movies.isRefreshing ? (
+                    <div className="home-refreshing" role="status">
+                      正在更新影片…
+                    </div>
+                  ) : null}
+                  {movies.isLoading ? (
+                    <div className="movies-list" aria-label="首页影片加载中">
+                      {MOVIE_SKELETON_KEYS.map((key) => (
+                        <div className="movie-card home-card-skeleton" key={key}>
+                          <Skeleton.Image active />
+                          <Skeleton active paragraph={{ rows: 2 }} title={false} />
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {!movies.isLoading && !movies.error && movies.data?.records.length === 0 ? (
+                    <Empty description="暂无可展示的影片" />
+                  ) : null}
+                  {movies.data && movies.data.records.length > 0 ? (
+                    <div className="movies-list" aria-live="polite">
+                      {movies.data.records.map((movie) => (
+                        <HomeMovieCard key={movie.movieId} movie={movie} />
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+
+                <section className="home-section" aria-labelledby="home-cinemas-title">
                   <div className="section-header">
-                    <h2 className="home-section-title">
-                      附近影院 <span className="section-subtitle">基于你的位置推荐</span>
-                    </h2>
+                    <div>
+                      <h2 className="home-section-title" id="home-cinemas-title">
+                        {DEFAULT_CITY_NAME}影院
+                      </h2>
+                      <p className="home-section-description">不获取位置，不展示距离或距离排序</p>
+                    </div>
                     <Link className="section-link" to="/cinemas">
-                      查看更多
+                      查看全部影院
                     </Link>
                   </div>
-                  <div className="cinemas-list">
-                    {[
-                      {
-                        id: 'ume-west-lake',
-                        name: 'UME影城 (杭州西湖店)',
-                        dist: '演示距离 1.2km',
-                        tags: ['IMAX', '杜比影院', '停车优惠'],
-                        price: '39',
-                        times: ['19:20', '20:40', '22:10'],
-                      },
-                      {
-                        id: 'xingju-yintai',
-                        name: '星聚影城 (城西银泰店)',
-                        dist: '演示距离 2.1km',
-                        tags: ['巨幕厅', 'VIP厅', '可停车'],
-                        price: '38',
-                        times: ['18:50', '20:30', '22:15'],
-                      },
-                      {
-                        id: 'yunbian-wanda',
-                        name: '云边影城 (杭州拱墅万达店)',
-                        dist: '演示距离 2.8km',
-                        tags: ['IMAX', 'RealD 3D', '美食套餐'],
-                        price: '42',
-                        times: ['19:10', '21:05', '23:00'],
-                      },
-                    ].map((cinema) => (
-                      <div className="cinema-card" key={cinema.id}>
-                        <div className="cinema-header">
-                          <div className="cinema-title-wrap">
-                            <div className="cinema-icon-placeholder"></div>
-                            <div className="cinema-name">{cinema.name}</div>
-                          </div>
-                          <div className="cinema-dist">{cinema.dist}</div>
-                        </div>
-                        <div className="cinema-tags">
-                          {cinema.tags.map((t) => (
-                            <span key={t} className="cinema-tag">
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="cinema-price-row">
-                          <span className="cinema-price">
-                            ¥{cinema.price} <span className="price-suffix">起</span>
-                          </span>
-                        </div>
-                        <div className="cinema-times">
-                          {cinema.times.map((t) => (
-                            <span key={t} className="cinema-time">
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
 
-                {/* 个性化服务横幅 */}
+                  {cinemas.data ? <FreshnessNotice freshness={cinemas.data} /> : null}
+                  {cinemas.isOfflineSnapshot ? (
+                    <Alert
+                      message="当前已离线，正在显示本页面内存中的影院只读快照"
+                      showIcon
+                      type="warning"
+                    />
+                  ) : null}
+                  {cinemas.error ? (
+                    <Alert
+                      action={
+                        <Button size="small" onClick={cinemas.retry}>
+                          重试
+                        </Button>
+                      }
+                      description={
+                        cinemas.error.traceId ? `问题编号：${cinemas.error.traceId}` : undefined
+                      }
+                      message={cinemas.data ? '影院更新失败，已保留上次结果' : '影院加载失败'}
+                      showIcon
+                      type="error"
+                    />
+                  ) : null}
+                  {cinemas.isRefreshing ? (
+                    <div className="home-refreshing" role="status">
+                      正在更新影院…
+                    </div>
+                  ) : null}
+                  {cinemas.isLoading ? (
+                    <div className="cinemas-list" aria-label="首页影院加载中">
+                      {CINEMA_SKELETON_KEYS.map((key) => (
+                        <div className="cinema-card home-card-skeleton" key={key}>
+                          <Skeleton active paragraph={{ rows: 3 }} title={{ width: '65%' }} />
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {!cinemas.isLoading && !cinemas.error && cinemas.data?.records.length === 0 ? (
+                    <Empty description="长沙暂无可展示的影院" />
+                  ) : null}
+                  {cinemas.data && cinemas.data.records.length > 0 ? (
+                    <div className="cinemas-list" aria-live="polite">
+                      {cinemas.data.records.map((cinema) => (
+                        <HomeCinemaCard cinema={cinema} key={cinema.cinemaId} />
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+
                 <div className="personalized-banner">
                   <div className="personalized-icon-wrap">
                     <RobotIcon size={24} />
@@ -218,7 +264,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* 右侧 Agent 面板（仅 PC 端） */}
         {!isMobile && (
           <aside className="home-page-agent-sidebar">
             <AgentCard onViewPlan={() => setShowPlans(true)} />
