@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.ticketing.infrastructure.persistence;
 
 import com.miaoyu.ticket.ticketing.application.AvailableDateQueryRepository;
+import com.miaoyu.ticket.ticketing.application.AvailableCinemaQueryRepository;
 import com.miaoyu.ticket.ticketing.application.AvailableMovieQueryRepository;
 import com.miaoyu.ticket.ticketing.application.ShowQueryRepository;
 import java.util.List;
@@ -11,6 +12,42 @@ import org.apache.ibatis.annotations.Select;
 /** 场次和座位快照的显式只读 SQL，查询范围与排序均在数据库侧固定。 */
 @Mapper
 public interface TicketingQueryMapper {
+
+    @Select("""
+            SELECT COUNT(DISTINCT ms.cinema_id)
+              FROM movie_show ms
+             WHERE ms.movie_id = #{criteria.movieId}
+               AND ms.status = 'ON_SALE'
+               AND ms.start_time > #{criteria.startsAfter}
+               AND ms.start_time < #{criteria.startsBefore}
+               AND EXISTS (
+                   SELECT 1 FROM show_seat ss
+                    WHERE ss.show_id = ms.id AND ss.status = 'AVAILABLE'
+               )
+            """)
+    long countAvailableCinemas(@Param("criteria") AvailableCinemaQueryRepository.QueryCriteria criteria);
+
+    @Select("""
+            SELECT ms.cinema_id,
+                   COUNT(*) AS available_show_count,
+                   MIN(ms.start_time) AS nearest_start_time,
+                   CASE WHEN COUNT(DISTINCT ms.source) = 1 THEN MIN(ms.source) ELSE 'MIXED' END AS schedule_source,
+                   MAX(ms.update_time) AS schedule_data_time
+              FROM movie_show ms
+             WHERE ms.movie_id = #{criteria.movieId}
+               AND ms.status = 'ON_SALE'
+               AND ms.start_time > #{criteria.startsAfter}
+               AND ms.start_time < #{criteria.startsBefore}
+               AND EXISTS (
+                   SELECT 1 FROM show_seat ss
+                    WHERE ss.show_id = ms.id AND ss.status = 'AVAILABLE'
+               )
+             GROUP BY ms.cinema_id
+             ORDER BY nearest_start_time, ms.cinema_id
+             LIMIT #{criteria.limit} OFFSET #{criteria.offset}
+            """)
+    List<AvailableCinemaQueryRow> findAvailableCinemas(
+            @Param("criteria") AvailableCinemaQueryRepository.QueryCriteria criteria);
 
     /**
      * 按影院聚合未来可售影片。来源只描述排期；混合来源时固定返回 MIXED，避免把聚合结果误标为 Demo。
