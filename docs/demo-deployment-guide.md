@@ -1,10 +1,12 @@
 # CineWise 演示环境持续部署指南
 
-本文说明 `dev` 分支到演示服务器的自动部署。它不改变团队的 Git 协作方式：普通功能仍从个人分支通过 PR 合入 `dev`；只有不改变运行行为的小型文档或协作规则维护，以及 A 已审核的隔离 Flyway 迁移及直接关联证据，才可以按 `AGENTS.md` 直接提交到 `dev`。
+本文说明 GitHub 官方 Runner 上的 PR 快检查，以及 `dev` 分支到演示服务器的重测试和自动部署。普通功能从个人分支通过 PR 合入 `dev`，`dev` 必须保持分支保护，禁止绕过 PR 直接推送应用代码。
 
 ## 1. 触发边界
 
-`.github/workflows/demo-deploy.yml` 在以下内容进入 `dev` 时触发：
+PR 只执行后端编译、单元测试、代码规范和静态检查，以及前端格式、Lint、类型检查、单元测试和生产构建。MySQL、Redis、Chromium 和浏览器 E2E 不在 PR 执行。
+
+`.github/workflows/demo-deploy.yml` 在以下内容进入 `dev` 时触发重测试和部署：
 
 - 后端代码或构建文件；
 - 前端代码或构建文件；
@@ -21,9 +23,10 @@ Flyway SQL 进入 `dev` 不代表数据库已经执行。数据库迁移仍由 A
 ## 2. 部署流程
 
 ```text
-代码进入 dev
-  → 后端 mvnw verify
-  → 前端 pnpm check、开发服务器 E2E 与生产 Nginx 镜像冒烟
+应用代码进入 dev
+  → MySQL 集成测试
+  → Redis 集成测试
+  → 前端开发服务器 E2E 与生产 Nginx 镜像冒烟
   → 使用 GitHub demo Environment 连接服务器
   → 获取本次 workflow 对应的精确 commit SHA
   → Docker Compose 构建并等待全部健康检查
@@ -31,7 +34,7 @@ Flyway SQL 进入 `dev` 不代表数据库已经执行。数据库迁移仍由 A
   → 失败：重新构建并恢复上一个已部署 commit，工作流保持失败
 ```
 
-CD 不使用服务器目录中“当前最新”的不确定代码，而是部署触发工作流的精确 Git SHA。部署组禁止并发执行，后到的部署会等待前一轮结束。
+CD 不重复执行 PR 已完成的后端 `verify` 或前端格式、Lint、类型、单元测试和构建。它不使用服务器目录中“当前最新”的不确定代码，而是部署触发工作流的精确 Git SHA。GitHub 官方 Runner 按顺序执行重测试，部署组禁止并发执行，后到的部署会等待前一轮结束。
 
 ## 3. GitHub Environment 与 Secrets
 
@@ -48,16 +51,17 @@ CD 不使用服务器目录中“当前最新”的不确定代码，而是部�
 
 生成 `DEPLOY_KNOWN_HOSTS` 时先由 A 通过可信渠道核对服务器指纹，再保存对应记录；不要在工作流中临时 `ssh-keyscan` 并无条件信任结果。
 
-## 4. 服务器前置条件
+## 4. 部署服务器前置条件
 
-服务器必须满足：
+GitHub Actions 的 PR、重测试和部署 job 均在 GitHub 官方 `ubuntu-latest` 上运行。公开仓库的 `pull_request` 不得使用自建 Runner，也不得使用 `pull_request_target` 或读取任何部署 Secret。
 
-1. Linux、Git、Docker Engine 和支持 `--wait` 的 Docker Compose v2 已安装。
-2. `DEPLOY_PATH` 已克隆 CineWise 仓库，`origin` 允许部署账号只读获取 `dev`。
-3. SSH 部署账号可以在不使用 root 的情况下运行该项目的 Docker Compose。
-4. 仓库根目录存在被 Git 忽略的 `.env`，真实凭据只保存在服务器。首次可从 `.env.server.example` 复制，不能复制开发者的本机 `.env`。
-5. 应用服务器能通过私网或固定公网 `/32` 白名单访问基础服务 ECS 的 MySQL、Redis 和可选 MinIO API；应用 Compose 不运行重复基础服务。
-6. `.env` 使用演示环境配置，且至少满足：
+部署服务器必须满足：
+
+1. `DEPLOY_PATH` 已克隆 CineWise 仓库，`origin` 允许部署账号只读获取 `dev`。
+2. SSH 部署账号可以在不使用 root 的情况下运行该项目的 Docker Compose。
+3. 仓库根目录存在被 Git 忽略的 `.env`，真实凭据只保存在服务器。首次可从 `.env.server.example` 复制，不能复制开发者的本机 `.env`。
+4. 应用服务器能通过私网或固定公网 `/32` 白名单访问基础服务 ECS 的 MySQL、Redis 和可选 MinIO API；应用 Compose 不运行重复基础服务。
+5. `.env` 使用演示环境配置，且至少满足：
 
 ```dotenv
 SPRING_PROFILES_ACTIVE=demo

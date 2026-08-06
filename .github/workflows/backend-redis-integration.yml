@@ -1,17 +1,7 @@
 name: Backend Redis Integration
 
 on:
-  pull_request:
-    paths:
-      - "backend/**"
-      - ".github/workflows/backend-redis-integration.yml"
-      - "openspec/changes/ci-redis-integration-verification/**"
-  push:
-    branches: [main, dev]
-    paths:
-      - "backend/**"
-      - ".github/workflows/backend-redis-integration.yml"
-      - "openspec/changes/ci-redis-integration-verification/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -38,7 +28,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Set up Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
