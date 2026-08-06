@@ -12,4 +12,4 @@
 ## 3. Verification
 
 - [x] 3.1 覆盖注册、合法转换、空结果、参数错误、查询不可用、预算收缩、无 userId 和状态机回写测试。
-- [ ] 3.2 执行定向测试、`mvnw.cmd verify`、OpenSpec 严格校验与 diff 检查。
+- [x] 3.2 执行定向测试、`mvnw.cmd verify`、OpenSpec 严格校验与 diff 检查。
