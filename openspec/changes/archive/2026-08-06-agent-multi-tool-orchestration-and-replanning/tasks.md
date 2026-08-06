@@ -25,4 +25,4 @@
 - [x] 4.2 运行 GitHub Actions `Backend MySQL Integration` 的 `mysql-integration`，记录运行编号、空库/重复初始化、CAS、重规划版本、事件顺序和结果未知恢复结果；验证：GitHub Actions #162 通过。（B）
 - [x] 4.3 完成 C 卡片 payload 合入后的安全字段接入；验证：`AgentPersistenceJsonFactoryTest` 与事件相关测试通过。 （B / C）
 - [x] 4.4 运行 `backend/mvnw.cmd verify`、严格 OpenSpec 校验、`git diff --check` 和变更文件核对；验证：532 项测试通过、28 项按环境跳过，Checkstyle 与 SpotBugs 通过。
-- [ ] 4.5 修复 PR #101 审查：提交入口调用 `MultiToolSupervisor`，保存已校验计划和等待确认步骤后再创建既有建单 action；验证：提交入口测试、`backend/mvnw.cmd verify`、MySQL 8.4 CI 复跑。（B）
+- [x] 4.5 修复 PR #101 审查：提交入口调用 `MultiToolSupervisor`，保存已校验计划和等待确认步骤后再创建既有建单 action；验证：提交入口测试、`backend/mvnw.cmd verify`、GitHub Actions `Backend MySQL Integration` #31090273106 / job `92579344830` 通过；空库迁移、MySQL 8.4 集成、Agent 持久化测试和重复 Flyway 初始化均通过。（B）
