@@ -1,5 +1,10 @@
 import { apiRequest } from '../../shared/api/client';
-import type { AvailableMoviesResponse, ShowSummary, SeatMapResponse } from './types';
+import type {
+  AvailableCinemasResponse,
+  AvailableMoviesResponse,
+  SeatMapResponse,
+  ShowSummary,
+} from './types';
 
 /** 按影院查询未来七天有排期的影片，避免前端逐部探测场次。 */
 export function getAvailableMovies(
@@ -8,6 +13,17 @@ export function getAvailableMovies(
 ): Promise<AvailableMoviesResponse> {
   return apiRequest<AvailableMoviesResponse>('/api/v1/shows/available-movies', {
     query: { cinemaId },
+    signal,
+  });
+}
+
+/** 查询指定影片当前可售的影院；售票条件仍以后续场次页实时查询为准。 */
+export function getAvailableCinemas(
+  movieId: string,
+  signal?: AbortSignal,
+): Promise<AvailableCinemasResponse> {
+  return apiRequest<AvailableCinemasResponse>('/api/v1/shows/available-cinemas', {
+    query: { movieId, page: 1, size: 20 },
     signal,
   });
 }

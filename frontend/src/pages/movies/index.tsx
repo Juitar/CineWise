@@ -1,6 +1,6 @@
 import { Alert, Button, Empty, Input, Pagination, Skeleton } from 'antd';
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'umi';
+import { Link, useSearchParams } from 'umi';
 
 import { getFreshnessNotices } from '../../modules/content/freshness';
 import { safePosterUrl } from '../../modules/content/poster';
@@ -19,7 +19,7 @@ const { Search } = Input;
 const MOVIE_GENRES = ['动作', '喜剧', '爱情', '科幻', '动画', '悬疑', '剧情'] as const;
 const SKELETON_KEYS = Array.from({ length: 10 }, (_, index) => `movie-skeleton-${index + 1}`);
 
-/** 渲染后端影片摘要；卡片本期不承担详情跳转，避免把尚未实现的详情路由做成可点击入口。 */
+/** 渲染后端影片摘要，并以服务端 movieId 进入可售影院选择页。 */
 function MovieCard({ movie }: { movie: MovieSummary }) {
   const posterUrl = safePosterUrl(movie.posterUrl);
   return (
@@ -59,6 +59,13 @@ function MovieCard({ movie }: { movie: MovieSummary }) {
         <div className="movie-grid-desc">
           {movie.durationMinutes === null ? '时长待更新' : `${movie.durationMinutes} 分钟`}
         </div>
+        <Link
+          aria-label={`为《${movie.title}》选择影院`}
+          className="movie-grid-purchase-link"
+          to={`/movies/${encodeURIComponent(movie.movieId)}/cinemas`}
+        >
+          选影院购票
+        </Link>
       </div>
     </article>
   );

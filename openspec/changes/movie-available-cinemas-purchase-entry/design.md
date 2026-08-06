@@ -1,29 +1,27 @@
 # 设计：影片可售影院入口
 
-## 当前阻塞
+## 接口与范围
 
-`backend/src/main/java/com/miaoyu/ticket/ticketing/api/ShowController.java` 目前只有 `queryAvailableMovies`，前端 `frontend/src/modules/ticketing/api.ts` 只有 `getAvailableMovies`；A 正在提供 `available-cinemas` Controller、Application Service、公开 DTO、OpenAPI 和固定夹具。`cinema-detail-purchase-entry` 明确覆盖相反方向，不覆盖本 change。
+后端已提供匿名公开只读接口 `GET /api/v1/shows/available-cinemas?movieId=&page=&size=`，安全白名单已在唯一 `applicationSecurityFilterChain` 中放行精确 GET 路径。
 
-## 已确认的安全规则
+`movieId` 只接受无前导零的正十进制字符串；默认 `page=1`、`size=20`，`size` 取值为 1 至 50。成功返回 `PageResult<AvailableCinemaResponse>`，每项包含：`cinemaId`、`name`、`address`、`availableShowCount`、`nearestStartTime`、`contentSource`、`contentDataTime`、`contentExpiresAt`、`contentExpired`、`scheduleSource`、`scheduleDataTime`。
 
-A 已确认 `GET /api/v1/shows/available-cinemas?movieId=&page=&size=` 是匿名公开只读查询。C 仅在唯一 `applicationSecurityFilterChain` 的现有场次 GET 白名单增加精确路径 `/api/v1/shows/available-cinemas`，与 `/available-movies`、`/available-dates` 保持一致。该修改不放开 POST、PUT、PATCH、DELETE 或其他 `/api/v1/shows/**` 路径，也不修改 JWT、Cookie、CSRF 或其他过滤链配置。
+合法无可售影院返回 HTTP 200 和空 `records`；参数非法为 HTTP 400 / `100001`；影片不存在或下线为 HTTP 404；内容摘要不可用为 HTTP 503 / `303004`；票务查询不可用为 HTTP 503 / `306003`。接口、OpenAPI 和固定夹具由 A 提供，前端只消费公开 DTO，不推断可售条件、价格、库存或座位。
 
-## A/D 必须确认的接口
+本 change 只覆盖影片列表到可售影院页，再跳转既有场次页。不修改 `/shows`、选座、建单、支付、电子票和退票。
 
-在实现前书面确认：
+## 前端分层
 
-1. A 已确认方法和路径为 `GET /api/v1/shows/available-cinemas?movieId=&page=&size=`，并由 C 放入现有匿名 GET 白名单。
-2. `movieId` 是否只接受正十进制字符串，以及 `page/size` 的取值范围。
-3. 响应是否包含 `cinemaId`、影院摘要、可售场次数量、最近开场时间、内容来源/时间、排期来源/时间，以及沿用哪组公共来源字段。
-4. 未来时间窗口、`ON_SALE`、余座条件、排序、分页上限和时区。
-5. 匿名权限；非法 ID、影片不存在/下线、内容不可用、票务失败的 HTTP 状态和业务码。
-6. 合法但无场次必须成功返回空数组，不能把内容故障伪装成空结果。
-7. A 提供票务查询/OpenAPI/契约测试，D 提供影院摘要 Application API 和来源语义，C 仅消费公开 DTO。
+`modules/ticketing` 增加 DTO、API 和 `useAvailableCinemas(movieId)` Hook。API 使用公共 `apiRequest<T>()`；Hook 处理取消、竞态、加载、失败、重试和当前页面生命周期内的只读快照。页面不直接请求网络。
 
-## 接口确认后的前端边界
+`/movies` 中每张影片卡片通过语义化 `Link` 进入 `/movies/:movieId/cinemas`。选影院页只从路由取得字符串 `movieId`，并用该 Hook 渲染影院；选择影院只生成 `/shows?movieId={movieId}&cinemaId={cinemaId}`。
 
-页面只通过 `modules/content`/`modules/ticketing` 的 API、Hook 和公共 `apiRequest<T>()` 查询。入口使用语义化 `Link`；选影院页读取字符串 `movieId`，影院入口只生成 `/shows?movieId=...&cinemaId=...`。Hook 负责取消、竞态、加载、失败和重试；页面区分空、失败、404、过期、降级和离线。无可售影院隐藏购票入口。PC/移动共享实现，触控目标至少 44px，支持键盘焦点。
+## 页面状态
+
+页面独立显示加载、合法空结果、失败与重试、404、内容或票务不可用、离线内存快照、内容过期、演示来源和降级来源。失败不能伪装为空结果；空结果不展示购票入口。`contentExpired` 或来源为演示/降级时明确提示数据不是实时可售承诺。
+
+同一套 DTO、API、Hook 和页面同时服务 PC、移动端与键盘。所有入口、返回与重试均可获得焦点，触控目标最小 44px；窄屏不产生影响操作的横向溢出。
 
 ## 测试与回退
 
-接口确认后测试列表点击、正常列表和参数、空态、加载、失败、重试、404、过期/降级、移动和键盘，再做真实 HTTP 联调。接口若被否决或字段冲突，更新本 change 后停工，不加猜测兼容分支；A 现有购票流程不回退。
+测试覆盖影片入口、正常列表和跳转参数、空态、加载、失败重试、404、`303004`、`306003`、过期或降级来源、移动端和键盘访问。回退时移除本 change 的前端页面、路由、模块调用和测试；不改 A 的接口和票务主流程。
