@@ -11,7 +11,7 @@
   "payload": {
     "toolName": "queryShows",
     "displayText": "工具暂时无法完成查询",
-    "errorCode": "TOOL_FAILED",
+    "errorCode": 306002,
     "retryable": true,
     "replanSuggested": true
   }

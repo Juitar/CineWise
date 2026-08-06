@@ -81,7 +81,7 @@ export interface ToolCompletePayload extends ToolStartPayload {
 }
 
 export interface ToolErrorPayload extends ToolStartPayload {
-  errorCode: string;
+  errorCode: string | number;
   retryable: boolean;
   replanSuggested: boolean;
 }

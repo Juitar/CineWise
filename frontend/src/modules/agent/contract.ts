@@ -294,7 +294,13 @@ function validateToolPayload(event: AgentEvent): void {
     return;
   }
   if (event.eventType === 'tool.start') return;
-  text(payload.errorCode);
+  const errorCode = payload.errorCode;
+  if (
+    !(typeof errorCode === 'string' && errorCode.length > 0) &&
+    !(typeof errorCode === 'number' && Number.isSafeInteger(errorCode) && errorCode >= 0)
+  ) {
+    throw new AgentContractError();
+  }
   boolean(payload.retryable);
   boolean(payload.replanSuggested);
 }

@@ -38,6 +38,15 @@ describe('Agent reducer 新 SSE 协议', () => {
     expect(complete.projection.lastEventId).toBe('44');
   });
 
+  it('接受后端数字工具错误码并推进合法事件游标', () => {
+    const result = consumeAgentEvent(
+      createAgentProjection('session-1'),
+      parseAgentEvent(toolError),
+    );
+    expect(result.outcome).toBe('applied');
+    expect(result.projection.lastEventId).toBe('42');
+  });
+
   it('展示 SELECT_SEATS 入口但只使用完整外层计划字段和 businessRef.showId', () => {
     const result = consumeAgentEvent(
       createAgentProjection('session-1'),
