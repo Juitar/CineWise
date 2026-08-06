@@ -7,6 +7,8 @@ import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationCatalog;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationQueryService;
+import com.miaoyu.ticket.recommendation.application.PersonalizedRecommendationQueryService;
+import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
 import com.miaoyu.ticket.recommendation.domain.PurchaseCandidateValidator.PurchaseCandidate;
 import java.time.Clock;
 import java.time.Instant;
@@ -14,6 +16,11 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class RankMoviePlanToolTest {
 
@@ -69,6 +76,29 @@ class RankMoviePlanToolTest {
         assertThat(result.status()).isEqualTo(ToolStatus.FAILED);
         // 使用稳定的参数错误码，供 B 安全处理。
         assertThat(result.errorCode()).isEqualTo(100001);
+    }
+
+    /** 生产容器必须选择双参数构造器，避免新版入口退回旧固定查询。 */
+    @Test
+    void shouldInjectPersonalizedServiceIntoProductionToolBean() {
+        FixedRecommendationQueryService fixed = mock(FixedRecommendationQueryService.class);
+        PersonalizedRecommendationQueryService personalized = mock(PersonalizedRecommendationQueryService.class);
+        RecommendationPlanResult expected = new RecommendationPlanResult("1.0", "rec-mvp-1", List.of(),
+                List.of("SHOWTIME"), null, false, "TICKETING:MOCK", NOW, NOW.plusSeconds(60), true);
+        when(personalized.query(any())).thenReturn(expected);
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.registerBean(FixedRecommendationQueryService.class, () -> fixed);
+            context.registerBean(PersonalizedRecommendationQueryService.class, () -> personalized);
+            context.register(RankMoviePlanTool.class);
+            context.refresh();
+
+            var result = context.getBean(RankMoviePlanTool.class).executeRecommendationPlan(context(),
+                    new RankMoviePlanCommand("430100", LocalDate.of(2026, 8, 3), 1, null, null, List.of(),
+                            null, null, null, null, List.of()));
+
+            assertThat(result.data()).isSameAs(expected);
+            verify(personalized).query(any());
+        }
     }
 
     /** 成功夹具：可购事实完整，展示名称等没有可靠来源时按规则留空。 */
