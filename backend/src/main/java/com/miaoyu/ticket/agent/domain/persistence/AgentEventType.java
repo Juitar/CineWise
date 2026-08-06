@@ -10,6 +10,9 @@ public enum AgentEventType {
     STEP_COMPLETE("step.complete"),
     STEP_FAILED("step.failed"),
     TOOL_START("tool.start"),
+    TOOL_COMPLETE("tool.complete"),
+    TOOL_ERROR("tool.error"),
+    /** 旧事件值保留给历史事件读取，不再由新运行写入。 */
     TOOL_RESULT("tool.result"),
     CARD("card"),
     MESSAGE_COMPLETE("message.complete"),

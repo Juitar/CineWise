@@ -13,7 +13,7 @@ import java.util.List;
  */
 public final class AgentCardEventValidator {
     private static final List<String> CARD_TYPES =
-            List.of("TEXT", "QUESTION", "MOVIE_CARD", "PLAN_CARD", "PROGRESS", "ERROR");
+            List.of("TEXT", "QUESTION", "MOVIE_CARD", "PLAN_CARD", "BUSINESS_INTENT", "PROGRESS", "ERROR");
 
     private AgentCardEventValidator() {
     }
@@ -45,6 +45,7 @@ public final class AgentCardEventValidator {
             case "QUESTION" -> question(payload);
             case "MOVIE_CARD" -> movieCard(payload);
             case "PLAN_CARD" -> planCard(event, payload);
+            case "BUSINESS_INTENT" -> businessIntent(event, payload);
             case "PROGRESS" -> required(payload, "stage") && required(payload, "status")
                     ? render(type) : rejected("PROGRESS 缺少 stage 或 status");
             case "ERROR" -> required(payload, "code") && required(payload, "message")
@@ -84,6 +85,14 @@ public final class AgentCardEventValidator {
                 && required(payload, "source")
                 && time(payload, "dataAt") && time(payload, "expiresAt") && payload.path("degraded").isBoolean()
                 ? render("PLAN_CARD") : rejected("PLAN_CARD 字段无效");
+    }
+
+    private static ValidationResult businessIntent(JsonNode event, JsonNode payload) {
+        JsonNode nested = payload.path("payload");
+        JsonNode businessRef = nested.path("businessRef");
+        return hasPlanContext(event) && "SELECT_SEATS".equals(nested.path("intent").asText())
+                && required(businessRef, "showId")
+                ? render("BUSINESS_INTENT") : rejected("SELECT_SEATS 卡片字段无效");
     }
 
     /** 计划卡片只有携带当前计划标识和正版本号时，C 才能安全处理旧版本和续传。 */

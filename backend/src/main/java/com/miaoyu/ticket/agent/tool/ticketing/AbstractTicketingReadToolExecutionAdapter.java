@@ -1,6 +1,6 @@
 package com.miaoyu.ticket.agent.tool.ticketing;
 
-import com.miaoyu.ticket.agent.application.tool.ReadOnlyToolExecutionAdapter;
+import com.miaoyu.ticket.agent.application.tool.AgentToolExecutor;
 import com.miaoyu.ticket.agent.domain.plan.ExecutionPlanNode;
 import com.miaoyu.ticket.agent.domain.plan.InputReference;
 import com.miaoyu.ticket.agent.domain.plan.InputReferenceSource;
@@ -9,6 +9,7 @@ import com.miaoyu.ticket.agent.domain.run.ExecutionRunState;
 import com.miaoyu.ticket.agent.domain.run.RunnableNodeSelection;
 import com.miaoyu.ticket.agent.domain.tool.ToolCommand;
 import com.miaoyu.ticket.agent.domain.tool.ToolContext;
+import com.miaoyu.ticket.agent.domain.tool.ToolDefinition;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
@@ -22,7 +23,7 @@ import java.util.Set;
 
 /** A 的票务只读 Adapter 公共执行骨架，固定 Agent 节点选择、预算收缩和状态机回写边界。 */
 abstract class AbstractTicketingReadToolExecutionAdapter<C extends ToolCommand, R>
-        implements ReadOnlyToolExecutionAdapter {
+        implements AgentToolExecutor<C, R> {
 
     private final String targetName;
     private final Duration timeout;
@@ -44,6 +45,15 @@ abstract class AbstractTicketingReadToolExecutionAdapter<C extends ToolCommand, 
     public final String targetName() {
         return targetName;
     }
+
+    @Override
+    public final ToolResult<R> execute(ToolContext context, C command) {
+        return executeTool(Objects.requireNonNull(context, "ToolContext不能为空"),
+                Objects.requireNonNull(command, "工具命令不能为空"));
+    }
+
+    @Override
+    public abstract ToolDefinition definition();
 
     @Override
     public final ExecutionResult execute(ExecutionRequest request) {

@@ -31,7 +31,8 @@ import java.util.Set;
  * <p>这里不提供“按工具名执行”的通用入口。目标工具、Command 和结果类型都通过构造器与 Java 类型固定，
  * 因此模型计划中的字符串不能被解释成 Bean 名、反射类名或其他跨模块调用。
  */
-public final class RankMoviePlanExecutionAdapter implements ReadOnlyToolExecutionAdapter {
+public final class RankMoviePlanExecutionAdapter
+        implements AgentToolExecutor<RankMoviePlanCommand, FixedRecommendationResult> {
     /**
      * D 当前公开 Command 允许的全部输入名。
      *
@@ -79,7 +80,7 @@ public final class RankMoviePlanExecutionAdapter implements ReadOnlyToolExecutio
         }
 
         // 唯一允许的跨模块调用：公开的 RankMoviePlanTool.execute(context, command)。
-        ToolResult<FixedRecommendationResult> toolResult = rankMoviePlanTool.execute(context, command);
+        ToolResult<FixedRecommendationResult> toolResult = execute(context, command);
         // 状态机决定 SUCCESS、PROCESSING、FAILED 与一次重试的状态语义；适配器不擅自修改结果状态。
         return new RankMoviePlanExecutionResult(
                 stateMachine.recordToolResult(runningState, node.nodeId(), toolResult), toolResult);
@@ -88,6 +89,18 @@ public final class RankMoviePlanExecutionAdapter implements ReadOnlyToolExecutio
     @Override
     public String targetName() {
         return RankMoviePlanTool.TARGET_NAME;
+    }
+
+    @Override
+    public com.miaoyu.ticket.agent.domain.tool.ToolDefinition definition() {
+        return AgentToolDefinitions.rankMoviePlan();
+    }
+
+    @Override
+    public ToolResult<FixedRecommendationResult> execute(ToolContext context, RankMoviePlanCommand command) {
+        return rankMoviePlanTool.execute(
+                Objects.requireNonNull(context, "工具上下文不能为空"),
+                Objects.requireNonNull(command, "工具命令不能为空"));
     }
 
     @Override
