@@ -2,6 +2,7 @@ package com.miaoyu.ticket.job;
 
 import com.miaoyu.ticket.content.application.ContentSeedApplicationService;
 import com.miaoyu.ticket.content.application.ContentSeedCatalog;
+import com.miaoyu.ticket.content.application.ContentPurchaseQueryPort;
 import com.miaoyu.ticket.ticketing.application.TicketingSeedApplicationService;
 import com.miaoyu.ticket.ticketing.application.TicketingSeedReport;
 import org.slf4j.Logger;
@@ -19,12 +20,15 @@ public class DemoSeedInitializer implements ApplicationRunner {
     private static final Logger LOGGER = LoggerFactory.getLogger(DemoSeedInitializer.class);
 
     private final ContentSeedApplicationService contentSeedService;
+    private final ContentPurchaseQueryPort contentPurchaseQueryPort;
     private final TicketingSeedApplicationService ticketingSeedService;
 
     public DemoSeedInitializer(
             ContentSeedApplicationService contentSeedService,
+            ContentPurchaseQueryPort contentPurchaseQueryPort,
             TicketingSeedApplicationService ticketingSeedService) {
         this.contentSeedService = contentSeedService;
+        this.contentPurchaseQueryPort = contentPurchaseQueryPort;
         this.ticketingSeedService = ticketingSeedService;
     }
 
@@ -49,6 +53,15 @@ public class DemoSeedInitializer implements ApplicationRunner {
                 report.auditoriumCount(),
                 report.showCount(),
                 report.seatCount());
+        contentPurchaseQueryPort.findChangshaLivePurchaseCatalog().ifPresent(liveCatalog -> {
+            TicketingSeedReport liveReport = ticketingSeedService.ensureFixedSeed(liveCatalog);
+            LOGGER.info(
+                    "长沙真实影院演示排期初始化完成: movies={}, cinemaId={}, shows={}, seats={}",
+                    liveCatalog.movies().size(),
+                    liveCatalog.cinemas().getFirst().id(),
+                    liveReport.showCount(),
+                    liveReport.seatCount());
+        });
         return report;
     }
 }

@@ -23,6 +23,23 @@ export interface ShowSummary {
   updatedAt: string;
 }
 
+/** 影院详情页按影院聚合的可售影片，不包含价格和余座。 */
+export interface AvailableMovie {
+  movieId: string;
+  title: string;
+  posterUrl: string | null;
+  showCount: number;
+  nearestStartTime: string;
+  contentSource: string;
+  contentDataTime: string;
+  scheduleSource: string;
+  scheduleDataTime: string;
+}
+
+export interface AvailableMoviesResponse {
+  movies: AvailableMovie[];
+}
+
 /** 列表中单个座位项 */
 export interface SeatItem {
   seatId: string;

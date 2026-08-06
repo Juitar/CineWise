@@ -4,11 +4,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.miaoyu.ticket.content.application.DemoContentCatalog;
 import com.miaoyu.ticket.content.application.DemoContentCatalogProvider;
+import com.miaoyu.ticket.content.application.ContentPersistencePort;
+import com.miaoyu.ticket.content.application.ContentQuery;
+import com.miaoyu.ticket.content.application.ContentResult;
+import com.miaoyu.ticket.content.application.ContentSnapshotPort;
+import com.miaoyu.ticket.content.domain.CinemaContent;
+import com.miaoyu.ticket.content.domain.ContentResourceType;
+import com.miaoyu.ticket.content.domain.ContentSource;
+import com.miaoyu.ticket.content.domain.ContentSourceType;
+import com.miaoyu.ticket.content.domain.MovieContent;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Map;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,6 +30,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.annotation.DirtiesContext;
 
 @ActiveProfiles("test")
 @SpringBootTest(properties = {
@@ -37,6 +50,50 @@ class DemoSeedInitializerTest {
 
     @Autowired
     private DemoContentCatalogProvider catalogProvider;
+
+    @Autowired
+    private ContentPersistencePort contentPersistencePort;
+
+    @Autowired
+    private ContentSnapshotPort contentSnapshotPort;
+
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+    void givenChangshaLiveContent_whenSeedRuns_thenCreateMarkedDemoSchedulesForLiveCinema() {
+        LocalDateTime dataTime = LocalDateTime.of(2026, 8, 2, 8, 0);
+        long movieId = contentPersistencePort.ensureMovie(new ContentPersistencePort.MovieRow(
+                9_100_001L, "live-purchase-movie", "长沙购票演示片", "[\"剧情\"]", 110,
+                new BigDecimal("8.8"), ContentSourceType.LIVE, "NETSTART_MAOYAN",
+                dataTime, dataTime.plusHours(6)));
+        long cinemaId = contentPersistencePort.ensureCinema(new ContentPersistencePort.CinemaRow(
+                9_200_001L, "live-purchase-cinema", "长沙购票演示影院", "430100", "岳麓区",
+                "梅溪湖路1号", null, null, ContentSourceType.LIVE, "NETSTART_MAOYAN",
+                dataTime, dataTime.plusHours(6)));
+        MovieContent movie = new MovieContent(movieId, "live-purchase-movie", "长沙购票演示片",
+                "[\"剧情\"]", 110, new BigDecimal("8.8"), null, null, null, null);
+        CinemaContent cinema = new CinemaContent(cinemaId, "live-purchase-cinema", "长沙购票演示影院",
+                "430100", "岳麓区", "梅溪湖路1号", null, null);
+        ContentSource liveSource = new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE);
+        ContentResult<List<? extends com.miaoyu.ticket.content.domain.ContentItem>> movieResult =
+                new ContentResult<>(List.of(movie), liveSource, dataTime, dataTime.plusHours(6),
+                        false, false, null);
+        ContentResult<List<? extends com.miaoyu.ticket.content.domain.ContentItem>> cinemaResult =
+                new ContentResult<>(List.of(cinema), liveSource, dataTime, dataTime.plusHours(6),
+                        false, false, null);
+        contentSnapshotPort.save(new ContentQuery(ContentResourceType.MOVIE, null, null, null), movieResult);
+        contentSnapshotPort.save(new ContentQuery(ContentResourceType.MOVIE, movieId, null, null), movieResult);
+        contentSnapshotPort.save(
+                new ContentQuery(ContentResourceType.CINEMA, null, "430100", null), cinemaResult);
+
+        initializer.initialize();
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM movie_show WHERE cinema_id = ? AND source = 'demo-seed'",
+                Long.class, cinemaId)).isEqualTo(42L);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM auditorium WHERE cinema_id = ? AND data_type = 'MOCK'",
+                Long.class, cinemaId)).isEqualTo(2L);
+    }
 
     @Test
     void givenLegacyDemoSeedAndLockedSeat_whenSeedRunsAgain_thenCountsStayStableAndSeatStateIsPreserved() {

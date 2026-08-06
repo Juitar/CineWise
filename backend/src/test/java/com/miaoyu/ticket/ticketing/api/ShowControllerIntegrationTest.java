@@ -50,6 +50,35 @@ class ShowControllerIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
+    void givenCinemaWithDemoSchedules_whenQueryAvailableMovies_thenReturnAggregatedMovieEntries() throws Exception {
+        String cinemaId = jdbcTemplate.queryForObject("SELECT MIN(cinema_id) FROM movie_show", String.class);
+
+        mockMvc.perform(get("/api/v1/shows/available-movies").param("cinemaId", cinemaId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.movies").isNotEmpty())
+                .andExpect(jsonPath("$.data.movies[*].movieId", everyItem(matchesPattern("\\d+"))))
+                .andExpect(jsonPath("$.data.movies[*].title", everyItem(not(""))))
+                .andExpect(jsonPath("$.data.movies[*].showCount", everyItem(greaterThan(0))))
+                .andExpect(jsonPath("$.data.movies[*].nearestStartTime", everyItem(endsWith("+08:00"))))
+                .andExpect(jsonPath("$.data.movies[*].contentSource", everyItem(matchesPattern(".+"))))
+                .andExpect(jsonPath("$.data.movies[*].contentDataTime", everyItem(endsWith("+08:00"))))
+                .andExpect(jsonPath("$.data.movies[*].scheduleSource", everyItem(matchesPattern("demo-seed"))))
+                .andExpect(jsonPath("$.data.movies[*].scheduleDataTime", everyItem(endsWith("+08:00"))));
+    }
+
+    @Test
+    void givenInvalidOrUnknownCinema_whenQueryAvailableMovies_thenReturnBadRequestOrEmptyMovies() throws Exception {
+        mockMvc.perform(get("/api/v1/shows/available-movies").param("cinemaId", "invalid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(100001));
+
+        mockMvc.perform(get("/api/v1/shows/available-movies").param("cinemaId", "999999999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.movies").isEmpty());
+    }
+
+    @Test
     void givenFixedMovieAndCinema_whenQueryShows_thenReturnFrozenContractAndTimeFilter() throws Exception {
         Map<String, Object> show = jdbcTemplate.queryForMap("""
                 SELECT movie_id, cinema_id
@@ -165,6 +194,7 @@ class ShowControllerIntegrationTest {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paths['/api/v1/shows'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/shows/available-movies'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/shows'].get.security").doesNotExist())
                 .andExpect(jsonPath("$.paths['/api/v1/shows/available-dates'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/shows/available-dates'].get.security").doesNotExist())

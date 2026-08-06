@@ -5,6 +5,7 @@ import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.ticketing.application.AvailableDateQueryService;
+import com.miaoyu.ticket.ticketing.application.AvailableMovieQueryService;
 import com.miaoyu.ticket.ticketing.application.SeatMapView;
 import com.miaoyu.ticket.ticketing.application.SeatQueryService;
 import com.miaoyu.ticket.ticketing.application.ShowQuery;
@@ -31,16 +32,40 @@ import org.springframework.web.bind.annotation.RestController;
 public class ShowController {
 
     private final AvailableDateQueryService availableDateQueryService;
+    private final AvailableMovieQueryService availableMovieQueryService;
     private final ShowQueryService showQueryService;
     private final SeatQueryService seatQueryService;
 
     public ShowController(
             AvailableDateQueryService availableDateQueryService,
+            AvailableMovieQueryService availableMovieQueryService,
             ShowQueryService showQueryService,
             SeatQueryService seatQueryService) {
         this.availableDateQueryService = availableDateQueryService;
+        this.availableMovieQueryService = availableMovieQueryService;
         this.showQueryService = showQueryService;
         this.seatQueryService = seatQueryService;
+    }
+
+    /** 影院详情页一次取得有排期的影片，避免前端下载全量影片后逐项探测场次。 */
+    @GetMapping("/available-movies")
+    @Operation(summary = "查询指定影院未来七天的可售影片")
+    public Result<AvailableMoviesResponse> queryAvailableMovies(@RequestParam String cinemaId) {
+        List<AvailableMoviesResponse.AvailableMovieItemResponse> movies = availableMovieQueryService
+                .queryAvailableMovies(parseBusinessId(cinemaId))
+                .stream()
+                .map(view -> new AvailableMoviesResponse.AvailableMovieItemResponse(
+                        Long.toString(view.movieId()),
+                        view.title(),
+                        view.posterUrl(),
+                        view.showCount(),
+                        toOffsetDateTime(view.nearestStartTime()),
+                        view.contentSource(),
+                        toOffsetDateTime(view.contentDataTime()),
+                        view.scheduleSource(),
+                        toOffsetDateTime(view.scheduleDataTime())))
+                .toList();
+        return Result.success(new AvailableMoviesResponse(movies));
     }
 
     /**

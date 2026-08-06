@@ -4,7 +4,7 @@ export default defineConfig({
   hash: true,
   proxy: {
     '/api': {
-      target: 'http://127.0.0.1:8080',
+      target: process.env.CINEWISE_API_PROXY_TARGET ?? 'http://127.0.0.1:8080',
       changeOrigin: true,
     },
   },
@@ -32,6 +32,7 @@ export default defineConfig({
         { path: '/', component: '@/pages/home' },
         { path: '/movies', component: '@/pages/movies' },
         { path: '/cinemas', component: '@/pages/cinemas' },
+        { path: '/cinemas/:cinemaId', component: '@/pages/cinemas/detail' },
         { path: '/shows', component: '@/pages/shows' },
         {
           path: '/shows/:showId/seats',

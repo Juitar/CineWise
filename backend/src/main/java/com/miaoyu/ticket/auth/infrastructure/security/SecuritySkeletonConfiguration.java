@@ -53,7 +53,8 @@ public class SecuritySkeletonConfiguration {
                         .permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/shows",
-                                "/api/v1/shows/available-dates")
+                                "/api/v1/shows/available-dates",
+                                "/api/v1/shows/available-movies")
                         .permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/movies",

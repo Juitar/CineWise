@@ -13,6 +13,9 @@ const pageMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('umi', () => ({
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
+    <a href={to}>{children}</a>
+  ),
   useSearchParams: () => [new URLSearchParams(pageMocks.search), pageMocks.setSearchParams],
 }));
 
@@ -86,6 +89,10 @@ describe('CinemasPage', () => {
     expect(screen.getByText('江南大道88号')).toBeInTheDocument();
     expect(screen.getByText('演示数据')).toBeInTheDocument();
     expect(screen.getByText('共 1 家影院')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /妙语影城·滨江店/ })).toHaveAttribute(
+      'href',
+      '/cinemas/8200001',
+    );
     expect(screen.queryByText('AI 推荐影院')).not.toBeInTheDocument();
     expect(pageMocks.useCinemaList).toHaveBeenCalledWith({
       keyword: undefined,

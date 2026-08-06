@@ -5,9 +5,15 @@ import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.error.ErrorCode;
 import com.miaoyu.ticket.content.domain.ContentItem;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
+import com.miaoyu.ticket.content.domain.CinemaContent;
+import com.miaoyu.ticket.content.domain.MovieContent;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -27,7 +33,10 @@ import org.springframework.stereotype.Service;
  * 系统获得了新的排期或余票。没有任何可用内容时，调用方得到固定的 303004 错误。</p>
  */
 @Service
-public class ContentQueryService {
+public class ContentQueryService implements ContentPurchaseQueryPort {
+
+    private static final String CHANGSHA_CITY_CODE = "430100";
+    private static final int DEMO_PURCHASE_MOVIE_LIMIT = 3;
 
     private final ContentCachePort cachePort;
     private final ContentSnapshotPort snapshotPort;
@@ -59,6 +68,72 @@ public class ContentQueryService {
                 // Demo 是离线最后回退层，绝不能写回 Redis 后被下一次查询伪装成真实缓存。
                 .orElseGet(() -> demoProvider.query(query)
                         .orElseThrow(() -> new BusinessException(ContentErrorCode.DATA_UNAVAILABLE))));
+    }
+
+    /**
+     * 一次读取影片目录后按内部 ID 过滤，避免 Redis 不可用时为每部影片分别等待连接超时。
+     * 单项缺失只排除该项，不拖垮其他有效影片；输入最多来自未来七天排期聚合。
+     */
+    @Override
+    public Map<Long, MovieSummary> findMovieSummaries(Set<Long> movieIds) {
+        if (movieIds.isEmpty()) {
+            return Map.of();
+        }
+        if (movieIds.size() > 100) {
+            throw new IllegalArgumentException("movieIds must not contain more than 100 items");
+        }
+        ContentResult<List<? extends ContentItem>> result = query(
+                new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
+                        null, null, null));
+        Map<Long, MovieSummary> summaries = new LinkedHashMap<>();
+        result.data().stream()
+                .map(MovieContent.class::cast)
+                .filter(movie -> movie.movieId() != null && movieIds.contains(movie.movieId()))
+                .sorted(java.util.Comparator.comparingLong(MovieContent::movieId))
+                .forEach(movie -> summaries.put(movie.movieId(), new MovieSummary(
+                        movie.movieId(),
+                        movie.title(),
+                        movie.posterUrl(),
+                        result.source().name(),
+                        result.dataTime())));
+        return Map.copyOf(summaries);
+    }
+
+    /**
+     * 演示购票只选择已经同步并标记为 LIVE 的长沙内容；排序使用内部 ID，保证同一数据库重复启动稳定。
+     * 返回的目录只承载公开 ID 和影片时长，票价、影厅、场次与座位仍由 A 的演示种子生成。
+     */
+    @Override
+    public Optional<ContentSeedCatalog> findChangshaLivePurchaseCatalog() {
+        ContentResult<List<? extends ContentItem>> cinemaResult = query(
+                new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA,
+                        null, CHANGSHA_CITY_CODE, null));
+        ContentResult<List<? extends ContentItem>> movieResult = query(
+                new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
+                        null, null, null));
+        if (cinemaResult.source().type() != ContentSourceType.LIVE
+                || movieResult.source().type() != ContentSourceType.LIVE) {
+            return Optional.empty();
+        }
+
+        List<ContentSeedCatalog.CinemaRef> cinemas = cinemaResult.data().stream()
+                .map(CinemaContent.class::cast)
+                .filter(cinema -> cinema.cinemaId() != null && cinema.cinemaId() > 0)
+                .sorted(java.util.Comparator.comparingLong(CinemaContent::cinemaId))
+                .limit(1)
+                .map(cinema -> new ContentSeedCatalog.CinemaRef(cinema.cinemaId(), cinema.sourceCinemaId()))
+                .toList();
+        List<ContentSeedCatalog.MovieRef> movies = movieResult.data().stream()
+                .map(MovieContent.class::cast)
+                .filter(movie -> movie.movieId() != null && movie.movieId() > 0)
+                .sorted(java.util.Comparator.comparingLong(MovieContent::movieId))
+                .limit(DEMO_PURCHASE_MOVIE_LIMIT)
+                .map(movie -> new ContentSeedCatalog.MovieRef(
+                        movie.movieId(), movie.sourceMovieId(), movie.durationMinutes()))
+                .toList();
+        return cinemas.isEmpty() || movies.isEmpty()
+                ? Optional.empty()
+                : Optional.of(new ContentSeedCatalog(movies, cinemas));
     }
 
     private java.util.Optional<ContentResult<List<? extends ContentItem>>> findFromSnapshot(ContentQuery query) {

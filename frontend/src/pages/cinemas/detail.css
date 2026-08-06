@@ -1,0 +1,200 @@
+.cinema-detail-page {
+  width: min(1120px, 100%);
+  min-height: 420px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.cinema-detail-breadcrumb {
+  margin-bottom: 20px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.cinema-detail-breadcrumb a,
+.cinema-detail-back {
+  color: #5f4cc4;
+}
+
+.cinema-detail-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 16px;
+}
+
+.cinema-detail-hero {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 28px;
+  border: 1px solid #ececf3;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #fff, #f8f7ff);
+}
+
+.cinema-detail-logo {
+  display: flex;
+  flex: 0 0 88px;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #6c5ce7, #4834d4);
+  color: #fff;
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.cinema-detail-hero h1 {
+  margin: 0 0 10px;
+  color: #1f2937;
+  font-size: 30px;
+}
+
+.cinema-detail-hero p,
+.cinema-detail-hero address {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 14px;
+  font-style: normal;
+}
+
+.cinema-detail-freshness {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 28px;
+}
+
+.cinema-detail-section-title h2 {
+  margin: 0 0 6px;
+  color: #1f2937;
+  font-size: 24px;
+}
+
+.cinema-detail-section-title p {
+  margin: 0 0 18px;
+  color: #6b7280;
+}
+
+.cinema-detail-movie-list {
+  display: grid;
+  gap: 16px;
+}
+
+.cinema-detail-movie-card {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid #ececf3;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.cinema-detail-poster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 92px;
+  height: 128px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #f0eff8;
+  color: #8279ad;
+  font-size: 13px;
+}
+
+.cinema-detail-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cinema-detail-movie-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cinema-detail-movie-heading h3 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 19px;
+}
+
+.cinema-detail-movie-main p {
+  margin: 8px 0 0;
+  color: #4b5563;
+}
+
+.cinema-detail-movie-main .cinema-detail-data-time {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.cinema-detail-purchase-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 112px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 10px;
+  background: #6c5ce7;
+  color: #fff;
+  font-weight: 600;
+}
+
+.cinema-detail-purchase-link:hover {
+  background: #5947cf;
+  color: #fff;
+}
+
+.cinema-detail-purchase-link:focus-visible {
+  outline: 3px solid rgba(108, 92, 231, 35%);
+  outline-offset: 3px;
+}
+
+@media (max-width: 767px) {
+  .cinema-detail-page {
+    padding: 16px;
+  }
+
+  .cinema-detail-hero {
+    align-items: flex-start;
+    padding: 20px;
+  }
+
+  .cinema-detail-logo {
+    flex-basis: 60px;
+    width: 60px;
+    height: 60px;
+    font-size: 26px;
+  }
+
+  .cinema-detail-hero h1 {
+    font-size: 23px;
+  }
+
+  .cinema-detail-movie-card {
+    grid-template-columns: 72px minmax(0, 1fr);
+    align-items: start;
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .cinema-detail-poster {
+    width: 72px;
+    height: 100px;
+  }
+
+  .cinema-detail-purchase-link {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
