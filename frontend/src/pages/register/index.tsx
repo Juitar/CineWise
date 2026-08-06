@@ -8,8 +8,6 @@ import { useAuth } from '../../shared/auth/AuthProvider';
 import {
   BrandLogoIcon,
   CinemaIllustrationSVG,
-  EyeIcon,
-  EyeInvisibleIcon,
   HomeIcon,
   LockIcon,
   MailIcon,
@@ -280,7 +278,7 @@ export default function RegisterPage() {
               </div>
 
               <div className="login-input-group register-password-row">
-                <Input
+                <Input.Password
                   aria-label="密码"
                   autoComplete="new-password"
                   className="login-input-antd"
@@ -289,25 +287,15 @@ export default function RegisterPage() {
                   placeholder="设置密码"
                   prefix={<LockIcon size={18} className="login-input-icon-antd" />}
                   size="large"
-                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(event) => {
                     setPassword(event.target.value);
                     handleFieldChange();
                   }}
-                  suffix={
-                    <button
-                      type="button"
-                      className="login-input-suffix-antd"
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label={showPassword ? '隐藏密码' : '显示密码'}
-                    >
-                      {showPassword ? <EyeInvisibleIcon size={18} /> : <EyeIcon size={18} />}
-                    </button>
-                  }
+                  visibilityToggle={{ visible: showPassword, onVisibleChange: setShowPassword }}
                 />
 
-                <Input
+                <Input.Password
                   aria-label="确认密码"
                   autoComplete="new-password"
                   className="login-input-antd"
@@ -316,22 +304,15 @@ export default function RegisterPage() {
                   placeholder="确认密码"
                   prefix={<LockIcon size={18} className="login-input-icon-antd" />}
                   size="large"
-                  type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(event) => {
                     setConfirmPassword(event.target.value);
                     handleFieldChange();
                   }}
-                  suffix={
-                    <button
-                      type="button"
-                      className="login-input-suffix-antd"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      aria-label={showConfirmPassword ? '隐藏确认密码' : '显示确认密码'}
-                    >
-                      {showConfirmPassword ? <EyeInvisibleIcon size={18} /> : <EyeIcon size={18} />}
-                    </button>
-                  }
+                  visibilityToggle={{
+                    visible: showConfirmPassword,
+                    onVisibleChange: setShowConfirmPassword,
+                  }}
                 />
               </div>
 

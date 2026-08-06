@@ -157,9 +157,9 @@ describe('LoginPage', () => {
     const passwordInput = screen.getByLabelText('密码');
     expect(passwordInput).toHaveAttribute('type', 'password');
 
-    fireEvent.click(screen.getByRole('button', { name: '显示密码' }));
+    fireEvent.click(screen.getByRole('img', { name: 'eye-invisible' }));
     expect(passwordInput).toHaveAttribute('type', 'text');
-    expect(screen.getByRole('button', { name: '隐藏密码' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'eye' })).toBeInTheDocument();
   });
 
   it('提交前校验邮箱和密码，不调用登录 Hook', () => {

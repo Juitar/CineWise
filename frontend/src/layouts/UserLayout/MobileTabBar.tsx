@@ -2,7 +2,12 @@ import { TabBar } from 'antd-mobile';
 import React from 'react';
 import { useLocation, useNavigate } from 'umi';
 
-import { FilmIcon, UserIcon } from '../../shared/components/icons/layout-icons';
+import {
+  FilmIcon,
+  HomeIcon,
+  MapPinIcon,
+  UserIcon,
+} from '../../shared/components/icons/layout-icons';
 
 export const MobileTabBar: React.FC = () => {
   const location = useLocation();
@@ -16,7 +21,7 @@ export const MobileTabBar: React.FC = () => {
     {
       key: '/',
       title: '首页',
-      icon: <FilmIcon size={24} />,
+      icon: <HomeIcon size={24} />,
     },
     {
       key: '/movies',
@@ -26,7 +31,7 @@ export const MobileTabBar: React.FC = () => {
     {
       key: '/cinemas',
       title: '影院',
-      icon: <FilmIcon size={24} />,
+      icon: <MapPinIcon size={24} />,
     },
     {
       key: '/profile',
