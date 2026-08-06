@@ -128,6 +128,8 @@ export async function postAgentStream(
     // 服务端成功建立 SSE 后可能更新 CSRF Cookie；下一次请求重新获取匹配的新 Header。
     // 非 2xx 响应必须先交给 safeHttpError，403/201007 不能清掉当前 Token。
   } catch (error) {
+    // 请求可能已经到达服务端并更新 HttpOnly Cookie；网络异常或取消后，恢复连接必须获取新 Header。
+    clearCsrfToken();
     if (signal.aborted) throw new ApiError('Agent 请求已取消', { kind: 'CANCELLED' });
     throw new ApiError('Agent 网络连接失败', { kind: 'NETWORK', isResultUnknown: true });
   }

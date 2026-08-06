@@ -15,13 +15,13 @@ function streamFrom(chunks: readonly string[]): ReadableStream<Uint8Array> {
   });
 }
 
-function csrfResponse(): Response {
+function csrfResponse(token = 'csrf-value'): Response {
   return new Response(
     JSON.stringify({
       code: 0,
       message: 'success',
       traceId: 'trace-csrf',
-      data: { headerName: 'X-XSRF-TOKEN', token: 'csrf-value' },
+      data: { headerName: 'X-XSRF-TOKEN', token },
     }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
   );
@@ -147,6 +147,32 @@ describe('POST SSE 客户端', () => {
 
     expect(fetchMock.mock.calls.filter(([url]) => url === '/api/v1/auth/csrf')).toHaveLength(
       shouldRefresh ? 2 : 1,
+    );
+  });
+
+  it('网络断开后恢复连接会重新获取 CSRF Token', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(csrfResponse('csrf-value-1'))
+      .mockRejectedValueOnce(new TypeError('network down'))
+      .mockResolvedValueOnce(csrfResponse('csrf-value-2'))
+      .mockResolvedValueOnce(new Response(streamFrom([]), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      postAgentStream('session-example-1', REQUEST, null, new AbortController().signal, {
+        onEvent: vi.fn(),
+        onHeartbeat: vi.fn(),
+      }),
+    ).rejects.toMatchObject({ kind: 'NETWORK' });
+    await postAgentStream('session-example-1', REQUEST, '40', new AbortController().signal, {
+      onEvent: vi.fn(),
+      onHeartbeat: vi.fn(),
+    });
+
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/v1/auth/csrf')).toHaveLength(2);
+    expect((fetchMock.mock.calls[3][1].headers as Headers).get('X-XSRF-TOKEN')).toBe(
+      'csrf-value-2',
     );
   });
 
