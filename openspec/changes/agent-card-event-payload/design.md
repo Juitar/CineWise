@@ -6,7 +6,7 @@
 
 payload 最小字段：`TEXT{text,format?}`；`QUESTION{questionId,questionKind,message,options,allowFreeText,input?,requiresConfirmation,expiresAt,locationAuthorization?}`；`MOVIE_CARD{title,movies,source,dataAt,expiresAt,degraded,fallbackType?}`；`PLAN_CARD{title,plans,source,dataAt,expiresAt,degraded}`；`PROGRESS{stage,status}`；`ERROR{code,message,retryable}`。所有文本按纯文本显示，不接受 HTML。
 
-位置授权只表示 UI 问题和用户结果，不携带坐标、住址或地图几何。`NOT_REQUESTED/GRANTED/DENIED/EXPIRED` 由 C 的浏览器权限结果映射；`DENIED` 允许手动地点，`EXPIRED` 用新的 `questionId` 再问，重复结果按原 `questionId` 去重。
+位置授权只表示 UI 问题和用户结果，不携带坐标、住址或地图几何。`permission` 固定为 `DEVICE_LOCATION`，`purpose` 固定为 `ROUTE_PLANNING`，`authorizationState` 只允许 `NOT_REQUESTED/GRANTED/DENIED/EXPIRED`，且必须给出 `deniedAction` 和 `expiredAction`。`DENIED` 允许手动地点，`EXPIRED` 用新的 `questionId` 再问，重复结果按原 `questionId` 去重。`PLAN_CARD` 必须携带非空 `planId` 和大于零的 `planVersion`，否则校验器拒绝。
 
 ## 确认接口
 

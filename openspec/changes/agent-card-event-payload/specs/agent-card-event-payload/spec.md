@@ -17,7 +17,7 @@
 - **AND** 不动态加载组件、URL 或 HTML
 
 ### Requirement: QUESTION 必须表达位置授权和失效
-QUESTION payload SHALL 包含 `questionId`、`questionKind`、`message`、`options`、`allowFreeText`、`input?`、`requiresConfirmation` 和 `expiresAt`。`LOCATION_PERMISSION` 必须带 `locationAuthorization.permission=DEVICE_LOCATION`、`authorizationState`、`purpose=ROUTE_PLANNING`、`resubmittable`、`deniedAction` 和 `expiredAction`。拒绝使用 `authorizationState=DENIED`，过期使用 `EXPIRED`，重新提交创建新 `questionId`；前端以 `questionKind` 判断，不解析自然语言。
+QUESTION payload SHALL 包含 `questionId`、`questionKind`、`message`、`options`、`allowFreeText`、`input?`、`requiresConfirmation` 和 `expiresAt`。`LOCATION_PERMISSION` 必须带 `locationAuthorization.permission=DEVICE_LOCATION`、`authorizationState`、`purpose=ROUTE_PLANNING`、`resubmittable`、`deniedAction` 和 `expiredAction`；`authorizationState` 只允许 `NOT_REQUESTED`、`GRANTED`、`DENIED`、`EXPIRED`。拒绝使用 `authorizationState=DENIED`，过期使用 `EXPIRED`，重新提交创建新 `questionId`；前端以 `questionKind` 判断，不解析自然语言。
 
 #### Scenario: 用户拒绝位置授权
 - **WHEN** 浏览器权限被拒绝

@@ -44,7 +44,7 @@ public final class AgentCardEventValidator {
             case "TEXT" -> required(payload, "text") ? render(type) : rejected("TEXT.text 不能为空");
             case "QUESTION" -> question(payload);
             case "MOVIE_CARD" -> movieCard(payload);
-            case "PLAN_CARD" -> planCard(payload);
+            case "PLAN_CARD" -> planCard(event, payload);
             case "PROGRESS" -> required(payload, "stage") && required(payload, "status")
                     ? render(type) : rejected("PROGRESS 缺少 stage 或 status");
             case "ERROR" -> required(payload, "code") && required(payload, "message")
@@ -66,9 +66,7 @@ public final class AgentCardEventValidator {
         }
         if ("LOCATION_PERMISSION".equals(payload.path("questionKind").asText())) {
             JsonNode authorization = payload.path("locationAuthorization");
-            if (!isObject(authorization) || !required(authorization, "permission")
-                    || !required(authorization, "authorizationState") || !required(authorization, "purpose")
-                    || !authorization.path("resubmittable").isBoolean()) {
+            if (!isValidLocationAuthorization(authorization)) {
                 return rejected("位置授权 QUESTION 字段无效");
             }
         }
@@ -81,10 +79,26 @@ public final class AgentCardEventValidator {
                 ? render("MOVIE_CARD") : rejected("MOVIE_CARD 字段无效");
     }
 
-    private static ValidationResult planCard(JsonNode payload) {
-        return required(payload, "title") && payload.path("plans").isArray() && required(payload, "source")
+    private static ValidationResult planCard(JsonNode event, JsonNode payload) {
+        return hasPlanContext(event) && required(payload, "title") && payload.path("plans").isArray()
+                && required(payload, "source")
                 && time(payload, "dataAt") && time(payload, "expiresAt") && payload.path("degraded").isBoolean()
                 ? render("PLAN_CARD") : rejected("PLAN_CARD 字段无效");
+    }
+
+    /** 计划卡片只有携带当前计划标识和正版本号时，C 才能安全处理旧版本和续传。 */
+    private static boolean hasPlanContext(JsonNode event) {
+        return text(event, "planId") && event.path("planVersion").isInt() && event.path("planVersion").asInt() > 0;
+    }
+
+    /** 位置授权字段是前端权限流程的固定协议，不能把任意文本当作可执行状态。 */
+    private static boolean isValidLocationAuthorization(JsonNode authorization) {
+        return isObject(authorization) && "DEVICE_LOCATION".equals(authorization.path("permission").asText())
+                && List.of("NOT_REQUESTED", "GRANTED", "DENIED", "EXPIRED")
+                        .contains(authorization.path("authorizationState").asText())
+                && "ROUTE_PLANNING".equals(authorization.path("purpose").asText())
+                && authorization.path("resubmittable").isBoolean() && required(authorization, "deniedAction")
+                && required(authorization, "expiredAction");
     }
 
     private static boolean isObject(JsonNode node) {

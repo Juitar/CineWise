@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.miaoyu.ticket.agent.api.AgentCardEventValidator;
 import java.io.InputStream;
 import java.time.OffsetDateTime;
@@ -39,6 +40,39 @@ class AgentCardEventValidatorTest {
         for (String fixture : List.of("missing-outer-field.json", "missing-payload-field.json",
                 "wrong-field-type.json")) {
             assertThat(validate(fixture).decision()).isEqualTo(AgentCardEventValidator.Decision.REJECT);
+        }
+    }
+
+    @Test
+    void shouldRejectPlanCardsWithoutCurrentPlanContext() throws Exception {
+        JsonNode missingPlanId = fixture("plan-card.json").deepCopy();
+        ((ObjectNode) missingPlanId).putNull("planId");
+        assertThat(AgentCardEventValidator.validate(missingPlanId).decision())
+                .isEqualTo(AgentCardEventValidator.Decision.REJECT);
+
+        JsonNode invalidPlanVersion = fixture("plan-card.json").deepCopy();
+        ((ObjectNode) invalidPlanVersion).put("planVersion", 0);
+        assertThat(AgentCardEventValidator.validate(invalidPlanVersion).decision())
+                .isEqualTo(AgentCardEventValidator.Decision.REJECT);
+    }
+
+    @Test
+    void shouldRejectInvalidLocationPermissionAuthorizationFields() throws Exception {
+        assertThat(validate("invalid-location-authorization.json").decision())
+                .isEqualTo(AgentCardEventValidator.Decision.REJECT);
+        for (String field : List.of("permission", "purpose", "authorizationState")) {
+            JsonNode invalid = fixture("location-permission-question.json").deepCopy();
+            ObjectNode authorization = (ObjectNode) invalid.path("payload").path("locationAuthorization");
+            authorization.put(field, "INVALID");
+            assertThat(AgentCardEventValidator.validate(invalid).decision())
+                    .isEqualTo(AgentCardEventValidator.Decision.REJECT);
+        }
+        for (String field : List.of("deniedAction", "expiredAction")) {
+            JsonNode missing = fixture("location-permission-question.json").deepCopy();
+            ObjectNode authorization = (ObjectNode) missing.path("payload").path("locationAuthorization");
+            authorization.remove(field);
+            assertThat(AgentCardEventValidator.validate(missing).decision())
+                    .isEqualTo(AgentCardEventValidator.Decision.REJECT);
         }
     }
 
