@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.regex.Pattern;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,6 +31,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/shows")
 public class ShowController {
+
+    /** REST 与 Agent 路由共用的业务 ID 规范，禁止前导零造成同一 BIGINT 的多种文本形式。 */
+    private static final Pattern CANONICAL_BUSINESS_ID = Pattern.compile("[1-9]\\d*");
 
     private final AvailableDateQueryService availableDateQueryService;
     private final AvailableMovieQueryService availableMovieQueryService;
@@ -116,16 +120,26 @@ public class ShowController {
         return Result.success(toResponse(seatQueryService.querySeatMap(parseBusinessId(showId))));
     }
 
+    /**
+     * 在 REST 边界统一收紧业务 ID。
+     *
+     * Long.parseLong 会接受前导零；如果不先校验，`01` 与 `1` 会指向同一场次，
+     * 从而破坏 B 的 Agent 卡片、C 的前端路由和 A 的公开响应之间的一致 ID 表示。
+     */
     private long parseBusinessId(String value) {
+        if (value == null || !CANONICAL_BUSINESS_ID.matcher(value).matches()) {
+            throw invalidBusinessId();
+        }
         try {
             long id = Long.parseLong(value);
-            if (id <= 0) {
-                throw new NumberFormatException("ID must be positive");
-            }
             return id;
         } catch (NumberFormatException exception) {
-            throw new BusinessException(CommonErrorCode.INVALID_PARAMETER, "业务ID必须是正整数");
+            throw invalidBusinessId();
         }
+    }
+
+    private BusinessException invalidBusinessId() {
+        return new BusinessException(CommonErrorCode.INVALID_PARAMETER, "业务ID必须是无前导零的正整数");
     }
 
     private ShowSummaryResponse toResponse(ShowSummaryView view) {
