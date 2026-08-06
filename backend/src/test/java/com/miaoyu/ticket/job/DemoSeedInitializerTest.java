@@ -93,6 +93,9 @@ class DemoSeedInitializerTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM auditorium WHERE cinema_id = ? AND data_type = 'MOCK'",
                 Long.class, cinemaId)).isEqualTo(2L);
+        // LIVE 扩展可以增加独立票务数据，但不能改变固定 Demo 种子的统计基线。
+        assertSeedCounts();
+        assertContentSourceIdentity();
     }
 
     @Test
@@ -142,8 +145,8 @@ class DemoSeedInitializerTest {
     }
 
     private void assertSeedCounts() {
-        assertThat(count("movie")).isEqualTo(10);
-        assertThat(count("cinema")).isEqualTo(4);
+        assertThat(countBySource("movie")).isEqualTo(10);
+        assertThat(countBySource("cinema")).isEqualTo(4);
         assertThat(countFixedAuditoriums()).isEqualTo(8);
         assertThat(countFixedShows()).isEqualTo(168);
         assertThat(countFixedSeats()).isEqualTo(13_440);
@@ -177,10 +180,6 @@ class DemoSeedInitializerTest {
                 """, Timestamp.class);
         assertThat(firstShow).isEqualTo(Timestamp.valueOf("2026-08-02 09:30:00"));
         assertThat(lastShow).isEqualTo(Timestamp.valueOf("2026-08-08 19:30:00"));
-    }
-
-    private long count(String tableName) {
-        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName, Long.class);
     }
 
     /** 固定种子与 LIVE 购票扩展共用票务表，测试只统计 DEMO_CONTENT 影院的票务数据。 */
