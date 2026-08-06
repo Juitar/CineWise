@@ -33,6 +33,9 @@ public interface OrderRepository {
     /** 按本人订单号读取订单与场次上下文，不替代交易状态查询。 */
     Optional<OrderQuerySnapshot> findOrderQueryByOrderNo(long userId, String orderNo);
 
+    /** 出行详情使用的最小本人订单投影，不携带交易和个人敏感字段。 */
+    Optional<TravelOrderSummarySnapshot> findTravelOrderSummaryByIdAndUserId(long orderId, long userId);
+
     /** 按主键查询订单座位快照，并按座位ID升序返回。 */
     List<Long> findSeatIds(long orderId);
 
@@ -193,6 +196,16 @@ public interface OrderRepository {
             LocalDateTime expireTime,
             int version,
             LocalDateTime updatedAt) {
+    }
+
+    /** A 权威订单与场次事实，供公开 Application Port 转换为跨模块 DTO。 */
+    record TravelOrderSummarySnapshot(
+            long orderId,
+            String orderNo,
+            long showId,
+            long movieId,
+            long cinemaId,
+            LocalDateTime showStartTime) {
     }
 
     record NewOrder(

@@ -263,6 +263,23 @@ public interface OrderPersistenceMapper {
             @Param("userId") long userId,
             @Param("orderNo") String orderNo);
 
+    /** 按本人订单主键读取出行所需最小事实，禁止扩大为交易明细投影。 */
+    @Select("""
+            SELECT orders.id AS order_id,
+                   orders.order_no,
+                   orders.show_id,
+                   shows.movie_id,
+                   shows.cinema_id,
+                   shows.start_time AS show_start_time
+              FROM ticket_order orders
+              INNER JOIN movie_show shows ON shows.id = orders.show_id
+             WHERE orders.id = #{orderId}
+               AND orders.user_id = #{userId}
+            """)
+    TravelOrderSummarySnapshotRow findTravelOrderSummaryByIdAndUserId(
+            @Param("orderId") long orderId,
+            @Param("userId") long userId);
+
     @Select("""
             SELECT show_seat_id
               FROM ticket_order_seat

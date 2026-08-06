@@ -2,6 +2,7 @@ package com.miaoyu.ticket.content.application;
 
 import com.miaoyu.ticket.content.domain.ContentItem;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 候选真实 Provider 向同步用例提供已标准化的内容，不暴露 HTTP 或 JSON。
@@ -17,6 +18,18 @@ public interface LiveContentSyncPort {
      * 据此写入 `data_sync_log`，页面仍只会读取已有快照或 Demo，不会因此发起第二次外部调用。</p>
      */
     DailySyncBatch fetchForDailySync();
+
+    /**
+     * 拉取当前热映目录中尚未成功保存详情的影片。
+     *
+     * <p>V014 尚未引入专用队列表，因此由调用方传入已落库的稳定外部身份。Provider 每次重新读取
+     * 当前目录后跳过这些身份，只处理当前分钟预算内的其余项；下一次任务会自然从剩余身份继续，
+     * 不需要在 HTTP 线程中等待下一分钟。</p>
+     */
+    default DailySyncBatch fetchCurrentHotMovies(Set<String> completedSourceMovieIds) {
+        // 旧的单方法测试替身仍可用于回归；正式 NetStart 适配器会覆盖为按已完成身份恢复的影片批次。
+        return fetchForDailySync();
+    }
 
     /** 单项同时携带规范化查询键和 LIVE 内容封套，以便只替换对应的真实快照与缓存。 */
     record SynchronizedContent(ContentQuery query, ContentResult<List<? extends ContentItem>> result) { }

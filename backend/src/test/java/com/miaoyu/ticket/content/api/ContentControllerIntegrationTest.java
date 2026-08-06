@@ -100,8 +100,8 @@ class ContentControllerIntegrationTest {
     void shouldExposeSynchronizedLiveMovieWithBusinessIdAndGenreArray() throws Exception {
         LocalDateTime dataTime = LocalDateTime.of(2026, 8, 3, 8, 0);
         long movieId = persistence.ensureMovie(new ContentPersistencePort.MovieRow(9_000_001L, "live-movie-1",
-                "LIVE 测试片", "[\"剧情\",\"喜剧\"]", 100, new BigDecimal("8.8"), ContentSourceType.LIVE,
-                "NETSTART_MAOYAN", dataTime, dataTime.plusHours(6)));
+                "LIVE 测试片", "[\"剧情\",\"喜剧\"]", 100, new BigDecimal("8.8"), null, null, null, null,
+                ContentSourceType.LIVE, "NETSTART_MAOYAN", dataTime, dataTime.plusHours(6)));
         ContentQuery query = new ContentQuery(ContentResourceType.MOVIE, null, null, "LIVE 测试片");
         snapshots.save(query, new ContentResult<>(List.of(new MovieContent(movieId, "live-movie-1", "LIVE 测试片",
                 "[\"剧情\",\"喜剧\"]", 100, new BigDecimal("8.8"),

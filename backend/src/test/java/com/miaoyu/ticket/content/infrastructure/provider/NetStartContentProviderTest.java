@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -214,6 +215,31 @@ class NetStartContentProviderTest {
         assertThat(batch.attemptedCount()).isEqualTo(1);
         assertThat(batch.outcome())
                 .isEqualTo(com.miaoyu.ticket.content.application.LiveContentSyncPort.Outcome.CONNECTION_FAILED);
+    }
+
+    @Test
+    void givenMoreThanOneMinuteOfHotMovies_whenRecovering_thenItSkipsCompletedIdsAndUsesAtMostTenRequests()
+            throws Exception {
+        AtomicInteger calls = new AtomicInteger();
+        NetStartContentProvider provider = provider(query -> {
+            calls.incrementAndGet();
+            if (query.contentId() == null) {
+                return json("{\"movieList\":[{\"id\":1},{\"id\":2},{\"id\":3},{\"id\":4},"
+                        + "{\"id\":5},{\"id\":6},{\"id\":7},{\"id\":8},{\"id\":9},{\"id\":10},{\"id\":11}]}" );
+            }
+            return json("{\"detailMovie\":{\"id\":" + query.contentId()
+                    + ",\"nm\":\"测试片\",\"cat\":\"剧情\",\"dur\":\"90分钟\",\"sc\":\"8.0\"}}");
+        });
+
+        var batch = provider.fetchCurrentHotMovies(Set.of("1", "2"));
+
+        // 目录占一次请求，剩下九次只给未完成详情；已完成身份不会再次占用额度。
+        assertThat(calls).hasValue(10);
+        assertThat(batch.contents()).hasSize(9);
+        assertThat(batch.contents()).extracting(content -> ((MovieContent) content.result().data().getFirst())
+                .sourceMovieId()).doesNotContain("1", "2");
+        assertThat(batch.outcome()).isEqualTo(
+                com.miaoyu.ticket.content.application.LiveContentSyncPort.Outcome.SUCCESS);
     }
 
     @Test
