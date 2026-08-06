@@ -136,7 +136,8 @@ public class PersonalizedRecommendationQueryService {
             return java.util.Optional.of(new RankedRecommendationCandidate(
                     showtimeCandidate.movieId(), showtimeCandidate.cinemaId(), showtimeCandidate.showId(),
                     showtimeCandidate.price(), showtimeCandidate.startTime(), showtimeCandidate.endTime(), genres,
-                    movie.rating(), showtimeCandidate.availableSeatCount(), showtimeCandidate.source(), showtimeCandidate.dataAt(),
+                    movie.rating(), showtimeCandidate.availableSeatCount(), showtimeCandidate.source(),
+                    showtimeCandidate.dataAt(),
                     showtimeCandidate.expiresAt()));
         } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
             // 损坏内容资料不能降级为无类型影片，否则会绕过用户的类型和排除条件。
