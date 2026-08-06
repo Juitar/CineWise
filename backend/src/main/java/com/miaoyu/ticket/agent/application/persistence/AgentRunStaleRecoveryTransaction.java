@@ -73,7 +73,9 @@ public class AgentRunStaleRecoveryTransaction {
     }
 
     private static boolean isUnfinished(PlanNodeStatus status) {
-        return status == PlanNodeStatus.PENDING || status == PlanNodeStatus.RUNNING;
+        return status == PlanNodeStatus.PENDING
+                || status == PlanNodeStatus.WAITING_CONFIRMATION
+                || status == PlanNodeStatus.RUNNING;
     }
 
     private static AgentRunStep failedStep(AgentRunStep step, LocalDateTime now) {

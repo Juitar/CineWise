@@ -98,11 +98,12 @@ public final class ExecutionNodeState {
     }
 
     static ExecutionNodeState initial(ExecutionPlanNode node) {
-        // 计划节点的初始状态由校验器确定，状态机不在此处替换 PENDING 或确认标记。
+        // 确认节点只等待用户动作，不会被只读调度器自动开始。
         Objects.requireNonNull(node, "计划节点不能为空");
         return new ExecutionNodeState(
                 node.nodeId(),
-                node.status(),
+                node.type() == com.miaoyu.ticket.agent.domain.plan.PlanNodeType.CONFIRM_ACTION
+                        ? PlanNodeStatus.WAITING_CONFIRMATION : node.status(),
                 0,
                 0,
                 null,
@@ -114,7 +115,9 @@ public final class ExecutionNodeState {
 
     ExecutionNodeState start() {
         // 只有 PENDING 可开始，防止重复调用把同一个工具节点并发执行两次。
-        requireStatus(PlanNodeStatus.PENDING);
+        if (status != PlanNodeStatus.PENDING && status != PlanNodeStatus.WAITING_CONFIRMATION) {
+            throw new IllegalStateException("节点 " + nodeId + " 当前状态为 " + status + "，不能执行该操作");
+        }
         return new ExecutionNodeState(
                 nodeId,
                 PlanNodeStatus.RUNNING,

@@ -64,10 +64,12 @@ class AgentPersistenceModelTest {
     }
 
     @Test
-    void shouldRejectValuesOutsideV008StepStateRules() {
+    void shouldApplyV015ConfirmationStepStateRules() {
+        assertDoesNotThrow(
+                () -> step(PlanNodeType.CONFIRM_ACTION, PlanNodeStatus.WAITING_CONFIRMATION, false, null, null));
         assertThrows(
                 IllegalArgumentException.class,
-                () -> step(PlanNodeType.CONFIRM_ACTION, PlanNodeStatus.PENDING, false, null, null));
+                () -> step(PlanNodeType.COMPUTE, PlanNodeStatus.WAITING_CONFIRMATION, false, null, null));
         assertThrows(
                 IllegalArgumentException.class,
                 () -> step(PlanNodeType.COMPUTE, PlanNodeStatus.RUNNING, true, null, null));

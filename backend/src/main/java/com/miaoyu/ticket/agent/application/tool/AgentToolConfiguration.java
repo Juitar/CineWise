@@ -2,6 +2,7 @@ package com.miaoyu.ticket.agent.application.tool;
 
 import com.miaoyu.ticket.agent.application.model.ModelGateway;
 import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentService;
+import com.miaoyu.ticket.agent.application.run.MultiToolSupervisor;
 import com.miaoyu.ticket.agent.domain.plan.PlanSchemaValidator;
 import com.miaoyu.ticket.agent.domain.run.ExecutionPlanStateMachine;
 import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
@@ -28,7 +29,7 @@ public class AgentToolConfiguration {
      */
     @Bean
     public ToolRegistry agentToolRegistry() {
-        return new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan()));
+        return new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan(), AgentToolDefinitions.createOrder()));
     }
 
     /**
@@ -88,6 +89,22 @@ public class AgentToolConfiguration {
             ExecutionPlanStateMachine executionPlanStateMachine,
             RankMoviePlanExecutionAdapter rankMoviePlanExecutionAdapter) {
         return new MinimalReadOnlyAgentService(
+                modelGateway,
+                agentToolRegistry,
+                planSchemaValidator,
+                executionPlanStateMachine,
+                rankMoviePlanExecutionAdapter);
+    }
+
+    /** 多工具主控与既有最小流程并存，提交入口完成持久化重规划接入后切换到该 Bean。 */
+    @Bean
+    public MultiToolSupervisor multiToolSupervisor(
+            ModelGateway modelGateway,
+            ToolRegistry agentToolRegistry,
+            PlanSchemaValidator planSchemaValidator,
+            ExecutionPlanStateMachine executionPlanStateMachine,
+            RankMoviePlanExecutionAdapter rankMoviePlanExecutionAdapter) {
+        return new MultiToolSupervisor(
                 modelGateway,
                 agentToolRegistry,
                 planSchemaValidator,

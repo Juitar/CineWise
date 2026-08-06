@@ -185,7 +185,7 @@ public class AgentRunResultTransaction {
             case SUCCESS, SKIPPED -> AgentEventType.STEP_COMPLETE;
             case FAILED -> AgentEventType.STEP_FAILED;
             case RUNNING -> AgentEventType.STEP_START;
-            case PENDING -> null;
+            case PENDING, WAITING_CONFIRMATION -> null;
             default -> null;
         };
         if (type != null) {
@@ -203,7 +203,10 @@ public class AgentRunResultTransaction {
     }
 
     private static LocalDateTime startedAt(PlanNodeStatus status, LocalDateTime now) {
-        return status == PlanNodeStatus.PENDING || status == PlanNodeStatus.SKIPPED ? null : now;
+        return status == PlanNodeStatus.PENDING
+                        || status == PlanNodeStatus.WAITING_CONFIRMATION
+                        || status == PlanNodeStatus.SKIPPED
+                ? null : now;
     }
 
     private static LocalDateTime finishedAt(PlanNodeStatus status, LocalDateTime now) {
@@ -218,6 +221,10 @@ public class AgentRunResultTransaction {
             return AgentRunStatus.FAILED;
         }
         if (state.nodeStates().values().stream().anyMatch(node -> node.status() == PlanNodeStatus.RUNNING)) {
+            return AgentRunStatus.RUNNING;
+        }
+        if (state.nodeStates().values().stream()
+                .anyMatch(node -> node.status() == PlanNodeStatus.WAITING_CONFIRMATION)) {
             return AgentRunStatus.RUNNING;
         }
         if (state.nodeStates().values().stream().anyMatch(node -> node.status() == PlanNodeStatus.PENDING)) {

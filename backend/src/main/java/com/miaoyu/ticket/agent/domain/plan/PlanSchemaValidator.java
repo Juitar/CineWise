@@ -256,15 +256,30 @@ public final class PlanSchemaValidator {
                 continue;
             }
             validateToolInputs(node, definition, nodesById, context, issues);
-            if (!definition.readOnly()) {
-                // 当前基础执行器没有确认凭证和写入恢复语义，因此写工具不能混入候选计划。
+            if (!definition.readOnly() && !hasConfirmationDependency(node, nodesById, new HashSet<>())) {
+                // 写工具只允许在一个已校验确认节点之后等待；计划本身不能附带 actionId 或写键。
                 issues.add(issue(
-                        PlanValidationIssueCode.WRITE_TOOL_NOT_SUPPORTED,
+                        PlanValidationIssueCode.WRITE_TOOL_CONFIRMATION_REQUIRED,
                         node.nodeId(),
-                        "targetName",
-                        "当前基础计划不支持执行写工具"));
+                        "dependsOn",
+                        "写工具必须依赖确认节点"));
             }
         }
+    }
+
+    private static boolean hasConfirmationDependency(
+            CandidatePlanNode node, Map<String, CandidatePlanNode> nodesById, Set<String> visited) {
+        for (String dependencyId : node.dependsOn()) {
+            if (!visited.add(dependencyId)) {
+                continue;
+            }
+            CandidatePlanNode dependency = nodesById.get(dependencyId);
+            if (dependency != null && (dependency.type() == PlanNodeType.CONFIRM_ACTION
+                    || hasConfirmationDependency(dependency, nodesById, visited))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -425,7 +440,7 @@ public final class PlanSchemaValidator {
      * <p>所有节点从 PENDING 开始，确认节点只标记“需要确认”而不创建 actionId。确认动作、持久化和
      * 写工具执行属于后续能力，不能由计划转换阶段擅自补上。
      */
-    private static ExecutionPlan toExecutionPlan(CandidatePlan plan, SlotSnapshot slotSnapshot) {
+    private ExecutionPlan toExecutionPlan(CandidatePlan plan, SlotSnapshot slotSnapshot) {
         List<ExecutionPlanNode> nodes = plan.nodes().stream()
                 .map(node -> new ExecutionPlanNode(
                         node.nodeId(),
@@ -435,7 +450,11 @@ public final class PlanSchemaValidator {
                         node.dependsOn(),
                         node.failurePolicy(),
                         PlanNodeStatus.PENDING,
-                        node.type() == PlanNodeType.CONFIRM_ACTION,
+                        node.type() == PlanNodeType.CONFIRM_ACTION
+                                || (node.type() == PlanNodeType.CALL_TOOL
+                                && toolRegistry.find(node.targetName())
+                                        .map(definition -> !definition.readOnly())
+                                        .orElse(false)),
                         false,
                         null,
                         null,
