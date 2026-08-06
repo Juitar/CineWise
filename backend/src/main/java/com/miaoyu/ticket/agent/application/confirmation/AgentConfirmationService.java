@@ -14,6 +14,7 @@ import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.common.error.BusinessException;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -22,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import com.miaoyu.ticket.profile.application.ProfileBehaviorRecorder;
 
 /**
  * 确认动作的应用用例。
@@ -38,6 +40,7 @@ public final class AgentConfirmationService {
     private final CurrentUserAccessor currentUserAccessor;
     private final Clock clock;
     private final ConfirmationTransactionRunner transactionRunner;
+    private final ProfileBehaviorRecorder profileBehaviorRecorder;
     private final AgentConfirmationActionValidator validator = new AgentConfirmationActionValidator();
 
     @Autowired
@@ -48,9 +51,9 @@ public final class AgentConfirmationService {
             AgentConfirmationEventPublisher eventPublisher,
             CurrentUserAccessor currentUserAccessor,
             Clock clock,
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager, ProfileBehaviorRecorder profileBehaviorRecorder) {
         this(repository, factsProvider, createOrderToolAdapter, eventPublisher, currentUserAccessor, clock,
-                transactionRunner(transactionManager));
+                transactionRunner(transactionManager), profileBehaviorRecorder);
     }
 
     /** 单元测试不需要真实数据库事务；生产 Bean 始终使用上方构造器传入的 TransactionTemplate。 */
@@ -62,7 +65,20 @@ public final class AgentConfirmationService {
             CurrentUserAccessor currentUserAccessor,
             Clock clock) {
         this(repository, factsProvider, createOrderToolAdapter, eventPublisher, currentUserAccessor, clock,
-                directTransactionRunner());
+                directTransactionRunner(), null);
+    }
+
+    /** 定向测试可注入画像记录器；生产 Bean 使用带事务管理器的构造器。 */
+    public AgentConfirmationService(
+            AgentConfirmationActionRepository repository,
+            AgentConfirmationFactsProvider factsProvider,
+            CreateOrderToolAdapter createOrderToolAdapter,
+            AgentConfirmationEventPublisher eventPublisher,
+            CurrentUserAccessor currentUserAccessor,
+            Clock clock,
+            ProfileBehaviorRecorder profileBehaviorRecorder) {
+        this(repository, factsProvider, createOrderToolAdapter, eventPublisher, currentUserAccessor, clock,
+                directTransactionRunner(), profileBehaviorRecorder);
     }
 
     private AgentConfirmationService(
@@ -72,7 +88,7 @@ public final class AgentConfirmationService {
             AgentConfirmationEventPublisher eventPublisher,
             CurrentUserAccessor currentUserAccessor,
             Clock clock,
-            ConfirmationTransactionRunner transactionRunner) {
+            ConfirmationTransactionRunner transactionRunner, ProfileBehaviorRecorder profileBehaviorRecorder) {
         this.repository = Objects.requireNonNull(repository, "repository 不能为空");
         this.factsProvider = Objects.requireNonNull(factsProvider, "factsProvider 不能为空");
         this.createOrderToolAdapter = Objects.requireNonNull(createOrderToolAdapter, "createOrderToolAdapter 不能为空");
@@ -80,6 +96,7 @@ public final class AgentConfirmationService {
         this.currentUserAccessor = Objects.requireNonNull(currentUserAccessor, "currentUserAccessor 不能为空");
         this.clock = Objects.requireNonNull(clock, "clock 不能为空");
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner 不能为空");
+        this.profileBehaviorRecorder = profileBehaviorRecorder;
     }
 
     /** 确认 body 只有布尔值；其余值均由服务端受控上下文生成。 */
@@ -87,15 +104,20 @@ public final class AgentConfirmationService {
         long currentUserId = currentUserAccessor.requireCurrentUserId();
         ClaimResult claimResult = transactionRunner.execute(() -> claim(actionId, confirmed, currentUserId));
         if (!claimResult.shouldExecute()) {
+            if (claimResult.feedbackApplied()) {
+                recordRejected(claimResult.result().action());
+            }
             return claimResult.result();
         }
         AgentConfirmationAction winner = claimResult.result().action();
         ToolResult<CreateOrderToolResult> toolResult =
                 createOrderToolAdapter.execute(winner.actionId(), toolContext(winner, traceId), winner.command());
         AgentConfirmationAction completed = resultAction(winner, toolResult, now());
-        AgentConfirmationAction result = transactionRunner.execute(
-                () -> updateOrReadWinner(winner, completed).action());
-        return new AgentConfirmationResult(result, null, true);
+        CasUpdateResult saved = transactionRunner.execute(() -> updateOrReadWinner(winner, completed));
+        if (saved.applied() && saved.action().status() == AgentConfirmationActionStatus.SUCCEEDED) {
+            recordAccepted(saved.action());
+        }
+        return new AgentConfirmationResult(saved.action(), null, true);
     }
 
     /** 仅对结果未知动作使用原 action 写标识查询；本方法绝不调用 execute。 */
@@ -130,17 +152,17 @@ public final class AgentConfirmationService {
         AgentConfirmationValidationContext facts = factsProvider.load(action, currentUserId);
         AgentConfirmationValidationFailure failure = validator.validate(action, facts).orElse(null);
         if (failure != null) {
-            return new ClaimResult(failValidation(action, failure, facts.now()), false);
+            return new ClaimResult(failValidation(action, failure, facts.now()), false, false);
         }
         if (!confirmed) {
             AgentConfirmationAction rejected = action.reject(facts.now());
-            return new ClaimResult(new AgentConfirmationResult(
-                    updateOrReadWinner(action, rejected).action(), null, false), false);
+            CasUpdateResult saved = updateOrReadWinner(action, rejected);
+            return new ClaimResult(new AgentConfirmationResult(saved.action(), null, false), false, saved.applied());
         }
         AgentConfirmationAction claimed = action.claim(
                 AgentActionWriteIdentifiers.forAction(action.actionId()), facts.now());
         CasUpdateResult winner = updateOrReadWinner(action, claimed);
-        return new ClaimResult(new AgentConfirmationResult(winner.action(), null, false), winner.applied());
+        return new ClaimResult(new AgentConfirmationResult(winner.action(), null, false), winner.applied(), false);
     }
 
     private Optional<AgentConfirmationAction> refresh(String actionId, long currentUserId) {
@@ -216,6 +238,32 @@ public final class AgentConfirmationService {
         return LocalDateTime.now(clock);
     }
 
+    private void recordAccepted(AgentConfirmationAction action) {
+        if (profileBehaviorRecorder == null) {
+            return;
+        }
+        try {
+            profileBehaviorRecorder.recordPlanAccepted(action.actionId(), action.planId(), utcNow());
+        } catch (RuntimeException ignored) {
+            // 画像记录失败不能改变已保存的确认和订单结果。
+        }
+    }
+
+    private void recordRejected(AgentConfirmationAction action) {
+        if (profileBehaviorRecorder == null) {
+            return;
+        }
+        try {
+            profileBehaviorRecorder.recordPlanRejected(action.actionId(), action.planId(), utcNow());
+        } catch (RuntimeException ignored) {
+            // 画像记录失败不能改变已保存的确认结果。
+        }
+    }
+
+    private LocalDateTime utcNow() {
+        return LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+    }
+
     private static String requireTraceId(String traceId) {
         if (traceId == null || traceId.isBlank()) {
             throw new IllegalArgumentException("traceId 不能为空");
@@ -246,7 +294,7 @@ public final class AgentConfirmationService {
     private record CasUpdateResult(AgentConfirmationAction action, boolean applied) {
     }
 
-    private record ClaimResult(AgentConfirmationResult result, boolean shouldExecute) {
+    private record ClaimResult(AgentConfirmationResult result, boolean shouldExecute, boolean feedbackApplied) {
     }
 
     @FunctionalInterface
