@@ -3,9 +3,11 @@ import { history } from 'umi';
 import { OrderList } from '../../features/order-list/OrderList';
 import type { OrderSummaryItem } from '../../features/order-list/OrderList';
 import { useOrders } from '../../modules/order/transaction-hooks';
+import { useOrderContentDetails } from '../../modules/order/useOrderContentDetails';
 import { formatOrderDateTime } from '../../modules/order/formatters';
 import type { OrderStatus } from '../../modules/order/types';
 import { TransactionBackButton } from '../../features/transaction-back-button/TransactionBackButton';
+import { OrderContentNotice } from '../../features/order-content-notice/OrderContentNotice';
 import './index.css';
 
 /**
@@ -27,22 +29,35 @@ export default function OrdersPage() {
     [currentPage, selectedDate, selectedStatus],
   );
   const ordersQuery = useOrders(query);
-  const orders: OrderSummaryItem[] = (ordersQuery.data?.records ?? []).map((order) => ({
+  const records = ordersQuery.data?.records ?? [];
+  const content = useOrderContentDetails(
+    useMemo(() => records.map(({ movieId, cinemaId }) => ({ movieId, cinemaId })), [records]),
+  );
+  const orders: OrderSummaryItem[] = records.map((order) => ({
     orderId: order.orderId,
     orderNo: order.orderNo,
-    showTitle: '影片信息暂不可用',
+    showTitle: content.moviesById.get(order.movieId)?.title ?? '影片信息暂不可用',
     showId: order.showId,
     showTime: formatOrderDateTime(order.showStartTime),
     ticketCount: order.ticketCount,
     totalAmount: order.totalAmount,
     status: order.status,
     expireTime: order.expireTime,
+    posterUrl: content.moviesById.get(order.movieId)?.posterUrl,
+    cinemaName: content.cinemasById.get(order.cinemaId)?.name,
+    cinemaArea: content.cinemasById.get(order.cinemaId)?.area ?? undefined,
+    cinemaAddress: content.cinemasById.get(order.cinemaId)?.address ?? undefined,
   }));
 
   return (
     <div className="orders-page-wrapper">
       <div className="orders-page-content">
         <TransactionBackButton onBack={() => history.push('/')} label="返回首页" />
+        <OrderContentNotice
+          isLoading={content.isLoading}
+          hasUnavailableContent={content.hasUnavailableContent}
+          onRetry={content.refresh}
+        />
         <OrderList
           orders={orders}
           loading={ordersQuery.loading}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { history, useParams } from 'umi';
 import { message } from 'antd';
 import { OrderDetail } from '../../../features/order-detail/OrderDetail';
@@ -9,6 +9,8 @@ import {
 } from '../../../modules/order/transaction-hooks';
 import { formatOrderDateTime } from '../../../modules/order/formatters';
 import { TransactionBackButton } from '../../../features/transaction-back-button/TransactionBackButton';
+import { OrderContentNotice } from '../../../features/order-content-notice/OrderContentNotice';
+import { useOrderContentDetails } from '../../../modules/order/useOrderContentDetails';
 import './index.css';
 
 /**
@@ -21,6 +23,11 @@ export default function OrderDetailPage() {
   const cancellation = useCancelOrder(orderNo);
   const paymentQuery = usePaymentQuery(orderNo);
   const order = orderQuery.data;
+  const content = useOrderContentDetails(
+    useMemo(() => (order ? [{ movieId: order.movieId, cinemaId: order.cinemaId }] : []), [order]),
+  );
+  const movie = order ? content.moviesById.get(order.movieId) : undefined;
+  const cinema = order ? content.cinemasById.get(order.cinemaId) : undefined;
 
   const handleCancel = async () => {
     const cancelled = await cancellation.submit();
@@ -53,13 +60,22 @@ export default function OrderDetailPage() {
     <div className="order-detail-page-wrapper">
       <div className="order-detail-page-content">
         <TransactionBackButton onBack={() => history.push('/orders')} label="返回订单列表" />
+        <OrderContentNotice
+          isLoading={content.isLoading}
+          hasUnavailableContent={content.hasUnavailableContent}
+          onRetry={content.refresh}
+        />
         <OrderDetail
           orderNo={order?.orderNo ?? orderNo}
           status={order?.status ?? 'PENDING_PAYMENT'}
-          showTitle={order ? '影片信息暂不可用' : undefined}
+          showTitle={order ? (movie?.title ?? '影片信息暂不可用') : undefined}
           showId={order?.showId}
           showTime={formatOrderDateTime(order?.showStartTime)}
           seatLabels={order?.seatIds}
+          posterUrl={movie?.posterUrl}
+          cinemaName={cinema?.name}
+          cinemaArea={cinema?.area ?? undefined}
+          cinemaAddress={cinema?.address ?? undefined}
           ticketCount={order?.ticketCount ?? 0}
           unitPrice={order?.unitPrice ?? '0.00'}
           totalAmount={order?.totalAmount ?? '0.00'}
