@@ -42,4 +42,35 @@ public interface ProfilePreferencePersistenceMapper {
       """)
   int incrementVersion(
       @Param("userId") long userId, @Param("updatedAt") java.time.LocalDateTime updatedAt);
+
+  @Update(
+      """
+      UPDATE user_preference
+         SET version = version + 1, update_time = #{updatedAt}
+       WHERE user_id = #{userId} AND version = #{expectedVersion} AND deleted_at IS NULL
+      """)
+  int incrementVersionIfMatches(
+      @Param("userId") long userId,
+      @Param("expectedVersion") long expectedVersion,
+      @Param("updatedAt") java.time.LocalDateTime updatedAt);
+
+  @Update(
+      """
+      UPDATE user_preference
+         SET personalization_enabled = #{enabled}, version = version + 1, update_time = #{updatedAt}
+       WHERE user_id = #{userId} AND version = #{expectedVersion} AND deleted_at IS NULL
+      """)
+  int updatePersonalization(
+      @Param("userId") long userId,
+      @Param("expectedVersion") long expectedVersion,
+      @Param("enabled") boolean enabled,
+      @Param("updatedAt") java.time.LocalDateTime updatedAt);
+
+  @Update(
+      """
+      UPDATE user_preference
+         SET personalization_enabled = FALSE, version = version + 1, update_time = #{updatedAt}
+       WHERE user_id = #{userId} AND deleted_at IS NULL
+      """)
+  int disable(@Param("userId") long userId, @Param("updatedAt") java.time.LocalDateTime updatedAt);
 }

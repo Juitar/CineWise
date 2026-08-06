@@ -38,6 +38,11 @@ public class MybatisProfileBehaviorEventRepository implements ProfileBehaviorEve
     }
   }
 
+  @Override
+  public int cleanupBefore(LocalDateTime before, int limit) {
+    return mapper.cleanupBefore(before, limit);
+  }
+
   private Snapshot toSnapshot(ProfileBehaviorEventRow row) {
     return new Snapshot(
         row.eventId(),

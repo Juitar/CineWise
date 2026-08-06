@@ -18,6 +18,10 @@ public interface ProfileBehaviorEventRepository {
 
   void insert(NewEvent event);
 
+  default int cleanupBefore(LocalDateTime before, int limit) {
+    return 0;
+  }
+
   record NewEvent(
       long id,
       String eventId,
@@ -25,6 +29,8 @@ public interface ProfileBehaviorEventRepository {
       ProfileBehaviorEventType eventType,
       ProfileBehaviorTargetType targetType,
       String targetId,
+      Long orderId,
+      Long orderVersion,
       LocalDateTime occurredAt,
       LocalDateTime createdAt) { }
 

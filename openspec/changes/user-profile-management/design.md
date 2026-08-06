@@ -20,7 +20,7 @@
 
 ### 0. 当前实现基线
 
-当前代码已存在 C 提供的 `CurrentUserAccessor.requireCurrentUserId()`，D 的 REST 和应用服务只能通过它取得用户 ID；`ToolContext` 不携带用户 ID，画像工具仍须在认证线程内通过该访问器取身份；`ToolResult<T>` 已提供统一结果包装。当前没有 `profile` 生产实现，只有四层包骨架；也没有 C 的 `ProfileDataConsentQuery` 或撤回可靠通知实现。D 本轮只创建不依赖这些接口的领域类型、错误码和分层测试，不创建默认设置、不开放写入入口，也不提供任何“默认同意”的替代实现。
+当前代码已存在 C 提供的 `CurrentUserAccessor.requireCurrentUserId()`，D 的 REST 和应用服务只能通过它取得用户 ID；`ToolContext` 不携带用户 ID，画像工具仍须在认证线程内通过该访问器取身份；`ToolResult<T>` 已提供统一结果包装。画像模块现已包含本人标签/开关 REST、幂等写入、行为接收、摘要缓存、工具适配、撤回停用和分期清理。C 的正式 `ProfileDataConsentQuery` 与可靠撤回通知仍未接入，因此 D 提供的 fallback 一律返回未同意；生产写入不会因为接口缺失而默认放行。
 
 ### 1. 数据分为开关、标签和原始行为摘要
 
