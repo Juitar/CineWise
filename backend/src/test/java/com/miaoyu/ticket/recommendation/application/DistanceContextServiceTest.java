@@ -19,7 +19,8 @@ class DistanceContextServiceTest {
         DistanceContextService service = new DistanceContextService(users,
                 Clock.fixed(Instant.parse("2026-08-06T10:00:00Z"), ZoneOffset.UTC));
         var context = service.create("run-1");
-        assertThat(service.upload(context.distanceContextId(), new BigDecimal("112.938814"), new BigDecimal("28.228209"))).isTrue();
+        assertThat(service.upload(context.distanceContextId(), new BigDecimal("112.938814"),
+                new BigDecimal("28.228209"))).isTrue();
         assertThat(service.consume(context.distanceContextId(), "run-1")).isNotNull();
         assertThat(service.consume(context.distanceContextId(), "run-1")).isNull();
     }

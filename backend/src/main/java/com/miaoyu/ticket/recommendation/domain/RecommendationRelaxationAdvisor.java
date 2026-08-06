@@ -11,7 +11,9 @@ public final class RecommendationRelaxationAdvisor {
     /** 按类型、时间、预算顺序尝试移除单项条件；无有效替代候选则不建议放宽。 */
     public static Optional<RelaxationSuggestion> suggest(
             List<RankedRecommendationCandidate> candidates, RecommendationConstraints constraints, Clock clock) {
-        if (!RecommendationCandidateFilter.filter(candidates, constraints, clock).isEmpty()) return Optional.empty();
+        if (!RecommendationCandidateFilter.filter(candidates, constraints, clock).isEmpty()) {
+            return Optional.empty();
+        }
         if (!constraints.genres().isEmpty() || !constraints.excludedGenres().isEmpty()) {
             RecommendationConstraints relaxed = copy(constraints, List.of(), List.of(), constraints.timeFrom(),
                     constraints.timeTo(), constraints.latestEndTime(), constraints.budget());

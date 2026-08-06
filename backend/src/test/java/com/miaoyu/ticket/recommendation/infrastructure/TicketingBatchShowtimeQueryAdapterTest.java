@@ -22,12 +22,14 @@ class TicketingBatchShowtimeQueryAdapterTest {
         SaleableShowView show = new SaleableShowView(3L, 1L, 2L, new BigDecimal("39.90"), now.plusHours(2),
                 now.plusHours(4), "MOCK", "seed", now, now.plusMinutes(1), true, 20, 1, now);
         when(service.query(Mockito.any())).thenReturn(new SaleableShowBatchResult(List.of(show), true));
-        var result = new TicketingBatchShowtimeQueryAdapter(service).querySaleable(LocalDate.of(2026, 8, 6), Set.of(2L));
+        var result = new TicketingBatchShowtimeQueryAdapter(service).querySaleable(
+                LocalDate.of(2026, 8, 6), Set.of(2L));
         assertThat(result.truncated()).isTrue();
         assertThat(result.candidates()).singleElement().satisfies(candidate -> {
             assertThat(candidate.showId()).isEqualTo("3");
             assertThat(candidate.price()).isEqualByComparingTo("39.90");
-            assertThat(candidate.source()).isEqualTo("TICKETING:MOCK");
+            // 既保留 MOCK 大类，也保留 A 给出的 demo-seed 具体来源。
+            assertThat(candidate.source()).isEqualTo("TICKETING:MOCK:seed");
         });
     }
 }

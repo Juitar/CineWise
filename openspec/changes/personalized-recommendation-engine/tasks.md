@@ -17,17 +17,17 @@
 
 ## 3. 推荐指标
 
-- [ ] 3.1 D 实现推荐空方案率和降级率的最小指标；验证：可按算法版本、候选来源和缺失因素排查，日志与指标不含会话、认证信息或精确位置。
+- [x] 3.1 D 实现推荐空方案率和降级率的最小指标；验证：`RecommendationMetricsRecorderTest` 覆盖算法版本、候选来源和缺失因素标签过滤，`PersonalizedRecommendationQueryServiceTest` 覆盖最终结果写入指标；日志与指标不含会话、认证信息或精确位置。
 
 ## 4. 工具、调用方和回归
 
 - [ ] 4.1 D 在 B、D 确认后升级 `RankMoviePlanTool` 的类型化输入输出，并保持只读、无 SSE、无模型调用和无 Agent 持久化访问；验证：工具字段、错误码、`dataAt`、`expiresAt`、空方案和消费者夹具一致。
 - [ ] 4.2 B 完成工具注册、运行上下文传递、用户确认后的重新调用和固定 `PLAN_CARD` 发送；验证：B 的 Agent 测试覆盖正常方案、空方案、放宽建议、直线距离和过期数据，D 不修改 B 的运行/SSE 实现。
 - [ ] 4.3 C 完成方案展示消费和一次性定位授权；验证：来源、更新时间、过期、空方案、直线距离和拒绝定位状态均可正确展示，D 不修改 C 的公共请求层。
-- [ ] 4.4 D 完成内容类型、候选过滤、评分、降级和隐私回归；验证：覆盖正常、边界、重复查询和失败场景。
+- [x] 4.4 D 完成内容类型、候选过滤、评分、降级和隐私回归；验证：15 个 D 推荐定向测试覆盖正常、边界、重复查询、过期候选、空方案、降级、内容合并和位置单次消费，且不访问 A 的持久化层、B 的运行状态或精确位置持久化。
 
 ## 5. 验证与交付
 
 - [ ] 5.1 D 在 A 批准的 MySQL、Redis 环境完成限定验证；验证：使用测试专属业务 ID 与缓存键、Flyway 关闭、限定清理和无残留检查。
-- [ ] 5.2 D 执行 `backend\mvnw.cmd verify`、`openspec validate personalized-recommendation-engine --strict`、`git diff --check` 和变更范围核对；验证：未验证项明确到 A、B、C 或 D。
+- [x] 5.2 D 执行 `backend\mvnw.cmd verify`、`openspec validate personalized-recommendation-engine --strict`、`git diff --check` 和变更范围核对；验证：`verify`、严格 OpenSpec 校验和 `git diff --check` 均通过，未验证的真实环境与跨负责人事项明确到 A、B、C。
 - [ ] 5.3 D 准备独立分支 PR 说明；验证：列出 Owner 确认、迁移版本、验证结果、未确认项和不伪造票务事实的边界；用户明确要求后才提交、推送或创建 PR。

@@ -19,7 +19,9 @@ public record RecommendationEvidence(String field, String value, String source, 
     }
 
     private static String requireText(String value, String fieldName) {
-        if (value == null || value.isBlank()) throw new IllegalArgumentException(fieldName + " 不能为空");
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " 不能为空");
+        }
         return value;
     }
 }

@@ -38,13 +38,17 @@ public class DistanceContextService {
         Coordinate coordinate = new Coordinate(longitude, latitude);
         return contexts.computeIfPresent(contextId, (id, context) -> context.userId() == userId
                 && !context.expiresAt().isBefore(clock.instant()) && !context.used()
-                ? new Context(context.userId(), context.runId(), context.expiresAt(), coordinate, false) : context) != null;
+                ? new Context(context.userId(), context.runId(), context.expiresAt(), coordinate, false) : context)
+                != null;
     }
 
     /** 推荐工具只用可信 runId 消费坐标一次；没有上下文时调用方继续普通推荐。 */
     public Coordinate consume(String contextId, String runId) {
         Context context = contexts.remove(contextId);
-        if (context == null || !context.runId().equals(runId) || context.expiresAt().isBefore(clock.instant())) return null;
+        if (context == null || !context.runId().equals(runId)
+                || context.expiresAt().isBefore(clock.instant())) {
+            return null;
+        }
         return context.coordinate();
     }
 

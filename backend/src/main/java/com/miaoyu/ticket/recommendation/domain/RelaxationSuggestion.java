@@ -4,6 +4,8 @@ package com.miaoyu.ticket.recommendation.domain;
 public record RelaxationSuggestion(Factor factor, String message) {
     public enum Factor { GENRE, TIME, BUDGET }
     public RelaxationSuggestion {
-        if (factor == null || message == null || message.isBlank()) throw new IllegalArgumentException("放宽建议不能为空");
+        if (factor == null || message == null || message.isBlank()) {
+            throw new IllegalArgumentException("放宽建议不能为空");
+        }
     }
 }

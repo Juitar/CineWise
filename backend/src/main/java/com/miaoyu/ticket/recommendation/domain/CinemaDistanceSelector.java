@@ -24,15 +24,18 @@ public final class CinemaDistanceSelector {
         return cinemas.stream().filter(CoordinateCinema::hasCoordinate)
                 .map(cinema -> new DistanceCinema(cinema.cinemaId(), distance(origin, cinema)))
                 .filter(item -> maxDistanceMeters == null || item.distanceMeters() <= maxDistanceMeters)
-                .sorted(Comparator.comparingInt(DistanceCinema::distanceMeters).thenComparingLong(DistanceCinema::cinemaId))
+                .sorted(Comparator.comparingInt(DistanceCinema::distanceMeters)
+                        .thenComparingLong(DistanceCinema::cinemaId))
                 .limit(MAX_NEARBY_CINEMAS).toList();
     }
 
     private static int distance(Coordinate origin, CoordinateCinema cinema) {
         double latitudeDelta = Math.toRadians(cinema.latitude().doubleValue() - origin.latitude().doubleValue());
-        double longitudeDelta = Math.toRadians(cinema.longitude().doubleValue() - origin.longitude().doubleValue());
+        double longitudeDelta = Math.toRadians(
+                cinema.longitude().doubleValue() - origin.longitude().doubleValue());
         double a = Math.sin(latitudeDelta / 2) * Math.sin(latitudeDelta / 2)
-                + Math.cos(Math.toRadians(origin.latitude().doubleValue())) * Math.cos(Math.toRadians(cinema.latitude().doubleValue()))
+                + Math.cos(Math.toRadians(origin.latitude().doubleValue()))
+                * Math.cos(Math.toRadians(cinema.latitude().doubleValue()))
                 * Math.sin(longitudeDelta / 2) * Math.sin(longitudeDelta / 2);
         return (int) Math.round(EARTH_RADIUS_METERS * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
     }
@@ -44,7 +47,9 @@ public final class CinemaDistanceSelector {
             latitude = require(latitude, "latitude", new BigDecimal("-90"), new BigDecimal("90"));
         }
         private static BigDecimal require(BigDecimal value, String name, BigDecimal min, BigDecimal max) {
-            if (value == null || value.compareTo(min) < 0 || value.compareTo(max) > 0) throw new IllegalArgumentException(name + " 超出范围");
+            if (value == null || value.compareTo(min) < 0 || value.compareTo(max) > 0) {
+                throw new IllegalArgumentException(name + " 超出范围");
+            }
             return value;
         }
     }

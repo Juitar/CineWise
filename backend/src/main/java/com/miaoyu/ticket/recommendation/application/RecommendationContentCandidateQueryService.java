@@ -20,10 +20,12 @@ public class RecommendationContentCandidateQueryService {
 
     /** 返回影院 ID、展示名、坐标和内容时效；内容不可用由内容模块稳定报错，不伪装为空列表。 */
     public List<CinemaCandidate> listCinemas(String cityCode) {
-        var result = contentQueryService.query(new ContentQuery(ContentResourceType.CINEMA, null, cityCode, null));
+        var result = contentQueryService.query(
+                new ContentQuery(ContentResourceType.CINEMA, null, cityCode, null));
         return result.data().stream().map(CinemaContent.class::cast)
                 .filter(cinema -> cinema.cinemaId() != null)
-                .map(cinema -> new CinemaCandidate(cinema.cinemaId(), cinema.name(), cinema.longitude(), cinema.latitude(),
+                .map(cinema -> new CinemaCandidate(
+                        cinema.cinemaId(), cinema.name(), cinema.longitude(), cinema.latitude(),
                         result.source().name(), result.dataTime(), result.expiresAt(), result.expired()))
                 .toList();
     }

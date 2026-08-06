@@ -21,19 +21,37 @@ public final class RecommendationCandidateFilter {
         return candidates.stream().filter(candidate -> matches(candidate, constraints, clock)).toList();
     }
 
-    private static boolean matches(RankedRecommendationCandidate candidate, RecommendationConstraints constraints, Clock clock) {
+    private static boolean matches(
+            RankedRecommendationCandidate candidate, RecommendationConstraints constraints, Clock clock) {
         // 过期票务快照不能靠较高评分重新进入可购推荐。
-        if (!candidate.expiresAt().isAfter(clock.instant())) return false;
+        if (!candidate.expiresAt().isAfter(clock.instant())) {
+            return false;
+        }
         LocalDateTime start = LocalDateTime.ofInstant(candidate.startTime(), BUSINESS_ZONE);
         LocalDateTime end = LocalDateTime.ofInstant(candidate.endTime(), BUSINESS_ZONE);
-        if (!start.toLocalDate().equals(constraints.date())) return false;
-        if (constraints.movieId() != null && !constraints.movieId().equals(candidate.movieId())) return false;
-        if (constraints.cinemaId() != null && !constraints.cinemaId().equals(candidate.cinemaId())) return false;
-        if (!constraints.genres().isEmpty() && candidate.genres().stream().noneMatch(constraints.genres()::contains)) return false;
-        if (candidate.genres().stream().anyMatch(constraints.excludedGenres()::contains)) return false;
+        if (!start.toLocalDate().equals(constraints.date())) {
+            return false;
+        }
+        if (constraints.movieId() != null && !constraints.movieId().equals(candidate.movieId())) {
+            return false;
+        }
+        if (constraints.cinemaId() != null && !constraints.cinemaId().equals(candidate.cinemaId())) {
+            return false;
+        }
+        if (!constraints.genres().isEmpty()
+                && candidate.genres().stream().noneMatch(constraints.genres()::contains)) {
+            return false;
+        }
+        if (candidate.genres().stream().anyMatch(constraints.excludedGenres()::contains)) {
+            return false;
+        }
         if (constraints.timeFrom() != null && (start.toLocalTime().isBefore(constraints.timeFrom())
-                || start.toLocalTime().isAfter(constraints.timeTo()))) return false;
-        if (constraints.latestEndTime() != null && end.toLocalTime().isAfter(constraints.latestEndTime())) return false;
+                || start.toLocalTime().isAfter(constraints.timeTo()))) {
+            return false;
+        }
+        if (constraints.latestEndTime() != null && end.toLocalTime().isAfter(constraints.latestEndTime())) {
+            return false;
+        }
         return constraints.budget() == null || candidate.price().compareTo(constraints.budget()) <= 0;
     }
 }

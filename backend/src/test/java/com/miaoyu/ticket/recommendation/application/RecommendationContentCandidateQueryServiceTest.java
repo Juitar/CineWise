@@ -22,7 +22,8 @@ class RecommendationContentCandidateQueryServiceTest {
         CinemaContent cinema = new CinemaContent(2L, "source-2", "测试影院", "430100", "岳麓区", "测试路",
                 new BigDecimal("112.938814"), new BigDecimal("28.228209"));
         when(service.query(Mockito.any())).thenReturn(new ContentResult<>(List.of(cinema),
-                new ContentSource("NETSTART", ContentSourceType.LIVE), dataAt, dataAt.plusHours(1), false, false, null));
+                new ContentSource("NETSTART", ContentSourceType.LIVE), dataAt,
+                dataAt.plusHours(1), false, false, null));
         var candidates = new RecommendationContentCandidateQueryService(service).listCinemas("430100");
         assertThat(candidates).singleElement().satisfies(candidate -> {
             assertThat(candidate.cinemaId()).isEqualTo(2L);

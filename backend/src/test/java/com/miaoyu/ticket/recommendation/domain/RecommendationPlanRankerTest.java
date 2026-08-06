@@ -32,13 +32,37 @@ class RecommendationPlanRankerTest {
     @Test
     void createsNearestPlanFromDistanceContextResult() {
         RankedRecommendationCandidate first = candidate("1", "30.00", "8.0", "2026-08-06T11:00:00Z");
-        RankedRecommendationCandidate second = new RankedRecommendationCandidate("10", "21", "2", new BigDecimal("30.00"),
+        RankedRecommendationCandidate second = new RankedRecommendationCandidate(
+                "10", "21", "2", new BigDecimal("30.00"),
                 Instant.parse("2026-08-06T11:00:00Z"), Instant.parse("2026-08-06T13:00:00Z"), List.of("喜剧"),
-                new BigDecimal("8.0"), "TICKETING:MOCK", Instant.parse("2026-08-06T10:00:00Z"), Instant.parse("2026-08-06T12:00:00Z"));
-        RecommendationPlan plan = RecommendationPlanRanker.nearest(List.of(first, second), java.util.Map.of("20", 1800, "21", 900),
-                new RecommendationConstraints("430100", LocalDate.of(2026, 8, 6), 1, null, null, List.of(), null, null, null, null, List.of()), CLOCK);
+                new BigDecimal("8.0"), "TICKETING:MOCK", Instant.parse("2026-08-06T10:00:00Z"),
+                Instant.parse("2026-08-06T12:00:00Z"));
+        RecommendationPlan plan = RecommendationPlanRanker.nearest(
+                List.of(first, second), java.util.Map.of("20", 1800, "21", 900),
+                new RecommendationConstraints("430100", LocalDate.of(2026, 8, 6), 1, null, null,
+                        List.of(), null, null, null, null, List.of()), CLOCK);
         assertThat(plan.planType()).isEqualTo(RecommendationPlan.PlanType.NEAREST);
         assertThat(plan.cinemaId()).isEqualTo("21");
+    }
+
+    @Test
+    void keepsTheSamePlansForRepeatedQueriesAndExcludesExpiredCandidates() {
+        RecommendationConstraints constraints = new RecommendationConstraints("430100", LocalDate.of(2026, 8, 6),
+                1, null, null, List.of("喜剧"), null, null, null, null, List.of());
+        RankedRecommendationCandidate eligible = candidate("1", "30.00", "8.0", "2026-08-06T11:00:00Z");
+        Instant expiredStart = Instant.parse("2026-08-06T11:30:00Z");
+        RankedRecommendationCandidate expired = new RankedRecommendationCandidate(
+                "10", "20", "2", new BigDecimal("10.00"),
+                expiredStart, expiredStart.plusSeconds(7200), List.of("喜剧"), new BigDecimal("9.0"), "TICKETING:MOCK",
+                Instant.parse("2026-08-06T09:00:00Z"), Instant.parse("2026-08-06T10:00:00Z"));
+
+        List<RecommendationPlan> first = RecommendationPlanRanker.rank(List.of(eligible, expired), constraints, CLOCK);
+        List<RecommendationPlan> second = RecommendationPlanRanker.rank(List.of(eligible, expired), constraints, CLOCK);
+
+        // 重复查询不能因集合遍历顺序变化生成不同的 showId 或方案顺序。
+        assertThat(first).isEqualTo(second);
+        // 过期快照即使票价低、评分高，也不能作为可购买推荐返回。
+        assertThat(first).extracting(RecommendationPlan::showId).containsOnly("1");
     }
 
     private RankedRecommendationCandidate candidate(String showId, String price, String rating, String startText) {
