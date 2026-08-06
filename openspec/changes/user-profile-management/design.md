@@ -36,7 +36,7 @@
 
 `ProfileSummary` 只包含 `enabled`、`version`、`generatedAt` 和有效标签的类型、值、极性、权重、置信度、来源及更新时间。开关关闭时必须只返回 `enabled=false`，不得查询或返回任何长期标签。摘要不含原始行为、完整对话、邮箱、精确位置或内部持久化 ID。
 
-Redis 缓存键为 `profile:{userId}:v:{version}`。标签、开关、软删除和过期任务成功写入后删除该用户所有 `profile:{userId}:v:*` 键；Redis 异常视为缓存未命中，必须读取 MySQL，不得阻断用户操作。
+Redis 缓存键为 `profile:{userId}:v:{version}`，并设置有限 TTL。标签、开关、软删除和过期任务在同一 MySQL 事务中成功写入后必须推进 `user_preference.version`，使旧版本键立即不可达；随后删除该用户所有 `profile:{userId}:v:*` 键仅用于回收。Redis 删除失败不得影响正确性：后续查询按新版本键读取 MySQL 或新缓存，不得继续命中旧摘要。
 
 ### 3. 本人写入使用版本和幂等键
 

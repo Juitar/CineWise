@@ -22,13 +22,16 @@ class ProfileDecayJobTest {
   @Test
   void shouldDecayThirtyDayOldBehaviorTagWithVersionCondition() {
     RecordingRepository repository = new RecordingRepository(snapshot(31, 59, "0.800"));
+    RecordingPreferenceRepository preferences = new RecordingPreferenceRepository();
     RecordingCache cache = new RecordingCache();
-    ProfileDecayJob job = new ProfileDecayJob(repository, cache, Clock.fixed(NOW, ZoneOffset.UTC));
+    ProfileDecayJob job =
+        new ProfileDecayJob(repository, preferences, cache, Clock.fixed(NOW, ZoneOffset.UTC));
 
     assertThat(job.executeOnce()).isEqualTo(1);
     assertThat(repository.updatedWeight).isEqualByComparingTo("0.680");
     assertThat(repository.updatedStatus).isEqualTo(ProfileTagStatus.ACTIVE);
     assertThat(repository.expectedVersion).isEqualTo(7L);
+    assertThat(preferences.incrementedUserIds).containsExactly(12L);
     assertThat(cache.invalidatedUserIds).containsExactly(12L);
   }
 
@@ -36,23 +39,29 @@ class ProfileDecayJobTest {
   void shouldExpireAtOriginalBehaviorDeadlineAfterPriorDecayUpdatedTime() {
     // 已在第 60 天衰减过，所以 update_time 只有 30 天；仍必须在原行为的第 90 天过期。
     RecordingRepository repository = new RecordingRepository(snapshot(30, 0, "0.680"));
+    RecordingPreferenceRepository preferences = new RecordingPreferenceRepository();
     RecordingCache cache = new RecordingCache();
-    ProfileDecayJob job = new ProfileDecayJob(repository, cache, Clock.fixed(NOW, ZoneOffset.UTC));
+    ProfileDecayJob job =
+        new ProfileDecayJob(repository, preferences, cache, Clock.fixed(NOW, ZoneOffset.UTC));
 
     assertThat(job.executeOnce()).isEqualTo(1);
     assertThat(repository.updatedStatus).isEqualTo(ProfileTagStatus.EXPIRED);
     assertThat(cache.invalidatedUserIds).containsExactly(12L);
+    assertThat(preferences.incrementedUserIds).containsExactly(12L);
   }
 
   @Test
   void shouldKeepCacheWhenVersionConditionRejectsStaleDecayTask() {
     RecordingRepository repository = new RecordingRepository(snapshot(31, 59, "0.800"));
     repository.updateResult = false;
+    RecordingPreferenceRepository preferences = new RecordingPreferenceRepository();
     RecordingCache cache = new RecordingCache();
-    ProfileDecayJob job = new ProfileDecayJob(repository, cache, Clock.fixed(NOW, ZoneOffset.UTC));
+    ProfileDecayJob job =
+        new ProfileDecayJob(repository, preferences, cache, Clock.fixed(NOW, ZoneOffset.UTC));
 
     assertThat(job.executeOnce()).isZero();
     assertThat(cache.invalidatedUserIds).isEmpty();
+    assertThat(preferences.incrementedUserIds).isEmpty();
   }
 
   private static ProfileTagRepository.Snapshot snapshot(
@@ -149,6 +158,31 @@ class ProfileDecayJobTest {
     @Override
     public void invalidateUser(long userId) {
       invalidatedUserIds.add(userId);
+    }
+  }
+
+  private static final class RecordingPreferenceRepository implements ProfilePreferenceRepository {
+    private final java.util.ArrayList<Long> incrementedUserIds = new java.util.ArrayList<>();
+
+    @Override
+    public Optional<Snapshot> findByUserId(long userId) {
+      return Optional.empty();
+    }
+
+    @Override
+    public Optional<Snapshot> findByUserIdForUpdate(long userId) {
+      return Optional.empty();
+    }
+
+    @Override
+    public void insertDefault(long userId, LocalDateTime now) {
+      throw new UnsupportedOperationException("衰减任务不创建默认设置");
+    }
+
+    @Override
+    public boolean incrementVersion(long userId, LocalDateTime updatedAt) {
+      incrementedUserIds.add(userId);
+      return true;
     }
   }
 }

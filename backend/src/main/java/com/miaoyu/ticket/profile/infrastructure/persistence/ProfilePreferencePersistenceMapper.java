@@ -4,6 +4,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 /** user_preference 最小 SQL；同意校验和并发规则必须留在应用服务。 */
 @Mapper
@@ -32,4 +33,13 @@ public interface ProfilePreferencePersistenceMapper {
       ) VALUES (#{userId}, TRUE, 0, #{now}, #{now}, NULL)
       """)
   int insertDefault(@Param("userId") long userId, @Param("now") java.time.LocalDateTime now);
+
+  @Update(
+      """
+      UPDATE user_preference
+         SET version = version + 1, update_time = #{updatedAt}
+       WHERE user_id = #{userId} AND deleted_at IS NULL
+      """)
+  int incrementVersion(
+      @Param("userId") long userId, @Param("updatedAt") java.time.LocalDateTime updatedAt);
 }

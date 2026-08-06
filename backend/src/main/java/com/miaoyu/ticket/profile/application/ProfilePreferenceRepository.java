@@ -13,6 +13,12 @@ public interface ProfilePreferenceRepository {
   /** 仅在画像保存同意已校验后的事务内创建默认设置。 */
   void insertDefault(long userId, LocalDateTime now);
 
+  /**
+   * 标签内容变化必须推进持久化版本，使此前 Redis 摘要键立刻不可达。
+   * 返回 false 说明用户设置不存在或已删除，调用方必须回滚标签写入。
+   */
+  boolean incrementVersion(long userId, LocalDateTime updatedAt);
+
   record Snapshot(
       long userId, boolean personalizationEnabled, long version, LocalDateTime updatedAt) { }
 }
