@@ -73,7 +73,12 @@ A 静态复核的 V013 仅追加 `travel_task.cinema_id BIGINT NULL`，位于 `s
 ## Risks / Trade-offs
 
 - [A 的支付事件尚未实际发布] → 将事件消费和 A 的发布适配拆为独立任务，先用夹具验证 D 的幂等规则。
-- [真实天气、餐饮或高德配置未确定] → 默认 Demo Provider，响应明确 `source` 和 `degraded`，不伪造实时数据。
+- [高德天气] → 仅在 `AMAP_WEATHER_ENABLED=true`、`AMAP_WEATHER_KEY` 已配置且影院区域存在行政区码时调用 `https://restapi.amap.com/v3/weather/weatherInfo`；请求只传影院区域的行政区码和服务端密钥，不传用户位置、地址或路线。成功数据标记为 `AMAP_WEATHER`；缺 key、缺行政区码、超时、限流、非成功响应或字段不完整时继续走缓存、Demo 和不可用回退。
+- [真实餐饮或高德路线配置未确定] → 默认 Demo Provider，响应明确 `source` 和 `degraded`，不伪造实时数据。
+
+### 5.1 页面建议响应
+
+`TravelAdviceSnapshot` 内部仍可保存 `weather_json` 和 `advice_json`，但 REST 层负责转换为类型化 `TravelAdviceResponse`。对外统一使用 `weather` 对象、`advice` 数组、`source`、`dataAt`、`expiresAt`、`expired`、`degraded` 和 `fallbackType`；`dataAt` 映射内部 `data_time`，避免页面依赖表字段名。天气缺失不是接口失败：`weather=null` 时仍返回通用 `TRANSPORT` 建议和明确降级标识。旧字符串字段仅作兼容，C 页面不得消费。
 - [邮件 Provider 无法按键查询] → `UNKNOWN` 保留告警且不自动重发；演示 Mock 必须支持按 `deliveryKey` 查询。
 - [多实例定时任务重复执行] → 任务版本条件更新、通知唯一键与数据库约束共同防重，并做并发测试。
 - [位置泄露] → 路线数据不写持久化、缓存或日志，并在成功、失败和超时测试中扫描敏感字段。
