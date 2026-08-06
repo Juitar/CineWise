@@ -6,7 +6,7 @@
 
 ### Requirement: 支付成功必须幂等创建出行任务
 
-系统 SHALL 仅在 A 的支付事务成功提交后消费 `PaymentSucceededEvent`，并使用 `eventId` 去重、`travel_task.order_id` 唯一约束创建任务。待 A 确认的事件扩展增加 `String cinemaId`；其必须是可解析为正 `BIGINT` 的十进制字符串。D 不得读取 A 的 Entity、Mapper、Repository 或 Controller 补齐字段。
+系统 SHALL 仅在 A 的支付事务成功提交后消费 `PaymentSucceededEvent`，并使用 `eventId` 去重、`travel_task.order_id` 唯一约束创建任务。A 已确认事件扩展增加 `String cinemaId`；A 只产生完整匹配 `^[1-9][0-9]*$` 且数值不超过 Java `long` 正数上限 `9223372036854775807` 的值。D 仍必须防御校验该格式和数值范围，不得读取 A 的 Entity、Mapper、Repository 或 Controller 补齐字段。
 
 #### Scenario: 重复支付事件
 - **GIVEN** 同一 `orderId` 已存在出行任务
@@ -20,14 +20,14 @@
 - **THEN** D 不创建出行任务
 
 #### Scenario: 支付事件影院 ID 非法
-- **GIVEN** 支付成功事件的 `cinemaId` 缺失、为空、超出 `BIGINT` 或解析后不大于零
+- **GIVEN** 支付成功事件的 `cinemaId` 缺失、为空、含前导零、不完整匹配 `^[1-9][0-9]*$`、超出 `9223372036854775807` 或解析后不大于零
 - **WHEN** D 在事务提交后处理该事件或 A 调用 `ensureTask`
 - **THEN** D 不创建新任务，只输出包含 `eventId` 的受控错误
 - **AND** A 的后续 PAID 补偿可携带合法影院 ID 恢复，且不回滚已提交支付
 
 ### Requirement: 订单失效必须按版本取消任务
 
-系统 SHALL 消费 A 在退款完成后登记的 `OrderInvalidated`；待 A 确认的事件扩展与支付事件同步包含 `String cinemaId`，另含 `invalidReason`，MVP 固定为 `REFUNDED`。D 仅当事件的 `orderVersion` 不小于任务的订单版本时取消未结束任务，并将既有建议标记为只读过期。较旧事件 MUST 被忽略。
+系统 SHALL 消费 A 在退款完成后登记的 `OrderInvalidated`；已确认的事件扩展与支付事件同步包含 `String cinemaId`，另含 `invalidReason`，MVP 固定为 `REFUNDED`。其 `cinemaId` 使用与支付事件相同的 `^[1-9][0-9]*$` 和 Java `long` 正数范围；D 仍做防御校验。D 仅当事件的 `orderVersion` 不小于任务的订单版本时取消未结束任务，并将既有建议标记为只读过期。较旧事件 MUST 被忽略。
 
 #### Scenario: 新版本订单失效事件
 - **GIVEN** 存在未结束的出行任务
@@ -76,7 +76,14 @@
 
 ### Requirement: 出行迁移必须约束计数与终态清理时间
 
-A 分配 Flyway 版本后，迁移 MUST 为 `travel_task.order_version`、`travel_task.version`、`travel_task.retry_count`、`travel_notification_log.task_version` 和 `travel_notification_log.attempt_count` 设置非负 CHECK。待 A 确认的 V013 MUST 增加可空的 `travel_task.cinema_id BIGINT`，不建物理外键、默认值或回填，并以 CHECK 仅允许 `NULL` 或正数。迁移 MUST 保证 `travel_task` 的 `COMPLETED`、`CANCELLED`、`FAILED` 状态有 `closed_at`，其他状态没有 `closed_at`；`travel_notification_log` 的 `SENT`、`FAILED` 状态有 `resolved_at`，`PENDING`、`SENDING`、`UNKNOWN` 状态没有 `resolved_at`。
+A 分配 Flyway 版本后，迁移 MUST 为 `travel_task.order_version`、`travel_task.version`、`travel_task.retry_count`、`travel_notification_log.task_version` 和 `travel_notification_log.attempt_count` 设置非负 CHECK。V013 MUST 增加可空的 `travel_task.cinema_id BIGINT`，不建物理外键、默认值或回填，并明确使用 `CHECK (cinema_id IS NULL OR cinema_id > 0)`。迁移 MUST 保证 `travel_task` 的 `COMPLETED`、`CANCELLED`、`FAILED` 状态有 `closed_at`，其他状态没有 `closed_at`；`travel_notification_log` 的 `SENT`、`FAILED` 状态有 `resolved_at`，`PENDING`、`SENDING`、`UNKNOWN` 状态没有 `resolved_at`。
+
+#### Scenario: 按顺序发布路线终点能力
+
+- **GIVEN** V013 迁移、A/D 兼容代码和路线终点查询尚未全部完成
+- **WHEN** 发布相关能力
+- **THEN** A 先发布 V013，再部署 A/D 的兼容事件与任务处理代码
+- **AND** 仅在 V013 与兼容代码均验证通过后启用路线终点查询
 
 #### Scenario: 影院 ID CHECK 与历史兼容
 - **WHEN** MySQL 向 `travel_task.cinema_id` 写入 `0` 或负数

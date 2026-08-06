@@ -4,7 +4,7 @@
 
 ## What Changes
 
-- 在支付事务提交后的 `PaymentSucceededEvent` 消费端，按事件和订单双重幂等创建或恢复 `travel_task`；待 A 确认后，`PaymentSucceededEvent`、`OrderInvalidated` 增加 `String cinemaId`，D 写入拟由 V013 增加的 `travel_task.cinema_id`；订单失效时按版本取消任务。
+- 在支付事务提交后的 `PaymentSucceededEvent` 消费端，按事件和订单双重幂等创建或恢复 `travel_task`；A 已确认 `PaymentSucceededEvent`、`OrderInvalidated` 增加 `String cinemaId`，A 只产生完整匹配 `^[1-9][0-9]*$` 且不超过 Java `long` 正数上限 `9223372036854775807` 的值，D 仍做防御校验后写入拟由 V013 增加的 `travel_task.cinema_id`；订单失效时按版本取消任务。
 - 提供天气、确定性通用交通建议、建议快照和 EMAIL 提醒调度；外部数据失败时明确使用缓存、版本化 Demo 或省略天气事实，不影响电子票展示。
 - 提供用户主动发起的单条基础路线和简单周边餐饮查询；路线仅使用一次性位置或手动地点，不保存精确位置和路线几何。
 - 建立 `travel_task`、`travel_advice_snapshot`、`travel_notification_log` 的迁移、任务状态、通知恢复、Mock 与回归测试方案。
@@ -24,6 +24,6 @@
 ## Impact
 
 - 代码范围：`backend` 下新增 `travel` 模块的 api、application、domain、infrastructure 和对应测试；D 的 Provider、缓存、定时任务、Demo 资源和回归清单。
-- 数据范围：在已发布 V007 的 `travel_task` 上，待 A 确认以 V013 增加 `cinema_id BIGINT NULL`。该字段不建物理外键、不设默认值、不回填历史任务，且 CHECK 只允许 `NULL` 或正数；历史任务和退款先到且影院 ID 非法的取消墓碑可保留 `NULL`，路线查询明确不可用。
+- 数据范围：在已发布 V007 的 `travel_task` 上，以 V013 增加 `cinema_id BIGINT NULL`。该字段不建物理外键、不设默认值、不回填历史任务，并使用 `CHECK (cinema_id IS NULL OR cinema_id > 0)`；历史任务和退款先到且影院 ID 非法的取消墓碑可保留 `NULL`，路线查询明确不可用。
 - 跨模块：A 的 `PaymentSucceededEvent`、`OrderInvalidated` 和补偿调用；C 的 `EmailDeliveryPort`、当前用户和路线展示；B 的 `ToolContext`、`ToolResult<T>` 与只读工具注册。
 - 外部依赖：天气、餐饮 POI、高德路线服务未确认时使用版本化 Demo Provider；路线的精确起点与几何不写 MySQL、Redis、日志、画像、快照、URL 或 Agent 轨迹。

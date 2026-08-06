@@ -5,7 +5,7 @@
 - [x] 1.3 C 确认 `EmailDeliveryPort` 的 `deliveryKey` 发送/查询语义、Mock Provider 和已验证邮箱解析边界；验证：D 仅传 `recipientUserId`，重复键可查回原结果。
 - [x] 1.4 A 已正式分配 V007，并确认 `travel_task`、`travel_advice_snapshot`、`travel_notification_log` 的字段、索引、保留期、非负计数和终态时间 CHECK 及兼容方案；验证：记录 Owner 确认，未修改已发布迁移。
 - [x] 1.5 B、C、D 确认只读出行工具和卡片边界；验证：B 对话读取不创建任务、刷新快照、发送邮件或请求位置，C 只在用户主动操作时发起路线和餐饮请求。
-- [ ] 1.6 待 A 在本 PR 正式确认 `PaymentSucceededEvent`、`OrderInvalidated` 的 `String cinemaId` 字段、V013 的 `travel_task.cinema_id BIGINT NULL` 及 `NULL 或正数` CHECK；验证：A 的审查结论记录在 PR，字段不含用户位置、坐标或路线数据。
+- [ ] 1.6 A 已确认 `PaymentSucceededEvent`、`OrderInvalidated` 的 `String cinemaId` 字段、V013 的 `travel_task.cinema_id BIGINT NULL` 及 `CHECK (cinema_id IS NULL OR cinema_id > 0)`；待 V013 SQL、A/D 事件处理和测试实际完成后再勾选。字段不含用户位置、坐标或路线数据。
 
 ## 2. 任务、事件与数据基础
 
