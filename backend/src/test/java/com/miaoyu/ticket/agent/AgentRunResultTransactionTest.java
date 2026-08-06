@@ -263,6 +263,8 @@ class AgentRunResultTransactionTest {
         assertEquals("BUSINESS_INTENT", payload.path("type").asText());
         assertEquals("SELECT_SEATS", payload.path("payload").path("intent").asText());
         assertEquals("70001", payload.path("payload").path("businessRef").path("showId").asText());
+        assertEquals("101", payload.path("payload").path("businessRef").path("movieId").asText());
+        assertEquals("201", payload.path("payload").path("businessRef").path("cinemaId").asText());
     }
 
     private static MinimalReadOnlyAgentResult result(

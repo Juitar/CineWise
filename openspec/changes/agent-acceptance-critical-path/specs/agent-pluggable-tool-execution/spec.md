@@ -31,4 +31,4 @@
 
 #### Scenario: 选座走购票页
 - **WHEN** 场次结果已由工具校验且用户进入选座阶段
-- **THEN** Agent 输出 `card` + `BUSINESS_INTENT`/`SELECT_SEATS`，携带已确认的 `businessRef.showId`，不调用 `querySeats`
+- **THEN** Agent 输出 `card` + `BUSINESS_INTENT`/`SELECT_SEATS`，在 `businessRef` 中携带同一场次的 `showId`、`movieId`、`cinemaId`；三者均为无前导零、Java `long` 范围内的正十进制字符串；不调用 `querySeats`

@@ -36,7 +36,7 @@ B 已有候选计划、服务端计划校验、运行状态机、`ToolContext + 
 
 工具返回统一使用 `ToolResult`；参数错误沿用稳定参数错误码，下游未预期运行时异常由 B 适配层映射为 `CommonErrorCode.INTERNAL_ERROR`、`retryable=false`、`replanSuggested=false` 的失败结果。异常原文只进入受保护日志，不进入模型提示、SSE 或持久化载荷。
 
-`rankMoviePlan` 先迁移为该接口；A 的 `queryAvailableDates`、`queryShows` 已通过正式 `ticketing.api.*Tool.execute(ToolContext, Command)` 接入，B 只依赖其公开 Command/ToolResult，不访问 A 的 Application Service 内部实现。`querySeats` 不作为本 change 验收依赖，保留扩展注册位；选座由 `card` 事件中的 `BUSINESS_INTENT`/`SELECT_SEATS` 携带已确认 `showId`，前端跳转购票页后由 A 重新查询座位。`createOrder` 仅登记定义和确认后调用入口，普通主控不直接执行它。
+`rankMoviePlan` 先迁移为该接口；A 的 `queryAvailableDates`、`queryShows` 已通过正式 `ticketing.api.*Tool.execute(ToolContext, Command)` 接入，B 只依赖其公开 Command/ToolResult，不访问 A 的 Application Service 内部实现。`querySeats` 不作为本 change 验收依赖，保留扩展注册位；选座由 `card` 事件中的 `BUSINESS_INTENT`/`SELECT_SEATS` 携带已确认的 `showId`、`movieId`、`cinemaId`，前端跳转购票页后由 A 重新查询座位。三个字段必须是 JSON string，匹配 `^[1-9]\\d*$` 且能解析为正 Java `long`；缺失、前缀、前导零、零、负数、非数字和超范围值均不能生成选座卡片。`createOrder` 仅登记定义和确认后调用入口，普通主控不直接执行它。
 
 ### 3. 重规划只处理已执行的只读失败
 
@@ -44,7 +44,7 @@ B 已有候选计划、服务端计划校验、运行状态机、`ToolContext + 
 
 ### 4. SSE 事件使用既有持久化事件流
 
-工具执行前后写入 `TOOL_START`、`TOOL_COMPLETE` 或 `TOOL_ERROR`；历史 `TOOL_RESULT` 只保留读取兼容。回复映射为 `QUESTION`、`PLAN_CARD`、`PROGRESS`、`ERROR`；选座映射为 `card` 事件中的 `BUSINESS_INTENT` 卡片，内层 `intent=SELECT_SEATS`，`businessRef.showId` 必须来自已校验的场次结果。每个卡片保留 `planId`、`planVersion`、`nodeId` 和已过滤 payload，旧版本及未知类型沿用现有客户端安全降级。
+工具执行前后写入 `TOOL_START`、`TOOL_COMPLETE` 或 `TOOL_ERROR`；历史 `TOOL_RESULT` 只保留读取兼容。回复映射为 `QUESTION`、`PLAN_CARD`、`PROGRESS`、`ERROR`；选座映射为 `card` 事件中的 `BUSINESS_INTENT` 卡片，内层 `intent=SELECT_SEATS`，`businessRef` 必须包含来自同一已校验场次结果的 `showId`、`movieId`、`cinemaId`。持久化 JSON 工厂和 SSE 校验器都按 `^[1-9]\\d*$` 与正 Java `long` 范围拒绝非法值，不能只校验非空。每个卡片保留 `planId`、`planVersion`、`nodeId` 和已过滤 payload，旧版本及未知类型沿用现有客户端安全降级。
 
 `MultiToolSupervisorResult.NodeToolResult` 同时保留节点 ID 和目标名，持久化层按节点关联工具事件，不按重规划后的列表位置猜测旧结果属于哪个节点。
 
@@ -67,4 +67,4 @@ B 已有候选计划、服务端计划校验、运行状态机、`ToolContext + 
 - A：`queryAvailableDates`、`queryShows` 已合入 `dev`，成功结果现在提供 `dataAt`、`expiresAt`，B 的 Adapter 会拒绝缺少时效窗口的动态成功结果；当前代码和 `TicketingReadToolExecutionAdapterTest` 已验证该规则。
 - D：`RankMoviePlanTool` 已新增返回 `ToolResult<RecommendationPlanResult>` 的兼容公开入口，并保留旧 `execute`。D 的公开完整 Command 以 `cityCode/date/ticketCount` 为必填条件，`genres/excludedGenres` 以 JSON 数组文本传递；B 已切换到新入口和完整 Command。D 的成功、空结果、降级夹具确认名称、评分、距离和预计路程没有可靠来源时为 `null`；C 当前卡片 Schema 未包含这些字段，因此 B 只映射已确认字段。
 - D/B 合入顺序：D 保留兼容入口，B 已完成新结果适配；D 后续可以在独立改动中删除旧入口或将新入口改回 `execute`。B 不修改 D 推荐模块内部逻辑。
-- C：前端固定夹具已合入，统一消费 SSE 外层字段；选座使用 `card` + `BUSINESS_INTENT`，外层必须有 `planId`、`planVersion`、`nodeId`，卡片内必须有 `intent=SELECT_SEATS` 和 `businessRef.showId`。`tool.complete`、`tool.error` 字段已由 B 的后端夹具测试核对；本机 Node 版本不满足前端工程要求，前端 Vitest 待 Node 24 环境补跑。
+- C：选座使用 `card` + `BUSINESS_INTENT`，外层必须有 `planId`、`planVersion`、`nodeId`，卡片内必须有 `intent=SELECT_SEATS` 和完整的 `businessRef.showId/movieId/cinemaId`。C 使用 `/shows/{showId}/seats?movieId={movieId}&cinemaId={cinemaId}`，负责校验并编码 query 参数；B 不依赖页面 state、localStorage 或前端推断补齐 ID。

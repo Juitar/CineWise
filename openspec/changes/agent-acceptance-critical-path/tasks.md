@@ -22,6 +22,7 @@
 - [x] 4.1 补齐 `QUESTION`、`PLAN_CARD`、`PROGRESS`、`ERROR`、工具阶段事件，以及 `card` + `BUSINESS_INTENT/SELECT_SEATS` 的持久化映射；验证 SSE 映射测试。
 - [x] 4.2 C 的前端固定夹具已合入；B 已用后端 `AgentCFixtureContractTest` 和 SSE 持久化测试核对字段，并在 Node `v24.19.0` 环境运行前端 Vitest：89 个测试文件、426 项全部通过。
 - [x] 4.3 已根据 C 确认的统一外层字段、`businessRef.showId` 和工具事件字段调整 B 侧协议校验；前端投影测试仍由 C 负责。
+- [x] 4.4 修复 `SELECT_SEATS` 的 `businessRef`：强制输出并校验 `showId`、`movieId`、`cinemaId` 三个正 `long` 十进制字符串；更新 B 的持久化映射、夹具与定向测试。验证：`SelectSeatsReplyFactsTest`、`AgentPersistenceJsonFactoryTest`、`AgentCardEventValidatorTest`、`AgentRunResultTransactionTest`。
 
 ## 5. 验证与交付（B）
 

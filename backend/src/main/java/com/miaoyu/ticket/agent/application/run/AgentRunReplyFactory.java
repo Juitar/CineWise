@@ -94,20 +94,14 @@ public final class AgentRunReplyFactory {
                 continue;
             }
             for (QueryShowsToolResult.ShowItem show : shows.shows()) {
-                if (isPositiveDecimalId(show.showId())) {
-                    return new SelectSeatsReplyFacts(show.showId());
+                if (SelectSeatsReplyFacts.isPositiveLongDecimal(show.showId())
+                        && SelectSeatsReplyFacts.isPositiveLongDecimal(show.movieId())
+                        && SelectSeatsReplyFacts.isPositiveLongDecimal(show.cinemaId())) {
+                    return new SelectSeatsReplyFacts(show.showId(), show.movieId(), show.cinemaId());
                 }
             }
         }
         return null;
-    }
-
-    private static boolean isPositiveDecimalId(String value) {
-        try {
-            return value != null && Long.parseLong(value) > 0L;
-        } catch (NumberFormatException exception) {
-            return false;
-        }
     }
 
     @SuppressWarnings("unchecked")

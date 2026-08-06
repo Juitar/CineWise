@@ -9,7 +9,11 @@
 
 #### Scenario: 用户需要补充信息或选择座位
 - **WHEN** 服务端决定继续追问或等待座位选择
-- **THEN** SSE 输出类型分别为 `QUESTION` 或 `card`，选座卡片只包含 `planId`、`planVersion`、`nodeId` 和 `businessRef.showId` 等受控字段
+- **THEN** SSE 输出类型分别为 `QUESTION` 或 `card`；选座卡片外层包含 `planId`、`planVersion`、`nodeId`，内层为 `BUSINESS_INTENT`/`SELECT_SEATS`，并在 `payload.businessRef` 中包含 `showId`、`movieId`、`cinemaId`
+
+#### Scenario: 选座业务引用非法
+- **WHEN** `showId`、`movieId` 或 `cinemaId` 缺失、不是 JSON string、不匹配 `^[1-9]\\d*$`，或无法解析为正 Java `long`
+- **THEN** 系统拒绝该 `SELECT_SEATS` 卡片，不生成或转发不完整的业务引用
 
 #### Scenario: 模型或工具发生安全失败
 - **WHEN** 模型、计划校验或工具执行无法完成

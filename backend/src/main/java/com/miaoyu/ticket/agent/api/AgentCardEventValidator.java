@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * C 消费卡片前使用的固定协议校验器。
@@ -14,6 +15,7 @@ import java.util.List;
 public final class AgentCardEventValidator {
     private static final List<String> CARD_TYPES =
             List.of("TEXT", "QUESTION", "MOVIE_CARD", "PLAN_CARD", "BUSINESS_INTENT", "PROGRESS", "ERROR");
+    private static final Pattern POSITIVE_LONG_DECIMAL = Pattern.compile("[1-9]\\d*");
 
     private AgentCardEventValidator() {
     }
@@ -91,8 +93,25 @@ public final class AgentCardEventValidator {
         JsonNode nested = payload.path("payload");
         JsonNode businessRef = nested.path("businessRef");
         return hasPlanContext(event) && "SELECT_SEATS".equals(nested.path("intent").asText())
-                && required(businessRef, "showId")
+                && validPositiveLongDecimal(businessRef, "showId")
+                && validPositiveLongDecimal(businessRef, "movieId")
+                && validPositiveLongDecimal(businessRef, "cinemaId")
                 ? render("BUSINESS_INTENT") : rejected("SELECT_SEATS 卡片字段无效");
+    }
+
+    private static boolean validPositiveLongDecimal(JsonNode node, String field) {
+        if (!text(node, field)) {
+            return false;
+        }
+        String value = node.path(field).asText();
+        if (!POSITIVE_LONG_DECIMAL.matcher(value).matches()) {
+            return false;
+        }
+        try {
+            return Long.parseLong(value) > 0L;
+        } catch (NumberFormatException exception) {
+            return false;
+        }
     }
 
     /** 计划卡片只有携带当前计划标识和正版本号时，C 才能安全处理旧版本和续传。 */
