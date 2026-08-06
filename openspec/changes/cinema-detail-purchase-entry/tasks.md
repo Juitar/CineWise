@@ -10,7 +10,7 @@
 ## A：按影院查询和演示排期
 
 - [x] A 实现按 `cinemaId` 聚合未来 7 天 `ON_SALE` 且未开场场次的 Application 查询。
-- [ ] D 审查确认 `ContentPurchaseQueryPort` 的批量输入、`MovieSummary` 五个输出字段、缺失项排除和整体不可用返回空 Map 的规则；未取得 D 确认前不得勾选。
+- [x] D 已于 2026-08-06 审查确认 `ContentPurchaseQueryPort`：批量输入最多 100 个 ID，空输入返回空 Map，`MovieSummary` 固定输出五个字段，单项缺失只排除对应 ID，内容目录整体不可用抛出 `303004` 并由接口返回 HTTP 503。
 - [x] A 实现 `GET /api/v1/shows/available-movies?cinemaId=`、REST DTO、参数校验、统一错误映射和 OpenAPI。
 - [x] A 为至少一家已确认的长沙 LIVE 影院建立明确标记 `demo-seed` 的可重复 Mock 排期；不得覆盖非 `AVAILABLE` 座位。
 - [x] A 增加 H2 HTTP 契约测试和演示种子测试，覆盖聚合、排序、空数组、非法参数和种子幂等；真实 MySQL 集成仍待共享库验收。
