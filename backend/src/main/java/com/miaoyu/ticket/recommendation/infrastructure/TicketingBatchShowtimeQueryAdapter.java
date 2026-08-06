@@ -35,8 +35,8 @@ public class TicketingBatchShowtimeQueryAdapter implements RecommendationBatchSh
                 // dataType 说明数据大类；source 说明具体生成者，例如 demo-seed。
                 // 两者都要保留，避免把不同演示来源或未来真实来源混成同一种候选。
                 // 该字符串只用于来源展示和诊断，不能作为订单、座位或库存判断依据。
-                .map(show -> new RankedRecommendationCandidate(Long.toString(show.movieId()),
-                        Long.toString(show.cinemaId()), Long.toString(show.showId()), show.price(),
+                .map(show -> new RankedRecommendationCandidate(Long.toString(show.movieId()), null,
+                        Long.toString(show.cinemaId()), null, Long.toString(show.showId()), show.price(),
                         show.startTime().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toInstant(),
                         show.endTime().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toInstant(), List.of(), null,
                         show.availableSeatCount(),

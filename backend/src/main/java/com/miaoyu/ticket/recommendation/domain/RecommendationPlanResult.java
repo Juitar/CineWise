@@ -6,8 +6,17 @@ import java.util.Objects;
 
 /** 推荐计算的最终结果，空方案仍是正常业务结果而不是虚构场次。 */
 public record RecommendationPlanResult(
-        String algorithmVersion, List<RecommendationPlan> plans, List<String> missingFactors,
-        RelaxationSuggestion relaxationSuggestion, String source, Instant dataAt, Instant expiresAt, boolean degraded) {
+        String schemaVersion, String algorithmVersion, List<RecommendationPlan> plans, List<String> missingFactors,
+        RelaxationSuggestion relaxationSuggestion, boolean usedProfile, String source, Instant dataAt,
+        Instant expiresAt, boolean degraded) {
+    /** 兼容现有 D 推荐查询；新工具结果固定使用 schemaVersion=1.0。 */
+    public RecommendationPlanResult(String algorithmVersion, List<RecommendationPlan> plans,
+            List<String> missingFactors,
+            RelaxationSuggestion relaxationSuggestion, String source, Instant dataAt, Instant expiresAt,
+            boolean degraded) {
+        this("1.0", algorithmVersion, plans, missingFactors, relaxationSuggestion, false, source, dataAt, expiresAt,
+                degraded);
+    }
     public RecommendationPlanResult {
         if (algorithmVersion == null || algorithmVersion.isBlank() || source == null || source.isBlank()) {
             throw new IllegalArgumentException("版本和来源不能为空");

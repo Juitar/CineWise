@@ -64,6 +64,9 @@ class PersonalizedRecommendationQueryServiceTest {
         assertThat(result.plans()).singleElement().satisfies(plan -> {
             assertThat(plan.showId()).isEqualTo("30");
             assertThat(plan.price()).isEqualByComparingTo("39.90");
+            assertThat(plan.movieName()).isEqualTo("测试影片");
+            assertThat(plan.cinemaName()).isEqualTo("测试影院");
+            assertThat(plan.rating()).isEqualByComparingTo("8.6");
         });
         assertThat(registry.find("recommendation.result.total")
                 .tags("algorithm_version", "rec-mvp-1", "candidate_source", "ticketing", "missing_factor", "none")

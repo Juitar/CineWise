@@ -7,6 +7,7 @@ import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationCatalog;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationQueryService;
+import com.miaoyu.ticket.recommendation.domain.PurchaseCandidateValidator.PurchaseCandidate;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -68,5 +69,62 @@ class RankMoviePlanToolTest {
         assertThat(result.status()).isEqualTo(ToolStatus.FAILED);
         // 使用稳定的参数错误码，供 B 安全处理。
         assertThat(result.errorCode()).isEqualTo(100001);
+    }
+
+    /** 成功夹具：可购事实完整，展示名称等没有可靠来源时按规则留空。 */
+    @Test
+    void recommendationPlanFixtureSuccess() {
+        var tool = toolWith(List.of(new PurchaseCandidate("301", "101", "201", "39.90", NOW.plusSeconds(3600),
+                NOW.plusSeconds(7200), "TICKETING:MOCK")));
+
+        var result = tool.executeRecommendationPlan(context(), command());
+
+        assertThat(result.status()).isEqualTo(ToolStatus.SUCCESS);
+        assertThat(result.data().plans()).hasSize(1);
+        assertThat(result.data().plans().getFirst().movieName()).isNull();
+        assertThat(result.data().plans().getFirst().cinemaName()).isNull();
+        assertThat(result.data().plans().getFirst().estimatedTravelMinutes()).isNull();
+        assertThat(result.degraded()).isFalse();
+    }
+
+    /** 空结果夹具：查询成功但没有可购方案，不生成虚构卡片内容。 */
+    @Test
+    void recommendationPlanFixtureEmpty() {
+        var tool = toolWith(List.of());
+
+        var result = tool.executeRecommendationPlan(context(), command());
+
+        assertThat(result.status()).isEqualTo(ToolStatus.SUCCESS);
+        assertThat(result.data().plans()).isEmpty();
+        assertThat(result.data().missingFactors()).containsExactly("SHOWTIME");
+        assertThat(result.data().degraded()).isTrue();
+    }
+
+    /** 降级夹具：保留真实来源和时效，缺失的距离/路线字段不得被补造。 */
+    @Test
+    void recommendationPlanFixtureDegraded() {
+        var tool = toolWith(List.of());
+
+        var result = tool.executeRecommendationPlan(context(), command());
+
+        assertThat(result.status()).isEqualTo(ToolStatus.SUCCESS);
+        assertThat(result.data().plans()).isEmpty();
+        assertThat(result.data().degraded()).isTrue();
+        assertThat(result.data().source()).isEqualTo("FIXED_RECOMMENDATION");
+    }
+
+    private static RankMoviePlanTool toolWith(List<PurchaseCandidate> candidates) {
+        return new RankMoviePlanTool(new FixedRecommendationQueryService(
+                () -> new FixedRecommendationCatalog("fixed-rec-v1", "FIXED_RECOMMENDATION",
+                        ContentSourceType.MOCK, 360), query -> candidates, Clock.fixed(NOW, ZoneOffset.UTC)));
+    }
+
+    private static ToolContext context() {
+        return new ToolContext("run-1", "node-1", RankMoviePlanTool.TARGET_NAME, List.of(), 3_000L,
+                "trace-1", null, null, 2L);
+    }
+
+    private static RankMoviePlanCommand command() {
+        return new RankMoviePlanCommand("101", "201", LocalDate.of(2026, 8, 3), null, null);
     }
 }
