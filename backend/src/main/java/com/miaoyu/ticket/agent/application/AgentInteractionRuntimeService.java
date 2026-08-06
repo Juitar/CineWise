@@ -97,7 +97,8 @@ public class AgentInteractionRuntimeService {
                 slots, new PlanValidationContext(Map.of(), Map.of(), slots), 30_000L));
         var replay = replayService.replay(sessionId, cursor);
         return new StreamView(sessionId, submitted.snapshot().run().runId(), replay.reset(), replay.watermark(),
-                replay.events().stream().map(event -> event(event, submitted.snapshot().run().planVersion())).toList());
+                replay.events().stream().map(event -> event(event, submitted.snapshot().run().planId(),
+                        submitted.snapshot().run().planVersion())).toList());
     }
 
     /** 仅重放已经提交的事件，供当前 POST SSE 的安全失败分支使用。 */
@@ -105,7 +106,7 @@ public class AgentInteractionRuntimeService {
         var replay = replayService.replay(sessionId, cursor);
         String runId = replay.events().isEmpty() ? null : replay.events().get(replay.events().size() - 1).runId();
         return new StreamView(sessionId, runId, replay.reset(), replay.watermark(),
-                replay.events().stream().map(event -> event(event, null)).toList());
+                replay.events().stream().map(event -> event(event, null, null)).toList());
     }
 
     public RunView queryMyRun(String runId) {
@@ -120,12 +121,13 @@ public class AgentInteractionRuntimeService {
                         .map(step -> new StepView(step.nodeId(), step.nodeType().name(), step.status().name(),
                                 step.attemptCount(), step.autoSkipped(), step.recoveryPending() ? "RUNNING" : null))
                         .toList(),
-                view.events().stream().map(event -> event(event, view.run().planVersion())).toList());
+                view.events().stream().map(event -> event(event, view.run().planId(), view.run().planVersion())).toList());
     }
 
-    private EventView event(com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEvent event, Integer planVersion) {
+    private EventView event(com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEvent event, String planId,
+            Integer planVersion) {
         JsonNode payload = refreshConfirmationCard(event.type(), payload(event.payload().value()));
-        return new EventView(Long.toString(event.eventId()), event.sessionId(), event.runId(), planVersion,
+        return new EventView(Long.toString(event.eventId()), event.sessionId(), event.runId(), planId, planVersion,
                 nodeId(payload), event.type().wireValue(), displayText(event.type().wireValue()), payload,
                 time(event.createTime()));
     }
@@ -230,7 +232,8 @@ public class AgentInteractionRuntimeService {
     public record StepView(String nodeId, String nodeType, String status, int attemptCount, boolean autoSkipped,
             String recoveryHint) {
     }
-    public record EventView(String eventId, String sessionId, String runId, Integer planVersion, String nodeId,
+    public record EventView(String eventId, String sessionId, String runId, String planId, Integer planVersion,
+            String nodeId,
             String eventType, String displayText, JsonNode payload, OffsetDateTime occurredAt) {
     }
 }

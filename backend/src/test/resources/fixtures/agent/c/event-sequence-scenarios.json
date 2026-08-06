@@ -1,0 +1,5 @@
+{
+  "expiredCard": {"eventId":"60","eventType":"card","sessionId":"session-1","runId":"run-1","occurredAt":"2026-08-05T10:00:00+08:00","planId":"plan-1","planVersion":1,"nodeId":"render","displayText":"已过期","payload":{"type":"PLAN_CARD","title":"已过期","plans":[],"source":"recommendation","dataAt":"2026-08-05T09:00:00+08:00","expiresAt":"2026-08-05T09:05:00+08:00","degraded":false}},
+  "oldPlanVersion": {"eventId":"61","eventType":"card","sessionId":"session-1","runId":"run-1","occurredAt":"2026-08-05T10:00:01+08:00","planId":"plan-1","planVersion":1,"nodeId":"render","displayText":"旧方案","payload":{"type":"TEXT","text":"忽略旧版本"}},
+  "duplicateEventId": ["62", "62"], "eventGap": ["63", "65"], "resetThenResume": ["stream.reset:65", "66"]
+}

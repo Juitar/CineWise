@@ -215,7 +215,7 @@ class AgentControllerTest {
         when(runtimeService.submitAndReplay("session-1", "4fc7ae0d-1c05-4bc1-9ad8-c84b1c706925", "推荐电影",
                 "workspace", 0L)).thenReturn(new AgentInteractionRuntimeService.StreamView("session-1", "run-1",
                         false, 7L, List.of(new AgentInteractionRuntimeService.EventView("7", "session-1", "run-1",
-                                1, "rank-\"movie", "step.complete", "步骤已完成",
+                                "plan-1", 1, "rank-\"movie", "step.complete", "步骤已完成",
                                 objectMapper.readTree("{\"nodeId\":\"rank-\\\"movie\"}"),
                                 OffsetDateTime.parse("2026-08-05T10:00:01+08:00")))));
 
@@ -243,10 +243,10 @@ class AgentControllerTest {
         when(runtimeService.submitAndReplay("session-1", "4fc7ae0d-1c05-4bc1-9ad8-c84b1c706925", "推荐电影",
                 "workspace", 0L)).thenThrow(new AgentFailurePersistedException());
         var failedReplay = new AgentInteractionRuntimeService.StreamView("session-1", "run-1", false, 9L, List.of(
-                        new AgentInteractionRuntimeService.EventView("8", "session-1", "run-1", null, null,
+                        new AgentInteractionRuntimeService.EventView("8", "session-1", "run-1", null, null, null,
                                 "message.error", "本次请求未完成", objectMapper.readTree("{\"reason\":\"RUN_FAILED\"}"),
                                 OffsetDateTime.parse("2026-08-05T10:00:01+08:00")),
-                        new AgentInteractionRuntimeService.EventView("9", "session-1", "run-1", null, null,
+                        new AgentInteractionRuntimeService.EventView("9", "session-1", "run-1", null, null, null,
                                 "run.complete", "运行已结束", objectMapper.readTree("{\"status\":\"FAILED\"}"),
                                 OffsetDateTime.parse("2026-08-05T10:00:02+08:00"))));
         when(runtimeService.replayPersistedEvents("session-1", 0L)).thenReturn(failedReplay);

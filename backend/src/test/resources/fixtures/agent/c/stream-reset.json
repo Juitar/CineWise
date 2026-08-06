@@ -2,6 +2,7 @@
   "eventId": "43",
   "sessionId": "session-example-1",
   "runId": "run-example-1",
+  "planId": null,
   "planVersion": null,
   "nodeId": null,
   "eventType": "stream.reset",
