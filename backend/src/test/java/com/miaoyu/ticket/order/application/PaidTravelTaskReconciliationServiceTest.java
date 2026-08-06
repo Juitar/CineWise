@@ -66,6 +66,9 @@ class PaidTravelTaskReconciliationServiceTest {
         verify(travelService, org.mockito.Mockito.times(3)).ensureTask(events.capture());
         assertThat(events.getAllValues()).extracting(PaymentSucceededEvent::orderId)
                 .containsExactly("101", "102", "103");
+        assertThat(events.getAllValues()).extracting(PaymentSucceededEvent::cinemaId)
+                .containsExactly("30101", "30102", "30103")
+                .allMatch(cinemaId -> cinemaId.matches("[1-9][0-9]*"));
         assertThat(events.getAllValues()).extracting(PaymentSucceededEvent::occurredAt)
                 .extracting(java.time.OffsetDateTime::toLocalDateTime)
                 .containsExactly(first.paidAt(), second.paidAt(), third.paidAt());
@@ -182,6 +185,7 @@ class PaidTravelTaskReconciliationServiceTest {
     private TravelEventContextResolver.TravelEventContext context(long showId) {
         return new TravelEventContextResolver.TravelEventContext(
                 showId,
+                showId + 10_000L,
                 "西湖区",
                 WINDOW_END.plusHours(6));
     }

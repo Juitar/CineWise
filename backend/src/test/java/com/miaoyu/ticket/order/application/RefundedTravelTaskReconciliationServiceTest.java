@@ -67,6 +67,9 @@ class RefundedTravelTaskReconciliationServiceTest {
                 .containsExactly("301", "302", "303");
         assertThat(events.getAllValues()).extracting(OrderInvalidated::invalidReason)
                 .containsOnly("REFUNDED");
+        assertThat(events.getAllValues()).extracting(OrderInvalidated::cinemaId)
+                .containsExactly("30301", "30302", "30303")
+                .allMatch(cinemaId -> cinemaId.matches("[1-9][0-9]*"));
         assertThat(events.getAllValues()).extracting(OrderInvalidated::occurredAt)
                 .extracting(java.time.OffsetDateTime::toLocalDateTime)
                 .containsExactly(first.refundedAt(), second.refundedAt(), third.refundedAt());
@@ -186,6 +189,7 @@ class RefundedTravelTaskReconciliationServiceTest {
     private TravelEventContextResolver.TravelEventContext context(long showId) {
         return new TravelEventContextResolver.TravelEventContext(
                 showId,
+                showId + 10_000L,
                 "西湖区",
                 WINDOW_END.plusHours(6));
     }

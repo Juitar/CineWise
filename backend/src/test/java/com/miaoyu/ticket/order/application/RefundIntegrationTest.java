@@ -138,6 +138,8 @@ class RefundIntegrationTest {
             assertThat(event.eventId()).isNotBlank();
             assertThat(event.orderId()).isEqualTo(Long.toString(paidOrder.order().orderId()));
             assertThat(event.showId()).isEqualTo(Long.toString(paidOrder.order().showId()));
+            assertThat(event.cinemaId()).isEqualTo(Long.toString(cinemaId(paidOrder.order().showId())));
+            assertThat(event.cinemaId()).matches("[1-9][0-9]*");
             assertThat(event.userId()).isEqualTo(Long.toString(USER_A));
             assertThat(event.cinemaArea()).isNotBlank();
             assertThat(event.startAt().getOffset()).isEqualTo(ZoneOffset.ofHours(8));
