@@ -7,8 +7,7 @@ package com.miaoyu.ticket.agent.application.reply;
  * D 内部 DTO 的任意 Map。模型只需要展示事实，不应获得更宽的运行上下文。
  */
 public sealed interface AgentReplyPayload
-        permits ErrorReplyFacts, ProgressReplyFacts, QuestionReplyFacts,
-        RecommendationReplyFacts, SelectSeatsReplyFacts {
+        permits ErrorReplyFacts, ProgressReplyFacts, QuestionReplyFacts, RecommendationReplyFacts {
 
     /**
      * 判断当前载荷是否允许用于指定回复类型。

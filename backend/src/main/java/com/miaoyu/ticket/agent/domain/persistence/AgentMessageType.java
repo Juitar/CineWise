@@ -6,7 +6,6 @@ public enum AgentMessageType {
     QUESTION,
     MOVIE_CARD,
     PLAN_CARD,
-    SELECT_SEATS,
     PROGRESS,
     ERROR
 }

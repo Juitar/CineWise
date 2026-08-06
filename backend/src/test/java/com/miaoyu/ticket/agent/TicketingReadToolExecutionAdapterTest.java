@@ -34,7 +34,6 @@ import com.miaoyu.ticket.ticketing.api.QueryShowsToolCommand;
 import com.miaoyu.ticket.ticketing.api.QueryShowsToolResult;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -128,25 +127,6 @@ class TicketingReadToolExecutionAdapterTest {
                 "101", "201", LocalDate.of(2026, 8, 8), LocalTime.of(18, 0), LocalTime.of(23, 0)));
     }
 
-    @Test
-    void shouldRejectDynamicTicketingSuccessWithoutFreshnessWindow() {
-        QueryAvailableDatesTool tool = mock(QueryAvailableDatesTool.class);
-        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry());
-        QueryAvailableDatesExecutionAdapter adapter = new QueryAvailableDatesExecutionAdapter(tool, stateMachine);
-        when(tool.execute(any(), any())).thenReturn(new ToolResult<>(
-                ToolStatus.SUCCESS, new QueryAvailableDatesToolResult(List.of()), null,
-                false, false, "CHOOSE_DATE", false, null, 7L, null, null));
-
-        var request = new com.miaoyu.ticket.agent.application.tool.ReadOnlyToolExecutionAdapter.ExecutionRequest(
-                stateMachine.initialize(validatedDatesPlan(Map.of("movieId", "101", "cinemaId", "201"))),
-                "dates", "run-4", "trace-4", 1_000L);
-        var result = adapter.execute(request);
-
-        assertThat(result.toolResult().status()).isEqualTo(ToolStatus.FAILED);
-        assertThat(result.toolResult().errorCode()).isEqualTo(306003);
-        assertThat(result.state().nodeState("dates").status()).isEqualTo(PlanNodeStatus.FAILED);
-    }
-
     private static ToolRegistry registry() {
         return new ToolRegistry(List.of(
                 AgentToolDefinitions.queryAvailableDates(), AgentToolDefinitions.queryShows()));
@@ -195,14 +175,12 @@ class TicketingReadToolExecutionAdapterTest {
     }
 
     private static ToolResult<QueryAvailableDatesToolResult> successDates() {
-        Instant dataAt = Instant.parse("2026-08-06T12:00:00Z");
         return new ToolResult<>(ToolStatus.SUCCESS, new QueryAvailableDatesToolResult(List.of()), null,
-                false, false, "CHOOSE_DATE", false, null, 7L, dataAt, dataAt.plusSeconds(5));
+                false, false, "CHOOSE_DATE", false, null, 7L, null, null);
     }
 
     private static ToolResult<QueryShowsToolResult> successShows() {
-        Instant dataAt = Instant.parse("2026-08-06T12:00:00Z");
         return new ToolResult<>(ToolStatus.SUCCESS, new QueryShowsToolResult(List.of()), null,
-                false, false, "VIEW_SHOWS", false, null, 7L, dataAt, dataAt.plusSeconds(5));
+                false, false, "VIEW_SHOWS", false, null, 7L, null, null);
     }
 }

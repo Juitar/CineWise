@@ -20,20 +20,13 @@ public record MultiToolSupervisorResult(
     }
 
     /** 单个节点的安全结果关联，供持久化层映射状态而不依赖结果列表顺序。 */
-    public record NodeToolResult(String nodeId, String targetName, ToolResult<?> result) {
-        public NodeToolResult(String nodeId, ToolResult<?> result) {
-            this(nodeId, null, result);
-        }
-
+    public record NodeToolResult(String nodeId, ToolResult<?> result) {
         public NodeToolResult {
             if (nodeId == null || nodeId.isBlank()) {
                 throw new IllegalArgumentException("nodeId 不能为空");
             }
             if (result == null) {
                 throw new IllegalArgumentException("工具结果不能为空");
-            }
-            if (targetName != null && targetName.isBlank()) {
-                throw new IllegalArgumentException("targetName 不能为空白");
             }
         }
     }

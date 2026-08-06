@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
 import com.miaoyu.ticket.agent.application.reply.RecommendationReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.RecommendationReplyCandidate;
-import com.miaoyu.ticket.agent.application.reply.SelectSeatsReplyFacts;
 import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
 import com.miaoyu.ticket.agent.domain.plan.ExecutionPlanNode;
 import com.miaoyu.ticket.agent.domain.plan.InputReferenceSource;
@@ -55,16 +54,8 @@ public class AgentPersistenceJsonFactory {
 
     /** C 的卡片事件只携带已收窄的推荐事实；不写工具原始响应、座位或确认参数。 */
     public AgentStoredJson cardPayload(ReplyGenerationResponse reply) {
-        if (reply.payload() instanceof SelectSeatsReplyFacts) {
-            SelectSeatsReplyFacts facts = (SelectSeatsReplyFacts) reply.payload();
-            return write(Map.of(
-                    "type", "BUSINESS_INTENT",
-                    "payload", Map.of(
-                            "intent", "SELECT_SEATS",
-                            "businessRef", Map.of("showId", facts.showId()))));
-        }
         if (!(reply.payload() instanceof RecommendationReplyFacts facts)) {
-            throw new IllegalArgumentException("只有推荐或选座回复可以生成卡片事件");
+            throw new IllegalArgumentException("只有推荐回复可以生成卡片事件");
         }
         Map<String, Object> payload = new LinkedHashMap<>();
         boolean planCard = reply.messageType()
