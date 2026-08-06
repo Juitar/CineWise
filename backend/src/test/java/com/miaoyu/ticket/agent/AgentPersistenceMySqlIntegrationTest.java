@@ -536,7 +536,8 @@ class AgentPersistenceMySqlIntegrationTest {
     }
 
     private static PlanGenerationResponse invalidResult() {
-        CandidatePlan candidatePlan = new CandidatePlan("candidate-1", 1, List.of());
+        CandidatePlan candidatePlan = new CandidatePlan("candidate-1", 1, List.of(new CandidatePlanNode(
+                "invalid", PlanNodeType.CALL_TOOL, "unknownTool", List.of(), List.of(), FailurePolicy.FAIL)));
         return new PlanGenerationResponse(candidatePlan,
                 PlanValidationResult.invalid(List.of(new PlanValidationIssue(
                         PlanValidationIssueCode.TOOL_NOT_FOUND, "rank", "targetName", "ignored"))));
