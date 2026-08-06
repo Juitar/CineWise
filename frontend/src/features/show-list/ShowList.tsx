@@ -6,6 +6,7 @@ import type { ShowSummary } from '../../modules/ticketing/types';
 import './index.css';
 
 export type ShowItemUI = Omit<ShowSummary, 'startTime' | 'endTime'> & {
+  showDateText: string;
   startTimeText: string;
   endTimeText: string;
 };
@@ -100,6 +101,7 @@ export const ShowList: React.FC<ShowListProps> = ({
         return (
           <div key={show.showId} className="show-list-card">
             <div className="show-list-time-info">
+              <div className="show-list-date">{show.showDateText}</div>
               <div className="show-list-start-time">{show.startTimeText}</div>
               <div className="show-list-end-time">{show.endTimeText} 散场</div>
             </div>

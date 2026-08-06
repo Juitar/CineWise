@@ -1,5 +1,6 @@
 import React from 'react';
-import { Spin, Alert, Empty, Tabs, Pagination, Button, Tag, Input } from 'antd';
+import dayjs from 'dayjs';
+import { Spin, Alert, Empty, Tabs, Pagination, Button, Tag, DatePicker } from 'antd';
 import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
 import { ORDER_STATUS_LABELS } from '../../modules/order/status-presentation';
 import type { OrderStatus } from '../../modules/order/types';
@@ -83,8 +84,8 @@ export const OrderList: React.FC<OrderListProps> = ({
     }
   };
 
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onDateFilterChange?.(e.target.value);
+  const handleDateChange = (_date: dayjs.Dayjs | null, dateString: string | string[]) => {
+    onDateFilterChange?.(typeof dateString === 'string' ? dateString : '');
   };
 
   return (
@@ -105,11 +106,13 @@ export const OrderList: React.FC<OrderListProps> = ({
           <label htmlFor="order-date-filter" className="order-date-label">
             下单日期：
           </label>
-          <Input
+          <DatePicker
             id="order-date-filter"
-            type="date"
             className="order-date-input"
-            value={selectedDate}
+            value={selectedDate ? dayjs(selectedDate) : null}
+            format="YYYY-MM-DD"
+            placeholder=" "
+            allowClear
             onChange={handleDateChange}
             aria-label="按下单日期筛选订单"
           />

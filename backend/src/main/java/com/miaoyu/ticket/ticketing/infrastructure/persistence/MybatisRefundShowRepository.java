@@ -30,7 +30,11 @@ public class MybatisRefundShowRepository implements RefundShowRepository {
         if (row == null) {
             return Optional.empty();
         }
-        return Optional.of(new RefundShowContext(row.showId(), row.movieId(), row.startTime()));
+        return Optional.of(new RefundShowContext(
+                row.showId(),
+                row.movieId(),
+                row.cinemaId(),
+                row.startTime()));
     }
 
     @Override

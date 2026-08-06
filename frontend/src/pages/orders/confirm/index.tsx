@@ -16,6 +16,7 @@ import { formatOrderTime } from '../../../modules/order/formatters';
 import { buildOrderDetailPath, buildPaymentPath } from '../../../modules/order/routes';
 import { ApiError } from '../../../shared/api/ApiError';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
+import { TransactionBackButton } from '../../../features/transaction-back-button/TransactionBackButton';
 import './index.css';
 
 /**
@@ -213,6 +214,7 @@ export default function OrderConfirmPage() {
 
   return (
     <div className="confirm-page-container">
+      <TransactionBackButton onBack={handleReturnToSeats} label="返回选座" />
       <h1 className="confirm-page-title">确认订单信息</h1>
 
       {order ? (

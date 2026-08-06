@@ -43,6 +43,12 @@
   min-width: 80px;
 }
 
+.show-list-date {
+  font-size: 12px;
+  color: var(--color-text-secondary, #6b7280);
+  line-height: 1.4;
+}
+
 .show-list-start-time {
   font-size: 20px;
   font-weight: 600;

@@ -4,6 +4,7 @@ import { PaymentPanel } from '../../features/payment-panel/PaymentPanel';
 import { useOrder, usePaymentAction } from '../../modules/order/transaction-hooks';
 import { formatOrderDateTime } from '../../modules/order/formatters';
 import { usePaymentDeadline } from '../../modules/order/payment-deadline';
+import { TransactionBackButton } from '../../features/transaction-back-button/TransactionBackButton';
 import './index.css';
 
 /**
@@ -31,7 +32,14 @@ export default function PaymentPage() {
             : isOrderNotPayable
               ? 'ERROR'
               : 'NORMAL';
-  const paymentDeadline = usePaymentDeadline(orderQuery.data?.expireTime, status === 'NORMAL');
+  const refreshExpiredOrder = () => {
+    void orderQuery.refresh();
+  };
+  const paymentDeadline = usePaymentDeadline(
+    orderQuery.data?.expireTime,
+    status === 'NORMAL',
+    refreshExpiredOrder,
+  );
 
   const submitPayment = async () => {
     const payment = await paymentAction.submit();
@@ -48,22 +56,28 @@ export default function PaymentPage() {
   };
   return (
     <div className="payment-page-wrapper">
-      <PaymentPanel
-        orderNo={orderQuery.data?.orderNo ?? orderNo}
-        ticketCount={orderQuery.data?.ticketCount ?? 0}
-        totalAmount={orderQuery.data?.totalAmount ?? '0.00'}
-        showTime={formatOrderDateTime(orderQuery.data?.showStartTime)}
-        paymentDeadlineText={paymentDeadline.text}
-        status={status}
-        error={
-          paymentAction.error?.message ??
-          orderQuery.error?.message ??
-          (isOrderNotPayable ? '当前订单状态不可支付，请返回订单详情查看最新状态' : undefined)
-        }
-        onPay={() => void submitPayment()}
-        onQueryOrderResult={() => void queryPayment()}
-        onCancelPayment={() => history.push(`/orders/${encodeURIComponent(orderNo)}`)}
-      />
+      <div className="payment-page-content">
+        <TransactionBackButton
+          onBack={() => history.push(`/orders/${encodeURIComponent(orderNo)}`)}
+          label="返回订单详情"
+        />
+        <PaymentPanel
+          orderNo={orderQuery.data?.orderNo ?? orderNo}
+          ticketCount={orderQuery.data?.ticketCount ?? 0}
+          totalAmount={orderQuery.data?.totalAmount ?? '0.00'}
+          showTime={formatOrderDateTime(orderQuery.data?.showStartTime)}
+          paymentDeadlineText={paymentDeadline.text}
+          status={status}
+          error={
+            paymentAction.error?.message ??
+            orderQuery.error?.message ??
+            (isOrderNotPayable ? '当前订单状态不可支付，请返回订单详情查看最新状态' : undefined)
+          }
+          onPay={() => void submitPayment()}
+          onQueryOrderResult={() => void queryPayment()}
+          onCancelPayment={() => history.push(`/orders/${encodeURIComponent(orderNo)}`)}
+        />
+      </div>
     </div>
   );
 }

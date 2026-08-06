@@ -15,6 +15,7 @@ const mockShows: ShowItemUI[] = [
     cinemaName: 'Test Cinema',
     auditoriumId: 'a-1',
     auditoriumName: '1号厅',
+    showDateText: '2023-01-01',
     startTimeText: '10:00',
     endTimeText: '12:00',
     expiresAt: '2023-01-01T09:45:00Z',
@@ -33,6 +34,7 @@ const mockShows: ShowItemUI[] = [
     cinemaName: 'Test Cinema',
     auditoriumId: 'a-2',
     auditoriumName: '2号厅',
+    showDateText: '2023-01-01',
     startTimeText: '13:00',
     endTimeText: '15:00',
     expiresAt: '2023-01-01T12:45:00Z',
@@ -52,6 +54,7 @@ describe('ShowList 组件', () => {
     render(<ShowList shows={mockShows} />);
 
     expect(screen.getByText('10:00')).toBeInTheDocument();
+    expect(screen.getAllByText('2023-01-01')).toHaveLength(2);
     expect(screen.getByText('12:00 散场')).toBeInTheDocument();
     expect(screen.getByText('1号厅')).toBeInTheDocument();
     expect(screen.getByText('原版 2D')).toBeInTheDocument();

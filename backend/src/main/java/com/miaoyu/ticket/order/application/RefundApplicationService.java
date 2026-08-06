@@ -181,6 +181,7 @@ public class RefundApplicationService {
         RefundShowRepository.AlternativeShowCriteria criteria =
                 new RefundShowRepository.AlternativeShowCriteria(
                         originalShow.movieId(),
+                        originalShow.cinemaId(),
                         originalShow.showId(),
                         now,
                         range.dateFrom().atStartOfDay(),

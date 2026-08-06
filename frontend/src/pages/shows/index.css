@@ -6,6 +6,21 @@
   padding: 24px 16px;
 }
 
+.shows-breadcrumb {
+  margin-bottom: 20px;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 13px;
+}
+
+.shows-breadcrumb a {
+  color: var(--color-primary, #1677ff);
+}
+
+.shows-breadcrumb .current {
+  color: var(--color-text, #1f2937);
+  font-weight: 500;
+}
+
 .shows-page-header {
   margin-bottom: 24px;
 }
