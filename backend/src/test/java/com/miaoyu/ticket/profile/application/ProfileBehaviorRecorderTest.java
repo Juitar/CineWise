@@ -1,11 +1,13 @@
 package com.miaoyu.ticket.profile.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.auth.application.RoleCode;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
+import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.order.event.PaymentSucceededEvent;
 import com.miaoyu.ticket.profile.domain.ProfileBehaviorEventType;
 import com.miaoyu.ticket.profile.domain.ProfileBehaviorTargetType;
@@ -64,6 +66,69 @@ class ProfileBehaviorRecorderTest {
     assertThat(recorder.recordPayment(event)).isEqualTo(new ProfileBehaviorRecorder.RecordResult(true, false));
     assertThat(events.rows.getFirst().targetType()).isEqualTo(ProfileBehaviorTargetType.SHOW);
     assertThat(tags.inserted).isEmpty();
+  }
+
+  @Test
+  void shouldRecordAcceptedPlanAsMinimalPlanEvent() {
+    EventRepository events = new EventRepository();
+    ProfileBehaviorRecorder recorder = recorder(events, new TagRepository());
+
+    assertThat(recorder.recordPlanAccepted("feedback-accepted", "550e8400-e29b-41d4-a716-446655440000",
+        LocalDateTime.ofInstant(CLOCK.instant(), ZoneOffset.UTC)))
+        .isEqualTo(new ProfileBehaviorRecorder.RecordResult(true, false));
+    assertThat(events.rows).singleElement().satisfies(row -> {
+      assertThat(row.eventType()).isEqualTo(ProfileBehaviorEventType.ACCEPT_PLAN);
+      assertThat(row.targetType()).isEqualTo(ProfileBehaviorTargetType.PLAN);
+      assertThat(row.targetId()).isEqualTo("550e8400-e29b-41d4-a716-446655440000");
+      assertThat(row.changed()).isFalse();
+    });
+  }
+
+  @Test
+  void shouldRecordRejectedPlanAsMinimalPlanEvent() {
+    EventRepository events = new EventRepository();
+    ProfileBehaviorRecorder recorder = recorder(events, new TagRepository());
+
+    assertThat(recorder.recordPlanRejected("feedback-rejected", "550e8400-e29b-41d4-a716-446655440001",
+        LocalDateTime.ofInstant(CLOCK.instant(), ZoneOffset.UTC)))
+        .isEqualTo(new ProfileBehaviorRecorder.RecordResult(true, false));
+    assertThat(events.rows).singleElement().satisfies(row -> {
+      assertThat(row.eventType()).isEqualTo(ProfileBehaviorEventType.REJECT_PLAN);
+      assertThat(row.targetType()).isEqualTo(ProfileBehaviorTargetType.PLAN);
+      assertThat(row.changed()).isFalse();
+    });
+  }
+
+  @Test
+  void shouldReplayPlanFeedbackWithoutWritingAnotherEvent() {
+    EventRepository events = new EventRepository();
+    ProfileBehaviorRecorder recorder = recorder(events, new TagRepository());
+    String planId = "550e8400-e29b-41d4-a716-446655440002";
+    LocalDateTime occurredAt = LocalDateTime.ofInstant(CLOCK.instant(), ZoneOffset.UTC);
+
+    assertThat(recorder.recordPlanAccepted("feedback-replay", planId, occurredAt))
+        .isEqualTo(new ProfileBehaviorRecorder.RecordResult(true, false));
+    assertThat(recorder.recordPlanAccepted("feedback-replay", planId, occurredAt))
+        .isEqualTo(new ProfileBehaviorRecorder.RecordResult(true, false));
+    assertThat(events.rows).hasSize(1);
+  }
+
+  @Test
+  void shouldRejectInvalidPlanFeedbackBeforeWriting() {
+    EventRepository events = new EventRepository();
+    ProfileBehaviorRecorder recorder = recorder(events, new TagRepository());
+
+    assertThatThrownBy(() -> recorder.recordPlanAccepted("feedback-invalid", "model-plan-1",
+        LocalDateTime.ofInstant(CLOCK.instant(), ZoneOffset.UTC)))
+        .isInstanceOf(BusinessException.class)
+        .satisfies(exception -> assertThat(((BusinessException) exception).getErrorCode())
+            .isEqualTo(ProfileErrorCode.INVALID_EVENT));
+    assertThatThrownBy(() -> recorder.recordPlanRejected("feedback-invalid-time",
+        "550e8400-e29b-41d4-a716-446655440003", null))
+        .isInstanceOf(BusinessException.class)
+        .satisfies(exception -> assertThat(((BusinessException) exception).getErrorCode())
+            .isEqualTo(ProfileErrorCode.INVALID_EVENT));
+    assertThat(events.rows).isEmpty();
   }
 
   private static ProfileBehaviorRecorder recorder(EventRepository events, TagRepository tags) {
