@@ -21,9 +21,15 @@ public interface ContentSyncTaskPort {
     /** 只有仍为 PENDING 的记录可被一个随机持有者取得运行租约。 */
     boolean claimPending(long syncId, String leaseOwner, LocalDateTime leaseUntil, LocalDateTime now);
 
+    /** 存活持有者每二十秒延长租约；返回 false 表示已经失去写入资格。 */
+    boolean renewLease(long syncId, String leaseOwner, LocalDateTime leaseUntil, LocalDateTime now);
+
     /** 终态写入必须仍匹配未过期持有者，避免慢请求覆盖已经被恢复的任务。 */
     boolean finish(long syncId, String leaseOwner, SyncTaskStatus status, int totalCount, int successCount,
                    int failureCount, Integer errorCode, FailureCategory failureCategory, LocalDateTime finishedAt);
+
+    /** 只把已经真正过期的 RUNNING 任务收敛为失败，不重新调用 Provider。 */
+    int failExpiredRunningTasks(LocalDateTime now, int errorCode, FailureCategory failureCategory);
 
     /** 管理页面只读取已经脱敏的审计视图。 */
     List<SourceStatus> findLatestSourceStatuses();
@@ -35,8 +41,9 @@ public interface ContentSyncTaskPort {
 
     /** 管理来源列表不暴露 Provider 城市编号、租约持有者、请求标识或异常正文。 */
     record SourceStatus(String provider, String resourceType, String cityName, SyncTaskStatus status,
-                        LocalDateTime startedAt, LocalDateTime finishedAt, int successCount, int failureCount,
-                        FailureCategory failureCategory) { }
+                        LocalDateTime startedAt, LocalDateTime finishedAt, LocalDateTime lastSuccessAt,
+                        int successCount, int failureCount, FailureCategory failureCategory,
+                        LocalDateTime dataTime, LocalDateTime expiresAt) { }
 
     enum SyncTaskStatus { PENDING, RUNNING, SUCCESS, PARTIAL, FAILED }
 

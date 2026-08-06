@@ -58,6 +58,21 @@ class AdminContentSyncServiceTest {
                 .satisfies(error -> assertThat(((BusinessException) error).getErrorCode().code()).isEqualTo(100409));
     }
 
+    @Test
+    void givenExpiredRunningTask_whenQueried_thenItIsRecoveredAsInternalFailureWithoutProviderRetry() {
+        InMemoryTasks tasks = new InMemoryTasks();
+        tasks.task = new ContentSyncTaskPort.SyncTask(701L, "expired-request", "长沙", "70",
+                ContentSyncTaskPort.SyncTaskStatus.RUNNING, LocalDateTime.of(2026, 8, 6, 9, 0), null, 0, 0, null);
+        AdminContentSyncService service = service(tasks, LiveContentSyncPort.Outcome.SUCCESS, 1);
+
+        var recovered = service.queryByRequestId("expired-request");
+
+        // 查询原 requestId 会先收敛真正过期任务；绝不重新提交或调用 Provider。
+        assertThat(recovered.status()).isEqualTo(ContentSyncTaskPort.SyncTaskStatus.FAILED);
+        assertThat(recovered.failureCategory()).isEqualTo(ContentSyncTaskPort.FailureCategory.INTERNAL);
+        assertThat(tasks.recovered).hasValue(1);
+    }
+
     private AdminContentSyncService service(InMemoryTasks tasks, LiveContentSyncPort.Outcome outcome, int attempts) {
         ContentSyncService content = new ContentSyncService(
                 () -> new LiveContentSyncPort.DailySyncBatch(List.of(), attempts, outcome,
@@ -113,12 +128,27 @@ class AdminContentSyncServiceTest {
                     SyncTaskStatus.RUNNING, task.startedAt(), null, 0, 0, null);
             return true;
         }
+        @Override
+        public boolean renewLease(long syncId, String leaseOwner, LocalDateTime leaseUntil, LocalDateTime now) {
+            return task != null && task.syncId() == syncId && task.status() == SyncTaskStatus.RUNNING;
+        }
         @Override public boolean finish(long syncId, String leaseOwner, SyncTaskStatus status, int totalCount,
                                         int successCount, int failureCount, Integer errorCode,
                                         FailureCategory failureCategory, LocalDateTime finishedAt) {
             task = new SyncTask(task.syncId(), task.clientRequestId(), task.cityName(), task.providerCityId(), status,
                     task.startedAt(), finishedAt, successCount, failureCount, failureCategory);
             return true;
+        }
+        private final AtomicInteger recovered = new AtomicInteger();
+        @Override
+        public int failExpiredRunningTasks(LocalDateTime now, int errorCode, FailureCategory failureCategory) {
+            if (task == null || task.status() != SyncTaskStatus.RUNNING) {
+                return 0;
+            }
+            task = new SyncTask(task.syncId(), task.clientRequestId(), task.cityName(), task.providerCityId(),
+                    SyncTaskStatus.FAILED, task.startedAt(), now, 0, 0, failureCategory);
+            recovered.incrementAndGet();
+            return 1;
         }
         @Override public List<SourceStatus> findLatestSourceStatuses() { return List.of(); }
     }

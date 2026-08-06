@@ -5,10 +5,16 @@ import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ScheduledFuture;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 
 /**
@@ -25,15 +31,25 @@ public class AdminContentSyncService {
     private final CityResolutionService cityResolutionService;
     private final BusinessIdGenerator idGenerator;
     private final Clock clock;
+    private final ObjectProvider<TaskScheduler> taskSchedulerProvider;
 
+    @Autowired
     public AdminContentSyncService(ContentSyncService contentSyncService, ContentSyncTaskPort taskPort,
                                    CityResolutionService cityResolutionService, BusinessIdGenerator idGenerator,
-                                   Clock clock) {
+                                   Clock clock,
+                                   @Qualifier("taskScheduler") ObjectProvider<TaskScheduler> taskSchedulerProvider) {
         this.contentSyncService = contentSyncService;
         this.taskPort = taskPort;
         this.cityResolutionService = cityResolutionService;
         this.idGenerator = idGenerator;
         this.clock = clock;
+        this.taskSchedulerProvider = taskSchedulerProvider;
+    }
+
+    /** 测试构造器不启动后台续租，测试通过显式调用端口模拟租约边界。 */
+    AdminContentSyncService(ContentSyncService contentSyncService, ContentSyncTaskPort taskPort,
+                            CityResolutionService cityResolutionService, BusinessIdGenerator idGenerator, Clock clock) {
+        this(contentSyncService, taskPort, cityResolutionService, idGenerator, clock, null);
     }
 
     /**
@@ -44,6 +60,7 @@ public class AdminContentSyncService {
      */
     public SyncTaskView requestSync(String clientRequestId, String cityName) {
         validateRequest(clientRequestId, cityName);
+        recoverExpiredSyncTasks();
         ContentSyncTaskPort.SyncTask existing = taskPort.findByClientRequestId(clientRequestId).orElse(null);
         if (existing != null) {
             if (!existing.cityName().equals(cityName)) {
@@ -66,13 +83,25 @@ public class AdminContentSyncService {
         if (!taskPort.claimPending(pending.syncId(), leaseOwner, startedAt.plusSeconds(90), startedAt)) {
             return queryByRequestId(clientRequestId);
         }
-        ContentSyncService.CurrentHotMovieSyncResult result =
-                contentSyncService.synchronizeCurrentHotMoviesWithResult();
-        LocalDateTime finishedAt = now();
-        ContentSyncTaskPort.SyncTaskStatus status = taskStatus(result);
-        ContentSyncTaskPort.FailureCategory category = failureCategory(result.outcome());
-        taskPort.finish(pending.syncId(), leaseOwner, status, result.totalCount(), result.successCount(),
-                result.failureCount(), result.errorCode(), category, finishedAt);
+        ScheduledFuture<?> renewal = startLeaseRenewal(pending.syncId(), leaseOwner);
+        try {
+            ContentSyncService.CurrentHotMovieSyncResult result =
+                    contentSyncService.synchronizeCurrentHotMoviesWithResult();
+            LocalDateTime finishedAt = now();
+            ContentSyncTaskPort.SyncTaskStatus status = taskStatus(result);
+            ContentSyncTaskPort.FailureCategory category = failureCategory(result.outcome());
+            taskPort.finish(pending.syncId(), leaseOwner, status, result.totalCount(), result.successCount(),
+                    result.failureCount(), errorCodeOf(result, status), category, finishedAt);
+        } catch (RuntimeException exception) {
+            // 外部调用或内容持久化异常必须收敛为可查询终态，不能把 requestId 永久留在 RUNNING。
+            LocalDateTime failedAt = now();
+            taskPort.finish(pending.syncId(), leaseOwner, ContentSyncTaskPort.SyncTaskStatus.FAILED,
+                    0, 0, 0, 303004, ContentSyncTaskPort.FailureCategory.INTERNAL, failedAt);
+        } finally {
+            if (renewal != null) {
+                renewal.cancel(false);
+            }
+        }
         return queryByRequestId(clientRequestId);
     }
 
@@ -81,6 +110,7 @@ public class AdminContentSyncService {
         if (clientRequestId == null || clientRequestId.isBlank() || clientRequestId.length() > 64) {
             throw new BusinessException(CommonErrorCode.INVALID_PARAMETER, "clientRequestId不合法");
         }
+        recoverExpiredSyncTasks();
         return taskPort.findByClientRequestId(clientRequestId)
                 .map(this::viewOf)
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND, "同步请求不存在"));
@@ -88,6 +118,23 @@ public class AdminContentSyncService {
 
     /** 来源列表刻意只传递安全视图，避免 Controller 因新增字段意外泄漏内部城市编号或租约。 */
     public List<ContentSyncTaskPort.SourceStatus> sourceStatuses() { return taskPort.findLatestSourceStatuses(); }
+
+    /** 定时入口和查询入口共享同一恢复规则，保证没有管理员访问时也会收敛过期任务。 */
+    public int recoverExpiredSyncTasks() {
+        return taskPort.failExpiredRunningTasks(now(), 303004, ContentSyncTaskPort.FailureCategory.INTERNAL);
+    }
+
+    /** 存活同步每二十秒续到当前时间后九十秒；没有调度器时由 Provider 的短超时保证不会长期占用。 */
+    private ScheduledFuture<?> startLeaseRenewal(long syncId, String leaseOwner) {
+        TaskScheduler scheduler = taskSchedulerProvider == null ? null : taskSchedulerProvider.getIfAvailable();
+        if (scheduler == null) {
+            return null;
+        }
+        return scheduler.scheduleAtFixedRate(() -> {
+            LocalDateTime currentTime = now();
+            taskPort.renewLease(syncId, leaseOwner, currentTime.plusSeconds(90), currentTime);
+        }, Duration.ofSeconds(20));
+    }
 
     private void validateRequest(String clientRequestId, String cityName) {
         if (clientRequestId == null || clientRequestId.isBlank() || clientRequestId.length() > 64
@@ -110,12 +157,19 @@ public class AdminContentSyncService {
 
     private ContentSyncTaskPort.FailureCategory failureCategory(LiveContentSyncPort.Outcome outcome) {
         return switch (outcome) {
-            case SUCCESS, PROVIDER_DISABLED -> null;
+            case SUCCESS -> null;
+            case PROVIDER_DISABLED -> ContentSyncTaskPort.FailureCategory.INTERNAL;
             case CONNECTION_FAILED -> ContentSyncTaskPort.FailureCategory.NETWORK;
             case RATE_LIMITED -> ContentSyncTaskPort.FailureCategory.RATE_LIMIT;
             case UPSTREAM_FAILED -> ContentSyncTaskPort.FailureCategory.PROVIDER_RESPONSE;
             case FIELD_REJECTED -> ContentSyncTaskPort.FailureCategory.DATA_VALIDATION;
         };
+    }
+
+    private Integer errorCodeOf(ContentSyncService.CurrentHotMovieSyncResult result,
+                                ContentSyncTaskPort.SyncTaskStatus status) {
+        return status == ContentSyncTaskPort.SyncTaskStatus.SUCCESS ? null
+                : result.errorCode() == null ? 303004 : result.errorCode();
     }
 
     private SyncTaskView viewOf(ContentSyncTaskPort.SyncTask task) {

@@ -62,6 +62,20 @@ public class JdbcContentSyncTaskAdapter implements ContentSyncTaskPort {
                 """, leaseOwner, timestamp(leaseUntil), timestamp(now), syncId) == 1;
     }
 
+    /**
+     * 续租必须同时命中持有者和未过期租约。
+     *
+     * <p>返回零行说明任务已被恢复器收敛、被其他实例接管或租约已经到期。调用方必须丢弃后续响应，
+     * 不能以“网络请求先开始”为由覆盖较新的任务结果。</p>
+     */
+    @Override
+    public boolean renewLease(long syncId, String leaseOwner, LocalDateTime leaseUntil, LocalDateTime now) {
+        return jdbcTemplate.update("""
+                UPDATE data_sync_log SET lease_until = ?, update_time = ?
+                 WHERE id = ? AND status = 'RUNNING' AND lease_owner = ? AND lease_until > ?
+                """, timestamp(leaseUntil), timestamp(now), syncId, leaseOwner, timestamp(now)) == 1;
+    }
+
     /** 终态同时清空租约，计数关系仍由 V014 CHECK 再次校验。 */
     @Override
     public boolean finish(long syncId, String leaseOwner, SyncTaskStatus status, int totalCount, int successCount,
@@ -77,20 +91,47 @@ public class JdbcContentSyncTaskAdapter implements ContentSyncTaskPort {
                 syncId, leaseOwner, timestamp(finishedAt)) == 1;
     }
 
+    /**
+     * 进程退出后不会有持有者续租，恢复器只在租约确实过期时写固定 INTERNAL 失败。
+     *
+     * <p>该更新不重新访问 Provider；相同 clientRequestId 后续只能查询这个终态，避免管理员因结果未知
+     * 反复产生外部调用。V014 允许零计数 FAILED，满足“尚未取得候选即失败”的兼容形态。</p>
+     */
+    @Override
+    public int failExpiredRunningTasks(LocalDateTime now, int errorCode, FailureCategory failureCategory) {
+        return jdbcTemplate.update("""
+                UPDATE data_sync_log SET status = 'FAILED', error_code = ?, failure_category = ?,
+                finished_at = ?, lease_owner = NULL, lease_until = NULL, update_time = ?
+                 WHERE provider = ? AND resource_type = ? AND status = 'RUNNING' AND lease_until < ?
+                """, errorCode, failureCategory.name(), timestamp(now), timestamp(now), PROVIDER, RESOURCE_TYPE,
+                timestamp(now));
+    }
+
     /** 每个来源和城市只展示最新一条，保留失败也方便管理员判断是否需要新的请求标识。 */
     @Override
     public List<SourceStatus> findLatestSourceStatuses() {
         return jdbcTemplate.query("""
-                SELECT provider, resource_type, city_name, status, started_at, finished_at, success_count,
-                       failure_count, failure_category
+                SELECT l.provider, l.resource_type, l.city_name, l.status, l.started_at, l.finished_at,
+                       l.success_count, l.failure_count, l.failure_category,
+                       (SELECT MAX(s.finished_at) FROM data_sync_log s
+                         WHERE s.provider = l.provider AND s.resource_type = l.resource_type
+                           AND s.city_name <=> l.city_name AND s.status = 'SUCCESS') AS last_success_at,
+                       snapshot.data_time, snapshot.expire_time
                   FROM data_sync_log l
+                  LEFT JOIN (
+                    SELECT MAX(data_time) AS data_time, MAX(expire_time) AS expire_time
+                      FROM external_data_snapshot
+                     WHERE provider = 'CONTENT_SNAPSHOT' AND data_type = 'MOVIE'
+                       AND JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.source.name')) = 'NETSTART_MAOYAN'
+                  ) snapshot ON 1 = 1
                  WHERE id IN (SELECT MAX(id) FROM data_sync_log GROUP BY provider, resource_type, city_name)
                  ORDER BY started_at DESC
                 """, (rs, row) -> new SourceStatus(rs.getString("provider"), rs.getString("resource_type"),
                 rs.getString("city_name"), SyncTaskStatus.valueOf(rs.getString("status")),
                 time(rs.getTimestamp("started_at")), time(rs.getTimestamp("finished_at")),
-                rs.getInt("success_count"), rs.getInt("failure_count"),
-                optionalCategory(rs.getString("failure_category"))));
+                time(rs.getTimestamp("last_success_at")), rs.getInt("success_count"), rs.getInt("failure_count"),
+                optionalCategory(rs.getString("failure_category")), time(rs.getTimestamp("data_time")),
+                time(rs.getTimestamp("expire_time"))));
     }
 
     private static Timestamp timestamp(LocalDateTime value) { return Timestamp.valueOf(value); }

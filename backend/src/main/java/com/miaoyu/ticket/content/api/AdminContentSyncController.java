@@ -13,6 +13,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.Clock;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
@@ -37,8 +38,12 @@ import org.springframework.web.bind.annotation.RestController;
 @SecurityRequirement(name = "cookieAuth")
 public class AdminContentSyncController {
     private final AdminContentSyncService service;
+    private final Clock clock;
 
-    public AdminContentSyncController(AdminContentSyncService service) { this.service = service; }
+    public AdminContentSyncController(AdminContentSyncService service, Clock clock) {
+        this.service = service;
+        this.clock = clock;
+    }
 
     /** 返回按来源和城市汇总的最近同步状态，不返回内部城市编号、请求标识或租约。 */
     @GetMapping("/sources")
@@ -69,9 +74,11 @@ public class AdminContentSyncController {
 
     private SourceStatusResponse sourceResponse(ContentSyncTaskPort.SourceStatus status) {
         return new SourceStatusResponse(status.provider(), status.resourceType(), status.cityName(),
-                status.status().name(), offset(status.startedAt()), offset(status.finishedAt()), null,
+                status.status().name(), offset(status.startedAt()), offset(status.finishedAt()),
+                offset(status.lastSuccessAt()),
                 status.successCount(), status.failureCount(),
-                status.failureCategory() == null ? null : status.failureCategory().name(), null, null, false,
+                status.failureCategory() == null ? null : status.failureCategory().name(), offset(status.dataTime()),
+                offset(status.expiresAt()), isExpired(status.expiresAt()),
                 "NetStart 仅用于开发和演示学习，不代表票务实时数据或商业授权");
     }
 
@@ -83,6 +90,12 @@ public class AdminContentSyncController {
 
     private OffsetDateTime offset(LocalDateTime value) {
         return value == null ? null : value.atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime();
+    }
+
+    /** 时效值来自真实快照；没有快照时保持 null，绝不伪造“未过期”。 */
+    private boolean isExpired(LocalDateTime expiresAt) {
+        return expiresAt != null && expiresAt.isBefore(LocalDateTime.ofInstant(clock.instant(),
+                ClockConfiguration.BUSINESS_ZONE_ID));
     }
 
     /** 请求只包含幂等恢复标识和城市名；ci、地点文本、URL 与 Provider 参数均不接受。 */
