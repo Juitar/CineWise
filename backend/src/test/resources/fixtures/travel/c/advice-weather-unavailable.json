@@ -1,0 +1,1 @@
+{ "code": 0, "message": "success", "data": { "available": true, "taskId": "90001", "taskStatus": "READY", "weather": null, "advice": [ { "type": "TRANSPORT", "text": "请预留充足时间，优先选择公共交通并提前到场" } ], "source": "UNAVAILABLE", "dataAt": "2026-08-05T16:00:00+08:00", "expiresAt": "2026-08-05T17:00:00+08:00", "isExpired": false, "degraded": true, "fallbackType": "NO_WEATHER" } }
