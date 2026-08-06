@@ -40,7 +40,7 @@ A 在 ticketing 模块实现公开查询。查询窗口按 `Asia/Shanghai` 和�
 }
 ```
 
-`movieId` 为十进制字符串，`showCount` 为正整数，时间为带偏移 ISO 8601。结果按 `nearestStartTime` 升序、`movieId` 升序稳定排列。无匹配场次返回 HTTP 200 和 `movies=[]`。缺失、空白或格式非法的 `cinemaId` 返回 HTTP 400 / `100001`。
+`movieId` 为十进制字符串，`showCount` 为正整数，时间为带偏移 ISO 8601。结果按 `nearestStartTime` 升序、`movieId` 升序稳定排列。无匹配场次返回 HTTP 200 和 `movies=[]`。单个影片摘要缺失时只排除对应影片；内容目录整体不可用时保留 `303004` 并返回 HTTP 503，不能显示成无可售影片。缺失、空白或格式非法的 `cinemaId` 返回 HTTP 400 / `100001`。
 
 ## 真实影院和演示排期
 

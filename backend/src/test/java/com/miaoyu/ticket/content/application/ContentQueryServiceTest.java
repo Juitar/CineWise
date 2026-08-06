@@ -152,7 +152,7 @@ class ContentQueryServiceTest {
     }
 
     @Test
-    void givenMultipleMovieIds_whenFindingSummaries_thenItReadsTheCatalogOnce() {
+    void givenSomeMovieIdsMissing_whenFindingSummaries_thenItReturnsAvailableItemsFromOneCatalogRead() {
         AtomicInteger cacheFindCount = new AtomicInteger();
         ContentResult<List<? extends ContentItem>> catalog = new ContentResult<>(List.of(
                 new MovieContent(101L, "movie-101", "影片甲", "[\"剧情\"]", 100, new BigDecimal("8.0")),
@@ -181,6 +181,16 @@ class ContentQueryServiceTest {
         assertThat(summaries.get(101L).title()).isEqualTo("影片甲");
         assertThat(summaries.get(101L).contentSource()).isEqualTo("TEST");
         assertThat(summaries.get(101L).contentDataTime()).isEqualTo(NOW);
+    }
+
+    @Test
+    void givenContentCatalogUnavailable_whenFindingSummaries_thenItKeepsDataUnavailable303004() {
+        ContentQueryService service = service(Optional.empty(), Optional.empty(), Optional.empty());
+
+        assertThatThrownBy(() -> service.findMovieSummaries(Set.of(101L)))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo(303004);
     }
 
     @Test

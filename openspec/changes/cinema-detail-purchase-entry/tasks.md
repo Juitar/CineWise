@@ -38,7 +38,7 @@
 
 ## 本地验证记录
 
-- 后端全量：`mvn -DforkCount=0 verify` 通过，405 个测试，0 失败、0 错误、23 个可选环境测试跳过；Checkstyle 和 SpotBugs 均为 0 问题。
+- 后端全量：`mvn -DforkCount=0 verify` 通过，407 个测试，0 失败、0 错误、23 个可选环境测试跳过；Checkstyle 和 SpotBugs 均为 0 问题。
 - 后端新增能力：`ShowControllerIntegrationTest` 9 个测试通过；`DemoSeedInitializerTest` 3 个测试通过，其中长沙 LIVE 影院生成 2 个 Mock 影厅、42 个场次和 3360 个座位。
 - 前端全量：`pnpm check` 通过，72 个测试文件、285 个测试通过；格式、Lint、类型检查和生产构建检查全部通过。
 - 本地 HTTP：8081 的真实 Spring Boot + H2 进程成功返回影院详情、`available-movies` 和后续 `/shows`；首个影片返回 4 个 `ON_SALE`、`MOCK/demo-seed` 场次。

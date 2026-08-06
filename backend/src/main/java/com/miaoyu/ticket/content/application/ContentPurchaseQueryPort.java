@@ -17,8 +17,8 @@ public interface ContentPurchaseQueryPort {
     /**
      * 批量取得最多 100 个影片展示摘要。
      *
-     * <p>空输入返回空 Map；未找到或不可展示的 ID 不进入结果；内容目录整体不可用时返回空 Map，
-     * 由 A 排除所有缺失摘要的排期，不得补写标题或来源。</p>
+     * <p>空输入返回空 Map；未找到或不可展示的 ID 不进入结果，由 A 排除对应排期，不得补写标题或来源。
+     * 内容目录整体不可用时抛出业务码 303004，由公开接口返回 HTTP 503，不能伪装成影院没有可售影片。</p>
      */
     Map<Long, MovieSummary> findMovieSummaries(Set<Long> movieIds);
 

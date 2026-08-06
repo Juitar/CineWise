@@ -82,25 +82,21 @@ public class ContentQueryService implements ContentPurchaseQueryPort {
         if (movieIds.size() > 100) {
             throw new IllegalArgumentException("movieIds must not contain more than 100 items");
         }
-        try {
-            ContentResult<List<? extends ContentItem>> result = query(
-                    new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
-                            null, null, null));
-            Map<Long, MovieSummary> summaries = new LinkedHashMap<>();
-            result.data().stream()
-                    .map(MovieContent.class::cast)
-                    .filter(movie -> movie.movieId() != null && movieIds.contains(movie.movieId()))
-                    .sorted(java.util.Comparator.comparingLong(MovieContent::movieId))
-                    .forEach(movie -> summaries.put(movie.movieId(), new MovieSummary(
-                            movie.movieId(),
-                            movie.title(),
-                            movie.posterUrl(),
-                            result.source().name(),
-                            result.dataTime())));
-            return Map.copyOf(summaries);
-        } catch (BusinessException exception) {
-            return Map.of();
-        }
+        ContentResult<List<? extends ContentItem>> result = query(
+                new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
+                        null, null, null));
+        Map<Long, MovieSummary> summaries = new LinkedHashMap<>();
+        result.data().stream()
+                .map(MovieContent.class::cast)
+                .filter(movie -> movie.movieId() != null && movieIds.contains(movie.movieId()))
+                .sorted(java.util.Comparator.comparingLong(MovieContent::movieId))
+                .forEach(movie -> summaries.put(movie.movieId(), new MovieSummary(
+                        movie.movieId(),
+                        movie.title(),
+                        movie.posterUrl(),
+                        result.source().name(),
+                        result.dataTime())));
+        return Map.copyOf(summaries);
     }
 
     /**
