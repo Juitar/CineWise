@@ -15,9 +15,9 @@ import orderPagePayload from '../../../../backend/src/test/resources/fixtures/ti
 import paymentPayload from '../../../../backend/src/test/resources/fixtures/ticketing/c/payment-success.json';
 import refundPayload from '../../../../backend/src/test/resources/fixtures/ticketing/c/refund-success.json';
 
-function response(payload: unknown): Response {
+function response(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
-    status: 200,
+    status,
     headers: { 'Content-Type': 'application/json' },
   });
 }
@@ -102,4 +102,64 @@ describe('订单第二批 REST 契约', () => {
     );
     expect(request.body).not.toContain('actionId');
   });
+
+  it.each([
+    {
+      status: 403,
+      code: 201009,
+      message: '安全校验已失效，请重新操作',
+      traceId: 'refund-trace-403',
+      refreshCsrf: true,
+    },
+    {
+      status: 401,
+      code: 201006,
+      message: '登录状态已失效',
+      traceId: 'refund-trace-401',
+      refreshCsrf: false,
+    },
+    {
+      status: 409,
+      code: 204003,
+      message: '当前退款状态不允许重复申请',
+      traceId: 'refund-trace-409',
+      refreshCsrf: false,
+    },
+  ])(
+    '退款请求收到 $status/$code 且省略 data 时保留公共 ApiError',
+    async ({ status, code, message, traceId, refreshCsrf }) => {
+      fetchMock
+        .mockResolvedValueOnce(response(csrfPayload))
+        .mockResolvedValueOnce(response({ code, message, traceId }, status));
+      if (refreshCsrf) {
+        fetchMock.mockResolvedValueOnce(
+          response({
+            code: 0,
+            message: 'success',
+            data: { token: 'csrf-refreshed', headerName: 'X-XSRF-TOKEN' },
+            traceId: 'csrf-refreshed-trace',
+          }),
+        );
+      }
+
+      await expect(
+        createRefund(
+          'CW2084194500000000001',
+          { clientRequestId: 'refund-error-request', refundReason: '行程变化' },
+          'refund-error-key',
+        ),
+      ).rejects.toMatchObject({
+        name: 'ApiError',
+        kind: 'HTTP',
+        status,
+        code,
+        message,
+        traceId,
+      });
+
+      expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/refunds'))).toHaveLength(
+        1,
+      );
+    },
+  );
 });
