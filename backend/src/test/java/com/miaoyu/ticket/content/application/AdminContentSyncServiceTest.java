@@ -133,7 +133,8 @@ class AdminContentSyncServiceTest {
             return task != null && task.syncId() == syncId && task.status() == SyncTaskStatus.RUNNING;
         }
         @Override
-        public boolean holdsActiveLease(long syncId, String leaseOwner, LocalDateTime now) {
+        public boolean lockAndRenewActiveLease(long syncId, String leaseOwner, LocalDateTime leaseUntil,
+                                               LocalDateTime now) {
             return task != null && task.syncId() == syncId && task.status() == SyncTaskStatus.RUNNING;
         }
         @Override public boolean finish(long syncId, String leaseOwner, SyncTaskStatus status, int totalCount,

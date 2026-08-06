@@ -25,11 +25,12 @@ public interface ContentSyncTaskPort {
     boolean renewLease(long syncId, String leaseOwner, LocalDateTime leaseUntil, LocalDateTime now);
 
     /**
-     * 在资料真正写入前再次确认当前实例仍持有未过期租约。
+     * 在资料事务内条件续租并锁住任务行，返回 false 时调用方必须回滚资料事务。
      *
-     * <p>续租成功只说明某个时刻曾持有租约；慢 Provider 返回后仍要复核，避免已被恢复任务收敛或接管的旧 Worker 覆盖公开资料。</p>
+     * <p>这不是普通查询：成功后该行锁一直保留到当前资料事务提交或回滚。恢复任务因此不能在旧 Worker
+     * 写资料与提交之间插入 `FAILED`，避免任务终态和公开资料出现不一致。</p>
      */
-    boolean holdsActiveLease(long syncId, String leaseOwner, LocalDateTime now);
+    boolean lockAndRenewActiveLease(long syncId, String leaseOwner, LocalDateTime leaseUntil, LocalDateTime now);
 
     /** 终态写入必须仍匹配未过期持有者，避免慢请求覆盖已经被恢复的任务。 */
     boolean finish(long syncId, String leaseOwner, SyncTaskStatus status, int totalCount, int successCount,

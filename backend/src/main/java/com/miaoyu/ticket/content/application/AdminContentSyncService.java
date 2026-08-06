@@ -89,7 +89,7 @@ public class AdminContentSyncService {
         try {
             ContentSyncService.CurrentHotMovieSyncResult result =
                     contentSyncService.synchronizeCurrentHotMoviesWithResult(
-                            () -> holdsActiveLease(pending.syncId(), leaseOwner, leaseActive));
+                            () -> lockAndRenewActiveLease(pending.syncId(), leaseOwner, leaseActive));
             LocalDateTime finishedAt = now();
             ContentSyncTaskPort.SyncTaskStatus status = taskStatus(result);
             ContentSyncTaskPort.FailureCategory category = failureCategory(result.outcome());
@@ -144,9 +144,11 @@ public class AdminContentSyncService {
         }, Duration.ofSeconds(20));
     }
 
-    /** 本地标志减少失租后的无效查询，数据库条件查询处理定时器与恢复任务的竞争。 */
-    private boolean holdsActiveLease(long syncId, String leaseOwner, AtomicBoolean leaseActive) {
-        return leaseActive.get() && taskPort.holdsActiveLease(syncId, leaseOwner, now());
+    /** 资料事务内的条件续租同时取得任务行锁，直到该事务提交或回滚才允许恢复器继续。 */
+    private boolean lockAndRenewActiveLease(long syncId, String leaseOwner, AtomicBoolean leaseActive) {
+        LocalDateTime currentTime = now();
+        return leaseActive.get() && taskPort.lockAndRenewActiveLease(syncId, leaseOwner,
+                currentTime.plusSeconds(90), currentTime);
     }
 
     private void validateRequest(String clientRequestId, String cityName) {

@@ -76,14 +76,18 @@ public class JdbcContentSyncTaskAdapter implements ContentSyncTaskPort {
                 """, timestamp(leaseUntil), timestamp(now), syncId, leaseOwner, timestamp(now)) == 1;
     }
 
-    /** 只读复核必须同时匹配运行状态、持有者和未过期时间，不能仅按任务 ID 判断。 */
+    /**
+     * 条件 UPDATE 成功后由 InnoDB 持有排他行锁至外层资料事务结束。
+     *
+     * <p>恢复器的过期更新会等待这把锁；提交后它看到的是刚续期的租约，回滚后才可把真正过期任务收敛为失败。</p>
+     */
     @Override
-    public boolean holdsActiveLease(long syncId, String leaseOwner, LocalDateTime now) {
-        Integer matched = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM data_sync_log
+    public boolean lockAndRenewActiveLease(long syncId, String leaseOwner, LocalDateTime leaseUntil,
+                                           LocalDateTime now) {
+        return jdbcTemplate.update("""
+                UPDATE data_sync_log SET lease_until = ?, update_time = ?
                  WHERE id = ? AND status = 'RUNNING' AND lease_owner = ? AND lease_until > ?
-                """, Integer.class, syncId, leaseOwner, timestamp(now));
-        return matched != null && matched == 1;
+                """, timestamp(leaseUntil), timestamp(now), syncId, leaseOwner, timestamp(now)) == 1;
     }
 
     /** 终态同时清空租约，计数关系仍由 V014 CHECK 再次校验。 */
