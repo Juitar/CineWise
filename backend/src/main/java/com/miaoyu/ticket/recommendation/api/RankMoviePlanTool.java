@@ -53,12 +53,12 @@ public class RankMoviePlanTool {
     private final FixedRecommendationQueryService queryService;
     private final PersonalizedRecommendationQueryService personalizedQueryService;
 
-    @Autowired
     public RankMoviePlanTool(FixedRecommendationQueryService queryService) {
         this(queryService, null);
     }
 
     /** 新版完整条件查询；旧构造器保留给现有 B 测试和兼容入口。 */
+    @Autowired
     public RankMoviePlanTool(FixedRecommendationQueryService queryService,
             PersonalizedRecommendationQueryService personalizedQueryService) {
         this.queryService = queryService;
