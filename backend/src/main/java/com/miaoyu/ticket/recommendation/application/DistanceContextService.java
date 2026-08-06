@@ -56,12 +56,20 @@ public class DistanceContextService {
 
     /** 推荐工具只用可信 runId 消费坐标一次；没有上下文时调用方继续普通推荐。 */
     public Coordinate consume(String contextId, String runId) {
-        Context context = contexts.remove(contextId);
-        if (context == null || !context.runId().equals(runId)
-                || context.expiresAt().isBefore(clock.instant())) {
-            return null;
+        Context expected = contexts.get(contextId);
+        while (expected != null) {
+            // 先校验可信运行标识、时效和已上传坐标，错误调用不能删除合法上下文。
+            if (!expected.runId().equals(runId) || expected.expiresAt().isBefore(clock.instant())
+                    || !expected.used() || expected.coordinate() == null) {
+                return null;
+            }
+            // 只有校验通过的旧对象才能被原子移除；并发消费只能有一个请求拿到坐标。
+            if (contexts.remove(contextId, expected)) {
+                return expected.coordinate();
+            }
+            expected = contexts.get(contextId);
         }
-        return context.coordinate();
+        return null;
     }
 
     public record CreatedContext(String distanceContextId, Instant expiresAt) { }

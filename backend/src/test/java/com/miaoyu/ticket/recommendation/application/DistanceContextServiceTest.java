@@ -42,6 +42,9 @@ class DistanceContextServiceTest {
         when(users.requireCurrentUserId()).thenReturn(7L);
         assertThat(service.upload(ownerContext.distanceContextId(), new BigDecimal("112.938814"),
                 new BigDecimal("28.228209"))).isEqualTo(DistanceContextService.UploadResult.SUCCESS);
+        assertThat(service.consume(ownerContext.distanceContextId(), "wrong-run")).isNull();
+        assertThat(service.upload(ownerContext.distanceContextId(), new BigDecimal("112.900000"),
+                new BigDecimal("28.200000"))).isEqualTo(DistanceContextService.UploadResult.CONFLICT);
         assertThat(service.upload(ownerContext.distanceContextId(), new BigDecimal("113.000000"),
                 new BigDecimal("28.000000"))).isEqualTo(DistanceContextService.UploadResult.CONFLICT);
         var coordinate = service.consume(ownerContext.distanceContextId(), "run-owner");
