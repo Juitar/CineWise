@@ -6,12 +6,16 @@ import {
   FilmIcon,
   HomeIcon,
   MapPinIcon,
+  OrderIcon,
   UserIcon,
 } from '../../shared/components/icons/layout-icons';
+import { useAuth } from '../../shared/auth/AuthProvider';
 
 export const MobileTabBar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { currentUser, status } = useAuth();
+  const isAuthenticated = status === 'authenticated' && currentUser !== null;
 
   const setRouteActive = (value: string) => {
     navigate(value);
@@ -33,6 +37,15 @@ export const MobileTabBar: React.FC = () => {
       title: '影院',
       icon: <MapPinIcon size={24} />,
     },
+    ...(isAuthenticated
+      ? [
+          {
+            key: '/orders',
+            title: '订单',
+            icon: <OrderIcon size={24} />,
+          },
+        ]
+      : []),
     {
       key: '/profile',
       title: '我的',

@@ -151,6 +151,7 @@
   gap: 12px;
 }
 
+.profile-orders-link,
 .profile-privacy-link,
 .profile-logout-button {
   display: inline-flex;
@@ -165,6 +166,7 @@
   text-decoration: none;
 }
 
+.profile-orders-link,
 .profile-privacy-link {
   color: #635bff;
   background: #fff;
@@ -178,6 +180,8 @@
   cursor: pointer;
 }
 
+.profile-orders-link:hover,
+.profile-orders-link:focus-visible,
 .profile-privacy-link:hover,
 .profile-privacy-link:focus-visible {
   color: #4f46d8;
@@ -191,6 +195,7 @@
   border-color: #d92d20;
 }
 
+.profile-orders-link:focus-visible,
 .profile-privacy-link:focus-visible,
 .profile-logout-button:focus-visible {
   outline: 2px solid #635bff;
@@ -274,6 +279,7 @@
     width: 100%;
   }
 
+  .profile-orders-link,
   .profile-privacy-link,
   .profile-logout-button {
     width: 100%;
