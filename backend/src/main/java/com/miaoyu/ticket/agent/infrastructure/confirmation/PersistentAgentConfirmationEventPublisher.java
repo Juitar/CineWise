@@ -59,6 +59,7 @@ public class PersistentAgentConfirmationEventPublisher implements AgentConfirmat
                 Map.entry("type", "PLAN_CARD"),
                 Map.entry("actionId", action.actionId()),
                 Map.entry("actionType", "CREATE_ORDER"),
+                Map.entry("nodeId", action.nodeId()),
                 Map.entry("expireAt", action.expireAt().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime()
                         .toString()),
                 Map.entry("status", AgentConfirmationCardStatus.fromActionStatus(action.status()).name()),

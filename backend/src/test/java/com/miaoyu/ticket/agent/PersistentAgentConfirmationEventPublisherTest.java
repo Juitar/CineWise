@@ -59,6 +59,7 @@ class PersistentAgentConfirmationEventPublisherTest {
                 Mockito.eq(AgentEventType.CARD), payload.capture());
         var json = new ObjectMapper().readTree(payload.getValue().value());
         assertThat(json.path("type").asText()).isEqualTo("PLAN_CARD");
+        assertThat(json.path("nodeId").asText()).isEqualTo("confirm-order");
         assertThat(json.path("actionId").asText()).isEqualTo("action-1");
         assertThat(json.path("actionType").asText()).isEqualTo("CREATE_ORDER");
         assertThat(json.path("status").asText()).isEqualTo("PENDING_CONFIRMATION");
