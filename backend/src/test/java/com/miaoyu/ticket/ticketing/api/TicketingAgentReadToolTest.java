@@ -17,18 +17,23 @@ import com.miaoyu.ticket.ticketing.application.TicketingErrorCode;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /** A 票务 Tool API 只验证自身结果映射和已确认错误语义，不启动 Agent 编排器。 */
 class TicketingAgentReadToolTest {
+    private static final Instant DATA_AT = Instant.parse("2026-08-08T10:00:00Z");
+    private static final Clock CLOCK = Clock.fixed(DATA_AT, ZoneId.of("Asia/Shanghai"));
 
     @Test
     void shouldReturnEmptyDatesAsSuccessfulReadResult() {
         AvailableDateQueryService service = mock(AvailableDateQueryService.class);
         when(service.queryAvailableDates(101L, 201L)).thenReturn(List.of());
 
-        var result = new QueryAvailableDatesTool(service)
+        var result = new QueryAvailableDatesTool(service, CLOCK)
                 .execute(
                         context(QueryAvailableDatesTool.TARGET_NAME),
                         new QueryAvailableDatesToolCommand("101", "201"));
@@ -36,6 +41,8 @@ class TicketingAgentReadToolTest {
         assertThat(result.status()).isEqualTo(ToolStatus.SUCCESS);
         assertThat(result.data().dates()).isEmpty();
         assertThat(result.suggestedNextAction()).isEqualTo("CHOOSE_MOVIE_OR_CINEMA");
+        assertThat(result.dataAt()).isEqualTo(DATA_AT);
+        assertThat(result.expiresAt()).isEqualTo(DATA_AT.plusSeconds(5L));
     }
 
     @Test
@@ -44,7 +51,7 @@ class TicketingAgentReadToolTest {
         when(service.queryAvailableDates(anyLong(), anyLong()))
                 .thenThrow(new BusinessException(TicketingErrorCode.QUERY_UNAVAILABLE));
 
-        var result = new QueryAvailableDatesTool(service)
+        var result = new QueryAvailableDatesTool(service, CLOCK)
                 .execute(
                         context(QueryAvailableDatesTool.TARGET_NAME),
                         new QueryAvailableDatesToolCommand("101", "201"));
@@ -62,11 +69,13 @@ class TicketingAgentReadToolTest {
                 301L, 101L, 201L, "万达影城", 401L, "IMAX厅", start, start.plusMinutes(130), start,
                 "国语3D", new BigDecimal("45.00"), 32, "ON_SALE", "REAL", 7, start.minusMinutes(5))));
 
-        var result = new QueryShowsTool(service).execute(
+        var result = new QueryShowsTool(service, CLOCK).execute(
                 context(QueryShowsTool.TARGET_NAME),
                 new QueryShowsToolCommand("101", "201", LocalDate.of(2026, 8, 8), null, null));
 
         assertThat(result.status()).isEqualTo(ToolStatus.SUCCESS);
+        assertThat(result.dataAt()).isEqualTo(DATA_AT);
+        assertThat(result.expiresAt()).isEqualTo(DATA_AT.plusSeconds(5L));
         assertThat(result.data().shows()).singleElement().satisfies(show -> {
             assertThat(show.showId()).isEqualTo("301");
             assertThat(show.basePrice()).isEqualTo("45.00");

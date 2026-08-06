@@ -10,6 +10,9 @@ import com.miaoyu.ticket.ticketing.application.ShowQuery;
 import com.miaoyu.ticket.ticketing.application.ShowQueryService;
 import com.miaoyu.ticket.ticketing.application.TicketingErrorCode;
 import java.math.RoundingMode;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
 
@@ -17,11 +20,14 @@ import org.springframework.stereotype.Service;
 @Service
 public class QueryShowsTool {
     public static final String TARGET_NAME = "queryShows";
+    private static final Duration FRESHNESS_WINDOW = Duration.ofSeconds(5L);
 
     private final ShowQueryService showQueryService;
+    private final Clock clock;
 
-    public QueryShowsTool(ShowQueryService showQueryService) {
+    public QueryShowsTool(ShowQueryService showQueryService, Clock clock) {
         this.showQueryService = Objects.requireNonNull(showQueryService, "场次查询服务不能为空");
+        this.clock = Objects.requireNonNull(clock, "业务时钟不能为空");
     }
 
     /** 不经本应用 HTTP Controller，直接调用 A 的应用服务以保持同进程模块边界。 */
@@ -32,6 +38,7 @@ public class QueryShowsTool {
             throw new IllegalArgumentException("ToolContext目标与场次查询工具不一致");
         }
         try {
+            Instant dataAt = clock.instant();
             QueryShowsToolResult result = new QueryShowsToolResult(showQueryService.queryShows(new ShowQuery(
                     command.parsedMovieId(),
                     command.parsedCinemaId(),
@@ -56,9 +63,16 @@ public class QueryShowsTool {
                             view.stateVersion(),
                             view.updatedAt().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime()))
                     .toList());
+            Instant expiresAt = result.shows().stream()
+                    .map(QueryShowsToolResult.ShowItem::expiresAt)
+                    .map(Instant::from)
+                    .min(Instant::compareTo)
+                    .map(candidateExpiry -> candidateExpiry.isBefore(dataAt.plus(FRESHNESS_WINDOW))
+                            ? candidateExpiry : dataAt.plus(FRESHNESS_WINDOW))
+                    .orElse(dataAt.plus(FRESHNESS_WINDOW));
             return new ToolResult<>(ToolStatus.SUCCESS, result, null, false, false,
                     result.shows().isEmpty() ? "CHOOSE_MOVIE_OR_CINEMA" : "VIEW_SHOWS",
-                    false, null, context.stateVersion(), null, null);
+                    false, null, context.stateVersion(), dataAt, expiresAt);
         } catch (BusinessException exception) {
             return knownFailure(context, exception);
         }

@@ -7,6 +7,9 @@ import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.ticketing.application.AvailableDateQueryService;
 import com.miaoyu.ticket.ticketing.application.TicketingErrorCode;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
 
@@ -14,11 +17,14 @@ import org.springframework.stereotype.Service;
 @Service
 public class QueryAvailableDatesTool {
     public static final String TARGET_NAME = "queryAvailableDates";
+    private static final Duration FRESHNESS_WINDOW = Duration.ofSeconds(5L);
 
     private final AvailableDateQueryService availableDateQueryService;
+    private final Clock clock;
 
-    public QueryAvailableDatesTool(AvailableDateQueryService availableDateQueryService) {
+    public QueryAvailableDatesTool(AvailableDateQueryService availableDateQueryService, Clock clock) {
         this.availableDateQueryService = Objects.requireNonNull(availableDateQueryService, "日期查询服务不能为空");
+        this.clock = Objects.requireNonNull(clock, "业务时钟不能为空");
     }
 
     /** 已知业务错误转换为稳定 ToolResult；未知故障交给 Agent 外层按 traceId 处理。 */
@@ -30,6 +36,7 @@ public class QueryAvailableDatesTool {
             throw new IllegalArgumentException("ToolContext目标与日期查询工具不一致");
         }
         try {
+            Instant dataAt = clock.instant();
             QueryAvailableDatesToolResult result = new QueryAvailableDatesToolResult(
                     availableDateQueryService.queryAvailableDates(command.parsedMovieId(), command.parsedCinemaId())
                             .stream()
@@ -38,7 +45,7 @@ public class QueryAvailableDatesTool {
                             .toList());
             return new ToolResult<>(ToolStatus.SUCCESS, result, null, false, false,
                     result.dates().isEmpty() ? "CHOOSE_MOVIE_OR_CINEMA" : "CHOOSE_DATE",
-                    false, null, context.stateVersion(), null, null);
+                    false, null, context.stateVersion(), dataAt, dataAt.plus(FRESHNESS_WINDOW));
         } catch (BusinessException exception) {
             return knownFailure(context, exception);
         }
