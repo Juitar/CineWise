@@ -1,0 +1,15 @@
+{
+  "eventId": "43",
+  "eventType": "card",
+  "sessionId": "session-1",
+  "runId": "run-1",
+  "planId": "plan-1",
+  "planVersion": 2,
+  "nodeId": "select-show-node",
+  "occurredAt": "2026-08-06T10:00:03+08:00",
+  "displayText": "已确认场次，可选座",
+  "payload": {
+    "type": "BUSINESS_INTENT",
+    "payload": { "intent": "SELECT_SEATS", "businessRef": { "showId": "show-70001" } }
+  }
+}
