@@ -4,6 +4,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import java.util.List;
 
 /** 出行任务最小读写 SQL；唯一键冲突必须交由应用层恢复原任务。 */
 @Mapper
@@ -75,6 +76,29 @@ public interface TravelTaskPersistenceMapper {
              WHERE task_id = #{taskId} AND user_id = #{userId}
             """)
     TravelTaskRow findByTaskIdAndUserId(@Param("taskId") String taskId, @Param("userId") long userId);
+
+    /** 批量读取只作为候选；后续生成仍由版本条件更新决定唯一赢家。 */
+    @Select("""
+            SELECT id, task_id AS task_id, user_id AS user_id, order_id AS order_id, show_id AS show_id,
+                   cinema_area AS cinema_area, start_at AS start_at, trigger_at AS trigger_at,
+                   order_version AS order_version, version, status, closed_at AS closed_at, update_time AS updated_at
+              FROM travel_task WHERE status = 'PENDING' AND trigger_at <= #{now}
+             ORDER BY trigger_at ASC, id ASC LIMIT #{limit}
+            """)
+    List<TravelTaskRow> listDueForAdvice(@Param("now") java.time.LocalDateTime now, @Param("limit") int limit);
+
+    @org.apache.ibatis.annotations.Update("""
+            UPDATE travel_task SET status = 'COMPLETED', closed_at = #{completedAt}, update_time = #{updatedAt}
+             WHERE id = #{id} AND status IN ('READY', 'NOTIFIED') AND start_at <= #{completedAt}
+            """)
+    int completeIfElapsed(@Param("id") long id, @Param("completedAt") java.time.LocalDateTime completedAt,
+                          @Param("updatedAt") java.time.LocalDateTime updatedAt);
+
+    @Select("""
+            SELECT id FROM travel_task WHERE status IN ('READY', 'NOTIFIED') AND start_at <= #{completedAt}
+             ORDER BY start_at ASC, id ASC LIMIT #{limit}
+            """)
+    List<Long> listElapsedTaskIds(@Param("completedAt") java.time.LocalDateTime completedAt, @Param("limit") int limit);
 
     @org.apache.ibatis.annotations.Update("""
             UPDATE travel_task
