@@ -11,6 +11,7 @@ export default defineConfig({
   routes: [
     { path: '/login', component: '@/pages/login' },
     { path: '/register', component: '@/pages/register' },
+    { path: '/password/reset', component: '@/pages/password/reset' },
     { path: '/privacy', component: '@/pages/privacy' },
     { path: '/403', component: '@/pages/forbidden' },
     {

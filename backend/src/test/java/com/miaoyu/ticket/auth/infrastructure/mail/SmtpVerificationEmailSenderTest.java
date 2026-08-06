@@ -59,6 +59,17 @@ class SmtpVerificationEmailSenderTest {
         verify(mailSender).send(any(SimpleMailMessage.class));
     }
 
+    @Test
+    void shouldRenderPasswordResetPurpose() {
+        assertThat(sender.send(
+                        "user@cinewise.test", "123456", VerificationPurpose.RESET_PASSWORD, "trace-1"))
+                .isEqualTo(VerificationEmailSender.DeliveryResult.SENT);
+
+        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(captor.capture());
+        assertThat(captor.getValue().getText()).contains("重置密码", "123456");
+    }
+
     private SmtpVerificationEmailSender sender() {
         MailProperties mailProperties = new MailProperties();
         mailProperties.setHost("smtp.cinewise.test");

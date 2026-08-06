@@ -1,8 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../../shared/api/ApiError';
-import type { CurrentUser, EmailCodeLoginRequest, RegisterRequest } from './types';
-import { sendEmailCode, submitEmailCodeLogin, submitRegistration } from './api';
+import type {
+  CurrentUser,
+  EmailCodeLoginRequest,
+  PasswordResetRequest,
+  RegisterRequest,
+} from './types';
+import {
+  sendEmailCode,
+  submitEmailCodeLogin,
+  submitPasswordReset,
+  submitRegistration,
+} from './api';
 
 const clientMocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
@@ -37,6 +47,13 @@ const emailCodeLoginRequest: EmailCodeLoginRequest = {
   email: 'user@cinewise.test',
 };
 
+const passwordResetRequest: PasswordResetRequest = {
+  clientRequestId: 'password-reset-1',
+  code: '123456',
+  email: 'user@cinewise.test',
+  newPassword: 'NewPassword1',
+};
+
 describe('auth api', () => {
   beforeEach(() => {
     clientMocks.apiRequest.mockReset();
@@ -52,6 +69,25 @@ describe('auth api', () => {
       body: { email: 'user@cinewise.test', purpose: 'REGISTER' },
       method: 'POST',
     });
+  });
+
+  it('使用 RESET_PASSWORD 用途发送验证码并提交重置接口', async () => {
+    clientMocks.apiRequest
+      .mockResolvedValueOnce({ cooldownSeconds: 60, expiresInSeconds: 300 })
+      .mockResolvedValueOnce({ changed: true });
+
+    await sendEmailCode({ email: 'user@cinewise.test', purpose: 'RESET_PASSWORD' });
+    await expect(submitPasswordReset(passwordResetRequest)).resolves.toEqual({ changed: true });
+
+    expect(clientMocks.apiRequest).toHaveBeenNthCalledWith(1, '/api/v1/auth/email-codes', {
+      body: { email: 'user@cinewise.test', purpose: 'RESET_PASSWORD' },
+      method: 'POST',
+    });
+    expect(clientMocks.apiRequest).toHaveBeenNthCalledWith(2, '/api/v1/auth/password/reset', {
+      body: passwordResetRequest,
+      method: 'POST',
+    });
+    expect(clientMocks.clearCsrfToken).not.toHaveBeenCalled();
   });
 
   it('提交注册成功后清除匿名阶段 CSRF Token', async () => {

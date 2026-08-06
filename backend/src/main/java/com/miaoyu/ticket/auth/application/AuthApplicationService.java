@@ -68,7 +68,7 @@ public class AuthApplicationService {
             throw new BusinessException(AuthErrorCode.INVALID_CREDENTIALS);
         }
 
-        String token = accessTokenService.issue(user);
+        IssuedAccessToken token = accessTokenService.issue(user);
         audit(command, user.id(), true, null);
         return new LoginResult(token, toView(user));
     }
@@ -104,7 +104,7 @@ public class AuthApplicationService {
             throw exception;
         }
 
-        String token = accessTokenService.issue(user);
+        IssuedAccessToken token = accessTokenService.issue(user);
         audit(command, user.id(), true, null);
         return new LoginResult(token, toView(user));
     }

@@ -6,6 +6,14 @@ interface AuthState {
   authenticated: boolean;
   lastEmailCodeLogin?: { clientRequestId?: string; code?: string; email?: string };
   lastEmailCodePurpose?: string;
+  lastPasswordReset?: {
+    clientRequestId?: string;
+    code?: string;
+    email?: string;
+    newPassword?: string;
+  };
+  passwordResetAttempts: number;
+  resetNetworkFailure?: boolean;
   role: Role;
 }
 
@@ -27,7 +35,7 @@ async function respond(route: Route, status: number, body: unknown) {
 }
 
 async function installAuthApi(page: Page, initialRole: Role = 'USER'): Promise<AuthState> {
-  const state: AuthState = { authenticated: false, role: initialRole };
+  const state: AuthState = { authenticated: false, passwordResetAttempts: 0, role: initialRole };
 
   await page.route('**/api/v1/auth/**', async (route) => {
     const url = new URL(route.request().url());
@@ -82,6 +90,17 @@ async function installAuthApi(page: Page, initialRole: Role = 'USER'): Promise<A
         email?: string;
       };
       await respond(route, 200, apiResult({ loggedIn: true }));
+      return;
+    }
+
+    if (url.pathname === '/api/v1/auth/password/reset') {
+      state.passwordResetAttempts += 1;
+      state.lastPasswordReset = route.request().postDataJSON() as AuthState['lastPasswordReset'];
+      if (state.resetNetworkFailure) {
+        await route.abort('connectionfailed');
+        return;
+      }
+      await respond(route, 200, apiResult({ changed: true }));
       return;
     }
 
@@ -183,6 +202,49 @@ test('桌面端和移动端使用邮箱验证码登录并恢复目标页', async
     email: 'user@cinewise.test',
   });
   expect(state.lastEmailCodeLogin?.clientRequestId).toBeTruthy();
+});
+
+test('桌面端和移动端通过邮箱验证码重置密码并返回登录页', async ({ page }) => {
+  const state = await installAuthApi(page);
+  await page.goto('/login');
+  await page.getByRole('link', { name: '忘记密码？' }).click();
+  await expect(page).toHaveURL('/password/reset');
+
+  await page.getByRole('textbox', { name: '邮箱', exact: true }).fill('user@cinewise.test');
+  await page.getByRole('button', { name: '获取验证码' }).click();
+  await page.getByRole('textbox', { name: '邮箱验证码' }).fill('123456');
+  await page.getByLabel('新密码', { exact: true }).fill('NewPassword1');
+  await page.getByLabel('确认新密码', { exact: true }).fill('NewPassword1');
+  await page.getByRole('button', { name: '确认重置' }).click();
+
+  await expect(page).toHaveURL('/login');
+  expect(state.lastEmailCodePurpose).toBe('RESET_PASSWORD');
+  expect(state.lastPasswordReset).toMatchObject({
+    code: '123456',
+    email: 'user@cinewise.test',
+    newPassword: 'NewPassword1',
+  });
+  expect(state.lastPasswordReset?.clientRequestId).toBeTruthy();
+  expect(await page.evaluate(() => ({ ...localStorage, ...sessionStorage }))).toEqual({});
+});
+
+test('密码重置断网后不自动重发并清除敏感输入', async ({ page }) => {
+  const state = await installAuthApi(page);
+  state.resetNetworkFailure = true;
+  await page.goto('/password/reset');
+  await page.getByRole('textbox', { name: '邮箱', exact: true }).fill('user@cinewise.test');
+  await page.getByRole('textbox', { name: '邮箱验证码' }).fill('123456');
+  await page.getByLabel('新密码', { exact: true }).fill('NewPassword1');
+  await page.getByLabel('确认新密码', { exact: true }).fill('NewPassword1');
+  await page.getByRole('button', { name: '确认重置' }).click();
+
+  await expect(page.getByRole('alert')).toContainText('不要自动重复提交');
+  await expect(page.getByRole('button', { name: '确认重置' })).toBeDisabled();
+  await expect(page.getByRole('textbox', { name: '邮箱验证码' })).toHaveValue('');
+  await expect(page.getByLabel('新密码', { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('确认新密码', { exact: true })).toHaveValue('');
+  await page.waitForTimeout(300);
+  expect(state.passwordResetAttempts).toBe(1);
 });
 
 test('桌面端和移动端从个人中心退出后不能再访问个人中心', async ({ page }) => {

@@ -26,7 +26,7 @@ export interface EmailCodeLoginRequest {
   email: string;
 }
 
-export type VerificationPurpose = 'LOGIN' | 'REGISTER';
+export type VerificationPurpose = 'LOGIN' | 'REGISTER' | 'RESET_PASSWORD';
 
 export interface SendEmailCodeRequest {
   email: string;
@@ -48,6 +48,18 @@ export interface RegisterRequest {
   password: string;
   privacyAccepted: boolean;
   privacyPolicyVersion: string;
+}
+
+/** 密码重置只提交服务端确认字段，响应不包含 tokenVersion。 */
+export interface PasswordResetRequest {
+  clientRequestId: string;
+  code: string;
+  email: string;
+  newPassword: string;
+}
+
+export interface PasswordResetResponse {
+  changed: boolean;
 }
 
 /** 当前注册页面对应的已确认隐私政策版本，后端仍会做最终一致性校验。 */

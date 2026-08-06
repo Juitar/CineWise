@@ -130,6 +130,8 @@ cinewise:
     jwt-secret: ${JWT_SECRET:}
     audit-hash-secret: ${AUTH_AUDIT_HASH_SECRET:${JWT_SECRET:}}
     access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:30m}
+    renewal-threshold: ${AUTH_RENEWAL_THRESHOLD:10m}
+    absolute-session-ttl: ${AUTH_ABSOLUTE_SESSION_TTL:8h}
     access-cookie-name: ${AUTH_ACCESS_COOKIE_NAME:cinewise_access_token}
     csrf-cookie-name: ${AUTH_CSRF_COOKIE_NAME:cinewise_csrf}
     csrf-header-name: X-XSRF-TOKEN
@@ -158,6 +160,14 @@ cinewise:
         smtp-enabled: ${AUTH_VERIFICATION_SMTP_ENABLED:false}
         from: ${AUTH_VERIFICATION_MAIL_FROM:}
         subject: ${AUTH_VERIFICATION_MAIL_SUBJECT:妙语购票邮箱验证码}
+    mail-delivery:
+      enabled: ${AUTH_MAIL_DELIVERY_ENABLED:false}
+      # mock 仅用于开发/演示，不代表真实邮箱已收到邮件。
+      provider: ${AUTH_MAIL_DELIVERY_PROVIDER:smtp}
+      from: ${AUTH_MAIL_DELIVERY_FROM:${AUTH_VERIFICATION_MAIL_FROM:}}
+      viewing-reminder:
+        subject: ${AUTH_VIEWING_REMINDER_MAIL_SUBJECT:}
+        body: ${AUTH_VIEWING_REMINDER_MAIL_BODY:}
     demo-seed:
       enabled: ${AUTH_DEMO_SEED_ENABLED:false}
       user-email: ${AUTH_DEMO_USER_EMAIL:}

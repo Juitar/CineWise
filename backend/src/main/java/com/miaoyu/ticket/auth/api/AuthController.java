@@ -6,6 +6,8 @@ import com.miaoyu.ticket.auth.application.EmailCodeApplicationService;
 import com.miaoyu.ticket.auth.application.EmailCodeLoginCommand;
 import com.miaoyu.ticket.auth.application.LoginCommand;
 import com.miaoyu.ticket.auth.application.LoginResult;
+import com.miaoyu.ticket.auth.application.PasswordResetApplicationService;
+import com.miaoyu.ticket.auth.application.PasswordResetCommand;
 import com.miaoyu.ticket.auth.application.RegistrationApplicationService;
 import com.miaoyu.ticket.auth.application.RegistrationCommand;
 import com.miaoyu.ticket.auth.application.SendEmailCodeCommand;
@@ -39,6 +41,7 @@ public class AuthController {
     private final AuthApplicationService authService;
     private final EmailCodeApplicationService emailCodeService;
     private final RegistrationApplicationService registrationService;
+    private final PasswordResetApplicationService passwordResetService;
     private final CurrentUserAccessor currentUserAccessor;
     private final AuthCookieManager cookieManager;
     private final CsrfTokenRepository csrfTokenRepository;
@@ -48,6 +51,7 @@ public class AuthController {
             AuthApplicationService authService,
             EmailCodeApplicationService emailCodeService,
             RegistrationApplicationService registrationService,
+            PasswordResetApplicationService passwordResetService,
             CurrentUserAccessor currentUserAccessor,
             AuthCookieManager cookieManager,
             CsrfTokenRepository csrfTokenRepository,
@@ -55,6 +59,7 @@ public class AuthController {
         this.authService = authService;
         this.emailCodeService = emailCodeService;
         this.registrationService = registrationService;
+        this.passwordResetService = passwordResetService;
         this.currentUserAccessor = currentUserAccessor;
         this.cookieManager = cookieManager;
         this.csrfTokenRepository = csrfTokenRepository;
@@ -150,6 +155,21 @@ public class AuthController {
                 Boolean.TRUE.equals(request.privacyAccepted())));
         writeLoginResult(result, servletRequest, servletResponse);
         return Result.success(CurrentUserResponse.from(result.currentUser()));
+    }
+
+    @PostMapping("/auth/password/reset")
+    @SecurityRequirement(name = "csrfToken")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "密码重置成功并使旧 Cookie/JWT 失效"),
+        @ApiResponse(responseCode = "400", description = "101001 请求参数或新密码不合法"),
+        @ApiResponse(responseCode = "422", description = "201002 验证码无效、过期或已使用"),
+        @ApiResponse(responseCode = "403", description = "201009 CSRF Token 缺失或无效")
+    })
+    public Result<PasswordResetResponse> resetPassword(
+            @Valid @RequestBody PasswordResetRequest request) {
+        passwordResetService.reset(new PasswordResetCommand(
+                request.clientRequestId(), request.email(), request.code(), request.newPassword()));
+        return Result.success(new PasswordResetResponse(true));
     }
 
     @PostMapping("/admin/auth/login")

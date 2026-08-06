@@ -46,6 +46,8 @@ class EmailCodeApplicationServiceTest {
                 properties());
         when(hasher.hash("user@cinewise.test", VerificationPurpose.LOGIN, "rate-limit"))
                 .thenReturn("email-hash");
+        when(hasher.hash("user@cinewise.test", VerificationPurpose.RESET_PASSWORD, "rate-limit"))
+                .thenReturn("email-hash");
         when(sanitizer.hashIp("127.0.0.1")).thenReturn("ip-hash");
     }
 
@@ -59,7 +61,7 @@ class EmailCodeApplicationServiceTest {
                 .thenReturn("code-hash");
         when(issueTransaction.issue(
                         "user@cinewise.test", VerificationPurpose.LOGIN, "code-hash", Duration.ofMinutes(5)))
-                .thenReturn(stored());
+                .thenReturn(stored(VerificationPurpose.LOGIN));
         when(sender.send("user@cinewise.test", "123456", VerificationPurpose.LOGIN, "trace-1"))
                 .thenReturn(VerificationEmailSender.DeliveryResult.SENT);
 
@@ -67,6 +69,52 @@ class EmailCodeApplicationServiceTest {
 
         assertThat(result).isEqualTo(new SendEmailCodeResult(60, 300));
         verify(sender).send("user@cinewise.test", "123456", VerificationPurpose.LOGIN, "trace-1");
+    }
+
+    @Test
+    void shouldIssueResetCodeOnlyForNormalVerifiedUser() {
+        when(rateLimiter.acquire(any(), any(), any(), any(), any(), anyInt()))
+                .thenReturn(new VerificationCodeRateLimiter.SendPermit(true, true, 60));
+        when(userRepository.findByEmail("user@cinewise.test")).thenReturn(Optional.of(user()));
+        when(generator.generate()).thenReturn("123456");
+        when(hasher.hash("user@cinewise.test", VerificationPurpose.RESET_PASSWORD, "123456"))
+                .thenReturn("reset-hash");
+        when(issueTransaction.issue(
+                        "user@cinewise.test",
+                        VerificationPurpose.RESET_PASSWORD,
+                        "reset-hash",
+                        Duration.ofMinutes(5)))
+                .thenReturn(stored(VerificationPurpose.RESET_PASSWORD));
+        when(sender.send(
+                        "user@cinewise.test", "123456", VerificationPurpose.RESET_PASSWORD, "trace-1"))
+                .thenReturn(VerificationEmailSender.DeliveryResult.SENT);
+
+        SendEmailCodeResult result = service.send(new SendEmailCodeCommand(
+                "user@cinewise.test",
+                VerificationPurpose.RESET_PASSWORD,
+                "127.0.0.1",
+                "trace-1"));
+
+        assertThat(result).isEqualTo(new SendEmailCodeResult(60, 300));
+        verify(sender).send(
+                "user@cinewise.test", "123456", VerificationPurpose.RESET_PASSWORD, "trace-1");
+    }
+
+    @Test
+    void shouldHideUnknownResetEmailBehindSameSuccessResponse() {
+        when(rateLimiter.acquire(any(), any(), any(), any(), any(), anyInt()))
+                .thenReturn(new VerificationCodeRateLimiter.SendPermit(true, true, 60));
+        when(userRepository.findByEmail("user@cinewise.test")).thenReturn(Optional.empty());
+
+        SendEmailCodeResult result = service.send(new SendEmailCodeCommand(
+                "user@cinewise.test",
+                VerificationPurpose.RESET_PASSWORD,
+                "127.0.0.1",
+                "trace-1"));
+
+        assertThat(result).isEqualTo(new SendEmailCodeResult(60, 300));
+        verify(issueTransaction, never()).issue(any(), any(), any(), any());
+        verify(sender, never()).send(any(), any(), any(), any());
     }
 
     @Test
@@ -100,7 +148,8 @@ class EmailCodeApplicationServiceTest {
         when(generator.generate()).thenReturn("123456");
         when(hasher.hash("user@cinewise.test", VerificationPurpose.LOGIN, "123456"))
                 .thenReturn("code-hash");
-        when(issueTransaction.issue(any(), any(), any(), any())).thenReturn(stored());
+        when(issueTransaction.issue(any(), any(), any(), any()))
+                .thenReturn(stored(VerificationPurpose.LOGIN));
         when(sender.send(any(), any(), any(), any()))
                 .thenReturn(VerificationEmailSender.DeliveryResult.FAILED);
 
@@ -131,11 +180,11 @@ class EmailCodeApplicationServiceTest {
                 LocalDateTime.of(2026, 8, 3, 8, 0));
     }
 
-    private EmailVerificationCode stored() {
+    private EmailVerificationCode stored(VerificationPurpose purpose) {
         return new EmailVerificationCode(
                 99L,
                 "user@cinewise.test",
-                VerificationPurpose.LOGIN,
+                purpose,
                 "code-hash",
                 VerificationCodeStatus.UNUSED,
                 LocalDateTime.of(2026, 8, 5, 10, 0),

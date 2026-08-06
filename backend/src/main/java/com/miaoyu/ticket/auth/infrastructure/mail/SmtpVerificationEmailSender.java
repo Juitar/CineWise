@@ -51,7 +51,11 @@ public class SmtpVerificationEmailSender implements VerificationEmailSender {
     }
 
     private String body(String code, VerificationPurpose purpose) {
-        String action = purpose == VerificationPurpose.LOGIN ? "登录" : "注册";
+        String action = switch (purpose) {
+            case LOGIN -> "登录";
+            case REGISTER -> "注册";
+            case RESET_PASSWORD -> "重置密码";
+        };
         return "您正在进行妙语购票" + action + "，验证码为：" + code + "。验证码 "
                 + properties.ttl().toMinutes() + " 分钟内有效，请勿转发。";
     }

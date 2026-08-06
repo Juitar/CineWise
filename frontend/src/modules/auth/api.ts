@@ -5,6 +5,8 @@ import type {
   EmailCodeLoginRequest,
   LogoutResult,
   PasswordLoginRequest,
+  PasswordResetRequest,
+  PasswordResetResponse,
   RegisterRequest,
   SendEmailCodeRequest,
   SendEmailCodeResponse,
@@ -52,6 +54,14 @@ export function fetchCurrentUser(handleUnauthorized = false): Promise<CurrentUse
 /** 申请邮箱验证码；具体用途必须由调用页面显式传入。 */
 export function sendEmailCode(request: SendEmailCodeRequest): Promise<SendEmailCodeResponse> {
   return apiRequest<SendEmailCodeResponse>('/api/v1/auth/email-codes', {
+    body: request,
+    method: 'POST',
+  });
+}
+
+/** 提交一次密码重置；网络结果未知时由页面提示，不自动重发敏感字段。 */
+export function submitPasswordReset(request: PasswordResetRequest): Promise<PasswordResetResponse> {
+  return apiRequest<PasswordResetResponse>('/api/v1/auth/password/reset', {
     body: request,
     method: 'POST',
   });

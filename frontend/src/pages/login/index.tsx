@@ -268,6 +268,9 @@ export default function LoginPage() {
                       </button>
                     }
                   />
+                  <div className="login-forgot-row">
+                    <Link to="/password/reset">忘记密码？</Link>
+                  </div>
                 </div>
               ) : (
                 <div className="login-input-group verify-code-group">

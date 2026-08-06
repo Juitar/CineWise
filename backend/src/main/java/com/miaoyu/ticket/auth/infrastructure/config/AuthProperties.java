@@ -17,6 +17,8 @@ public record AuthProperties(
         @NotBlank String jwtSecret,
         @NotBlank String auditHashSecret,
         @NotNull Duration accessTokenTtl,
+        @NotNull Duration renewalThreshold,
+        @NotNull Duration absoluteSessionTtl,
         @NotBlank String accessCookieName,
         @NotBlank String csrfCookieName,
         @NotBlank String csrfHeaderName,
@@ -33,9 +35,24 @@ public record AuthProperties(
         return byteLength(jwtSecret) >= MIN_SECRET_BYTES && byteLength(auditHashSecret) >= MIN_SECRET_BYTES;
     }
 
-    @AssertTrue(message = "JWT 有效期必须大于零")
-    public boolean isAccessTokenTtlValid() {
-        return accessTokenTtl != null && !accessTokenTtl.isZero() && !accessTokenTtl.isNegative();
+    @AssertTrue(message = "JWT 有效期、续期阈值和最长连续登录时间必须大于零")
+    public boolean isSessionDurationsPositive() {
+        return isPositive(accessTokenTtl)
+                && isPositive(renewalThreshold)
+                && isPositive(absoluteSessionTtl);
+    }
+
+    @AssertTrue(message = "续期阈值必须小于 JWT 有效期，最长连续登录时间不得小于 JWT 有效期")
+    public boolean isSessionDurationsConsistent() {
+        if (accessTokenTtl == null || renewalThreshold == null || absoluteSessionTtl == null) {
+            return true;
+        }
+        return renewalThreshold.compareTo(accessTokenTtl) < 0
+                && absoluteSessionTtl.compareTo(accessTokenTtl) >= 0;
+    }
+
+    private static boolean isPositive(Duration duration) {
+        return duration != null && !duration.isZero() && !duration.isNegative();
     }
 
     private static int byteLength(String value) {
