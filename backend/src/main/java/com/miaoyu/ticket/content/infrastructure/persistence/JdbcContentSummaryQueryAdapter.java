@@ -1,14 +1,16 @@
 package com.miaoyu.ticket.content.infrastructure.persistence;
 
 import com.miaoyu.ticket.content.application.ContentSummaryQueryPort;
+import com.miaoyu.ticket.content.application.ContentSummaryQueryPort.ContentSummaryErrorCode;
+import com.miaoyu.ticket.common.error.BusinessException;
 import java.util.Collections;
-import java.util.Map;
+import java.util.List;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.HashSet;
 import java.time.Clock;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DataAccessException;
 
 /**
  * D 提供给其他模块的内容摘要适配器；调用方只能获得公开摘要，不能接触内容持久化模型。
@@ -39,27 +41,30 @@ public class JdbcContentSummaryQueryAdapter implements ContentSummaryQueryPort {
 
     /** 空集合直接返回空 Map，避免生成非法 IN () SQL 或额外访问数据库。 */
     @Override
-    public Map<Long, CinemaSummary> findCinemaSummaries(Set<Long> cinemaIds) {
+    public CinemaSummaryBatch findCinemaSummaries(Set<Long> cinemaIds) {
         // 输入 ID 来自 A 的场次查询，仍只作为查询条件，不被写入 D 的内容表。
         if (cinemaIds.isEmpty()) {
             // 没有场次引用影院时不需要查询内容库。
-            return Map.of();
+            return new CinemaSummaryBatch(List.of(), Set.of());
         }
         String placeholders = String.join(",", Collections.nCopies(cinemaIds.size(), "?"));
         // 占位符个数严格来自集合大小，所有 ID 仍以参数方式绑定，不能拼入 SQL 文本。
         String sql = """
-                SELECT id, name, area, source, data_time, expires_at
-                  FROM cinema
+                SELECT id, name, area, address, source, data_time, expires_at
+                 FROM cinema
                  WHERE id IN (%s)
                    AND deleted_at IS NULL
+                 ORDER BY id ASC
                 """.formatted(placeholders);
         // 只选公开 DTO 所需列，避免把完整 cinema 行泄露给跨模块调用方。
-        return jdbcTemplate.query(
+        try {
+            List<CinemaSummary> cinemas = jdbcTemplate.query(
                         sql,
                         (resultSet, rowNumber) -> new CinemaSummary(
                                 resultSet.getLong("id"),
                                 resultSet.getString("name"),
                                 resultSet.getString("area"),
+                                resultSet.getString("address"),
                                 resultSet.getString("source"),
                                 resultSet.getTimestamp("data_time").toLocalDateTime(),
                                 resultSet.getTimestamp("expires_at") == null
@@ -68,8 +73,15 @@ public class JdbcContentSummaryQueryAdapter implements ContentSummaryQueryPort {
                                         && resultSet.getTimestamp("expires_at").toLocalDateTime().isBefore(
                                         java.time.LocalDateTime.ofInstant(
                                                 clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID))),
-                        cinemaIds.toArray())
-                .stream()
-                .collect(Collectors.toUnmodifiableMap(CinemaSummary::cinemaId, Function.identity()));
+                    cinemaIds.toArray());
+            Set<Long> foundIds = cinemas.stream().map(CinemaSummary::cinemaId)
+                    .collect(java.util.stream.Collectors.toSet());
+            Set<Long> missingIds = new HashSet<>(cinemaIds);
+            missingIds.removeAll(foundIds);
+            return new CinemaSummaryBatch(cinemas, missingIds);
+        } catch (DataAccessException exception) {
+            // 数据库异常不是“没有匹配影院”；A 必须得到可重试的内容不可用错误。
+            throw new BusinessException(ContentSummaryErrorCode.DATA_UNAVAILABLE);
+        }
     }
 }
