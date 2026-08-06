@@ -80,6 +80,7 @@ public final class MockModelGateway implements ModelGateway {
             case QUESTION -> questionText((QuestionReplyFacts) replyRequest.payload());
             case PLAN_CARD -> recommendationText((RecommendationReplyFacts) replyRequest.payload(), true);
             case MOVIE_CARD -> recommendationText((RecommendationReplyFacts) replyRequest.payload(), false);
+            case SELECT_SEATS -> "请在选座页面选择座位。";
             case PROGRESS -> progressText((ProgressReplyFacts) replyRequest.payload());
             case ERROR -> errorText((ErrorReplyFacts) replyRequest.payload());
         };

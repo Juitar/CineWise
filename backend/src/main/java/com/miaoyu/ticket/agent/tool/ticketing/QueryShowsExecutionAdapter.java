@@ -5,6 +5,7 @@ import com.miaoyu.ticket.agent.domain.plan.ExecutionPlanNode;
 import com.miaoyu.ticket.agent.domain.plan.InputReference;
 import com.miaoyu.ticket.agent.domain.run.ExecutionPlanStateMachine;
 import com.miaoyu.ticket.agent.domain.tool.ToolContext;
+import com.miaoyu.ticket.agent.domain.tool.ToolDefinition;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.ticketing.api.QueryShowsTool;
 import com.miaoyu.ticket.ticketing.api.QueryShowsToolCommand;
@@ -27,6 +28,11 @@ public final class QueryShowsExecutionAdapter
     public QueryShowsExecutionAdapter(QueryShowsTool queryShowsTool, ExecutionPlanStateMachine stateMachine) {
         super(QueryShowsTool.TARGET_NAME, AgentToolDefinitions.TICKETING_READ_TIMEOUT, INPUT_NAMES, stateMachine);
         this.queryShowsTool = Objects.requireNonNull(queryShowsTool, "场次查询Tool不能为空");
+    }
+
+    @Override
+    public ToolDefinition definition() {
+        return AgentToolDefinitions.queryShows();
     }
 
     @Override

@@ -12,6 +12,7 @@ import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
 import com.miaoyu.ticket.ticketing.api.QueryAvailableDatesTool;
 import com.miaoyu.ticket.ticketing.api.QueryShowsTool;
 import java.util.List;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -65,6 +66,8 @@ public class AgentToolConfiguration {
      * <p>业务主控依赖端口而非 Mock 的具体类，后续替换真实模型时不能让 SDK 响应穿透到运行状态或工具层。
      */
     @Bean
+    @ConditionalOnProperty(
+            prefix = "cinewise.agent.deepseek", name = "enabled", havingValue = "false", matchIfMissing = true)
     public MockModelGateway mockModelGateway(
             PlanSchemaValidator planSchemaValidator, ToolRegistry agentToolRegistry) {
         return new MockModelGateway(planSchemaValidator, agentToolRegistry);

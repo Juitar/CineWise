@@ -5,6 +5,7 @@ import com.miaoyu.ticket.agent.domain.plan.ExecutionPlanNode;
 import com.miaoyu.ticket.agent.domain.plan.InputReference;
 import com.miaoyu.ticket.agent.domain.run.ExecutionPlanStateMachine;
 import com.miaoyu.ticket.agent.domain.tool.ToolContext;
+import com.miaoyu.ticket.agent.domain.tool.ToolDefinition;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.ticketing.api.QueryAvailableDatesTool;
 import com.miaoyu.ticket.ticketing.api.QueryAvailableDatesToolCommand;
@@ -31,6 +32,11 @@ public final class QueryAvailableDatesExecutionAdapter
                 INPUT_NAMES,
                 stateMachine);
         this.queryAvailableDatesTool = Objects.requireNonNull(queryAvailableDatesTool, "日期查询Tool不能为空");
+    }
+
+    @Override
+    public ToolDefinition definition() {
+        return AgentToolDefinitions.queryAvailableDates();
     }
 
     @Override
