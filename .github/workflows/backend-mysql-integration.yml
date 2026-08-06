@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   mysql-integration:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, cinewise-ci]
     timeout-minutes: 25
     services:
       mysql:

@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, cinewise-ci]
     timeout-minutes: 35
     defaults:
       run:

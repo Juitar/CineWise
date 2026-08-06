@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   redis-integration:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, cinewise-ci]
     timeout-minutes: 20
     services:
       redis:
