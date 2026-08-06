@@ -66,6 +66,21 @@ class AmapWeatherProviderTest {
         assertThat(failed.query("西湖区", REQUESTED_AT)).isEmpty();
     }
 
+    @Test
+    void givenAmapLiveWeatherMissingRequiredFields_whenQuerying_thenReturnEmptyForFallback() {
+        AmapWeatherProvider missingTemperature = provider((adcode, key) -> responseUnchecked(
+                "{\"status\":\"1\",\"lives\":[{\"weather\":\"小雨\",\"reporttime\":\"2026-08-06 14:00:00\"}]}"));
+        AmapWeatherProvider missingReportTime = provider((adcode, key) -> responseUnchecked(
+                "{\"status\":\"1\",\"lives\":[{\"weather\":\"小雨\",\"temperature\":\"18\"}]}"));
+        AmapWeatherProvider invalidReportTime = provider((adcode, key) -> responseUnchecked(
+                "{\"status\":\"1\",\"lives\":[{\"weather\":\"小雨\",\"temperature\":\"18\","
+                        + "\"reporttime\":\"invalid\"}]}"));
+
+        assertThat(missingTemperature.query("西湖区", REQUESTED_AT)).isEmpty();
+        assertThat(missingReportTime.query("西湖区", REQUESTED_AT)).isEmpty();
+        assertThat(invalidReportTime.query("西湖区", REQUESTED_AT)).isEmpty();
+    }
+
     private AmapWeatherProvider provider(AmapWeatherClient client) {
         return new AmapWeatherProvider(
                 new AmapWeatherProperties(true, "test-key", Duration.ofMinutes(15), Map.of("西湖区", "330106")),

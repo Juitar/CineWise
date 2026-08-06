@@ -63,16 +63,16 @@ public final class AmapWeatherProvider implements WeatherProvider {
         }
         JsonNode live = response.path("lives").get(0);
         String weather = text(live, "weather");
-        if (weather == null) {
-            // 没有天气现象时不拼接半成品建议，交给统一回退处理。
+        String temperature = text(live, "temperature");
+        Optional<OffsetDateTime> dataTime = parseReportTime(text(live, "reporttime"));
+        if (weather == null || temperature == null || dataTime.isEmpty()) {
+            // 真实天气缺少任一展示与可信时间字段时不生成半成品结果，交给上层回退。
             return Optional.empty();
         }
-        String temperature = text(live, "temperature");
-        // reporttime 是高德提供的数据时间；缺失或格式变化时使用本次请求时间。
-        OffsetDateTime dataTime = parseReportTime(text(live, "reporttime"), requestedAt);
-        String condition = temperature == null ? weather : weather + "（" + temperature + "℃）";
+        String condition = weather + "（" + temperature + "℃）";
         // 有效期从请求时刻计算，避免上游 reporttime 较旧时刚写入就被当成过期。
-        return Optional.of(new WeatherObservation(cinemaArea, condition, travelAdvice(weather), SOURCE, dataTime,
+        return Optional.of(new WeatherObservation(cinemaArea, condition, travelAdvice(weather), SOURCE,
+                dataTime.orElseThrow(),
                 requestedAt.plus(properties.cacheTtl()), false, false, null));
     }
 
@@ -98,17 +98,16 @@ public final class AmapWeatherProvider implements WeatherProvider {
         return "请预留充足到场时间，并在出发前再次确认天气";
     }
 
-    private OffsetDateTime parseReportTime(String reportTime, OffsetDateTime fallback) {
+    private Optional<OffsetDateTime> parseReportTime(String reportTime) {
         if (reportTime == null) {
-            // 高德偶发缺少上报时间时仍可展示本次成功结果，但标注时间为查询时刻。
-            return fallback;
+            return Optional.empty();
         }
         try {
-            return LocalDateTime.parse(reportTime, REPORT_TIME_FORMAT)
-                    .atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime();
+            return Optional.of(LocalDateTime.parse(reportTime, REPORT_TIME_FORMAT)
+                    .atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime());
         } catch (DateTimeParseException exception) {
-            // 上游时间格式变化不影响购票和 Demo 回退，只降级为请求时间。
-            return fallback;
+            // 上游时间格式变化时不能伪装为实时天气，交给上层回退。
+            return Optional.empty();
         }
     }
 
