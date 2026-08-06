@@ -14,6 +14,7 @@ import type {
   EmailCodeLoginRequest,
   PasswordLoginRequest,
 } from '../../modules/auth/types';
+import { notifySessionEnding } from './sessionLifecycle';
 
 export type AuthSessionStatus = 'anonymous' | 'authenticated' | 'checking' | 'error';
 
@@ -42,6 +43,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<AuthSessionStatus>('checking');
 
   const clearSession = useCallback(() => {
+    notifySessionEnding();
     setCurrentUser(null);
     setStatus('anonymous');
   }, []);
@@ -116,6 +118,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   );
 
   const logout = useCallback(async () => {
+    notifySessionEnding();
     try {
       await submitLogout();
     } finally {

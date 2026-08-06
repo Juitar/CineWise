@@ -1,0 +1,177 @@
+import { expect, test } from '@playwright/test';
+
+const sessionId = 'session-example-1';
+
+function envelope(data: unknown, code = 0) {
+  return { code, data, message: code === 0 ? 'success' : 'error', traceId: 'agent-e2e-trace' };
+}
+
+async function mockAuthenticatedAgent(page: import('@playwright/test').Page) {
+  await page
+    .context()
+    .addCookies([
+      { name: 'access_token', value: 'http-only-cookie-placeholder', url: 'http://127.0.0.1:4173' },
+    ]);
+  await page.route('**/api/v1/auth/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/api/v1/auth/me') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          envelope({
+            emailMasked: 'u***@example.com',
+            emailVerified: true,
+            id: 'user-1',
+            nickname: '测试用户',
+            privacyPolicyVersion: '2026-08-03',
+            role: 'USER',
+            status: 'NORMAL',
+          }),
+        ),
+      });
+      return;
+    }
+    if (path === '/api/v1/auth/csrf') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(envelope({ headerName: 'X-XSRF-TOKEN', token: 'csrf-agent-e2e' })),
+      });
+      return;
+    }
+    await route.fallback();
+  });
+
+  await page.route('**/api/v1/agent/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === `/api/v1/agent/sessions/${sessionId}/messages/stream`) {
+      expect(request.method()).toBe('POST');
+      expect(request.headers()['x-xsrf-token']).toBe('csrf-agent-e2e');
+      expect(request.headers().cookie).toContain('access_token=');
+      const body = request.postDataJSON();
+      expect(body).toMatchObject({ content: '推荐一部电影', context: { entry: 'workspace' } });
+      const events = [
+        {
+          eventId: '40',
+          sessionId,
+          runId: 'run-example-1',
+          planId: 'plan-example-1',
+          planVersion: 1,
+          nodeId: 'rank-movie',
+          eventType: 'step.start',
+          displayText: '正在查找',
+          payload: { status: 'RUNNING' },
+          occurredAt: '2026-08-06T10:00:00+08:00',
+        },
+        {
+          eventId: '41',
+          sessionId,
+          runId: 'run-example-1',
+          planId: 'plan-example-1',
+          planVersion: 1,
+          nodeId: 'render-recommendation',
+          eventType: 'card',
+          displayText: '已生成推荐卡片',
+          payload: {
+            type: 'MOVIE_CARD',
+            title: '暂未找到可购场次',
+            movies: [{ movieId: '1001', title: '示例影片' }],
+            source: 'recommendation',
+            dataAt: '2026-08-06T10:00:00+08:00',
+            expiresAt: '2026-08-06T10:05:00+08:00',
+            degraded: true,
+            fallbackType: 'SHOWTIME_UNAVAILABLE',
+          },
+          occurredAt: '2026-08-06T10:00:01+08:00',
+        },
+        {
+          eventId: '42',
+          sessionId,
+          runId: 'run-example-1',
+          planId: 'plan-example-1',
+          planVersion: 1,
+          nodeId: null,
+          eventType: 'run.complete',
+          displayText: '运行已完成',
+          payload: { status: 'COMPLETED' },
+          occurredAt: '2026-08-06T10:00:02+08:00',
+        },
+      ];
+      const bodyText = events
+        .map(
+          (event) =>
+            `id: ${event.eventId}\nevent: ${event.eventType}\ndata: ${JSON.stringify(event)}\n\n`,
+        )
+        .join('');
+      await route.fulfill({ status: 200, contentType: 'text/event-stream', body: bodyText });
+      return;
+    }
+    if (path === `/api/v1/agent/sessions/${sessionId}/messages`) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(envelope({ total: 0, page: 1, size: 100, records: [] })),
+      });
+      return;
+    }
+    if (path === '/api/v1/agent/sessions') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          envelope({
+            total: 1,
+            page: 1,
+            size: 100,
+            records: [
+              {
+                sessionId,
+                summary: '周末观影',
+                status: 'ACTIVE',
+                createdAt: '2026-08-06T09:00:00+08:00',
+                updatedAt: '2026-08-06T09:00:00+08:00',
+              },
+            ],
+          }),
+        ),
+      });
+      return;
+    }
+    await route.fallback();
+  });
+}
+
+test('匿名访问 Agent 工作区安全跳转登录', async ({ page }) => {
+  await page.route('**/api/v1/auth/me*', async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify(envelope(null, 201006)),
+    });
+  });
+  await page.goto(`/assistant/${sessionId}`);
+  await expect(page).toHaveURL(/\/login\?returnUrl=%2Fassistant%2Fsession-example-1/);
+});
+
+test('登录用户消费 POST SSE 并展示类型化降级卡片', async ({ page }) => {
+  await mockAuthenticatedAgent(page);
+  await page.goto(`/assistant/${sessionId}`);
+  await expect(page.getByRole('heading', { name: '妙语观影助手' })).toBeVisible();
+  const mobileSessionButton = page.getByRole('button', { name: '会话列表' });
+  const mobileLayout = await mobileSessionButton.isVisible().catch(() => false);
+  if (mobileLayout) {
+    await mobileSessionButton.click();
+  }
+  await expect(page.getByText('周末观影')).toBeVisible();
+  if (mobileLayout) await page.keyboard.press('Escape');
+  await page.getByLabel('观影需求').fill('推荐一部电影');
+  await page.getByRole('button', { name: /发\s*送/ }).click();
+  await expect(page.getByText('暂未找到可购场次')).toBeVisible();
+  await expect(page.getByText('当前结果为降级数据，请注意来源和有效时间')).toBeVisible();
+  await expect(page.getByText('recommendation')).toBeVisible();
+  await expect(page.getByText('已完成', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /购票|确认|支付/ })).toHaveCount(0);
+  await expect(page.getByText(/¥|库存|路线|餐饮/)).toHaveCount(0);
+});
