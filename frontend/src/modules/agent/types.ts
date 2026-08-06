@@ -9,7 +9,8 @@ export const AGENT_EVENT_TYPES = [
   'step.complete',
   'step.failed',
   'tool.start',
-  'tool.result',
+  'tool.complete',
+  'tool.error',
   'card',
   'message.complete',
   'message.error',
@@ -55,7 +56,43 @@ export interface AgentEvent {
 }
 
 export type AgentCardPayloadType =
-  'TEXT' | 'QUESTION' | 'MOVIE_CARD' | 'PLAN_CARD' | 'PROGRESS' | 'ERROR';
+  'TEXT' | 'QUESTION' | 'MOVIE_CARD' | 'PLAN_CARD' | 'BUSINESS_INTENT' | 'PROGRESS' | 'ERROR';
+
+export type BusinessIntent =
+  | 'BROWSE_MOVIES'
+  | 'BROWSE_CINEMAS'
+  | 'VIEW_MOVIE'
+  | 'VIEW_SHOWS'
+  | 'SELECT_SEATS'
+  | 'REVIEW_ORDER'
+  | 'VIEW_ORDER'
+  | 'REQUEST_REFUND'
+  | 'VIEW_TRAVEL_ADVICE';
+
+export interface ToolStartPayload {
+  toolName: string;
+  displayText: string;
+}
+
+export interface ToolCompletePayload extends ToolStartPayload {
+  degraded: boolean;
+  fallbackType?: string;
+  dataAt?: string;
+}
+
+export interface ToolErrorPayload extends ToolStartPayload {
+  errorCode: string | number;
+  retryable: boolean;
+  replanSuggested: boolean;
+}
+
+export interface BusinessIntentCardPayload {
+  type: 'BUSINESS_INTENT';
+  payload: {
+    intent: BusinessIntent;
+    businessRef: { showId: string };
+  };
+}
 
 export interface AgentRunMessage {
   messageId: string;

@@ -1,6 +1,6 @@
 import { AGENT_EVENT_TYPES } from './types';
 import type { AgentEvent, AgentMessage, AgentRunSnapshot, AgentWorkspaceStatus } from './types';
-import { validateAgentCardEvent } from './contract';
+import { validateAgentCardEvent, validateAgentToolEvent } from './contract';
 
 export type AgentDisplayKind =
   | 'assistant-text'
@@ -11,6 +11,7 @@ export type AgentDisplayKind =
   | 'error'
   | 'progress'
   | 'question'
+  | 'business-intent'
   | 'user-text';
 
 export interface AgentDisplayItem {
@@ -162,6 +163,17 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
       fields: locationState ? [{ label: '位置授权', value: locationState }] : undefined,
     };
   }
+  if (type === 'BUSINESS_INTENT') {
+    const nested = event.payload.payload as Record<string, unknown>;
+    const businessRef = nested.businessRef as Record<string, unknown>;
+    return {
+      key,
+      kind: 'business-intent',
+      title: '已确认场次',
+      text: '已确认场次，可选座',
+      fields: [{ label: '场次 ID', value: businessRef.showId as string }],
+    };
+  }
   if (type === 'PROGRESS') {
     return {
       key,
@@ -215,12 +227,16 @@ function displayItem(event: AgentEvent): AgentDisplayItem | null {
   if (event.eventType === 'message.delta') {
     return { key, kind: 'assistant-text', text: event.displayText };
   }
+  if (event.eventType === 'tool.complete' && event.payload.degraded === true) {
+    return { key, kind: 'progress', text: `${event.displayText || '工具已完成'}，结果可能不完整` };
+  }
   if (
     event.eventType === 'message.start' ||
     event.eventType === 'step.start' ||
     event.eventType === 'tool.start' ||
-    event.eventType === 'step.complete' ||
-    event.eventType === 'tool.result'
+    event.eventType === 'tool.complete' ||
+    event.eventType === 'tool.error' ||
+    event.eventType === 'step.complete'
   ) {
     return { key, kind: 'progress', text: event.displayText || '正在处理' };
   }
@@ -275,7 +291,21 @@ export function consumeAgentEvent(
     };
   }
 
+  if (
+    event.eventType === 'tool.start' ||
+    event.eventType === 'tool.complete' ||
+    event.eventType === 'tool.error'
+  ) {
+    if (!validateAgentToolEvent(event)) {
+      return {
+        outcome: 'rejected',
+        projection: { ...projection, safeError: '收到的工具进度内容不完整，已保留当前结果' },
+      };
+    }
+  }
+
   const unknownEvent = !AGENT_EVENT_TYPES.some((type) => type === event.eventType);
+  if (unknownEvent) return { outcome: 'ignored', projection };
   const item =
     cardValidation?.decision === 'safe-text' || unknownEvent
       ? safePlaceholder(event)

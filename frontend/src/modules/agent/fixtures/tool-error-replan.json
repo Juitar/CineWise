@@ -1,0 +1,18 @@
+{
+  "eventId": "42",
+  "eventType": "tool.error",
+  "sessionId": "session-1",
+  "runId": "run-1",
+  "planId": "plan-1",
+  "planVersion": 2,
+  "nodeId": "query-shows-node",
+  "occurredAt": "2026-08-06T10:00:02+08:00",
+  "displayText": "工具暂时无法完成查询",
+  "payload": {
+    "toolName": "queryShows",
+    "displayText": "工具暂时无法完成查询",
+    "errorCode": 306002,
+    "retryable": true,
+    "replanSuggested": true
+  }
+}

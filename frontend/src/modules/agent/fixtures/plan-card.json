@@ -1,0 +1,31 @@
+{
+  "eventId": "44",
+  "eventType": "card",
+  "sessionId": "session-1",
+  "runId": "run-1",
+  "planId": "plan-1",
+  "planVersion": 2,
+  "nodeId": "render-plan-node",
+  "occurredAt": "2026-08-06T10:00:04+08:00",
+  "displayText": "已找到可购方案",
+  "payload": {
+    "type": "PLAN_CARD",
+    "title": "推荐场次",
+    "plans": [
+      {
+        "movieId": "movie-1",
+        "cinemaId": "cinema-1",
+        "showId": "show-70001",
+        "price": "45.00",
+        "startTime": "2026-08-06T19:30:00+08:00",
+        "source": "queryShows",
+        "expired": false,
+        "purchaseEligible": true
+      }
+    ],
+    "source": "recommendation",
+    "dataAt": "2026-08-06T10:00:00+08:00",
+    "expiresAt": "2026-08-06T10:10:00+08:00",
+    "degraded": false
+  }
+}

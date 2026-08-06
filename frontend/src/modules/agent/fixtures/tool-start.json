@@ -1,0 +1,12 @@
+{
+  "eventId": "40",
+  "eventType": "tool.start",
+  "sessionId": "session-1",
+  "runId": "run-1",
+  "planId": "plan-1",
+  "planVersion": 2,
+  "nodeId": "query-shows-node",
+  "occurredAt": "2026-08-06T10:00:00+08:00",
+  "displayText": "正在查询场次",
+  "payload": { "toolName": "queryShows", "displayText": "正在查询场次" }
+}
