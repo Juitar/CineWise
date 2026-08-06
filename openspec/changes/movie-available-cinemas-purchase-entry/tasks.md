@@ -1,10 +1,10 @@
-## 方案确认（当前只能停在这里）
+## 接口已确认，等待 C 完成前端入口
 
 - [x] C 根据 A 于 2026-08-07 的确认，在唯一 `applicationSecurityFilterChain` 将 `GET /api/v1/shows/available-cinemas` 加入精确公开白名单；验证：`CineWiseApplicationTest` 断言匿名 GET 不返回 401/403，且默认未公开路径仍返回 401。
-- [ ] A、D 在 A PR 提供并确认最终 DTO、OpenAPI、固定夹具和 `movieId/page/size` 校验；验证：字段、范围与确认记录一致。
-- [ ] A 确认可售时间窗口、`ON_SALE`、余座、排序、分页和时区；验证：边界及空结果契约测试。
-- [ ] D 确认影院摘要 Application API、字段来源和时间语义；验证：不暴露持久化对象，内容故障不等于空结果。
-- [ ] A、D 确认非法 ID、影片不存在/下线、内容不可用、票务失败的 HTTP 状态和业务码；验证：契约测试记录状态码和业务码。
+- [x] A 已提供并验证最终 DTO、OpenAPI 注解、固定夹具和 `movieId/page/size` 校验；验证：`AvailableCinemaContractFixtureTest`、`AvailableCinemasIntegrationTest`。
+- [x] A 已确认并测试可售时间窗口、`ON_SALE`、余座、排序、分页和 `Asia/Shanghai` 时区；验证：`AvailableCinemaQueryServiceTest` 与 `TicketingQueryMapper` SQL 条件。
+- [x] D 已在影院详情购票流程确认中提供影院摘要 Application API、字段来源和时间语义；验证：不暴露持久化对象，内容故障不等于空结果。
+- [x] A、D 已在 #124 PR 及相关契约测试中确认非法 ID、影片不存在/下线、内容不可用、票务失败的 HTTP 状态和业务码；验证：固定夹具与 HTTP 测试记录状态码和业务码。
 
 ## 接口确认后由 C 实现
 
