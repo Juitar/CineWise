@@ -13,6 +13,8 @@
 
 业务 ID 是正十进制 `String`，日期和时间由 Adapter 转为 `LocalDate`、`LocalTime`。无结果是 `SUCCESS`，不生成虚构场次或日期。`availableSeatCount` 仅为读取时快照，不作为锁座承诺；每个场次的 `expiresAt` 仅是该候选的截止时刻。
 
+两个成功 `ToolResult` 都由 A 的业务 `Clock` 生成 freshness 元数据：`dataAt` 是本次 Application 查询完成时刻，默认 `expiresAt=dataAt+5s`。`queryShows` 的公共 `expiresAt` 还不得晚于返回场次中最早的候选 `expiresAt`；失败结果的两个字段保持同时为空。B 的 Adapter 只消费这两个字段，不自行生成时间。
+
 ### Execution and failure
 
 Adapter 重新从状态机选择当前可执行节点，先标记 `RUNNING`，再调用业务 Tool，并将唯一 `ToolResult` 交回 `recordToolResult`。调用预算取 `min(5 seconds, remainingDeadlineMs)`；只读 Tool 不生成 `clientRequestId` 或 `idempotencyKey`。

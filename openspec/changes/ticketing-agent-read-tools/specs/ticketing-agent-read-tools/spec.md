@@ -42,3 +42,14 @@
 - **WHEN** 节点含有未声明输入引用或非槽位来源
 - **THEN** Adapter 返回 `FAILED + 100001`
 - **AND** 不调用业务 Tool
+
+### Requirement: 成功查询必须携带受控时效窗口
+
+两个查询 Tool 的成功 `ToolResult` SHALL 使用 A 注入的业务 `Clock` 填充成对的 `dataAt` 和 `expiresAt`。默认窗口为 `dataAt` 起五秒；`queryShows` 的公共 `expiresAt` 不得晚于返回场次中最早的场次候选截止时间。失败结果的两个字段 SHALL 同时为空，B 的 Adapter 不得重写它们。
+
+#### Scenario: 成功查询返回可供 Agent 判断的新鲜度
+
+- **WHEN** `queryAvailableDates` 或 `queryShows` 查询成功
+- **THEN** `dataAt` 和 `expiresAt` 均非空
+- **AND** `expiresAt` 严格晚于 `dataAt`
+- **AND** `expiresAt` 不超过五秒窗口或场次候选的更早截止时间
