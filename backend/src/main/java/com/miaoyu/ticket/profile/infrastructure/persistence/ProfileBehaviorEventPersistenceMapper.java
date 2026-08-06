@@ -13,7 +13,7 @@ public interface ProfileBehaviorEventPersistenceMapper {
       """
       SELECT event_id AS event_id, user_id AS user_id, event_type AS event_type,
              target_type AS target_type, target_id AS target_id, occurred_at AS occurred_at,
-             CAST(payload_json AS CHAR) AS payload_json
+             COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.changed')) = 'true', FALSE) AS changed
         FROM user_behavior_event WHERE event_id = #{eventId}
       """)
   ProfileBehaviorEventRow findByEventId(@Param("eventId") String eventId);

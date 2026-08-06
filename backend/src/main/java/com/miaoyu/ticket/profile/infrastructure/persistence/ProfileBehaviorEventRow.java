@@ -10,4 +10,4 @@ public record ProfileBehaviorEventRow(
     String targetType,
     String targetId,
     LocalDateTime occurredAt,
-    String payloadJson) { }
+    boolean changed) { }

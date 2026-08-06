@@ -51,6 +51,6 @@ public class MybatisProfileBehaviorEventRepository implements ProfileBehaviorEve
         ProfileBehaviorTargetType.valueOf(row.targetType()),
         row.targetId(),
         row.occurredAt(),
-        "{\"changed\":true}".equals(row.payloadJson()));
+        row.changed());
   }
 }
