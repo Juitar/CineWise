@@ -2,6 +2,7 @@ import React from 'react';
 import { Menu } from 'antd';
 import { Link, history, useLocation } from 'umi';
 import { BrandLogoIcon } from '../../shared/components/icons';
+import { ActivityIcon, DashboardIcon, OrderIcon } from '../../shared/components/icons/layout-icons';
 import './index.css';
 
 export function AdminSidebar() {
@@ -11,17 +12,17 @@ export function AdminSidebar() {
   const menuItems = [
     {
       key: '/admin/content',
-      icon: <span className="menu-icon">🏠</span>,
+      icon: <DashboardIcon size={18} />,
       label: '工作台',
     },
     {
       key: '/admin/orders',
-      icon: <span className="menu-icon">📄</span>,
+      icon: <OrderIcon size={18} />,
       label: '订单管理',
     },
     {
       key: '/admin/agent-runs',
-      icon: <span className="menu-icon">🤖</span>,
+      icon: <ActivityIcon size={18} />,
       label: 'Agent轨迹',
     },
   ];

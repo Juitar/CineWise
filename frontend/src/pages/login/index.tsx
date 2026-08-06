@@ -9,8 +9,6 @@ import { resolveSafeReturnUrl } from '../../shared/auth/safeReturnUrl';
 import {
   BrandLogoIcon,
   CinemaIllustrationSVG,
-  EyeIcon,
-  EyeInvisibleIcon,
   HomeIcon,
   LockIcon,
   MailIcon,
@@ -239,9 +237,8 @@ export default function LoginPage() {
                   <label className="visually-hidden" htmlFor="password-input">
                     密码
                   </label>
-                  <Input
+                  <Input.Password
                     id="password-input"
-                    type={showPassword ? 'text' : 'password'}
                     size="large"
                     prefix={<LockIcon size={18} className="login-input-icon-antd" />}
                     placeholder="请输入密码"
@@ -256,17 +253,7 @@ export default function LoginPage() {
                     className="login-input-antd"
                     disabled={activeLoginDisabled}
                     maxLength={128}
-                    suffix={
-                      <button
-                        type="button"
-                        className="login-input-suffix-antd"
-                        onClick={() => setShowPassword(!showPassword)}
-                        title={showPassword ? '隐藏密码' : '显示密码'}
-                        aria-label={showPassword ? '隐藏密码' : '显示密码'}
-                      >
-                        {showPassword ? <EyeInvisibleIcon size={18} /> : <EyeIcon size={18} />}
-                      </button>
-                    }
+                    visibilityToggle={{ visible: showPassword, onVisibleChange: setShowPassword }}
                   />
                   <div className="login-forgot-row">
                     <Link to="/password/reset">忘记密码？</Link>
