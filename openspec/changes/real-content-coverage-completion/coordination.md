@@ -32,7 +32,7 @@
 ### 3. A 的迁移与票务边界输入
 
 - 已形成迁移申请设计：`movie` 新增可空 `poster_url/summary/release_status/release_date`；`content_identity_mapping` 保存外部身份、内部内容 ID、ACTIVE/INVALID 状态、固定失效分类和生成 ACTIVE 唯一键；`cinema` 新增 `city_name/provider_city_id`；`data_sync_log` 新增城市字段和固定 `failure_category`，完整字段、索引、CHECK、180 天清理和兼容规则见 `design.md`。
-- 当前已发布迁移最高为 V012。A 已正式分配本 change 使用 V014；D 先补齐并同步完整 OpenSpec，再提交 V014 SQL 草案给 A 静态复核。复核通过前 D 不创建或执行 SQL，不修改既有迁移，也不自行执行 Flyway。
+- 当前已发布迁移最高为 V013，且 `V013__add_travel_task_cinema_id.sql` 已进入 `dev`。A 已正式分配本 change 使用 V014；A 在授权 V014 验证或发布前确认 V013 的最终验证结果、checksum 与执行顺序，V014 必须在 V013 之后执行。D 先补齐并同步完整 OpenSpec，再提交 V014 SQL 草案给 A 静态复核。复核通过前 D 不创建或执行 SQL，不修改既有迁移，也不自行执行 Flyway。
 - 迁移还需为 `cinema` 与 `data_sync_log` 增加 `city_name`、`provider_city_id`，使按城市同步、状态展示和按原请求恢复可追溯；地点原文不落库。
 - 真实影片/影院仅展示基础资料。没有 A 公开可售结果时，C 显示“暂无可售场次”，不显示价格、余座或购票入口。
 - A 未来只能经 D 的公开 Application API，用 `provider + resourceType + externalId` 解析内部 ID；不得读取 D 的 Entity、Mapper、Repository、缓存或内容表。
