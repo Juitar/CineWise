@@ -1,0 +1,101 @@
+name: Backend MySQL Integration
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mysql-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          TZ: Asia/Shanghai
+          MYSQL_ROOT_PASSWORD: root-ci-only
+          MYSQL_DATABASE: cinewise_ticketing_concurrency_check
+          MYSQL_USER: cinewise_ci
+          MYSQL_PASSWORD: cinewise-ci-only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot-ci-only --silent"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TZ: Asia/Shanghai
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: cinewise_ticketing_concurrency_check
+      MYSQL_USER: cinewise_ci
+      MYSQL_PASSWORD: cinewise-ci-only
+      SPRING_FLYWAY_TARGET: latest
+      JWT_SECRET: cinewise-ci-jwt-secret-at-least-32-bytes-long
+      AUTH_AUDIT_HASH_SECRET: cinewise-ci-audit-secret-at-least-32-bytes-long
+      AUTH_VERIFICATION_HASH_SECRET: cinewise-ci-verification-secret-at-least-32-bytes
+      AUTH_INVITE_HASH_SECRET: cinewise-ci-invite-secret-at-least-32-bytes
+      AUTH_CURRENT_PRIVACY_POLICY_VERSION: 2026-08-03
+      CINEWISE_MYSQL_IT: "true"
+      CINEWISE_MYSQL_CONCURRENCY_IT: "true"
+      CINEWISE_MYSQL_LIFECYCLE_IT: "true"
+      CINEWISE_MYSQL_PAYMENT_IT: "true"
+      CINEWISE_MYSQL_REFUND_IT: "true"
+      CINEWISE_MYSQL_PAID_TRAVEL_RECONCILIATION_IT: "true"
+      CINEWISE_MYSQL_REFUNDED_TRAVEL_RECONCILIATION_IT: "true"
+      CINEWISE_MYSQL_ADMIN_ORDER_IT: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Create migration and Agent integration databases
+        env:
+          MYSQL_PWD: root-ci-only
+        run: >-
+          mysql --protocol=tcp -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u root
+          -e "CREATE DATABASE cinewise_migration_ci CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+          CREATE DATABASE cinewise_agent_it CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+          GRANT ALL PRIVILEGES ON cinewise_migration_ci.* TO 'cinewise_ci'@'%';
+          GRANT ALL PRIVILEGES ON cinewise_agent_it.* TO 'cinewise_ci'@'%';"
+      - name: Verify latest Flyway migrations on empty MySQL
+        working-directory: backend
+        env:
+          MYSQL_DATABASE: cinewise_migration_ci
+          CINEWISE_MYSQL_MIGRATION_IT: "true"
+        run: >-
+          bash ./mvnw --batch-mode --no-transfer-progress
+          -Dtest=FlywayLatestMySqlIntegrationTest
+          test
+      - name: Run MySQL 8.4 integration tests
+        working-directory: backend
+        run: >-
+          bash ./mvnw --batch-mode --no-transfer-progress
+          -Dtest=ShowQueryMySqlIntegrationTest,OrderCreationMySqlConcurrencyIntegrationTest,OrderLifecycleMySqlIntegrationTest,PaymentMySqlIntegrationTest,RefundMySqlIntegrationTest,PaidTravelTaskReconciliationMySqlIntegrationTest,RefundedTravelTaskReconciliationMySqlIntegrationTest,AdminOrderQueryMySqlIntegrationTest
+          test
+      - name: Run Agent MySQL persistence integration tests
+        working-directory: backend
+        env:
+          MYSQL_DATABASE: cinewise_agent_it
+          CINEWISE_MYSQL_AGENT_PERSISTENCE_IT: "true"
+        run: >-
+          bash ./mvnw --batch-mode --no-transfer-progress
+          -Dtest=AgentPersistenceMySqlIntegrationTest
+          test
+      - name: Repeat Agent Flyway initialization
+        working-directory: backend
+        env:
+          MYSQL_DATABASE: cinewise_agent_it
+          CINEWISE_MYSQL_AGENT_PERSISTENCE_IT: "true"
+        run: >-
+          bash ./mvnw --batch-mode --no-transfer-progress
+          -Dtest=AgentPersistenceMySqlIntegrationTest
+          test
