@@ -106,19 +106,15 @@ SSE 复用 `card` 与 `tool.result` 等持久化事件类型：新增的确认�
 
 ## Risks / Trade-offs
 
-- [A 的公开建单 Tool 已落地但未调用 B 授权 Port] → B 的生产适配器已只依赖 `CreateOrderTool`，但当前 `CreateOrderTool.execute` 未注入或调用 `AgentActionAuthorizationPort`。A 必须在进入 `OrderApplicationService` 前补齐该调用；B 不改 A 的订单代码，也不把本 change 的 B 侧校验当作替代。
-- [MySQL CI 已验证] → `Backend MySQL Integration / mysql-integration` 运行 `31026148068`（第 154 次，重跑）通过，已覆盖空库 Flyway、重复初始化、action 创建/查询、CAS、重复确认、并发最多一次建单、结果未知恢复和回滚；后续生产 A/B 联调仍须在 A 接入授权 Port 后补充。
+- [A/B 授权已接入] → B 的生产适配器只依赖 `CreateOrderTool`；A 的 `CreateOrderTool.execute` 已在进入 `OrderApplicationService` 前调用 `AgentActionAuthorizationPort`。拒绝统一返回 `205004`，不进入订单事务、锁座或订单写入。
+- [MySQL CI 已验证] → `Backend MySQL Integration / mysql-integration` 运行 `31026148068`（第 154 次，重跑）已覆盖确认动作的空库 Flyway、重复初始化、action 创建/查询、CAS、重复确认、并发最多一次建单、结果未知恢复和回滚；A 授权拒绝路径由运行 `31064766664`（第 161 次）在 MySQL 8.4 中额外验证。
 - [写结果丢失] → 固定原 action 的键并查询；查不到结论保持 `RESULT_UNKNOWN`，宁可提示处理中也不重复建单。
 - [并发确认] → CAS 和唯一约束作为最终保证，单机锁和 SSE 状态不作为正确性依据；在 CI MySQL 8.4 验证并发。
-- [A API 最终需要同步身份] → `ToolContext` 已预留 run/node/trace/稳定键；A 必须确认 userId 如何在公开 API 内安全获得，B 不传递前端用户字段。
+- [当前用户身份] → `ToolContext` 不携带 userId；A 已在公开 Tool 内通过 `CurrentUserAccessor` 取得当前用户，B 不传递或模拟前端用户字段。
 
 ## Migration Plan
 
 1. V011 已发布，原 V012 邀请码种子已取消；A 已分配、审查并发布 V012（`ddd4fcf`）。B 不再修改该迁移。
 2. B 已在 GitHub Actions 的 `Backend MySQL Integration / mysql-integration` job 对空 `cinewise_agent_it` 验证首次 Flyway、重复启动、CAS、并发和恢复；运行 `31026148068`（第 154 次，重跑）通过。
-3. B 部署领域与适配器；确认卡只在服务端 action 持久化后发布。A 的生产适配器经接口测试后才启用。
+3. B 部署领域与适配器；确认卡只在服务端 action 持久化后发布。A/B Tool 契约和 MySQL 授权拒绝路径已验证后启用生产适配器。
 4. 回滚时停止创建新 action；已 `RESULT_UNKNOWN` 的 action 继续按原键查询，不删除记录、不生成替代键。
-
-## Open Questions
-
-1. A：在 `com.miaoyu.ticket.order.api.CreateOrderTool.execute` 中，在调用 `OrderApplicationService` 前调用 B 的 `AgentActionAuthorizationPort`；验证：A 的类型化 Tool 契约测试覆盖授权拒绝映射为 `205004`，且不创建订单。

@@ -24,8 +24,8 @@
 
 - [x] 4.1 B/A：`V012__create_agent_action_table.sql` 已由 A 静态审查、MySQL 8.4 迁移验证并发布；B 已实现 MyBatis 映射、查询索引、唯一约束和 CAS SQL；验证：`dev@ddd4fcf`、`AgentConfirmationActionPersistenceTest`、GitHub Actions `31025050412`。
 - [x] 4.2 B：在持久化实现可用后实现 `POST /api/v1/agent/actions/{actionId}/confirm`，只接受 `{confirmed}` 且经 `CurrentUserAccessor` 校验；验证：`AgentControllerTest` 覆盖成功、额外字段拒绝、206003、206004、206005、206006，领域/服务测试覆盖拒绝、越权、运行结束、版本变化与业务失效，MySQL CI `31025050412` 覆盖持久化 Service。
-- [ ] 4.3 A/B：A 在独立 change 落地 `com.miaoyu.ticket.order.api.CreateOrderTool`、`CreateOrderForAgentCommand`、`AgentOrderResult` 和原请求查询入口后，B 实现并注册生产 `CreateOrderToolAdapter`；验证：只经 A 公开 API 的契约测试、原键结果查询和无本机 HTTP/私有持久化访问扫描。
-- [ ] 4.4 A：在 `CreateOrderTool.execute` 调用 `OrderApplicationService` 前调用 B 的 `AgentActionAuthorizationPort`；验证：A 的 Tool 契约测试授权拒绝返回 `205004` 且订单不落库。当前 `dev` 的 `CreateOrderTool` 尚未引用该 Port，B 不得以本模块本地校验替代。
+- [x] 4.3 A/B：A 已落地 `com.miaoyu.ticket.order.api.CreateOrderTool`、`CreateOrderForAgentCommand`、`AgentOrderResult` 和原请求查询入口后，B 已实现并注册生产 `CreateOrderToolAdapter`；验证：`CreateOrderToolAdapterTest` 仅调用 A 公开 Tool、传递服务端 Command，并在恢复时只按原键查询，未使用本机 HTTP 或 A 私有持久化。
+- [x] 4.4 A：`CreateOrderTool.execute` 已在调用 `OrderApplicationService` 前调用 B 的 `AgentActionAuthorizationPort`；验证：A PR #90（合并提交 `a63be849`）的 Tool 契约测试和 GitHub Actions MySQL 8.4 `31064766664`（第 161 次）验证授权拒绝返回 `205004`、订单不落库且座位不锁定。
 
 ## 5. SSE、恢复与并发
 
@@ -36,4 +36,4 @@
 ## 6. MySQL CI 与交付检查
 
 - [x] 6.1 B/A：已在 `Backend MySQL Integration / mysql-integration` 的一次性 MySQL 8.4 `cinewise_agent_it` 执行空库 Flyway、重复启动、action 创建/查询/过期/重复确认/并发/CAS/未知恢复/回滚；运行 `31026148068`（第 154 次，重跑）通过。
-- [x] 6.2 B：完成本地相关单元和 H2 集成测试、`backend/mvnw.cmd verify`、严格 OpenSpec 校验、`git diff --check`、状态和变更范围核对；验证：本地 `verify` 通过，GitHub Actions Backend Verify `31026148341`（第 311 次，重跑）通过；未验证项已列为 A 授权 Port 和真实运行时 Command 来源。
+- [x] 6.2 B：完成本地相关单元和 H2 集成测试、`backend/mvnw.cmd verify`、严格 OpenSpec 校验、`git diff --check`、状态和变更范围核对；验证：合入 A PR #90 后本地 `backend/mvnw.cmd verify`、`openspec validate agent-confirmed-order-execution --strict` 和 `git diff --check` 均通过；GitHub Actions Backend Verify `31065207143`（第 328 次）通过。A 授权 Port 与真实运行时 Command 的接入已由 4.3、4.4 验证。
