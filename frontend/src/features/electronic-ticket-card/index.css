@@ -41,6 +41,14 @@
   margin: 0;
 }
 
+.ticket-movie-poster {
+  width: 48px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #f5f5f5;
+}
+
 .ticket-info-list {
   display: flex;
   flex-direction: column;
