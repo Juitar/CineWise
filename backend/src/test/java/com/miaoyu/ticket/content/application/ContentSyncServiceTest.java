@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.content.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.miaoyu.ticket.content.domain.ContentItem;
 import com.miaoyu.ticket.content.domain.ContentResourceType;
@@ -205,6 +206,41 @@ class ContentSyncServiceTest {
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }
+    }
+
+    @Test
+    void givenSlowWorkerLosesLeaseBeforeWriting_whenAdminSyncReturns_thenItDoesNotWriteMovieSnapshotCacheOrAudit() {
+        ContentQuery query = new ContentQuery(ContentResourceType.MOVIE, 1L, null, null);
+        ContentResult<List<? extends ContentItem>> result = new ContentResult<>(List.of(
+                new MovieContent("late-1", "慢请求影片", "[\"剧情\"]", 90, new BigDecimal("8.0"))),
+                new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), LocalDateTime.of(2026, 8, 4, 9, 0),
+                LocalDateTime.of(2026, 8, 4, 15, 0), false, false, null);
+        AtomicInteger movies = new AtomicInteger();
+        AtomicInteger snapshots = new AtomicInteger();
+        AtomicInteger caches = new AtomicInteger();
+        AtomicInteger logs = new AtomicInteger();
+        ContentPersistencePort guardedPersistence = new ContentPersistencePort() {
+            @Override public long ensureMovie(MovieRow row) {
+                movies.incrementAndGet();
+                return row.id();
+            }
+            @Override public long ensureCinema(CinemaRow row) { return row.id(); }
+            @Override public void insertSnapshot(SnapshotRow row) { }
+            @Override public void insertSyncLog(SyncLogRow row) { logs.incrementAndGet(); }
+        };
+        ContentSyncService service = new ContentSyncService(
+                () -> batch(List.of(new LiveContentSyncPort.SynchronizedContent(query, result)), 1,
+                        LiveContentSyncPort.Outcome.SUCCESS, null), snapshotPort(snapshots), cachePort(caches),
+                guardedPersistence, () -> 99L,
+                Clock.fixed(Instant.parse("2026-08-04T01:00:00Z"), ZoneId.of("Asia/Shanghai")));
+
+        // 恢复器已收敛任务或其他实例已接管时，慢 Provider 的旧结果必须在任何公开资料写入前被丢弃。
+        assertThatThrownBy(() -> service.synchronizeCurrentHotMoviesWithResult(() -> false))
+                .isInstanceOf(ContentSyncService.LeaseLostException.class);
+        assertThat(movies).hasValue(0);
+        assertThat(snapshots).hasValue(0);
+        assertThat(caches).hasValue(0);
+        assertThat(logs).hasValue(0);
     }
     private ContentSnapshotPort snapshotPort(AtomicInteger saved) { return new ContentSnapshotPort() {
         @Override public Optional<ContentResult<List<? extends ContentItem>>> findLatest(ContentQuery query) {
