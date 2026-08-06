@@ -53,7 +53,7 @@ const sessionPage = {
   ],
 };
 
-function snapshot(status: AgentRunSnapshot['status']): AgentRunSnapshot {
+function snapshot(status: AgentRunSnapshot['status'], lastEventId = '40'): AgentRunSnapshot {
   return {
     runId: 'run-example-1',
     sessionId: 'session-example-1',
@@ -62,7 +62,7 @@ function snapshot(status: AgentRunSnapshot['status']): AgentRunSnapshot {
     planVersion: 1,
     startedAt: null,
     finishedAt: status === 'RUNNING' ? null : '2026-08-05T10:00:01+08:00',
-    lastEventId: '40',
+    lastEventId,
     messages: [],
     steps: [],
     events: [],
@@ -225,7 +225,7 @@ describe('useAgentWorkspace 状态与恢复', () => {
 
   it('20 秒无事件或心跳时查询原运行并使用原游标续传', async () => {
     vi.useFakeTimers();
-    mocks.getAgentRun.mockResolvedValue(snapshot('RUNNING'));
+    mocks.getAgentRun.mockResolvedValue(snapshot('RUNNING', '42'));
     mocks.postAgentStream.mockImplementation(
       async (_session, _request, _cursor, signal, handlers) => {
         if (mocks.postAgentStream.mock.calls.length === 1) await handlers.onEvent(processingEvent);
@@ -253,7 +253,7 @@ describe('useAgentWorkspace 状态与恢复', () => {
     });
     expect(mocks.getAgentRun).toHaveBeenCalledWith('run-example-1');
     expect(mocks.postAgentStream).toHaveBeenCalledTimes(2);
-    expect(mocks.postAgentStream.mock.calls[1][2]).toBe('40');
+    expect(mocks.postAgentStream.mock.calls[1][2]).toBe('42');
     unmount();
     await act(async () => {
       await submission;

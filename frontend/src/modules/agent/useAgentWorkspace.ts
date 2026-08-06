@@ -176,7 +176,7 @@ export function useAgentWorkspace(sessionId: string) {
         if (sequence !== sequenceRef.current) return;
         const rebuilt = buildProjectionFromSnapshot(snapshot, history.records);
         replaceProjection(rebuilt);
-        if (snapshot.status === 'RUNNING') await resume(current.lastEventId);
+        if (snapshot.status === 'RUNNING') await resume(rebuilt.lastEventId);
       } catch (error) {
         if (sequence !== sequenceRef.current) return;
         replaceProjection({

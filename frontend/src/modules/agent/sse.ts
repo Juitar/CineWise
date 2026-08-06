@@ -125,15 +125,14 @@ export async function postAgentStream(
         signal,
       },
     );
-    // 服务端可在 POST SSE 建连时更新 CSRF Cookie；下一次重连必须重新获取匹配的新 Header。
-    clearCsrfToken();
+    // 服务端成功建立 SSE 后可能更新 CSRF Cookie；下一次请求重新获取匹配的新 Header。
+    // 非 2xx 响应必须先交给 safeHttpError，403/201007 不能清掉当前 Token。
   } catch (error) {
-    // 请求可能已到达服务端并更新 Cookie，断网或取消后也不能继续复用旧 Token。
-    clearCsrfToken();
     if (signal.aborted) throw new ApiError('Agent 请求已取消', { kind: 'CANCELLED' });
     throw new ApiError('Agent 网络连接失败', { kind: 'NETWORK', isResultUnknown: true });
   }
 
+  if (response.ok) clearCsrfToken();
   if (!response.ok) throw await safeHttpError(response);
   if (!response.body) {
     throw new ApiError('Agent 服务没有返回事件流', { kind: 'INVALID_RESPONSE' });

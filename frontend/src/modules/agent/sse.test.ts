@@ -118,6 +118,38 @@ describe('POST SSE 客户端', () => {
     );
   });
 
+  it.each([
+    [201007, false],
+    [201009, true],
+  ])('SSE 建连返回 403/%s 时按公共规则处理 CSRF Token', async (code, shouldRefresh) => {
+    const responses = [
+      csrfResponse(),
+      new Response(JSON.stringify({ code, message: 'denied', data: null }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+      ...(shouldRefresh ? [csrfResponse()] : []),
+      new Response(streamFrom([]), { status: 200 }),
+    ];
+    const fetchMock = vi.fn().mockImplementation(async () => responses.shift());
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      postAgentStream('session-example-1', REQUEST, null, new AbortController().signal, {
+        onEvent: vi.fn(),
+        onHeartbeat: vi.fn(),
+      }),
+    ).rejects.toMatchObject({ status: 403, code });
+    await postAgentStream('session-example-1', REQUEST, '40', new AbortController().signal, {
+      onEvent: vi.fn(),
+      onHeartbeat: vi.fn(),
+    });
+
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/v1/auth/csrf')).toHaveLength(
+      shouldRefresh ? 2 : 1,
+    );
+  });
+
   it('非法 JSON 不会作为事件投递', async () => {
     vi.stubGlobal(
       'fetch',
