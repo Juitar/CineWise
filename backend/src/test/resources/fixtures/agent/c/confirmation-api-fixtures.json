@@ -1,0 +1,9 @@
+{
+  "request": {"confirmed": true},
+  "success": {"code": 0, "message": "success", "traceId": "trace-1", "data": {"actionId": "action-1", "runId": "run-1", "planVersion": 2, "status": "SUCCEEDED", "updatedAt": "2026-08-05T16:31:00+08:00"}},
+  "rejected": {"code": 0, "message": "success", "traceId": "trace-2", "data": {"actionId": "action-1", "runId": "run-1", "planVersion": 2, "status": "REJECTED", "updatedAt": "2026-08-05T16:31:00+08:00"}},
+  "expired": {"code": 206003, "message": "确认动作已过期", "traceId": "trace-3", "data": null},
+  "parametersChanged": {"code": 206004, "message": "操作内容已变化", "traceId": "trace-4", "data": null},
+  "duplicate": {"code": 206006, "message": "正在确认操作结果，请勿重复提交", "traceId": "trace-5", "data": null},
+  "resultUnknown": {"code": 0, "message": "success", "traceId": "trace-6", "data": {"actionId": "action-1", "runId": "run-1", "planVersion": 2, "status": "RESULT_UNKNOWN", "updatedAt": "2026-08-05T16:31:00+08:00"}}
+}

@@ -58,12 +58,16 @@ class PersistentAgentConfirmationEventPublisherTest {
         verify(runtimeEventService).append(Mockito.eq(session()), Mockito.eq(run()),
                 Mockito.eq(AgentEventType.CARD), payload.capture());
         var json = new ObjectMapper().readTree(payload.getValue().value());
+        assertThat(json.path("type").asText()).isEqualTo("PLAN_CARD");
+        assertThat(json.path("nodeId").asText()).isEqualTo("confirm-order");
         assertThat(json.path("actionId").asText()).isEqualTo("action-1");
         assertThat(json.path("actionType").asText()).isEqualTo("CREATE_ORDER");
         assertThat(json.path("status").asText()).isEqualTo("PENDING_CONFIRMATION");
         assertThat(json.path("expireAt").asText()).contains("+08:00");
         assertThat(json.path("displayLines").isArray()).isTrue();
-        assertThat(json.has("planVersion")).isFalse();
+        assertThat(json.path("plans").isArray()).isTrue();
+        assertThat(json.path("dataAt").asText()).contains("+08:00");
+        assertThat(json.path("expiresAt").asText()).contains("+08:00");
         assertThat(json.has("showId")).isFalse();
         assertThat(json.has("seatIds")).isFalse();
         assertThat(json.has("parameterHash")).isFalse();

@@ -1,0 +1,1 @@
+{"eventId":"48","eventType":"card","sessionId":"session-example-1","runId":"run-example-1","occurredAt":"2026-08-05T10:00:07+08:00","planId":"plan-example-1","planVersion":1,"nodeId":"rank-movie","displayText":"正在推荐","payload":{"type":"PROGRESS","stage":"TOOL_RUNNING","status":"RUNNING"}}

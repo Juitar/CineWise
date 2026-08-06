@@ -23,6 +23,7 @@ class AgentCFixtureContractTest {
             assertThat(fixture.path("eventId").isTextual()).isTrue();
             assertThat(fixture.path("sessionId").isTextual()).isTrue();
             assertThat(fixture.path("runId").isTextual()).isTrue();
+            assertThat(fixture.has("planId")).isTrue();
             assertThat(fixture.has("planVersion")).isTrue();
             assertThat(fixture.has("nodeId")).isTrue();
             assertThat(fixture.path("eventType").isTextual()).isTrue();

@@ -2,17 +2,24 @@
   "eventId": "90001",
   "sessionId": "session-1",
   "runId": "run-1",
+  "planId": "plan-1",
   "planVersion": 2,
   "nodeId": "confirm-order",
   "eventType": "card",
   "displayText": "请确认建单",
   "occurredAt": "2026-08-05T16:30:00+08:00",
   "payload": {
+    "type": "PLAN_CARD",
     "actionId": "action-1",
     "actionType": "CREATE_ORDER",
     "expireAt": "2026-08-05T16:35:00+08:00",
     "status": "PENDING_CONFIRMATION",
-    "displayTitle": "确认建单",
-    "displayLines": ["影片：示例影片", "座位：A1、A2"]
+    "title": "确认建单",
+    "displayLines": ["影片：示例影片", "座位：A1、A2"],
+    "plans": [],
+    "source": "agent_confirmation",
+    "dataAt": "2026-08-05T16:30:00+08:00",
+    "expiresAt": "2026-08-05T16:35:00+08:00",
+    "degraded": false
   }
 }
