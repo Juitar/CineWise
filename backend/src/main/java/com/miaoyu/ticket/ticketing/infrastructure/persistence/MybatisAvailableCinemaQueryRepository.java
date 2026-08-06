@@ -15,11 +15,6 @@ public class MybatisAvailableCinemaQueryRepository implements AvailableCinemaQue
     }
 
     @Override
-    public long countAvailableCinemas(QueryCriteria criteria) {
-        return mapper.countAvailableCinemas(criteria);
-    }
-
-    @Override
     public List<AvailableCinemaSnapshot> findAvailableCinemas(QueryCriteria criteria) {
         return mapper.findAvailableCinemas(criteria).stream()
                 .map(row -> new AvailableCinemaSnapshot(row.cinemaId(), row.availableShowCount(),

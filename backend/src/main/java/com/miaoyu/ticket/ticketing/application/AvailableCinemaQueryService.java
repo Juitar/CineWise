@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Set;
+import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
@@ -53,13 +54,12 @@ public class AvailableCinemaQueryService {
         LocalDateTime now = LocalDateTime.ofInstant(businessClock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         LocalDateTime end = LocalDate.now(businessClock).plusDays(WINDOW_DAYS).atStartOfDay();
         AvailableCinemaQueryRepository.QueryCriteria criteria =
-                new AvailableCinemaQueryRepository.QueryCriteria(parsedMovieId, now, end, (int) offset, resolvedSize);
+                new AvailableCinemaQueryRepository.QueryCriteria(parsedMovieId, now, end);
         try {
-            long total = repository.countAvailableCinemas(criteria);
-            if (total == 0) {
+            var snapshots = repository.findAvailableCinemas(criteria);
+            if (snapshots.isEmpty()) {
                 return new PageResult<>(0, resolvedPage, resolvedSize, java.util.List.of());
             }
-            var snapshots = repository.findAvailableCinemas(criteria);
             Set<Long> cinemaIds = snapshots.stream()
                     .map(AvailableCinemaQueryRepository.AvailableCinemaSnapshot::cinemaId)
                     .collect(Collectors.toUnmodifiableSet());
@@ -67,11 +67,14 @@ public class AvailableCinemaQueryService {
                     .findCinemaSummaries(cinemaIds).cinemas().stream()
                     .collect(Collectors.toUnmodifiableMap(
                             ContentSummaryQueryPort.CinemaSummary::cinemaId, summary -> summary));
-            var records = snapshots.stream()
+            List<AvailableCinemaView> records = snapshots.stream()
                     .filter(snapshot -> summaries.containsKey(snapshot.cinemaId()))
                     .map(snapshot -> toView(snapshot, summaries.get(snapshot.cinemaId())))
                     .toList();
-            return new PageResult<>(total, resolvedPage, resolvedSize, records);
+            int fromIndex = Math.min((int) offset, records.size());
+            int toIndex = Math.min(fromIndex + resolvedSize, records.size());
+            return new PageResult<>(records.size(), resolvedPage, resolvedSize,
+                    records.subList(fromIndex, toIndex));
         } catch (DataAccessException exception) {
             // A 的票务事实不可读时不能把系统故障伪装为“没有影院”。
             throw new BusinessException(TicketingErrorCode.QUERY_UNAVAILABLE);

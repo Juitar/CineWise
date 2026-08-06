@@ -14,20 +14,6 @@ import org.apache.ibatis.annotations.Select;
 public interface TicketingQueryMapper {
 
     @Select("""
-            SELECT COUNT(DISTINCT ms.cinema_id)
-              FROM movie_show ms
-             WHERE ms.movie_id = #{criteria.movieId}
-               AND ms.status = 'ON_SALE'
-               AND ms.start_time > #{criteria.startsAfter}
-               AND ms.start_time < #{criteria.startsBefore}
-               AND EXISTS (
-                   SELECT 1 FROM show_seat ss
-                    WHERE ss.show_id = ms.id AND ss.status = 'AVAILABLE'
-               )
-            """)
-    long countAvailableCinemas(@Param("criteria") AvailableCinemaQueryRepository.QueryCriteria criteria);
-
-    @Select("""
             SELECT ms.cinema_id,
                    COUNT(*) AS available_show_count,
                    MIN(ms.start_time) AS nearest_start_time,
@@ -44,7 +30,6 @@ public interface TicketingQueryMapper {
                )
              GROUP BY ms.cinema_id
              ORDER BY nearest_start_time, ms.cinema_id
-             LIMIT #{criteria.limit} OFFSET #{criteria.offset}
             """)
     List<AvailableCinemaQueryRow> findAvailableCinemas(
             @Param("criteria") AvailableCinemaQueryRepository.QueryCriteria criteria);

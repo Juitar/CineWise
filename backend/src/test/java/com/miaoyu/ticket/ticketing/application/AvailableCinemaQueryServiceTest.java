@@ -28,7 +28,6 @@ class AvailableCinemaQueryServiceTest {
     void givenSaleableCinema_whenQuery_thenMergeContentAndScheduleFacts() {
         AvailableCinemaQueryRepository repository = mock(AvailableCinemaQueryRepository.class);
         ContentSummaryQueryPort content = mock(ContentSummaryQueryPort.class);
-        when(repository.countAvailableCinemas(any())).thenReturn(1L);
         when(repository.findAvailableCinemas(any())).thenReturn(List.of(
                 new AvailableCinemaQueryRepository.AvailableCinemaSnapshot(
                         20001L, 3, LocalDateTime.of(2026, 8, 8, 14, 0), "demo-seed",
@@ -58,13 +57,13 @@ class AvailableCinemaQueryServiceTest {
                 .queryAvailableCinemas("01", null, null))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CommonErrorCode.INVALID_PARAMETER));
-        verify(repository, never()).countAvailableCinemas(any());
+        verify(repository, never()).findAvailableCinemas(any());
     }
 
     @Test
     void givenTicketingDatabaseUnavailable_whenQuery_thenReturn306003() {
         AvailableCinemaQueryRepository repository = mock(AvailableCinemaQueryRepository.class);
-        when(repository.countAvailableCinemas(any()))
+        when(repository.findAvailableCinemas(any()))
                 .thenThrow(new DataAccessResourceFailureException("database unavailable"));
 
         assertThatThrownBy(() -> service(repository, mock(ContentSummaryQueryPort.class))
@@ -77,7 +76,7 @@ class AvailableCinemaQueryServiceTest {
     void givenNoSaleableCinema_whenQuery_thenReturnEmptyWithoutContentLookup() {
         AvailableCinemaQueryRepository repository = mock(AvailableCinemaQueryRepository.class);
         ContentSummaryQueryPort content = mock(ContentSummaryQueryPort.class);
-        when(repository.countAvailableCinemas(any())).thenReturn(0L);
+        when(repository.findAvailableCinemas(any())).thenReturn(List.of());
 
         var result = service(repository, content).queryAvailableCinemas("10001", 1, 20);
 
@@ -90,7 +89,6 @@ class AvailableCinemaQueryServiceTest {
     void givenContentUnavailable_whenQuery_thenKeep303004ForCaller() {
         AvailableCinemaQueryRepository repository = mock(AvailableCinemaQueryRepository.class);
         ContentSummaryQueryPort content = mock(ContentSummaryQueryPort.class);
-        when(repository.countAvailableCinemas(any())).thenReturn(1L);
         when(repository.findAvailableCinemas(any())).thenReturn(List.of(
                 new AvailableCinemaQueryRepository.AvailableCinemaSnapshot(
                         20001L, 1, LocalDateTime.of(2026, 8, 8, 14, 0), "demo-seed",

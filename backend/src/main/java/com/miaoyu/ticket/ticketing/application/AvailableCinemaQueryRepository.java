@@ -6,11 +6,9 @@ import java.util.List;
 /** 按影片聚合可售影院的 A 侧只读持久化边界。 */
 public interface AvailableCinemaQueryRepository {
 
-    long countAvailableCinemas(QueryCriteria criteria);
-
     List<AvailableCinemaSnapshot> findAvailableCinemas(QueryCriteria criteria);
 
-    record QueryCriteria(long movieId, LocalDateTime startsAfter, LocalDateTime startsBefore, int offset, int limit) {
+    record QueryCriteria(long movieId, LocalDateTime startsAfter, LocalDateTime startsBefore) {
     }
 
     /** 场次来源只描述 A 的排期快照，内容展示字段由 D 的公开 Port 提供。 */
