@@ -108,11 +108,11 @@ public class RankMoviePlanTool {
     }
 
     /**
-     * 完整推荐的正式只读入口。
+     * 为 B 4.2 对接准备的完整推荐入口。
      *
-     * <p>该入口只接受包含城市、日期和人数的完整 Command，并始终调用完整推荐查询。旧的
-     * {@link #execute(ToolContext, RankMoviePlanCommand)} 仅供 B 迁移期间保持已有固定推荐流程可用；
-     * 它绝不能把旧结果伪装成完整方案。</p>
+     * <p>该入口只接受包含城市、日期和人数的完整 Command，并始终调用完整推荐查询。当前 Agent
+     * 白名单和运行适配器仍使用旧 {@link #execute(ToolContext, RankMoviePlanCommand)}；只有 B 完成
+     * 4.2 的注册表和适配器切换后，本入口才是实际运行入口。</p>
      */
     public ToolResult<RecommendationPlanResult> executeRecommendationPlan(
             ToolContext context, RankMoviePlanCommand command) {
