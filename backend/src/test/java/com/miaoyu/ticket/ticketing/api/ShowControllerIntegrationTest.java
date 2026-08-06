@@ -190,6 +190,34 @@ class ShowControllerIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "seed-user")
+    void givenNonCanonicalBusinessIds_whenQueryTicketingEndpoints_thenRejectBeforeDomainQuery() throws Exception {
+        String movieId = jdbcTemplate.queryForObject("SELECT MIN(id) FROM movie", String.class);
+        String cinemaId = jdbcTemplate.queryForObject("SELECT MIN(id) FROM cinema", String.class);
+        String showId = jdbcTemplate.queryForObject("SELECT MIN(id) FROM movie_show", String.class);
+
+        mockMvc.perform(get("/api/v1/shows/available-movies").param("cinemaId", "0" + cinemaId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(100001));
+        mockMvc.perform(get("/api/v1/shows/available-dates")
+                        .param("movieId", movieId)
+                        .param("cinemaId", "show-" + cinemaId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(100001));
+        mockMvc.perform(get("/api/v1/shows")
+                        .param("movieId", "0" + movieId)
+                        .param("cinemaId", cinemaId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(100001));
+        mockMvc.perform(get("/api/v1/shows/{showId}/seats", "0" + showId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(100001));
+        mockMvc.perform(get("/api/v1/shows/{showId}/seats", "9223372036854775808"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(100001));
+    }
+
+    @Test
     void givenTicketingEndpoints_whenReadOpenApi_thenExposeReadAndOrderContracts() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
