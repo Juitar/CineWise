@@ -45,7 +45,6 @@ class MultiToolSupervisorTest {
         ModelGateway gateway = Mockito.mock(ModelGateway.class);
         RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
         when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
-        when(adapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
         CandidatePlan plan = candidatePlan();
         when(gateway.generatePlan(any()))
                 .thenReturn(new PlanGenerationResponse(plan, validator.validate(plan, context())));
@@ -84,7 +83,6 @@ class MultiToolSupervisorTest {
         ModelGateway gateway = Mockito.mock(ModelGateway.class);
         RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
         when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
-        when(adapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
         CandidatePlan plan = candidatePlan();
         when(gateway.generatePlan(any()))
                 .thenReturn(new PlanGenerationResponse(plan, validator.validate(plan, context())));
@@ -121,7 +119,6 @@ class MultiToolSupervisorTest {
         ModelGateway gateway = Mockito.mock(ModelGateway.class);
         RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
         when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
-        when(adapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
         CandidatePlan firstPlan = candidatePlan();
         CandidatePlan replacement = new CandidatePlan("plan-2", 2, List.of(
                 new CandidatePlanNode("confirm-2", PlanNodeType.CONFIRM_ACTION, null, List.of(), List.of(),
@@ -161,7 +158,6 @@ class MultiToolSupervisorTest {
         ModelGateway gateway = Mockito.mock(ModelGateway.class);
         RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
         when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
-        when(adapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
         CandidatePlan unknown = new CandidatePlan("unknown", 1, List.of(new CandidatePlanNode(
                 "unknown", PlanNodeType.CALL_TOOL, "notRegistered", List.of(), List.of(), FailurePolicy.FAIL)));
         when(gateway.generatePlan(any()))
@@ -186,7 +182,6 @@ class MultiToolSupervisorTest {
         ModelGateway gateway = Mockito.mock(ModelGateway.class);
         RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
         when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
-        when(adapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
         CandidatePlan plan = new CandidatePlan("two-read", 1, List.of(
                 rankNode("rank-a"), rankNode("rank-b")));
         when(gateway.generatePlan(any()))
@@ -211,108 +206,6 @@ class MultiToolSupervisorTest {
                 .containsExactlyInAnyOrder("rank-a", "rank-b");
         Mockito.verify(adapter, Mockito.times(2))
                 .execute(any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class));
-    }
-
-    @Test
-    void shouldReplanAndContinueOnlyAfterReadOnlyToolSuggestsIt() {
-        ToolRegistry registry = new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan()));
-        PlanSchemaValidator validator = new PlanSchemaValidator(registry);
-        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry);
-        ModelGateway gateway = Mockito.mock(ModelGateway.class);
-        RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
-        when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
-        when(adapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
-        CandidatePlan first = new CandidatePlan("first", 1, List.of(rankNode("rank-first")));
-        CandidatePlan second = new CandidatePlan("second", 2, List.of(rankNode("rank-second")));
-        when(gateway.generatePlan(any()))
-                .thenReturn(new PlanGenerationResponse(first, validator.validate(first, context())))
-                .thenReturn(new PlanGenerationResponse(second, validator.validate(second, context())));
-        when(adapter.execute(any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class))).thenAnswer(invocation -> {
-            var request = invocation.getArgument(0, ReadOnlyToolExecutionAdapter.ExecutionRequest.class);
-            var running = stateMachine.startNode(request.state(), request.nodeId());
-            boolean firstNode = "rank-first".equals(request.nodeId());
-            ToolResult<FixedRecommendationResult> result = new ToolResult<>(
-                    firstNode ? ToolStatus.FAILED : ToolStatus.SUCCESS,
-                    null,
-                    firstNode ? 306002 : null,
-                    false,
-                    firstNode,
-                    firstNode ? "REPLAN" : "CONTINUE",
-                    false,
-                    null,
-                    1L,
-                    null,
-                    null);
-            return new ReadOnlyToolExecutionAdapter.ExecutionResult(
-                    stateMachine.recordToolResult(running, request.nodeId(), result), result);
-        });
-        MultiToolSupervisor supervisor = new MultiToolSupervisor(
-                gateway, registry, validator, stateMachine, List.of(adapter));
-
-        var result = supervisor.run(new MultiToolSupervisorRequest(
-                "request-replan", "换一个方案", context(), "run-replan", "trace-replan", 3_000L));
-
-        assertThat(result.state().plan().version()).isEqualTo(2);
-        assertThat(result.toolResults()).extracting(MultiToolSupervisorResult.NodeToolResult::nodeId)
-                .containsExactly("rank-first", "rank-second");
-        Mockito.verify(gateway, Mockito.times(2)).generatePlan(any());
-    }
-
-    @Test
-    void shouldReturnServerDerivedQuestionWhenRequiredSlotIsMissing() {
-        ToolRegistry registry = new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan()));
-        PlanSchemaValidator validator = new PlanSchemaValidator(registry);
-        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry);
-        RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
-        when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
-        when(adapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
-        MultiToolSupervisor supervisor = new MultiToolSupervisor(
-                new com.miaoyu.ticket.agent.infrastructure.model.MockModelGateway(validator, registry),
-                registry, validator, stateMachine, List.of(adapter));
-
-        var result = supervisor.run(new MultiToolSupervisorRequest(
-                "request-question", "找电影", new PlanValidationContext(
-                        Map.of(), Map.of(), new SlotSnapshot(1L, Map.of())),
-                "run-question", "trace-question", 3_000L));
-
-        assertThat(result.safeNextAction()).isEqualTo("QUESTION:movieId");
-        assertThat(result.state().nodeState("ask-movieId").status())
-                .isEqualTo(com.miaoyu.ticket.agent.domain.plan.PlanNodeStatus.SUCCESS);
-        Mockito.verify(adapter, Mockito.never())
-                .execute(any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class));
-    }
-
-    @Test
-    void shouldAdvanceRenderResultAfterReadOnlyToolAndLeaveCardReady() {
-        ToolRegistry registry = new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan()));
-        PlanSchemaValidator validator = new PlanSchemaValidator(registry);
-        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry);
-        RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
-        when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
-        when(adapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
-        when(adapter.execute(any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class))).thenAnswer(invocation -> {
-            var request = invocation.getArgument(0, ReadOnlyToolExecutionAdapter.ExecutionRequest.class);
-            var running = stateMachine.startNode(request.state(), request.nodeId());
-            ToolResult<FixedRecommendationResult> success = new ToolResult<>(
-                    ToolStatus.SUCCESS, new FixedRecommendationResult(
-                            "v1", List.of(), false, List.of("SHOWTIME"), "fixture",
-                            java.time.Instant.parse("2026-08-06T00:00:00Z"),
-                            java.time.Instant.parse("2026-08-06T01:00:00Z"), false),
-                    null, false, false, "CONTINUE", false, null, 1L, null, null);
-            return new ReadOnlyToolExecutionAdapter.ExecutionResult(
-                    stateMachine.recordToolResult(running, request.nodeId(), success), success);
-        });
-        MultiToolSupervisor supervisor = new MultiToolSupervisor(
-                new com.miaoyu.ticket.agent.infrastructure.model.MockModelGateway(validator, registry),
-                registry, validator, stateMachine, List.of(adapter));
-
-        var result = supervisor.run(new MultiToolSupervisorRequest(
-                "request-render", "推荐", context(), "run-render", "trace-render", 3_000L));
-
-        assertThat(result.state().nodeState("render-result").status())
-                .isEqualTo(com.miaoyu.ticket.agent.domain.plan.PlanNodeStatus.SUCCESS);
-        assertThat(result.toolResults()).hasSize(1);
-        assertThat(result.safeNextAction()).isNull();
     }
 
     private static CandidatePlan candidatePlan() {

@@ -57,20 +57,6 @@ class AgentCardEventValidatorTest {
     }
 
     @Test
-    void shouldRenderSeatSelectionBusinessIntentCardWithShowId() throws Exception {
-        JsonNode seatSelection = fixture("plan-card.json").deepCopy();
-        ObjectNode payload = (ObjectNode) seatSelection.path("payload");
-        payload.removeAll();
-        payload.put("type", "BUSINESS_INTENT");
-        ObjectNode intent = payload.putObject("payload");
-        intent.put("intent", "SELECT_SEATS");
-        intent.putObject("businessRef").put("showId", "show-70001");
-
-        assertThat(AgentCardEventValidator.validate(seatSelection).decision())
-                .isEqualTo(AgentCardEventValidator.Decision.RENDER);
-    }
-
-    @Test
     void shouldRejectInvalidLocationPermissionAuthorizationFields() throws Exception {
         assertThat(validate("invalid-location-authorization.json").decision())
                 .isEqualTo(AgentCardEventValidator.Decision.REJECT);

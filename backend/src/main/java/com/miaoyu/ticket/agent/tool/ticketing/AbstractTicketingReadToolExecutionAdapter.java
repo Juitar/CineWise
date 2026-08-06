@@ -1,6 +1,6 @@
 package com.miaoyu.ticket.agent.tool.ticketing;
 
-import com.miaoyu.ticket.agent.application.tool.AgentToolExecutor;
+import com.miaoyu.ticket.agent.application.tool.ReadOnlyToolExecutionAdapter;
 import com.miaoyu.ticket.agent.domain.plan.ExecutionPlanNode;
 import com.miaoyu.ticket.agent.domain.plan.InputReference;
 import com.miaoyu.ticket.agent.domain.plan.InputReferenceSource;
@@ -9,11 +9,9 @@ import com.miaoyu.ticket.agent.domain.run.ExecutionRunState;
 import com.miaoyu.ticket.agent.domain.run.RunnableNodeSelection;
 import com.miaoyu.ticket.agent.domain.tool.ToolCommand;
 import com.miaoyu.ticket.agent.domain.tool.ToolContext;
-import com.miaoyu.ticket.agent.domain.tool.ToolDefinition;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
-import com.miaoyu.ticket.ticketing.application.TicketingErrorCode;
 import java.time.DateTimeException;
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -24,7 +22,7 @@ import java.util.Set;
 
 /** A 的票务只读 Adapter 公共执行骨架，固定 Agent 节点选择、预算收缩和状态机回写边界。 */
 abstract class AbstractTicketingReadToolExecutionAdapter<C extends ToolCommand, R>
-        implements AgentToolExecutor<C, R> {
+        implements ReadOnlyToolExecutionAdapter {
 
     private final String targetName;
     private final Duration timeout;
@@ -48,15 +46,6 @@ abstract class AbstractTicketingReadToolExecutionAdapter<C extends ToolCommand, 
     }
 
     @Override
-    public final ToolResult<R> execute(ToolContext context, C command) {
-        return executeTool(Objects.requireNonNull(context, "ToolContext不能为空"),
-                Objects.requireNonNull(command, "工具命令不能为空"));
-    }
-
-    @Override
-    public abstract ToolDefinition definition();
-
-    @Override
     public final ExecutionResult execute(ExecutionRequest request) {
         ExecutionRequest executionRequest = Objects.requireNonNull(request, "执行请求不能为空");
         RunnableNodeSelection selection = stateMachine.selectRunnableNodes(executionRequest.state());
@@ -66,7 +55,7 @@ abstract class AbstractTicketingReadToolExecutionAdapter<C extends ToolCommand, 
 
         try {
             C command = createCommand(node, indexSlotReferences(node));
-            ToolResult<R> result = requireFreshness(context, executeTool(context, command));
+            ToolResult<R> result = executeTool(context, command);
             return new ExecutionResult(stateMachine.recordToolResult(runningState, node.nodeId(), result), result);
         } catch (DateTimeException | IllegalArgumentException exception) {
             // 模型或旧计划的输入不合法时禁止访问票务服务，也不能把解析异常写入 Agent 事件。
@@ -165,26 +154,6 @@ abstract class AbstractTicketingReadToolExecutionAdapter<C extends ToolCommand, 
                 false,
                 false,
                 "CHECK_INPUT",
-                false,
-                null,
-                context.stateVersion(),
-                null,
-                null);
-    }
-
-    /** 动态票务结果必须声明有效时间，B 不得在适配层伪造该时间。 */
-    private ToolResult<R> requireFreshness(ToolContext context, ToolResult<R> result) {
-        ToolResult<R> publicResult = Objects.requireNonNull(result, "票务Tool结果不能为空");
-        if (publicResult.status() != ToolStatus.SUCCESS || publicResult.hasFreshnessWindow()) {
-            return publicResult;
-        }
-        return new ToolResult<>(
-                ToolStatus.FAILED,
-                null,
-                TicketingErrorCode.QUERY_UNAVAILABLE.code(),
-                false,
-                false,
-                "REFRESH_REQUIRED",
                 false,
                 null,
                 context.stateVersion(),

@@ -2,7 +2,6 @@ package com.miaoyu.ticket.agent.application.tool;
 
 import com.miaoyu.ticket.agent.domain.tool.ToolDefinition;
 import com.miaoyu.ticket.agent.domain.tool.ToolInputDefinition;
-import com.miaoyu.ticket.agent.domain.tool.DeferredAgentToolCommand;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanCommand;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
@@ -25,10 +24,6 @@ import java.util.Set;
 
 /** B 维护的 Agent 工具白名单定义，不把模型输出解释为 Java 调用目标。 */
 public final class AgentToolDefinitions {
-    /** A 票务查询工具的公开名称；字段和 Application API 等待 A 确认。 */
-    public static final String QUERY_AVAILABLE_DATES = "queryAvailableDates";
-    public static final String QUERY_SHOWS = "queryShows";
-    public static final String QUERY_SEATS = "querySeats";
     /** D 的推荐工具属于本应用内部只读调用，最多占用三秒预算。 */
     public static final Duration RANK_MOVIE_PLAN_TIMEOUT = Duration.ofSeconds(3L);
     /** A 的两个票务查询 Tool 共享五秒上限；具体 Adapter 只能继续缩小剩余预算。 */
@@ -106,25 +101,5 @@ public final class AgentToolDefinitions {
                         new ToolInputDefinition("showId", String.class, true),
                         new ToolInputDefinition("seatIds", List.class, true)),
                 Set.of(CommonErrorCode.INVALID_PARAMETER.code()));
-    }
-
-    /**
-     * 为 Owner 联调夹具生成无业务字段的只读定义。
-     *
-     * <p>该定义不能加入生产默认白名单；正式接入必须替换为 Owner 确认的 Command、Result、输入和错误码。
-     */
-    public static ToolDefinition deferredReadOnly(String targetName) {
-        if (!Set.of(QUERY_AVAILABLE_DATES, QUERY_SHOWS, QUERY_SEATS).contains(targetName)) {
-            throw new IllegalArgumentException("未知延期工具: " + targetName);
-        }
-        return new ToolDefinition(
-                targetName,
-                DeferredAgentToolCommand.class,
-                Void.class,
-                true,
-                Duration.ofSeconds(5L),
-                false,
-                List.of(),
-                Set.of());
     }
 }

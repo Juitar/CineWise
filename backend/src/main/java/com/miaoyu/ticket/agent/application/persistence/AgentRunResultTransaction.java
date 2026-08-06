@@ -1,8 +1,10 @@
 package com.miaoyu.ticket.agent.application.persistence;
 
 import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentResult;
-import com.miaoyu.ticket.agent.application.run.AgentRunReplyFactory;
 import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorResult;
+import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
+import com.miaoyu.ticket.agent.application.reply.ErrorReplyFacts;
+import com.miaoyu.ticket.agent.application.reply.ProgressReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
 import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
@@ -19,6 +21,7 @@ import com.miaoyu.ticket.agent.domain.plan.PlanNodeStatus;
 import com.miaoyu.ticket.agent.domain.run.ExecutionNodeState;
 import com.miaoyu.ticket.agent.domain.run.ExecutionRunState;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
+import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import java.time.Clock;
@@ -68,13 +71,6 @@ public class AgentRunResultTransaction {
     /** 写入本轮结果；PROCESSING 保持 RUNNING 和活动会话引用。 */
     @Transactional
     public AgentRun record(AgentRun run, MinimalReadOnlyAgentResult result) {
-        return recordInternal(run, result, null);
-    }
-
-    private AgentRun recordInternal(
-            AgentRun run,
-            MinimalReadOnlyAgentResult result,
-            List<MultiToolSupervisorResult.NodeToolResult> nodeToolResults) {
         Objects.requireNonNull(run, "运行不能为空");
         Objects.requireNonNull(result, "运行结果不能为空");
         LocalDateTime now = now();
@@ -93,7 +89,7 @@ public class AgentRunResultTransaction {
                     .toList());
         }
         messageRepository.insert(assistantMessage(run, result, now));
-        recordVisibleEvents(sessionFor(run), nextRun, result, nodeToolResults, now);
+        recordVisibleEvents(sessionFor(run), nextRun, result, now);
         if (nextStatus.isTerminal()) {
             sessionRepository.releaseActiveRun(run.sessionId(), run.id());
         }
@@ -106,10 +102,36 @@ public class AgentRunResultTransaction {
      */
     @Transactional
     public AgentRun record(AgentRun run, MultiToolSupervisorResult result) {
-        Objects.requireNonNull(result, "运行结果不能为空");
-        return recordInternal(run, AgentRunReplyFactory.asMinimalResult(result), result.toolResults());
+        return record(run, asMinimalResult(result));
     }
 
+    @SuppressWarnings("unchecked")
+    private static MinimalReadOnlyAgentResult asMinimalResult(MultiToolSupervisorResult result) {
+        Objects.requireNonNull(result, "运行结果不能为空");
+        List<com.miaoyu.ticket.agent.domain.tool.ToolResult<FixedRecommendationResult>> toolResults =
+                result.toolResults()
+                .stream()
+                .map(item -> (com.miaoyu.ticket.agent.domain.tool.ToolResult<FixedRecommendationResult>) item.result())
+                .toList();
+        ReplyGenerationResponse reply;
+        if (!result.validation().isValid()) {
+            reply = new ReplyGenerationResponse(
+                    "当前请求无法安全执行", AgentReplyMessageType.ERROR,
+                    new ErrorReplyFacts(null, List.of("PLAN_REJECTED")));
+        } else {
+            String nodeId = result.state().plan().nodes().stream()
+                    .filter(node -> result.state().nodeState(node.nodeId()).status()
+                            == PlanNodeStatus.WAITING_CONFIRMATION
+                            || result.state().nodeState(node.nodeId()).status() == PlanNodeStatus.RUNNING)
+                    .map(ExecutionPlanNode::nodeId)
+                    .findFirst()
+                    .orElse("plan");
+            reply = new ReplyGenerationResponse(
+                    "计划已保存，请等待下一步操作。", AgentReplyMessageType.PROGRESS, new ProgressReplyFacts(nodeId));
+        }
+        return new MinimalReadOnlyAgentResult(
+                result.candidatePlan(), result.validation(), result.state(), toolResults, reply);
+    }
 
     /** 主控或只读工具异常后，用新的短事务写入安全错误并释放仍指向本运行的会话。 */
     @Transactional
@@ -145,37 +167,32 @@ public class AgentRunResultTransaction {
     }
 
     private void recordVisibleEvents(
-            AgentSession session,
-            AgentRun run,
-            MinimalReadOnlyAgentResult result,
-            List<MultiToolSupervisorResult.NodeToolResult> nodeToolResults,
-            LocalDateTime now) {
+            AgentSession session, AgentRun run, MinimalReadOnlyAgentResult result, LocalDateTime now) {
         ExecutionRunState state = result.state();
         if (state != null) {
             runtimeEventService.append(session, run, AgentEventType.PLAN_CREATED,
                     jsonFactory.eventPayload(Map.of("planVersion", state.plan().version())));
+            List<ExecutionPlanNode> toolNodes = new ArrayList<>();
             state.plan().nodes().forEach(node -> {
                 PlanNodeStatus status = state.nodeState(node.nodeId()).status();
                 if (node.type() == com.miaoyu.ticket.agent.domain.plan.PlanNodeType.CALL_TOOL
                         && status != PlanNodeStatus.PENDING) {
+                    toolNodes.add(node);
                     runtimeEventService.append(session, run, AgentEventType.STEP_START,
                             jsonFactory.eventPayload(Map.of("nodeId", node.nodeId())));
-                    String toolName = node.targetName();
                     runtimeEventService.append(session, run, AgentEventType.TOOL_START,
-                            jsonFactory.eventPayload(Map.of("nodeId", node.nodeId(), "toolName", toolName,
-                                    "displayText", displayText(toolName, false))));
+                            jsonFactory.eventPayload(Map.of("nodeId", node.nodeId(), "targetName", node.targetName())));
                 } else {
                     recordNodeEvent(session, run, status, node.nodeId());
                 }
             });
-            recordToolEvents(session, run, result, nodeToolResults, state);
+            recordToolEvents(session, run, result, toolNodes, state);
         } else {
-            recordToolEvents(session, run, result, nodeToolResults, null);
+            recordToolEvents(session, run, result, List.of(), null);
         }
         AgentReplyMessageType replyType = result.reply().messageType();
         boolean isCardReply = replyType == AgentReplyMessageType.MOVIE_CARD
-                || replyType == AgentReplyMessageType.PLAN_CARD
-                || replyType == AgentReplyMessageType.SELECT_SEATS;
+                || replyType == AgentReplyMessageType.PLAN_CARD;
         AgentEventType replyEvent = isCardReply
                 ? AgentEventType.CARD : replyType == AgentReplyMessageType.ERROR
                         ? AgentEventType.MESSAGE_ERROR : AgentEventType.MESSAGE_COMPLETE;
@@ -190,86 +207,17 @@ public class AgentRunResultTransaction {
     }
 
     private void recordToolEvents(AgentSession session, AgentRun run, MinimalReadOnlyAgentResult result,
-            List<MultiToolSupervisorResult.NodeToolResult> nodeToolResults,
-            ExecutionRunState state) {
-        if (nodeToolResults == null) {
-            List<String> nodeIds = state == null ? List.of() : state.plan().nodes().stream()
-                    .filter(node -> node.type() == com.miaoyu.ticket.agent.domain.plan.PlanNodeType.CALL_TOOL)
-                    .map(ExecutionPlanNode::nodeId)
-                    .toList();
-            nodeToolResults = new ArrayList<>();
-            for (int index = 0; index < result.toolResults().size(); index++) {
-                String nodeId = index < nodeIds.size() ? nodeIds.get(index) : "tool-" + index;
-                nodeToolResults.add(new MultiToolSupervisorResult.NodeToolResult(nodeId,
-                        result.toolResults().get(index)));
-            }
-        }
-        for (var toolResult : nodeToolResults) {
-            String nodeId = toolResult.nodeId();
-            var publicResult = toolResult.result();
-            String toolName = toolName(toolResult, state);
-            boolean startAlreadyRecorded = state != null && state.nodeStates().containsKey(nodeId)
-                    && state.nodeState(nodeId).status() != PlanNodeStatus.PENDING;
-            if (!startAlreadyRecorded) {
-                Map<String, Object> startPayload = new java.util.LinkedHashMap<>();
-                startPayload.put("nodeId", nodeId);
-                startPayload.put("toolName", toolName);
-                startPayload.put("displayText", displayText(toolName, false));
-                runtimeEventService.append(session, run, AgentEventType.TOOL_START,
-                        jsonFactory.eventPayload(startPayload));
-            }
-            Map<String, Object> payload = new java.util.LinkedHashMap<>();
-            payload.put("nodeId", nodeId);
-            payload.put("toolName", toolName);
-            payload.put("displayText", displayText(toolName, publicResult.status() == ToolStatus.FAILED));
-            AgentEventType eventType = publicResult.status() == ToolStatus.FAILED
-                    ? AgentEventType.TOOL_ERROR : AgentEventType.TOOL_COMPLETE;
-            if (eventType == AgentEventType.TOOL_ERROR) {
-                payload.put("errorCode", publicResult.errorCode() == null ? "TOOL_FAILED" : publicResult.errorCode());
-                payload.put("retryable", publicResult.retryable());
-                payload.put("replanSuggested", publicResult.replanSuggested());
-            } else {
-                payload.put("degraded", publicResult.degraded());
-                if (publicResult.fallbackType() != null) {
-                    payload.put("fallbackType", publicResult.fallbackType());
-                }
-                if (publicResult.dataAt() != null) {
-                    payload.put("dataAt", publicResult.dataAt().toString());
-                }
-            }
-            runtimeEventService.append(session, run, eventType, jsonFactory.eventPayload(payload));
-            if (state != null && state.nodeStates().containsKey(nodeId)) {
+            List<ExecutionPlanNode> toolNodes, ExecutionRunState state) {
+        for (int index = 0; index < result.toolResults().size(); index++) {
+            String nodeId = index < toolNodes.size() ? toolNodes.get(index).nodeId() : null;
+            Map<String, String> payload = nodeId == null
+                    ? Map.of("status", result.toolResults().get(index).status().name())
+                    : Map.of("nodeId", nodeId, "status", result.toolResults().get(index).status().name());
+            runtimeEventService.append(session, run, AgentEventType.TOOL_RESULT, jsonFactory.eventPayload(payload));
+            if (nodeId != null && state != null) {
                 recordTerminalToolNodeEvent(session, run, state.nodeState(nodeId).status(), nodeId);
             }
         }
-    }
-
-    private static String toolName(MultiToolSupervisorResult.NodeToolResult result, ExecutionRunState state) {
-        if (result.targetName() != null && !result.targetName().isBlank()) {
-            return result.targetName();
-        }
-        if (state != null) {
-            return state.plan().nodes().stream()
-                    .filter(node -> node.nodeId().equals(result.nodeId()))
-                    .map(ExecutionPlanNode::targetName)
-                    .filter(java.util.Objects::nonNull)
-                    .findFirst()
-                    .orElse("unknown");
-        }
-        return "unknown";
-    }
-
-    private static String displayText(String toolName, boolean failed) {
-        if (failed) {
-            return "工具暂时无法完成查询";
-        }
-        return switch (toolName) {
-            case "rankMoviePlan" -> "正在整理推荐方案";
-            case "queryAvailableDates" -> "正在查询可用日期";
-            case "queryShows" -> "正在查询场次";
-            case "querySeats" -> "正在查询座位";
-            default -> "正在处理请求";
-        };
     }
 
     private void recordTerminalToolNodeEvent(AgentSession session, AgentRun run, PlanNodeStatus status, String nodeId) {

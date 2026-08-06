@@ -11,8 +11,6 @@ public enum AgentReplyMessageType {
     QUESTION,
     /** 已取得至少一个可购买场次时的推荐计划卡。 */
     PLAN_CARD,
-    /** 已确定进入选座步骤，但座位业务 DTO 仍由 A 的公开接口定义。 */
-    SELECT_SEATS,
     /** 查询成功但当前没有可购买场次时的降级影片卡。 */
     MOVIE_CARD,
     /** 下游工具结果尚未确定时的进度提示，不代表请求最终成功。 */
