@@ -13,6 +13,7 @@ import com.miaoyu.ticket.agent.domain.tool.ToolDefinition;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
+import com.miaoyu.ticket.ticketing.application.TicketingErrorCode;
 import java.time.DateTimeException;
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -65,7 +66,7 @@ abstract class AbstractTicketingReadToolExecutionAdapter<C extends ToolCommand, 
 
         try {
             C command = createCommand(node, indexSlotReferences(node));
-            ToolResult<R> result = executeTool(context, command);
+            ToolResult<R> result = requireFreshness(context, executeTool(context, command));
             return new ExecutionResult(stateMachine.recordToolResult(runningState, node.nodeId(), result), result);
         } catch (DateTimeException | IllegalArgumentException exception) {
             // 模型或旧计划的输入不合法时禁止访问票务服务，也不能把解析异常写入 Agent 事件。
@@ -164,6 +165,26 @@ abstract class AbstractTicketingReadToolExecutionAdapter<C extends ToolCommand, 
                 false,
                 false,
                 "CHECK_INPUT",
+                false,
+                null,
+                context.stateVersion(),
+                null,
+                null);
+    }
+
+    /** 动态票务结果必须声明有效时间，B 不得在适配层伪造该时间。 */
+    private ToolResult<R> requireFreshness(ToolContext context, ToolResult<R> result) {
+        ToolResult<R> publicResult = Objects.requireNonNull(result, "票务Tool结果不能为空");
+        if (publicResult.status() != ToolStatus.SUCCESS || publicResult.hasFreshnessWindow()) {
+            return publicResult;
+        }
+        return new ToolResult<>(
+                ToolStatus.FAILED,
+                null,
+                TicketingErrorCode.QUERY_UNAVAILABLE.code(),
+                false,
+                false,
+                "REFRESH_REQUIRED",
                 false,
                 null,
                 context.stateVersion(),
