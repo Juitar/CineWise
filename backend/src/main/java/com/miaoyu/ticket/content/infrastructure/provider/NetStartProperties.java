@@ -1,8 +1,10 @@
 package com.miaoyu.ticket.content.infrastructure.provider;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 /**
  * NetStart 学习 Provider 的运行开关和本地保护参数。
@@ -22,19 +24,31 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties("cinewise.content.netstart")
 public record NetStartProperties(boolean enabled, boolean syncOnStartup, String baseUrl, String dailySyncCron,
                                  Duration connectTimeout, Duration readTimeout,
-                                 int requestsPerMinute, int retryCount, Duration retryBackoff) {
+                                 int requestsPerMinute, int retryCount, Duration retryBackoff,
+                                 List<String> syncCities) {
+
+    /** 兼容旧单元测试夹具；生产配置使用带 syncCities 的完整构造器。 */
+    public NetStartProperties(boolean enabled, boolean syncOnStartup, String baseUrl, String dailySyncCron,
+                              Duration connectTimeout, Duration readTimeout, int requestsPerMinute, int retryCount,
+                              Duration retryBackoff) {
+        this(enabled, syncOnStartup, baseUrl, dailySyncCron, connectTimeout, readTimeout, requestsPerMinute,
+                retryCount, retryBackoff, List.of("长沙"));
+    }
 
     /**
      * 启动即拒绝危险参数，防止限流、超时或重试在运行时失效。
      *
      * <p>这里不接受运行时放宽请求次数或重试次数，避免测试配置把第三方保护阈值变成可随意绕过的值。</p>
      */
+    @ConstructorBinding
     public NetStartProperties {
         baseUrl = requireText(baseUrl, "baseUrl");
         dailySyncCron = requireText(dailySyncCron, "dailySyncCron");
         connectTimeout = requirePositive(connectTimeout, "connectTimeout");
         readTimeout = requirePositive(readTimeout, "readTimeout");
         retryBackoff = requirePositive(retryBackoff, "retryBackoff");
+        syncCities = syncCities == null ? List.of("长沙") : syncCities.stream()
+                .filter(value -> value != null && !value.isBlank()).distinct().toList();
         if (requestsPerMinute != 10 || retryCount != 1) {
             throw new IllegalArgumentException("NetStart only permits 10 req/min and one retry");
         }

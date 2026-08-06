@@ -11,6 +11,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +40,9 @@ import org.springframework.transaction.support.TransactionTemplate;
         "cinewise.auth.audit-hash-secret=content-lease-mysql-it-audit-secret-at-least-32-bytes"
 })
 class ContentSyncLeaseMySqlConcurrencyIntegrationTest {
-    private static final String DATABASE = "cinewise_content_lease_check";
+    /** 默认保持原有专用库；A 提供其它隔离库时通过环境变量切换，不把库名写死到测试逻辑。 */
+    private static final String DATABASE = System.getenv().getOrDefault("CINEWISE_CONTENT_MYSQL_DATABASE",
+            "cinewise_content_lease_check");
     private static final long SYNC_ID = 9_300_001L;
     private static final long SNAPSHOT_ID = 9_300_002L;
     private static final String REQUEST_ID = "content-lease-lock-it";
@@ -80,10 +83,7 @@ class ContentSyncLeaseMySqlConcurrencyIntegrationTest {
     void givenLeaseRowLockedInsideContentTransaction_whenRecoveryRuns_thenRollbackPreventsSnapshotCommit() {
         CountDownLatch recoveryEntered = new CountDownLatch(1);
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<Integer> recovery = executor.submit(() -> {
-            recoveryEntered.countDown();
-            return failExpiredSyncTasksForTest(LocalDateTime.now().plusMinutes(2));
-        });
+        AtomicReference<Future<Integer>> recoveryRef = new AtomicReference<>();
         try {
             TransactionTemplate transaction = new TransactionTemplate(transactionManager);
             assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
@@ -95,8 +95,15 @@ class ContentSyncLeaseMySqlConcurrencyIntegrationTest {
                         VALUES (?, 'CONTENT_SNAPSHOT', 'lease-lock-it', 'MOVIE', '{}', ?, ?, 0, ?, ?)
                         """, SNAPSHOT_ID, Timestamp.valueOf(now), Timestamp.valueOf(now.plusHours(1)),
                         Timestamp.valueOf(now), Timestamp.valueOf(now));
+                // 旧 Worker 已经取得有效租约并写入资料后，才启动恢复器，排除测试夹具自身的先后竞态。
+                Future<Integer> recovery = executor.submit(() -> {
+                    recoveryEntered.countDown();
+                    return failExpiredSyncTasksForTest(LocalDateTime.now().plusMinutes(2));
+                });
+                recoveryRef.set(recovery);
                 try {
-                    assertThat(recoveryEntered.await(2, TimeUnit.SECONDS)).isTrue();
+                    // 云端 MySQL 首次建立第二条连接可能超过两秒；先等线程进入恢复调用，再断言锁等待。
+                    assertThat(recoveryEntered.await(10, TimeUnit.SECONDS)).isTrue();
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
                     throw new AssertionError(exception);
@@ -104,7 +111,7 @@ class ContentSyncLeaseMySqlConcurrencyIntegrationTest {
                 assertThat(recovery.isDone()).as("恢复器必须等待资料事务释放租约行锁").isFalse();
                 throw new RollbackFixtureException();
             })).isInstanceOf(RollbackFixtureException.class);
-            assertThat(recovery.get(5, TimeUnit.SECONDS)).isEqualTo(1);
+            assertThat(recoveryRef.get().get(10, TimeUnit.SECONDS)).isEqualTo(1);
             assertThat(jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM external_data_snapshot WHERE id = ?", Integer.class, SNAPSHOT_ID)).isZero();
             assertThat(jdbcTemplate.queryForObject(

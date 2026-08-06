@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.content.application.ContentQuery;
 import com.miaoyu.ticket.content.application.ContentResult;
+import com.miaoyu.ticket.content.application.ContentPersistencePort;
 import com.miaoyu.ticket.content.domain.ContentItem;
 import com.miaoyu.ticket.content.domain.ContentResourceType;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
@@ -13,8 +14,10 @@ import com.miaoyu.ticket.content.domain.CinemaContent;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -240,6 +243,23 @@ class NetStartContentProviderTest {
                 .sourceMovieId()).doesNotContain("1", "2");
         assertThat(batch.outcome()).isEqualTo(
                 com.miaoyu.ticket.content.application.LiveContentSyncPort.Outcome.SUCCESS);
+    }
+
+    @Test
+    void givenSameReleaseStateButYesterdayMaterialCheck_whenIncrementalSync_thenItRefreshesTheDetail() {
+        AtomicInteger calls = new AtomicInteger();
+        NetStartContentProvider provider = provider(query -> {
+            calls.incrementAndGet();
+            if (query.contentId() == null) {
+                return json("{\"movieList\":[{\"id\":1,\"rt\":\"2026-08-01\",\"globalReleased\":true}]}");
+            }
+            return json("{\"detailMovie\":{\"id\":1,\"nm\":\"refresh\",\"cat\":\"drama\","
+                    + "\"dur\":\"90 minutes\",\"sc\":\"8.0\"}}");
+        });
+        var batch = provider.fetchCurrentHotMovies(Map.of("1", new ContentPersistencePort.MovieState(
+                "2026-08-01", "NOW_SHOWING", LocalDateTime.of(2026, 8, 3, 10, 0))));
+        assertThat(calls).hasValue(2);
+        assertThat(batch.contents()).hasSize(1);
     }
 
     @Test

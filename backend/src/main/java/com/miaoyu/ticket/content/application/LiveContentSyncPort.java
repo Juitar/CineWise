@@ -3,6 +3,7 @@ package com.miaoyu.ticket.content.application;
 import com.miaoyu.ticket.content.domain.ContentItem;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
 
 /**
  * 候选真实 Provider 向同步用例提供已标准化的内容，不暴露 HTTP 或 JSON。
@@ -19,6 +20,11 @@ public interface LiveContentSyncPort {
      */
     DailySyncBatch fetchForDailySync();
 
+    /** 按已解析的行政区划代码拉取该城市影院资料，默认实现供旧 Provider 测试替身兼容。 */
+    default DailySyncBatch fetchCityCinemas(String cityCode) {
+        return fetchForDailySync();
+    }
+
     /**
      * 拉取当前热映目录中尚未成功保存详情的影片。
      *
@@ -29,6 +35,11 @@ public interface LiveContentSyncPort {
     default DailySyncBatch fetchCurrentHotMovies(Set<String> completedSourceMovieIds) {
         // 旧的单方法测试替身仍可用于回归；正式 NetStart 适配器会覆盖为按已完成身份恢复的影片批次。
         return fetchForDailySync();
+    }
+
+    /** 带上映状态和日期的增量恢复入口；旧测试替身仍可通过 Set 入口工作。 */
+    default DailySyncBatch fetchCurrentHotMovies(Map<String, ContentPersistencePort.MovieState> completedStates) {
+        return fetchCurrentHotMovies(completedStates.keySet());
     }
 
     /** 单项同时携带规范化查询键和 LIVE 内容封套，以便只替换对应的真实快照与缓存。 */

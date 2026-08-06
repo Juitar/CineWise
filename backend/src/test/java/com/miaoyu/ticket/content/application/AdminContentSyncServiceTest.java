@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.DefaultResourceLoader;
@@ -30,9 +31,10 @@ class AdminContentSyncServiceTest {
         assertThat(response.cityName()).isEqualTo("长沙");
         assertThat(response.status()).isEqualTo(ContentSyncTaskPort.SyncTaskStatus.FAILED);
         assertThat(response.failureCount()).isEqualTo(1);
+        assertThat(response.failureCategory()).isEqualTo(ContentSyncTaskPort.FailureCategory.DATA_VALIDATION);
         assertThat(tasks.created).hasValue(1);
         // providerCityId 虽被任务内部使用，但 REST 安全视图中没有该字段可供序列化。
-        assertThat(response).hasNoNullFieldsOrPropertiesExcept("finishedAt", "failureCategory");
+        assertThat(response).hasNoNullFieldsOrPropertiesExcept("finishedAt");
     }
 
     @Test
@@ -48,6 +50,31 @@ class AdminContentSyncServiceTest {
     }
 
     @Test
+    void givenChangshaAndHangzhou_whenAdminSyncs_thenItCallsTheirResolvedProviderCities() {
+        InMemoryTasks changshaTasks = new InMemoryTasks();
+        InMemoryTasks hangzhouTasks = new InMemoryTasks();
+        TrackingCityProvider provider = new TrackingCityProvider(LiveContentSyncPort.Outcome.SUCCESS, 1);
+
+        service(changshaTasks, provider).requestSync("request-changsha", "长沙");
+        service(hangzhouTasks, provider).requestSync("request-hangzhou", "杭州");
+
+        // 城市编号只留在 Provider 边界；管理员返回值和任务安全视图均不公开它。
+        assertThat(provider.cityCodes).containsExactly("70", "50");
+    }
+
+    @Test
+    void givenSameRequestId_whenRetried_thenProviderCitySyncRunsOnlyOnce() {
+        InMemoryTasks tasks = new InMemoryTasks();
+        TrackingCityProvider provider = new TrackingCityProvider(LiveContentSyncPort.Outcome.SUCCESS, 1);
+        AdminContentSyncService service = service(tasks, provider);
+
+        service.requestSync("request-idempotent", "长沙");
+        service.requestSync("request-idempotent", "长沙");
+
+        assertThat(provider.cityCodes).containsExactly("70");
+    }
+
+    @Test
     void givenSameRequestIdWithDifferentCity_whenRetried_thenItReturnsConflict() {
         InMemoryTasks tasks = new InMemoryTasks();
         AdminContentSyncService service = service(tasks, LiveContentSyncPort.Outcome.SUCCESS, 1);
@@ -56,6 +83,27 @@ class AdminContentSyncServiceTest {
         assertThatThrownBy(() -> service.requestSync("request-3", "杭州"))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(error -> assertThat(((BusinessException) error).getErrorCode().code()).isEqualTo(100409));
+    }
+
+    @Test
+    void givenUnknownCity_whenRequested_thenItIsRejectedBeforeProviderIsCalled() {
+        InMemoryTasks tasks = new InMemoryTasks();
+        TrackingCityProvider provider = new TrackingCityProvider(LiveContentSyncPort.Outcome.SUCCESS, 1);
+
+        assertThatThrownBy(() -> service(tasks, provider).requestSync("request-unknown", "不存在城市"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> assertThat(((BusinessException) error).getErrorCode().code()).isEqualTo(100001));
+        assertThat(provider.cityCodes).isEmpty();
+    }
+
+    @Test
+    void givenProviderFailureOutcomes_whenSyncCompletes_thenEachGetsAQueryableFailureCategory() {
+        assertFailureCategory(LiveContentSyncPort.Outcome.CONNECTION_FAILED,
+                ContentSyncTaskPort.FailureCategory.NETWORK);
+        assertFailureCategory(LiveContentSyncPort.Outcome.RATE_LIMITED,
+                ContentSyncTaskPort.FailureCategory.RATE_LIMIT);
+        assertFailureCategory(LiveContentSyncPort.Outcome.FIELD_REJECTED,
+                ContentSyncTaskPort.FailureCategory.DATA_VALIDATION);
     }
 
     @Test
@@ -74,12 +122,49 @@ class AdminContentSyncServiceTest {
     }
 
     private AdminContentSyncService service(InMemoryTasks tasks, LiveContentSyncPort.Outcome outcome, int attempts) {
+        return service(tasks, new TrackingCityProvider(outcome, attempts));
+    }
+
+    private AdminContentSyncService service(InMemoryTasks tasks, LiveContentSyncPort provider) {
         ContentSyncService content = new ContentSyncService(
-                () -> new LiveContentSyncPort.DailySyncBatch(List.of(), attempts, outcome,
-                        outcome == LiveContentSyncPort.Outcome.RATE_LIMITED ? 429 : null),
+                provider,
                 snapshotPort(), cachePort(), persistence(), () -> 101L, CLOCK);
         return new AdminContentSyncService(content, tasks,
                 new CityResolutionService(new ObjectMapper(), new DefaultResourceLoader()), () -> 700L, CLOCK);
+    }
+
+    private void assertFailureCategory(LiveContentSyncPort.Outcome outcome,
+                                       ContentSyncTaskPort.FailureCategory expectedCategory) {
+        InMemoryTasks tasks = new InMemoryTasks();
+
+        var response = service(tasks, new TrackingCityProvider(outcome, 0)).requestSync("request-" + outcome, "长沙");
+
+        assertThat(response.status()).isEqualTo(ContentSyncTaskPort.SyncTaskStatus.FAILED);
+        assertThat(response.failureCategory()).isEqualTo(expectedCategory);
+    }
+
+    /** Provider 替身只保留内部 ci 调用痕迹，不包含任何原始响应、Key 或地点文本。 */
+    private static final class TrackingCityProvider implements LiveContentSyncPort {
+        private final Outcome outcome;
+        private final int attemptedCount;
+        private final List<String> cityCodes = new ArrayList<>();
+
+        private TrackingCityProvider(Outcome outcome, int attemptedCount) {
+            this.outcome = outcome;
+            this.attemptedCount = attemptedCount;
+        }
+
+        @Override public DailySyncBatch fetchForDailySync() { return batch(); }
+
+        @Override public DailySyncBatch fetchCityCinemas(String cityCode) {
+            cityCodes.add(cityCode);
+            return batch();
+        }
+
+        private DailySyncBatch batch() {
+            return new DailySyncBatch(List.of(), attemptedCount, outcome,
+                    outcome == Outcome.RATE_LIMITED ? 429 : null);
+        }
     }
 
     private ContentSnapshotPort snapshotPort() {

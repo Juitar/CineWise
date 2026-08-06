@@ -75,6 +75,24 @@ class JdbcContentPersistenceAdapterIntegrationTest {
     }
 
     @Test
+    void givenV014CinemaColumns_whenCitySyncWritesThenItKeepsTheControlledCityOnInsertAndUpdate() {
+        Assumptions.assumeTrue(hasV014CinemaColumns(), "固定 H2 测试结构只执行到 V009");
+        long cinemaId = persistencePort.ensureCinema(cinema(8_000_040L), "上海", "10");
+        CinemaRow updated = new CinemaRow(8_000_041L, "test-cinema-001", "更新后的影院", "10", "黄浦区",
+                "更新地址", null, null, ContentSourceType.LIVE, "test-provider", DATA_TIME.plusHours(1),
+                DATA_TIME.plusHours(7));
+
+        assertThat(persistencePort.ensureCinema(updated, "上海", "10")).isEqualTo(cinemaId);
+        assertThat(jdbcTemplate.queryForMap("""
+                SELECT name, city_name, provider_city_id, address, version FROM cinema WHERE id = ?
+                """, cinemaId)).containsEntry("name", "更新后的影院")
+                .containsEntry("city_name", "上海")
+                .containsEntry("provider_city_id", "10")
+                .containsEntry("address", "更新地址")
+                .containsEntry("version", 1L);
+    }
+
+    @Test
     void givenDuplicateSnapshotOrSyncRequest_whenInserted_thenDatabaseKeepsOnlyTheFirstAuditRecord() {
         SnapshotRow snapshot = new SnapshotRow(8_000_010L, "test-provider", "external-001", "MOVIE",
                 "{\"title\":\"测试影片\"}", DATA_TIME, DATA_TIME.plusHours(6));
@@ -149,6 +167,14 @@ class JdbcContentPersistenceAdapterIntegrationTest {
                 SELECT COUNT(*)
                   FROM INFORMATION_SCHEMA.COLUMNS
                  WHERE TABLE_NAME = 'MOVIE' AND COLUMN_NAME = 'POSTER_URL'
+                """, Integer.class);
+        return count != null && count > 0;
+    }
+
+    private boolean hasV014CinemaColumns() {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_NAME = 'CINEMA' AND COLUMN_NAME = 'CITY_NAME'
                 """, Integer.class);
         return count != null && count > 0;
     }
