@@ -8,12 +8,14 @@ import com.miaoyu.ticket.content.domain.ContentSourceType;
 import com.miaoyu.ticket.content.domain.MovieContent;
 import java.util.ArrayList;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -96,6 +98,39 @@ public class ContentSyncService {
         return transactionTemplate == null ? persistBatch(batch, startedAt)
                 : transactionTemplate.execute(status -> persistBatch(batch, startedAt));
     }
+
+    /**
+     * 同步当前热映目录中尚未完成的详情。
+     *
+     * <p>先读取目录身份只是为了取得本地已完成集合；真正目录和详情仍由 Provider 在受控限流内读取。
+     * 已落库身份不会重复请求，未落库身份也不会提前进入公开影片目录。</p>
+     */
+    public int synchronizeCurrentHotMovies() {
+        return synchronizeCurrentHotMoviesWithResult().successCount();
+    }
+
+    /**
+     * 为管理员任务返回可脱敏审计的本轮统计。
+     *
+     * <p>Provider 仍在事务外执行，数据库写入只包围持久化步骤。调用方只能看到固定失败分类和数量，
+     * 不会接触外部 URL、原始 JSON 或影片目录内容。</p>
+     */
+    public CurrentHotMovieSyncResult synchronizeCurrentHotMoviesWithResult() {
+        Set<String> completedSourceMovieIds = persistence.findExistingMovieSourceIds("NETSTART_MAOYAN");
+        LiveContentSyncPort.DailySyncBatch batch = provider.fetchCurrentHotMovies(completedSourceMovieIds);
+        // V014 没有专用队列表，所以每轮依据已成功落库的身份过滤目录；本轮未处理的身份保持不在该集合中，
+        // 下一次任务会继续请求它们。本轮仍由 ensureMovie 幂等保护重复并发执行。
+        LocalDateTime startedAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
+        int successCount = transactionTemplate == null ? persistBatch(batch, startedAt)
+                : transactionTemplate.execute(status -> persistBatch(batch, startedAt));
+        int totalCount = Math.max(batch.attemptedCount(), successCount);
+        return new CurrentHotMovieSyncResult(totalCount, successCount, totalCount - successCount, batch.outcome(),
+                batch.errorCode());
+    }
+
+    /** 管理接口只用此不可变统计映射任务状态，不能从中恢复第三方响应内容。 */
+    public record CurrentHotMovieSyncResult(int totalCount, int successCount, int failureCount,
+                                            LiveContentSyncPort.Outcome outcome, Integer errorCode) { }
 
     /** 该方法仅被事务模板回调调用，保证业务 ID、快照和审计日志要么一起提交，要么一起回滚。 */
     private int persistBatch(LiveContentSyncPort.DailySyncBatch batch, LocalDateTime startedAt) {
@@ -224,6 +259,7 @@ public class ContentSyncService {
         if (item instanceof MovieContent movie) {
             long movieId = persistence.ensureMovie(new ContentPersistencePort.MovieRow(idGenerator.nextId(),
                     movie.sourceMovieId(), movie.title(), movie.genresJson(), movie.durationMinutes(), movie.rating(),
+                    movie.posterUrl(), movie.summary(), movie.releaseStatus(), releaseDateOf(movie.releaseDate()),
                     result.source().type(), result.source().name(), result.dataTime(), result.expiresAt()));
             // 这四项属于 Provider 已校验过的可选展示资料，业务 ID 回填后仍要进入快照和 Redis。
             // 不能只保留落库的旧基础列，否则同步成功后前端会读到没有海报和简介的影片。
@@ -238,6 +274,15 @@ public class ContentSyncService {
                 result.dataTime(), result.expiresAt()));
         return new CinemaContent(cinemaId, cinema.sourceCinemaId(), cinema.name(), cinema.cityCode(), cinema.area(),
                 cinema.address(), cinema.longitude(), cinema.latitude());
+    }
+
+    /**
+     * Provider Mapper 已拒绝非法日期；这里仅把公开模型的 ISO 字符串转换为 V014 的 DATE 列类型。
+     *
+     * <p>空值表示来源未提供上映日期，不将它伪造成今天或同步日期；持久化适配器会保留历史合格值。</p>
+     */
+    private LocalDate releaseDateOf(String releaseDate) {
+        return releaseDate == null ? null : LocalDate.parse(releaseDate);
     }
 
     /**

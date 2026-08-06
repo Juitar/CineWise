@@ -63,7 +63,7 @@ class DemoSeedInitializerTest {
         LocalDateTime dataTime = LocalDateTime.of(2026, 8, 2, 8, 0);
         long movieId = contentPersistencePort.ensureMovie(new ContentPersistencePort.MovieRow(
                 9_100_001L, "live-purchase-movie", "长沙购票演示片", "[\"剧情\"]", 110,
-                new BigDecimal("8.8"), ContentSourceType.LIVE, "NETSTART_MAOYAN",
+                new BigDecimal("8.8"), null, null, null, null, ContentSourceType.LIVE, "NETSTART_MAOYAN",
                 dataTime, dataTime.plusHours(6)));
         long cinemaId = contentPersistencePort.ensureCinema(new ContentPersistencePort.CinemaRow(
                 9_200_001L, "live-purchase-cinema", "长沙购票演示影院", "430100", "岳麓区",

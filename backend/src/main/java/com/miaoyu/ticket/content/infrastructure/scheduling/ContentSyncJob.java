@@ -16,7 +16,7 @@ public class ContentSyncJob {
 
     public ContentSyncJob(ContentSyncService service) { this.service = service; }
 
-    /** 默认每天凌晨执行一次；Provider 未启用时同步服务返回零条，不发起外网请求。 */
+    /** 默认每天凌晨执行一次；每轮只处理当前热映目录的一分钟详情预算，下一轮继续未完成身份。 */
     @Scheduled(cron = "${cinewise.content.netstart.daily-sync-cron}")
-    public void synchronizeDailyContent() { service.synchronizeDailyContent(); }
+    public void synchronizeDailyContent() { service.synchronizeCurrentHotMovies(); }
 }

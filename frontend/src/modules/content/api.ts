@@ -4,13 +4,38 @@ import type {
   CinemaDetail,
   CinemaSummary,
   ContentPageResponse,
+  MovieDetail,
   MovieListQuery,
   MovieSummary,
 } from '../../shared/types/api';
 
-/** 查询公开影院详情；来源和更新时间由详情响应自身决定。 */
-export function queryCinemaDetail(cinemaId: string, signal?: AbortSignal): Promise<CinemaDetail> {
+/**
+ * 读取影片详情的基础展示资料。
+ *
+ * 该函数只请求内容模块已声明的标题、海报和来源时效；不补充或推断场次、价格、座位、库存和距离。
+ * 调用方负责加载、404、网络失败和重试状态，并可用 signal 取消失效的只读请求。
+ */
+export function getMovieDetail(movieId: string, signal?: AbortSignal): Promise<MovieDetail> {
+  return apiRequest<MovieDetail>(`/api/v1/movies/${encodeURIComponent(movieId)}`, { signal });
+}
+
+/**
+ * 读取影院详情的基础展示资料。
+ *
+ * 结果仅包含影院名称、区域、地址和来源时效；票务场次、价格、座位、库存和距离仍由所属模块单独查询。
+ * 调用方负责加载、404、网络失败和重试状态，并可用 signal 取消失效的只读请求。
+ */
+export function getCinemaDetail(cinemaId: string, signal?: AbortSignal): Promise<CinemaDetail> {
   return apiRequest<CinemaDetail>(`/api/v1/cinemas/${encodeURIComponent(cinemaId)}`, { signal });
+}
+
+/**
+ * 保留旧名称，避免现有调用方在 A 切换到 getCinemaDetail 前出现构建中断。
+ *
+ * 新增调用应使用 getCinemaDetail；此别名不新增请求逻辑，也不会改变公共鉴权或路由。
+ */
+export function queryCinemaDetail(cinemaId: string, signal?: AbortSignal): Promise<CinemaDetail> {
+  return getCinemaDetail(cinemaId, signal);
 }
 
 /**
