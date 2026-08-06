@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -83,15 +84,19 @@ public class AdminContentSyncService {
         if (!taskPort.claimPending(pending.syncId(), leaseOwner, startedAt.plusSeconds(90), startedAt)) {
             return queryByRequestId(clientRequestId);
         }
-        ScheduledFuture<?> renewal = startLeaseRenewal(pending.syncId(), leaseOwner);
+        AtomicBoolean leaseActive = new AtomicBoolean(true);
+        ScheduledFuture<?> renewal = startLeaseRenewal(pending.syncId(), leaseOwner, leaseActive);
         try {
             ContentSyncService.CurrentHotMovieSyncResult result =
-                    contentSyncService.synchronizeCurrentHotMoviesWithResult();
+                    contentSyncService.synchronizeCurrentHotMoviesWithResult(
+                            () -> holdsActiveLease(pending.syncId(), leaseOwner, leaseActive));
             LocalDateTime finishedAt = now();
             ContentSyncTaskPort.SyncTaskStatus status = taskStatus(result);
             ContentSyncTaskPort.FailureCategory category = failureCategory(result.outcome());
             taskPort.finish(pending.syncId(), leaseOwner, status, result.totalCount(), result.successCount(),
                     result.failureCount(), errorCodeOf(result, status), category, finishedAt);
+        } catch (ContentSyncService.LeaseLostException lostLease) {
+            // 旧 Worker 已失去写入资格，不能再次改写被接管或已收敛任务的终态。
         } catch (RuntimeException exception) {
             // 外部调用或内容持久化异常必须收敛为可查询终态，不能把 requestId 永久留在 RUNNING。
             LocalDateTime failedAt = now();
@@ -125,15 +130,23 @@ public class AdminContentSyncService {
     }
 
     /** 存活同步每二十秒续到当前时间后九十秒；没有调度器时由 Provider 的短超时保证不会长期占用。 */
-    private ScheduledFuture<?> startLeaseRenewal(long syncId, String leaseOwner) {
+    private ScheduledFuture<?> startLeaseRenewal(long syncId, String leaseOwner, AtomicBoolean leaseActive) {
         TaskScheduler scheduler = taskSchedulerProvider == null ? null : taskSchedulerProvider.getIfAvailable();
         if (scheduler == null) {
             return null;
         }
         return scheduler.scheduleAtFixedRate(() -> {
             LocalDateTime currentTime = now();
-            taskPort.renewLease(syncId, leaseOwner, currentTime.plusSeconds(90), currentTime);
+            if (!taskPort.renewLease(syncId, leaseOwner, currentTime.plusSeconds(90), currentTime)) {
+                // 续租失败后先在本地阻止写入；资料事务会再向数据库复核一次。
+                leaseActive.set(false);
+            }
         }, Duration.ofSeconds(20));
+    }
+
+    /** 本地标志减少失租后的无效查询，数据库条件查询处理定时器与恢复任务的竞争。 */
+    private boolean holdsActiveLease(long syncId, String leaseOwner, AtomicBoolean leaseActive) {
+        return leaseActive.get() && taskPort.holdsActiveLease(syncId, leaseOwner, now());
     }
 
     private void validateRequest(String clientRequestId, String cityName) {

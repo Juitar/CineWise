@@ -76,6 +76,16 @@ public class JdbcContentSyncTaskAdapter implements ContentSyncTaskPort {
                 """, timestamp(leaseUntil), timestamp(now), syncId, leaseOwner, timestamp(now)) == 1;
     }
 
+    /** 只读复核必须同时匹配运行状态、持有者和未过期时间，不能仅按任务 ID 判断。 */
+    @Override
+    public boolean holdsActiveLease(long syncId, String leaseOwner, LocalDateTime now) {
+        Integer matched = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM data_sync_log
+                 WHERE id = ? AND status = 'RUNNING' AND lease_owner = ? AND lease_until > ?
+                """, Integer.class, syncId, leaseOwner, timestamp(now));
+        return matched != null && matched == 1;
+    }
+
     /** 终态同时清空租约，计数关系仍由 V014 CHECK 再次校验。 */
     @Override
     public boolean finish(long syncId, String leaseOwner, SyncTaskStatus status, int totalCount, int successCount,
