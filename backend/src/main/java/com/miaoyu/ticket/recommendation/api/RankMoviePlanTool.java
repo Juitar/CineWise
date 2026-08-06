@@ -7,11 +7,7 @@ import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationQueryService;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
 import com.miaoyu.ticket.recommendation.application.PersonalizedRecommendationQueryService;
-import com.miaoyu.ticket.recommendation.domain.RecommendationEvidence;
-import com.miaoyu.ticket.recommendation.domain.RecommendationPlan;
 import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
-import java.math.BigDecimal;
-import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,9 +46,12 @@ public class RankMoviePlanTool {
 
     public static final String TARGET_NAME = "rankMoviePlan";
 
+    // 旧查询服务只为已上线的固定推荐调用保留，完整入口不能用它补造方案。
     private final FixedRecommendationQueryService queryService;
+    // 完整服务聚合内容和 A 的可售场次，是新结果唯一可信的计算来源。
     private final PersonalizedRecommendationQueryService personalizedQueryService;
 
+    // 旧构造器只留给现有 B 适配器和历史测试，生产容器必须选择下面的完整依赖构造器。
     public RankMoviePlanTool(FixedRecommendationQueryService queryService) {
         this(queryService, null);
     }
@@ -61,6 +60,7 @@ public class RankMoviePlanTool {
     @Autowired
     public RankMoviePlanTool(FixedRecommendationQueryService queryService,
             PersonalizedRecommendationQueryService personalizedQueryService) {
+        // 两个服务分开保存，避免完整推荐切换期间改变旧工具的查询语义。
         this.queryService = queryService;
         this.personalizedQueryService = personalizedQueryService;
     }
@@ -108,46 +108,38 @@ public class RankMoviePlanTool {
     }
 
     /**
-     * 新版只读结果入口。旧 execute 保留给 B 迁移期间的 Agent 代码，两个入口共享同一份查询事实。
+     * 为 B 4.2 对接准备的完整推荐入口。
      *
-     * <p>这里仅把固定查询结果转换成公开方案；名称、评分、距离和预计路程没有可靠来源时保持空值，
-     * 不能用业务 ID、直线距离或模型输出补造展示事实。</p>
+     * <p>该入口只接受包含城市、日期和人数的完整 Command，并始终调用完整推荐查询。当前 Agent
+     * 白名单和运行适配器仍使用旧 {@link #execute(ToolContext, RankMoviePlanCommand)}；只有 B 完成
+     * 4.2 的注册表和适配器切换后，本入口才是实际运行入口。</p>
      */
     public ToolResult<RecommendationPlanResult> executeRecommendationPlan(
             ToolContext context, RankMoviePlanCommand command) {
+        // 上下文只提供 B 已验证的运行元数据，用户条件只能来自类型化 Command。
         Objects.requireNonNull(context, "context 不能为空");
         Objects.requireNonNull(command, "command 不能为空");
         if (!TARGET_NAME.equals(context.targetName())) {
+            // 错误路由不能触发内容和票务查询，避免其它工具节点意外得到推荐结果。
             return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INVALID_PARAMETER.code(), false, false,
                     "CHECK_TOOL_TARGET", false, null, context.stateVersion(), null, null);
         }
-        RecommendationPlanResult result;
-        if (personalizedQueryService != null && command.cityCode() != null) {
-            result = personalizedQueryService.query(command.toConstraints());
-        } else {
-            FixedRecommendationResult fixed = queryService.query(command.toQuery());
-            result = toPlanResult(fixed);
+        if (command.cityCode() == null || command.cityCode().isBlank()) {
+            // 完整方案不能回退到旧固定查询，否则 B 会把缺少城市和人数的结果误当成可展示方案。
+            return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INVALID_PARAMETER.code(), false, false,
+                    "COMPLETE_CONSTRAINTS_REQUIRED", false, null, context.stateVersion(), null, null);
         }
+        if (personalizedQueryService == null) {
+            // 这是错误的测试装配或 Bean 装配，不把内部异常或固定推荐结果泄露给调用方。
+            return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INTERNAL_ERROR.code(), false, false,
+                    "RETRY_LATER", false, null, context.stateVersion(), null, null);
+        }
+        // 只把 D 的完整计算结果原样交给 B，卡片、SSE 和 Agent 状态仍由 B 负责。
+        RecommendationPlanResult result = personalizedQueryService.query(command.toConstraints());
+        // 空方案或放宽建议仍是成功查询；降级标识只描述结果可用性，不能变成自动重试。
         return new ToolResult<>(ToolStatus.SUCCESS, result, null, false, false, "RENDER_RESULT",
                 result.degraded(), result.degraded() ? "RECOMMENDATION_DEGRADED" : null,
                 context.stateVersion(), result.dataAt(), result.expiresAt());
     }
 
-    private static RecommendationPlanResult toPlanResult(FixedRecommendationResult fixed) {
-        List<RecommendationPlan> plans = fixed.candidates().stream()
-                .filter(candidate -> candidate.purchaseEligible() && !candidate.isExpired())
-                .filter(candidate -> candidate.showId() != null && candidate.price() != null
-                        && candidate.startTime() != null)
-                .map(candidate -> new RecommendationPlan(
-                        RecommendationPlan.PlanType.COMPREHENSIVE, candidate.movieId(), null, candidate.cinemaId(),
-                        null, candidate.showId(), new BigDecimal(candidate.price()), candidate.startTime(), null, null,
-                        null, 0D, List.of("固定推荐结果"),
-                        List.of(new RecommendationEvidence("showtime", candidate.showId(), candidate.source(),
-                                candidate.startTime(), fixed.expiresAt())), candidate.source(), fixed.dataAt(),
-                        fixed.expiresAt(), true))
-                .toList();
-        boolean degraded = fixed.isExpired() || !fixed.purchaseEligible() || !fixed.missingFactors().isEmpty();
-        return new RecommendationPlanResult("1.0", fixed.algorithmVersion(), plans, fixed.missingFactors(), null,
-                fixed.profileApplied(), fixed.source(), fixed.dataAt(), fixed.expiresAt(), degraded);
-    }
 }
