@@ -10,6 +10,10 @@ public interface ProfileWriteRequestRepository {
 
   void insert(NewRequest request);
 
+  default int cleanupExpired(LocalDateTime before, int limit) {
+    return 0;
+  }
+
   record NewRequest(
       long id,
       long userId,

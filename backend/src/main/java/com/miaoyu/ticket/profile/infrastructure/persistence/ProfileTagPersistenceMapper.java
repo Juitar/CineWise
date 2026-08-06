@@ -27,6 +27,36 @@ SELECT id, user_id AS user_id, tag_type AS tag_type, tag_value AS tag_value, pol
 """)
   ProfileTagRow findByIdAndUserId(@Param("tagId") long tagId, @Param("userId") long userId);
 
+  @Select(
+      """
+SELECT id, user_id AS user_id, tag_type AS tag_type, tag_value AS tag_value, polarity,
+       weight, source, confidence, status, expires_at AS expires_at, version, update_time AS updated_at
+  FROM user_profile_tag
+ WHERE user_id = #{userId} AND tag_type = #{type} AND tag_value = #{value}
+   AND source = #{source} AND status = 'ACTIVE' AND deleted_at IS NULL
+""")
+  ProfileTagRow findActiveByKey(
+      @Param("userId") long userId,
+      @Param("type") String type,
+      @Param("value") String value,
+      @Param("source") String source);
+
+  @Update(
+      """
+UPDATE user_profile_tag
+   SET weight = #{weight}, polarity = #{polarity}, expires_at = #{expiresAt},
+       version = version + 1, update_time = #{updatedAt}
+ WHERE id = #{tagId} AND source = 'BEHAVIOR' AND status = 'ACTIVE'
+   AND version = #{expectedVersion} AND deleted_at IS NULL
+""")
+  int updateBehaviorWeight(
+      @Param("tagId") long tagId,
+      @Param("expectedVersion") long expectedVersion,
+      @Param("weight") java.math.BigDecimal weight,
+      @Param("polarity") String polarity,
+      @Param("expiresAt") java.time.LocalDateTime expiresAt,
+      @Param("updatedAt") java.time.LocalDateTime updatedAt);
+
   @Update(
       """
 UPDATE user_profile_tag SET status = #{status}, version = version + 1, update_time = #{updatedAt}
@@ -39,6 +69,24 @@ UPDATE user_profile_tag SET status = #{status}, version = version + 1, update_ti
       @Param("status") String status,
       @Param("updatedAt") java.time.LocalDateTime updatedAt);
 
+  @Update(
+      """
+UPDATE user_profile_tag
+   SET polarity = #{polarity}, weight = #{weight}, confidence = #{confidence},
+       expires_at = #{expiresAt}, version = version + 1, update_time = #{updatedAt}
+ WHERE id = #{tagId} AND user_id = #{userId} AND version = #{expectedVersion}
+   AND status = 'ACTIVE' AND deleted_at IS NULL
+""")
+  int update(
+      @Param("tagId") long tagId,
+      @Param("userId") long userId,
+      @Param("expectedVersion") long expectedVersion,
+      @Param("polarity") String polarity,
+      @Param("weight") java.math.BigDecimal weight,
+      @Param("confidence") java.math.BigDecimal confidence,
+      @Param("expiresAt") java.time.LocalDateTime expiresAt,
+      @Param("updatedAt") java.time.LocalDateTime updatedAt);
+
   @Select(
       """
 SELECT id, user_id AS user_id, tag_type AS tag_type, tag_value AS tag_value, polarity,
@@ -48,6 +96,9 @@ SELECT id, user_id AS user_id, tag_type AS tag_type, tag_value AS tag_value, pol
 """)
   java.util.List<ProfileTagRow> findPageByUserId(
       @Param("userId") long userId, @Param("offset") int offset, @Param("limit") int limit);
+
+  @Select("SELECT COUNT(*) FROM user_profile_tag WHERE user_id = #{userId} AND deleted_at IS NULL")
+  long countByUserId(@Param("userId") long userId);
 
   @Update(
       """
@@ -60,6 +111,18 @@ UPDATE user_profile_tag SET status = 'DELETED', deleted_at = #{deletedAt},
       @Param("userId") long userId,
       @Param("expectedVersion") long expectedVersion,
       @Param("deletedAt") java.time.LocalDateTime deletedAt);
+
+  @Update(
+      """
+UPDATE user_profile_tag SET status = 'DELETED', deleted_at = #{deletedAt}, update_time = #{deletedAt}
+ WHERE user_id = #{userId} AND deleted_at IS NULL
+""")
+  int softDeleteAll(@Param("userId") long userId, @Param("deletedAt") java.time.LocalDateTime deletedAt);
+
+  @org.apache.ibatis.annotations.Delete(
+      "DELETE FROM user_profile_tag WHERE deleted_at IS NOT NULL AND deleted_at <= #{before} LIMIT #{limit}")
+  int cleanupDeletedBefore(
+      @Param("before") java.time.LocalDateTime before, @Param("limit") int limit);
 
   @Update(
       """

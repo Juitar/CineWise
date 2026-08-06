@@ -18,7 +18,23 @@ public record FixedRecommendationResult(
         String source,
         Instant dataAt,
         Instant expiresAt,
-        boolean isExpired) {
+        boolean isExpired,
+        boolean profileApplied,
+        List<ProfileRecommendationEvidence> profileEvidence) {
+
+    /** 保持既有调用方可继续构造不使用画像的结果。 */
+    public FixedRecommendationResult(
+            String algorithmVersion,
+            List<RecommendationCandidate> candidates,
+            boolean purchaseEligible,
+            List<String> missingFactors,
+            String source,
+            Instant dataAt,
+            Instant expiresAt,
+            boolean isExpired) {
+        this(algorithmVersion, candidates, purchaseEligible, missingFactors, source, dataAt, expiresAt,
+                isExpired, false, List.of());
+    }
 
     // 不可购结果仍保留内容候选，主控可展示后继续询问用户。
 
@@ -34,6 +50,10 @@ public record FixedRecommendationResult(
         // 目录时间窗口成对出现，避免下游误把无时效的结果用于后续写节点。
         dataAt = Objects.requireNonNull(dataAt, "dataAt 不能为空");
         expiresAt = Objects.requireNonNull(expiresAt, "expiresAt 不能为空");
+        profileEvidence = List.copyOf(Objects.requireNonNull(profileEvidence, "profileEvidence 不能为空"));
+        if (!profileApplied && !profileEvidence.isEmpty()) {
+            throw new IllegalArgumentException("未采用画像时不能返回画像证据");
+        }
         if (!expiresAt.isAfter(dataAt)) {
             throw new IllegalArgumentException("expiresAt 必须晚于 dataAt");
         }

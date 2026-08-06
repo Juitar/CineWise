@@ -37,6 +37,22 @@ public class MybatisProfilePreferenceRepository implements ProfilePreferenceRepo
     return mapper.incrementVersion(userId, updatedAt) == 1;
   }
 
+  @Override
+  public boolean incrementVersionIfMatches(long userId, long expectedVersion, LocalDateTime updatedAt) {
+    return mapper.incrementVersionIfMatches(userId, expectedVersion, updatedAt) == 1;
+  }
+
+  @Override
+  public boolean updatePersonalization(
+      long userId, long expectedVersion, boolean enabled, LocalDateTime updatedAt) {
+    return mapper.updatePersonalization(userId, expectedVersion, enabled, updatedAt) == 1;
+  }
+
+  @Override
+  public boolean disable(long userId, LocalDateTime updatedAt) {
+    return mapper.disable(userId, updatedAt) == 1;
+  }
+
   private Snapshot toSnapshot(ProfilePreferenceRow row) {
     return new Snapshot(row.userId(), row.personalizationEnabled(), row.version(), row.updatedAt());
   }

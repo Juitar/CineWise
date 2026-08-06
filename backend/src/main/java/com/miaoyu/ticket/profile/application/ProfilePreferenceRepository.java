@@ -19,6 +19,24 @@ public interface ProfilePreferenceRepository {
    */
   boolean incrementVersion(long userId, LocalDateTime updatedAt);
 
+  /** 画像总版本的 CAS，标签和开关写入以它阻止两个旧页面同时成功。 */
+  default boolean incrementVersionIfMatches(long userId, long expectedVersion, LocalDateTime updatedAt) {
+    return false;
+  }
+
+  /**
+   * 开关写入必须同时比较画像版本，不能让两个旧页面相互覆盖。
+   * 返回 false 表示设置不存在、已删除或版本已经被别的写入推进。
+   */
+  default boolean updatePersonalization(
+      long userId, long expectedVersion, boolean enabled, LocalDateTime updatedAt) {
+    return false;
+  }
+
+  default boolean disable(long userId, LocalDateTime updatedAt) {
+    return false;
+  }
+
   record Snapshot(
       long userId, boolean personalizationEnabled, long version, LocalDateTime updatedAt) { }
 }

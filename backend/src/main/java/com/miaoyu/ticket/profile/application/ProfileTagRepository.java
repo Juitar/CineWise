@@ -16,6 +16,29 @@ public interface ProfileTagRepository {
 
   Optional<Snapshot> findByIdAndUserId(long tagId, long userId);
 
+  default Optional<Snapshot> findActiveByKey(
+      long userId, ProfileTagType type, String value, ProfileTagSource source) {
+    return Optional.empty();
+  }
+
+  default boolean updateBehaviorWeight(
+      long tagId,
+      long expectedVersion,
+      BigDecimal weight,
+      ProfileTagPolarity polarity,
+      LocalDateTime expiresAt,
+      LocalDateTime updatedAt) {
+    return false;
+  }
+
+  default int softDeleteAll(long userId, LocalDateTime deletedAt) {
+    return 0;
+  }
+
+  default int cleanupDeletedBefore(LocalDateTime before, int limit) {
+    return 0;
+  }
+
   boolean updateStatus(
       long tagId,
       long userId,
@@ -23,7 +46,23 @@ public interface ProfileTagRepository {
       ProfileTagStatus status,
       LocalDateTime updatedAt);
 
+  default boolean update(
+      long tagId,
+      long userId,
+      long expectedVersion,
+      ProfileTagPolarity polarity,
+      BigDecimal weight,
+      BigDecimal confidence,
+      LocalDateTime expiresAt,
+      LocalDateTime updatedAt) {
+    return false;
+  }
+
   List<Snapshot> findPageByUserId(long userId, int offset, int limit);
+
+  default long countByUserId(long userId) {
+    return 0L;
+  }
 
   boolean softDelete(long tagId, long userId, long expectedVersion, LocalDateTime deletedAt);
 

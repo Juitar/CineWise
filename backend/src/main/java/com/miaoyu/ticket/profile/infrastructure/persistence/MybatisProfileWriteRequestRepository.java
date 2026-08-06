@@ -35,4 +35,9 @@ public class MybatisProfileWriteRequestRepository implements ProfileWriteRequest
       throw new IllegalStateException("画像幂等记录写入行数异常");
     }
   }
+
+  @Override
+  public int cleanupExpired(java.time.LocalDateTime before, int limit) {
+    return mapper.cleanupExpired(before, limit);
+  }
 }

@@ -6,13 +6,23 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.error.ErrorCode;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
+import com.miaoyu.ticket.auth.application.CurrentUser;
+import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
+import com.miaoyu.ticket.auth.application.RoleCode;
+import com.miaoyu.ticket.profile.application.ProfileQueryService;
+import com.miaoyu.ticket.profile.application.ProfileSummary;
+import com.miaoyu.ticket.profile.domain.ProfileTagPolarity;
+import com.miaoyu.ticket.profile.domain.ProfileTagSource;
+import com.miaoyu.ticket.profile.domain.ProfileTagType;
 import com.miaoyu.ticket.recommendation.domain.PurchaseCandidateValidator.PurchaseCandidate;
+import java.lang.reflect.Constructor;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 
 class FixedRecommendationQueryServiceTest {
@@ -121,5 +131,50 @@ class FixedRecommendationQueryServiceTest {
             assertThat(candidate.showId()).isNull();
             assertThat(candidate.price()).isNull();
         });
+    }
+
+    @Test
+    void shouldRecordOnlyMatchingCinemaProfileAsMinimalEvidence() {
+        ProfileQueryService profileQueryService = new ProfileQueryService(null, null, null, null) {
+            @Override
+            public ProfileSummary assembleSummary(long userId) {
+                return new ProfileSummary(true, 3L, NOW, java.util.List.of(new ProfileSummary.Tag(
+                        ProfileTagType.CINEMA,
+                        "201",
+                        ProfileTagPolarity.LIKE,
+                        new java.math.BigDecimal("0.900"),
+                        new java.math.BigDecimal("0.900"),
+                        ProfileTagSource.MANUAL,
+                        NOW)));
+            }
+        };
+        CurrentUserAccessor currentUserAccessor = () -> new CurrentUser(99L, RoleCode.USER, 0L);
+        FixedRecommendationQueryService service = new FixedRecommendationQueryService(
+                () -> new FixedRecommendationCatalog(
+                        "fixed-rec-v1", "FIXED_RECOMMENDATION", ContentSourceType.MOCK, 360),
+                query -> java.util.List.of(),
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                profileQueryService,
+                currentUserAccessor);
+
+        FixedRecommendationResult result = service.query(
+                new RecommendationQuery("101", "201", LocalDate.of(2026, 8, 3), null, null));
+
+        assertThat(result.profileApplied()).isTrue();
+        assertThat(result.profileEvidence()).singleElement().satisfies(evidence -> {
+            assertThat(evidence.type()).isEqualTo(ProfileTagType.CINEMA);
+            assertThat(evidence.value()).isEqualTo("201");
+            assertThat(evidence.source()).isEqualTo(ProfileTagSource.MANUAL);
+        });
+    }
+
+    @Test
+    void shouldUseProfileAwareConstructorForSpringInjection() {
+        Constructor<?>[] constructors = FixedRecommendationQueryService.class.getConstructors();
+
+        assertThat(constructors)
+                .filteredOn(constructor -> constructor.isAnnotationPresent(Autowired.class))
+                .singleElement()
+                .satisfies(constructor -> assertThat(constructor.getParameterCount()).isEqualTo(5));
     }
 }
