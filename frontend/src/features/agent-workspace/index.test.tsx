@@ -123,7 +123,7 @@ describe('AgentWorkspace 页面', () => {
         key: 'select-seats-1',
         kind: 'business-intent',
         text: '已确认场次，可选座',
-        selectSeatsPath: '/shows/show-70001/seats',
+        selectSeatsPath: '/shows/70001/seats',
       },
       {
         key: 'plan-1',
@@ -141,7 +141,7 @@ describe('AgentWorkspace 页面', () => {
 
     expect(screen.getByRole('link', { name: '去选座' })).toHaveAttribute(
       'href',
-      '/shows/show-70001/seats',
+      '/shows/70001/seats',
     );
     expect(screen.queryByRole('button', { name: /确认|支付|建单|锁座/ })).not.toBeInTheDocument();
   });

@@ -56,12 +56,12 @@ describe('Agent reducer 新 SSE 协议', () => {
     expect(result.projection.items[0]).toEqual(
       expect.objectContaining({ kind: 'business-intent', text: '已确认场次，可选座' }),
     );
-    expect(result.projection.items[0].fields).toEqual([{ label: '场次 ID', value: 'show-70001' }]);
-    expect(result.projection.items[0].selectSeatsPath).toBe('/shows/show-70001/seats');
+    expect(result.projection.items[0].fields).toEqual([{ label: '场次 ID', value: '70001' }]);
+    expect(result.projection.items[0].selectSeatsPath).toBe('/shows/70001/seats');
   });
 
-  it('只编码 showId，不补齐影片、影院或交易参数', () => {
-    expect(buildAgentSelectSeatsPath('show / 1')).toBe('/shows/show%20%2F%201/seats');
+  it('只使用已校验的十进制 showId，不补齐影片、影院或交易参数', () => {
+    expect(buildAgentSelectSeatsPath('70001')).toBe('/shows/70001/seats');
   });
 
   it('SELECT_SEATS 缺少 showId 时拒绝且不推进游标', () => {
@@ -73,6 +73,22 @@ describe('Agent reducer 新 SSE 协议', () => {
       }),
     );
     expect(invalid.outcome).toBe('rejected');
+    expect(invalid.projection.lastEventId).toBe('0');
+  });
+
+  it('SELECT_SEATS 使用非十进制 showId 时拒绝、不显示入口且不推进游标', () => {
+    const invalid = consumeAgentEvent(
+      createAgentProjection('session-1'),
+      parseAgentEvent({
+        ...selectSeatsCard,
+        payload: {
+          type: 'BUSINESS_INTENT',
+          payload: { intent: 'SELECT_SEATS', businessRef: { showId: 'show-70001' } },
+        },
+      }),
+    );
+    expect(invalid.outcome).toBe('rejected');
+    expect(invalid.projection.items).toHaveLength(0);
     expect(invalid.projection.lastEventId).toBe('0');
   });
 
