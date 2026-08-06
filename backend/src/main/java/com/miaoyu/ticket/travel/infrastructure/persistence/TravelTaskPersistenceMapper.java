@@ -88,11 +88,11 @@ public interface TravelTaskPersistenceMapper {
     List<TravelTaskRow> listDueForAdvice(@Param("now") java.time.LocalDateTime now, @Param("limit") int limit);
 
     @org.apache.ibatis.annotations.Update("""
-            UPDATE travel_task SET status = 'COMPLETED', closed_at = #{completedAt}, update_time = #{updatedAt}
-             WHERE id = #{id} AND status IN ('READY', 'NOTIFIED') AND start_at <= #{completedAt}
+            UPDATE travel_task SET status = 'COMPLETED', closed_at = #{closedAt}, update_time = #{closedAt}
+             WHERE id = #{id} AND status IN ('READY', 'NOTIFIED') AND start_at <= #{elapsedBefore}
             """)
-    int completeIfElapsed(@Param("id") long id, @Param("completedAt") java.time.LocalDateTime completedAt,
-                          @Param("updatedAt") java.time.LocalDateTime updatedAt);
+    int completeIfElapsed(@Param("id") long id, @Param("elapsedBefore") java.time.LocalDateTime elapsedBefore,
+                          @Param("closedAt") java.time.LocalDateTime closedAt);
 
     @Select("""
             SELECT id FROM travel_task WHERE status IN ('READY', 'NOTIFIED') AND start_at <= #{completedAt}

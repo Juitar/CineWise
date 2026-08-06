@@ -7,6 +7,7 @@ import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.travel.application.WeatherObservation;
 import com.miaoyu.ticket.travel.application.WeatherQueryService;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /**
@@ -20,6 +21,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class GetWeatherTool {
     public static final String TARGET_NAME = "getWeather";
+    // 当前 MVP 仅允许内容 Demo 已登记影院的行政区，拒绝地址、坐标和任意 Agent 文本进入缓存键。
+    private static final Set<String> ALLOWED_CINEMA_AREAS = Set.of("西湖区", "滨江区", "拱墅区", "上城区");
     private final WeatherQueryService weatherQueryService;
 
     public GetWeatherTool(WeatherQueryService weatherQueryService) {
@@ -34,6 +37,9 @@ public class GetWeatherTool {
         Objects.requireNonNull(context, "context 不能为空");
         Objects.requireNonNull(command, "command 不能为空");
         if (!TARGET_NAME.equals(context.targetName())) {
+            return failed(context);
+        }
+        if (!ALLOWED_CINEMA_AREAS.contains(command.cinemaArea())) {
             return failed(context);
         }
         WeatherObservation result = weatherQueryService.query(command.cinemaArea());

@@ -35,7 +35,7 @@ public interface TravelTaskRepository {
     }
 
     /** 观影结束两小时后关闭已完成建议的任务；退款终态和失败终态绝不被覆盖。 */
-    default boolean completeIfElapsed(long id, LocalDateTime completedAt, LocalDateTime updatedAt) {
+    default boolean completeIfElapsed(long id, LocalDateTime elapsedBefore, LocalDateTime closedAt) {
         return false;
     }
 

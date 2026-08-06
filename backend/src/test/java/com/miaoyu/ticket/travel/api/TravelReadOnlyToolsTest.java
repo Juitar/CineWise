@@ -3,6 +3,7 @@ package com.miaoyu.ticket.travel.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.miaoyu.ticket.agent.domain.tool.ToolContext;
@@ -53,6 +54,17 @@ class TravelReadOnlyToolsTest {
         assertThat(result.status()).isEqualTo(ToolStatus.FAILED);
         assertThat(result.errorCode()).isEqualTo(100001);
         org.mockito.Mockito.verifyNoInteractions(service);
+    }
+
+    @Test
+    void shouldRejectExactAddressBeforeCallingWeatherService() {
+        WeatherQueryService service = mock(WeatherQueryService.class);
+
+        var result = new GetWeatherTool(service).execute(
+                WEATHER_CONTEXT, new GetWeatherTool.GetWeatherCommand("文三路168号"));
+
+        assertThat(result.status()).isEqualTo(ToolStatus.FAILED);
+        verifyNoInteractions(service);
     }
 
     @Test

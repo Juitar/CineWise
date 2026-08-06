@@ -57,8 +57,8 @@ public class MybatisTravelTaskRepository implements TravelTaskRepository {
     }
 
     @Override
-    public boolean completeIfElapsed(long id, java.time.LocalDateTime completedAt, java.time.LocalDateTime updatedAt) {
-        return mapper.completeIfElapsed(id, completedAt, updatedAt) == 1;
+    public boolean completeIfElapsed(long id, java.time.LocalDateTime elapsedBefore, java.time.LocalDateTime closedAt) {
+        return mapper.completeIfElapsed(id, elapsedBefore, closedAt) == 1;
     }
 
     @Override

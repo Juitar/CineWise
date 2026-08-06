@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.miaoyu.ticket.order.event.OrderInvalidated;
 import com.miaoyu.ticket.order.event.PaymentSucceededEvent;
+import com.miaoyu.ticket.common.config.ClockConfiguration;
 import java.time.Clock;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -50,6 +52,9 @@ class TravelTaskPaymentEventIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private Clock clock;
 
     @BeforeEach
     void clearTravelTasks() {
@@ -183,8 +188,9 @@ class TravelTaskPaymentEventIntegrationTest {
         long internalTaskId = jdbcTemplate.queryForObject(
                 "SELECT id FROM travel_task WHERE task_id = ?", Long.class, task.taskId());
         // 该用例只验证到期提醒的去重，不应因固定历史 start_at 被完成清理分支抢先关闭。
-        jdbcTemplate.update("UPDATE travel_task SET start_at = DATEADD('DAY', 1, CURRENT_TIMESTAMP) WHERE id = ?",
-                internalTaskId);
+        LocalDateTime futureStartAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID)
+                .plusDays(1);
+        jdbcTemplate.update("UPDATE travel_task SET start_at = ? WHERE id = ?", futureStartAt, internalTaskId);
         jdbcTemplate.update("UPDATE travel_task SET trigger_at = DATEADD('MINUTE', -1, CURRENT_TIMESTAMP) WHERE id = ?",
                 internalTaskId);
 

@@ -42,9 +42,10 @@ public class TravelReminderSchedulingService {
                         task.id(), exception.getClass().getSimpleName());
             }
         }
-        LocalDateTime completedAt = now.minusHours(COMPLETE_AFTER_HOURS);
-        for (Long taskId : taskRepository.listElapsedTaskIds(completedAt, BATCH_SIZE)) {
-            taskRepository.completeIfElapsed(taskId, completedAt, now);
+        LocalDateTime elapsedBefore = now.minusHours(COMPLETE_AFTER_HOURS);
+        for (Long taskId : taskRepository.listElapsedTaskIds(elapsedBefore, BATCH_SIZE)) {
+            // 阈值只用于判断是否已结束；closed_at 必须记录本次真实关闭时间，不能提前两小时。
+            taskRepository.completeIfElapsed(taskId, elapsedBefore, now);
         }
     }
 
