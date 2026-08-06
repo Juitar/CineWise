@@ -36,10 +36,22 @@ public class DistanceContextService {
     public boolean upload(String contextId, BigDecimal longitude, BigDecimal latitude) {
         long userId = currentUserAccessor.requireCurrentUserId();
         Coordinate coordinate = new Coordinate(longitude, latitude);
-        return contexts.computeIfPresent(contextId, (id, context) -> context.userId() == userId
-                && !context.expiresAt().isBefore(clock.instant()) && !context.used()
-                ? new Context(context.userId(), context.runId(), context.expiresAt(), coordinate, false) : context)
-                != null;
+        Context expected = contexts.get(contextId);
+        while (expected != null) {
+            // 归属、时效和一次性标记任一不满足都必须失败，并保留原上下文不被覆盖或删除。
+            if (expected.userId() != userId || expected.expiresAt().isBefore(clock.instant()) || expected.used()) {
+                return false;
+            }
+            // replace 是基于旧对象的原子替换；并发上传只能有一个请求把空坐标替换为已上传坐标。
+            Context uploaded = new Context(
+                    expected.userId(), expected.runId(), expected.expiresAt(), coordinate, true);
+            if (contexts.replace(contextId, expected, uploaded)) {
+                return true;
+            }
+            // 上下文可能被同一次运行中的另一个请求消费或上传，重新读取后再次按同一规则判断。
+            expected = contexts.get(contextId);
+        }
+        return false;
     }
 
     /** 推荐工具只用可信 runId 消费坐标一次；没有上下文时调用方继续普通推荐。 */
