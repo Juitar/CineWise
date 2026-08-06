@@ -145,6 +145,28 @@ describe('HomePage', () => {
     expect(screen.getByLabelText('首页影院加载中')).toBeInTheDocument();
   });
 
+  it('保留旧影片时展示刷新和离线只读快照状态', () => {
+    pageMocks.useMovieList.mockReturnValue(
+      movieState({ isOfflineSnapshot: true, isRefreshing: true }),
+    );
+    render(<HomePage />);
+
+    expect(screen.getByText('正在更新影片…')).toBeInTheDocument();
+    expect(screen.getByText('当前已离线，正在显示本页面内存中的影片只读快照')).toBeInTheDocument();
+    expect(screen.getByTestId('home-movie-8100001')).toBeInTheDocument();
+  });
+
+  it('保留旧影院时展示刷新和离线只读快照状态', () => {
+    pageMocks.useCinemaList.mockReturnValue(
+      cinemaState({ isOfflineSnapshot: true, isRefreshing: true }),
+    );
+    render(<HomePage />);
+
+    expect(screen.getByText('正在更新影院…')).toBeInTheDocument();
+    expect(screen.getByText('当前已离线，正在显示本页面内存中的影院只读快照')).toBeInTheDocument();
+    expect(screen.getByTestId('home-cinema-8200001')).toBeInTheDocument();
+  });
+
   it('影片和影院空结果都有明确提示', () => {
     pageMocks.useMovieList.mockReturnValue(
       movieState({ data: { ...movieResponse, records: [], total: 0 } }),

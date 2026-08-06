@@ -134,6 +134,13 @@ export default function HomePage() {
                   </div>
 
                   {movies.data ? <FreshnessNotice freshness={movies.data} /> : null}
+                  {movies.isOfflineSnapshot ? (
+                    <Alert
+                      message="当前已离线，正在显示本页面内存中的影片只读快照"
+                      showIcon
+                      type="warning"
+                    />
+                  ) : null}
                   {movies.error ? (
                     <Alert
                       action={
@@ -148,6 +155,11 @@ export default function HomePage() {
                       showIcon
                       type="error"
                     />
+                  ) : null}
+                  {movies.isRefreshing ? (
+                    <div className="home-refreshing" role="status">
+                      正在更新影片…
+                    </div>
                   ) : null}
                   {movies.isLoading ? (
                     <div className="movies-list" aria-label="首页影片加载中">
@@ -185,6 +197,13 @@ export default function HomePage() {
                   </div>
 
                   {cinemas.data ? <FreshnessNotice freshness={cinemas.data} /> : null}
+                  {cinemas.isOfflineSnapshot ? (
+                    <Alert
+                      message="当前已离线，正在显示本页面内存中的影院只读快照"
+                      showIcon
+                      type="warning"
+                    />
+                  ) : null}
                   {cinemas.error ? (
                     <Alert
                       action={
@@ -199,6 +218,11 @@ export default function HomePage() {
                       showIcon
                       type="error"
                     />
+                  ) : null}
+                  {cinemas.isRefreshing ? (
+                    <div className="home-refreshing" role="status">
+                      正在更新影院…
+                    </div>
                   ) : null}
                   {cinemas.isLoading ? (
                     <div className="cinemas-list" aria-label="首页影院加载中">
