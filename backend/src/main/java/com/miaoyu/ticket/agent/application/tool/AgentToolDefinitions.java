@@ -9,6 +9,13 @@ import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
 import com.miaoyu.ticket.agent.domain.confirmation.ConfirmedOrderCommand;
 import com.miaoyu.ticket.agent.application.confirmation.CreateOrderToolResult;
 import com.miaoyu.ticket.order.api.CreateOrderTool;
+import com.miaoyu.ticket.ticketing.api.QueryAvailableDatesTool;
+import com.miaoyu.ticket.ticketing.api.QueryAvailableDatesToolCommand;
+import com.miaoyu.ticket.ticketing.api.QueryAvailableDatesToolResult;
+import com.miaoyu.ticket.ticketing.api.QueryShowsTool;
+import com.miaoyu.ticket.ticketing.api.QueryShowsToolCommand;
+import com.miaoyu.ticket.ticketing.api.QueryShowsToolResult;
+import com.miaoyu.ticket.ticketing.application.TicketingErrorCode;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -19,6 +26,8 @@ import java.util.Set;
 public final class AgentToolDefinitions {
     /** D 的推荐工具属于本应用内部只读调用，最多占用三秒预算。 */
     public static final Duration RANK_MOVIE_PLAN_TIMEOUT = Duration.ofSeconds(3L);
+    /** A 的两个票务查询 Tool 共享五秒上限；具体 Adapter 只能继续缩小剩余预算。 */
+    public static final Duration TICKETING_READ_TIMEOUT = Duration.ofSeconds(5L);
 
     private AgentToolDefinitions() {
     }
@@ -44,6 +53,39 @@ public final class AgentToolDefinitions {
                         new ToolInputDefinition("timeFrom", LocalTime.class, false),
                         new ToolInputDefinition("timeTo", LocalTime.class, false)),
                 Set.of(CommonErrorCode.INVALID_PARAMETER.code()));
+    }
+
+    /** A 的日期摘要查询仅供 Agent 追问日期，不返回座位或库存锁定事实。 */
+    public static ToolDefinition queryAvailableDates() {
+        return new ToolDefinition(
+                QueryAvailableDatesTool.TARGET_NAME,
+                QueryAvailableDatesToolCommand.class,
+                QueryAvailableDatesToolResult.class,
+                true,
+                TICKETING_READ_TIMEOUT,
+                false,
+                List.of(
+                        new ToolInputDefinition("movieId", String.class, true),
+                        new ToolInputDefinition("cinemaId", String.class, true)),
+                Set.of(CommonErrorCode.INVALID_PARAMETER.code(), TicketingErrorCode.QUERY_UNAVAILABLE.code()));
+    }
+
+    /** A 的场次查询只返回当前摘要；用户选择后仍必须进入购票页重新查询权威座位图。 */
+    public static ToolDefinition queryShows() {
+        return new ToolDefinition(
+                QueryShowsTool.TARGET_NAME,
+                QueryShowsToolCommand.class,
+                QueryShowsToolResult.class,
+                true,
+                TICKETING_READ_TIMEOUT,
+                false,
+                List.of(
+                        new ToolInputDefinition("movieId", String.class, true),
+                        new ToolInputDefinition("cinemaId", String.class, true),
+                        new ToolInputDefinition("businessDate", LocalDate.class, true),
+                        new ToolInputDefinition("timeFrom", LocalTime.class, false),
+                        new ToolInputDefinition("timeTo", LocalTime.class, false)),
+                Set.of(CommonErrorCode.INVALID_PARAMETER.code(), TicketingErrorCode.QUERY_UNAVAILABLE.code()));
     }
 
     /** A 已合入的建单能力只登记为写工具；实际调用仍由确认动作服务独占。 */

@@ -6,7 +6,11 @@ import com.miaoyu.ticket.agent.domain.plan.PlanSchemaValidator;
 import com.miaoyu.ticket.agent.domain.run.ExecutionPlanStateMachine;
 import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
 import com.miaoyu.ticket.agent.infrastructure.model.MockModelGateway;
+import com.miaoyu.ticket.agent.tool.ticketing.QueryAvailableDatesExecutionAdapter;
+import com.miaoyu.ticket.agent.tool.ticketing.QueryShowsExecutionAdapter;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
+import com.miaoyu.ticket.ticketing.api.QueryAvailableDatesTool;
+import com.miaoyu.ticket.ticketing.api.QueryShowsTool;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,7 +32,11 @@ public class AgentToolConfiguration {
      */
     @Bean
     public ToolRegistry agentToolRegistry() {
-        return new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan(), AgentToolDefinitions.createOrder()));
+        return new ToolRegistry(List.of(
+                AgentToolDefinitions.rankMoviePlan(),
+                AgentToolDefinitions.queryAvailableDates(),
+                AgentToolDefinitions.queryShows(),
+                AgentToolDefinitions.createOrder()));
     }
 
     /**
@@ -74,6 +82,22 @@ public class AgentToolConfiguration {
         return new RankMoviePlanExecutionAdapter(rankMoviePlanTool, executionPlanStateMachine);
     }
 
+    /** A 的日期 Tool 只接通明确的公开 API；它不注入票务持久化实现。 */
+    @Bean
+    public QueryAvailableDatesExecutionAdapter queryAvailableDatesExecutionAdapter(
+            QueryAvailableDatesTool queryAvailableDatesTool,
+            ExecutionPlanStateMachine executionPlanStateMachine) {
+        return new QueryAvailableDatesExecutionAdapter(queryAvailableDatesTool, executionPlanStateMachine);
+    }
+
+    /** A 的场次 Tool 只接通当前公开场次查询；座位图继续由购票页直接读取。 */
+    @Bean
+    public QueryShowsExecutionAdapter queryShowsExecutionAdapter(
+            QueryShowsTool queryShowsTool,
+            ExecutionPlanStateMachine executionPlanStateMachine) {
+        return new QueryShowsExecutionAdapter(queryShowsTool, executionPlanStateMachine);
+    }
+
     /** 提交入口只使用该主控，模型候选计划必须经过服务端校验和白名单选择。 */
     @Bean
     public MultiToolSupervisor multiToolSupervisor(
@@ -81,13 +105,18 @@ public class AgentToolConfiguration {
             ToolRegistry agentToolRegistry,
             PlanSchemaValidator planSchemaValidator,
             ExecutionPlanStateMachine executionPlanStateMachine,
-            RankMoviePlanExecutionAdapter rankMoviePlanExecutionAdapter) {
+            RankMoviePlanExecutionAdapter rankMoviePlanExecutionAdapter,
+            QueryAvailableDatesExecutionAdapter queryAvailableDatesExecutionAdapter,
+            QueryShowsExecutionAdapter queryShowsExecutionAdapter) {
         return new MultiToolSupervisor(
                 modelGateway,
                 agentToolRegistry,
                 planSchemaValidator,
                 executionPlanStateMachine,
-                List.of(rankMoviePlanExecutionAdapter));
+                List.of(
+                        rankMoviePlanExecutionAdapter,
+                        queryAvailableDatesExecutionAdapter,
+                        queryShowsExecutionAdapter));
     }
 
 }
