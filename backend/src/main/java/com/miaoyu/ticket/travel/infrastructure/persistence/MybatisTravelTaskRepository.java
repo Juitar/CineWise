@@ -3,6 +3,7 @@ package com.miaoyu.ticket.travel.infrastructure.persistence;
 import com.miaoyu.ticket.travel.application.TravelTaskRepository;
 import com.miaoyu.ticket.travel.domain.TravelTaskStatus;
 import java.util.Optional;
+import java.util.List;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -48,6 +49,21 @@ public class MybatisTravelTaskRepository implements TravelTaskRepository {
     public boolean updateTriggerAt(long id, long expectedVersion, java.time.LocalDateTime triggerAt,
                                    java.time.LocalDateTime updatedAt) {
         return mapper.updateTriggerAt(id, expectedVersion, triggerAt, updatedAt) == 1;
+    }
+
+    @Override
+    public List<TravelTaskSnapshot> listDueForAdvice(java.time.LocalDateTime now, int limit) {
+        return mapper.listDueForAdvice(now, limit).stream().map(this::toSnapshot).toList();
+    }
+
+    @Override
+    public boolean completeIfElapsed(long id, java.time.LocalDateTime elapsedBefore, java.time.LocalDateTime closedAt) {
+        return mapper.completeIfElapsed(id, elapsedBefore, closedAt) == 1;
+    }
+
+    @Override
+    public List<Long> listElapsedTaskIds(java.time.LocalDateTime completedAt, int limit) {
+        return mapper.listElapsedTaskIds(completedAt, limit);
     }
 
     @Override

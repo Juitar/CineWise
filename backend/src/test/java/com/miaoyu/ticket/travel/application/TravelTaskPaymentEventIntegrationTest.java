@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.miaoyu.ticket.order.event.OrderInvalidated;
 import com.miaoyu.ticket.order.event.PaymentSucceededEvent;
+import com.miaoyu.ticket.common.config.ClockConfiguration;
 import java.time.Clock;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -43,10 +45,16 @@ class TravelTaskPaymentEventIntegrationTest {
     private TravelAdviceRepository travelAdviceRepository;
 
     @Autowired
+    private TravelReminderSchedulingService travelReminderSchedulingService;
+
+    @Autowired
     private PlatformTransactionManager transactionManager;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private Clock clock;
 
     @BeforeEach
     void clearTravelTasks() {
@@ -171,6 +179,55 @@ class TravelTaskPaymentEventIntegrationTest {
                 Long.class, internalTaskId, snapshot.taskVersion())).isEqualTo(1L);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT status FROM travel_task WHERE id = ?", String.class, internalTaskId)).isEqualTo("READY");
+    }
+
+    @Test
+    void givenDueTask_whenSchedulerRunsRepeatedly_thenAppendOnlyOneAdviceSnapshot() {
+        TravelTaskSummary task = travelTaskApplicationService.ensureTask(
+                paymentEvent("scheduled-advice", "88009"));
+        long internalTaskId = jdbcTemplate.queryForObject(
+                "SELECT id FROM travel_task WHERE task_id = ?", Long.class, task.taskId());
+        // 该用例只验证到期提醒的去重，不应因固定历史 start_at 被完成清理分支抢先关闭。
+        LocalDateTime futureStartAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID)
+                .plusDays(1);
+        jdbcTemplate.update("UPDATE travel_task SET start_at = ? WHERE id = ?", futureStartAt, internalTaskId);
+        jdbcTemplate.update("UPDATE travel_task SET trigger_at = DATEADD('MINUTE', -1, CURRENT_TIMESTAMP) WHERE id = ?",
+                internalTaskId);
+
+        travelReminderSchedulingService.runDueTasks();
+        travelReminderSchedulingService.runDueTasks();
+
+        // 第二次调度已看不到 PENDING 候选，且版本条件更新不允许重复快照。
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM travel_advice_snapshot WHERE travel_task_id = ?", Long.class, internalTaskId))
+                .isEqualTo(1L);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM travel_task WHERE id = ?", String.class, internalTaskId)).isEqualTo("READY");
+    }
+
+    @Test
+    void givenCancelledOrElapsedTask_whenSchedulerRuns_thenDoNotGenerateAndCloseElapsedTask() {
+        TravelTaskSummary cancelled = travelTaskApplicationService.ensureTask(
+                paymentEvent("scheduled-cancel", "88010"));
+        transactionTemplate.executeWithoutResult(status -> eventPublisher.publishEvent(
+                invalidatedEvent("scheduled-cancelled", "88010", 6L)));
+        long cancelledId = jdbcTemplate.queryForObject(
+                "SELECT id FROM travel_task WHERE task_id = ?", Long.class, cancelled.taskId());
+        TravelTaskSummary elapsed = travelTaskApplicationService.ensureTask(
+                paymentEvent("scheduled-complete", "88011"));
+        long elapsedId = jdbcTemplate.queryForObject(
+                "SELECT id FROM travel_task WHERE task_id = ?", Long.class, elapsed.taskId());
+        travelAdviceService.generate(elapsedId);
+        jdbcTemplate.update("UPDATE travel_task SET start_at = DATEADD('HOUR', -3, CURRENT_TIMESTAMP) WHERE id = ?",
+                elapsedId);
+
+        travelReminderSchedulingService.runDueTasks();
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM travel_advice_snapshot WHERE travel_task_id = ?", Long.class, cancelledId))
+                .isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM travel_task WHERE id = ?", String.class, elapsedId)).isEqualTo("COMPLETED");
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.miaoyu.ticket.travel.application;
 
 import com.miaoyu.ticket.travel.domain.TravelTaskStatus;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -27,6 +28,21 @@ public interface TravelTaskRepository {
     Optional<TravelTaskSnapshot> findByTaskIdAndUserId(String taskId, long userId);
 
     boolean updateTriggerAt(long id, long expectedVersion, LocalDateTime triggerAt, LocalDateTime updatedAt);
+
+    /** 调度只领取已到提醒时间的 PENDING 任务，单次上限由 D 配置控制。 */
+    default List<TravelTaskSnapshot> listDueForAdvice(LocalDateTime now, int limit) {
+        return List.of();
+    }
+
+    /** 观影结束两小时后关闭已完成建议的任务；退款终态和失败终态绝不被覆盖。 */
+    default boolean completeIfElapsed(long id, LocalDateTime elapsedBefore, LocalDateTime closedAt) {
+        return false;
+    }
+
+    /** 只返回尚未关闭、且已超过观影结束窗口的内部任务号，避免调度层扫描订单或用户数据。 */
+    default List<Long> listElapsedTaskIds(LocalDateTime completedAt, int limit) {
+        return List.of();
+    }
 
     /**
      * 仅将尚未结束、且订单版本不高于退款事件的任务置为取消。
