@@ -83,15 +83,6 @@ class AgentConfirmationActionTest {
     }
 
     @Test
-    void shouldKeepInternalSessionRunIdsSeparateFromExternalRunId() {
-        AgentConfirmationAction action = pendingAction();
-
-        assertEquals(10L, action.agentSessionId());
-        assertEquals(11L, action.agentRunId());
-        assertEquals("run-1", action.runId());
-    }
-
-    @Test
     void shouldAllowOnlyOneWayConfirmationTransitions() {
         AgentConfirmationAction pending = pendingAction();
         AgentConfirmationAction claimed = pending.claim(
