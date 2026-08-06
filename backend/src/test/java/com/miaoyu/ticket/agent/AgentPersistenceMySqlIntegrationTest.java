@@ -43,10 +43,13 @@ import com.miaoyu.ticket.agent.domain.confirmation.ConfirmedOrderCommand;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationValidationContext;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
+import com.miaoyu.ticket.agent.domain.tool.ToolContext;
 import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.auth.application.RoleCode;
 import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.order.api.CreateOrderForAgentCommand;
+import com.miaoyu.ticket.order.api.CreateOrderTool;
 import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -132,6 +135,9 @@ class AgentPersistenceMySqlIntegrationTest {
 
     @Autowired
     private CreateOrderToolAdapter createOrderToolAdapter;
+
+    @Autowired
+    private CreateOrderTool createOrderTool;
 
     @Autowired
     private MinimalReadOnlyAgentService minimalReadOnlyAgentService;
@@ -432,6 +438,43 @@ class AgentPersistenceMySqlIntegrationTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    @Test
+    void shouldRejectPendingActionBeforeCreateOrderToolWritesOrderOrLocksSeat() {
+        AgentConfirmationAction pending = action("action-tool-authorization-rejected");
+        actionRepository.insert(pending);
+        int ordersBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ticket_order", Integer.class);
+        int orderSeatsBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ticket_order_seat", Integer.class);
+        int lockedSeatsBefore = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM show_seat WHERE status = 'LOCKED'", Integer.class);
+        ToolContext context = new ToolContext(
+                pending.runId(),
+                pending.nodeId(),
+                pending.command().toolName(),
+                List.of(),
+                3_000L,
+                "trace-authorization-rejected",
+                "authorization-rejected-request",
+                "authorization-rejected-key",
+                pending.version());
+
+        ToolResult<?> result = createOrderTool.execute(
+                context,
+                new CreateOrderForAgentCommand(
+                        pending.actionId(),
+                        pending.command().showId(),
+                        pending.command().sortedSeatIds()));
+
+        assertThat(result.status()).isEqualTo(ToolStatus.FAILED);
+        assertThat(result.errorCode()).isEqualTo(205004);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ticket_order", Integer.class))
+                .isEqualTo(ordersBefore);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ticket_order_seat", Integer.class))
+                .isEqualTo(orderSeatsBefore);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM show_seat WHERE status = 'LOCKED'", Integer.class))
+                .isEqualTo(lockedSeatsBefore);
     }
 
     private Callable<Attempt> submitAfterSignal(CountDownLatch start, String requestId) {
