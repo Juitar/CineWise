@@ -5,8 +5,10 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import org.springframework.stereotype.Component;
 
 /** 将设置和标签转换为最小摘要；关闭时不读取或暴露任何标签。 */
+@Component
 public class ProfileSummaryAssembler {
   private final Clock clock;
 

@@ -32,4 +32,9 @@ VALUES (#{request.id}, #{request.userId}, #{request.operation}, #{request.idempo
     #{request.completedAt}, #{request.expiresAt}, #{request.completedAt}, #{request.completedAt})
 """)
   int insert(@Param("request") ProfileWriteRequestRepository.NewRequest request);
+
+  @org.apache.ibatis.annotations.Delete(
+      "DELETE FROM profile_write_request WHERE expires_at <= #{before} LIMIT #{limit}")
+  int cleanupExpired(
+      @Param("before") java.time.LocalDateTime before, @Param("limit") int limit);
 }

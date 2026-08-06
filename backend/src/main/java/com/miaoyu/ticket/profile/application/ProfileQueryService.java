@@ -1,8 +1,10 @@
 package com.miaoyu.ticket.profile.application;
 
 import java.util.List;
+import org.springframework.stereotype.Service;
 
 /** 本人标签与摘要查询服务；默认设置创建必须由接入同意校验后的写服务负责。 */
+@Service
 public class ProfileQueryService {
   private final ProfilePreferenceRepository preferenceRepository;
   private final ProfileTagRepository tagRepository;
@@ -34,7 +36,11 @@ public class ProfileQueryService {
   }
 
   public ProfileSummary assembleSummary(long userId) {
-    ProfilePreferenceRepository.Snapshot preference = requireExistingPreference(userId);
+    ProfilePreferenceRepository.Snapshot preference = preferenceRepository.findByUserId(userId).orElse(null);
+    if (preference == null) {
+      // 没有画像设置时不能创建默认记录；只返回关闭摘要，避免读取行为或把登录状态当成同意。
+      return new ProfileSummary(false, 0, java.time.Instant.now(java.time.Clock.systemUTC()), List.of());
+    }
     return summaryCache
         .find(userId, preference.version())
         .orElseGet(

@@ -9,6 +9,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.scheduling.annotation.Scheduled;
 
 /** 行为标签衰减任务：每批按标签版本写回，重复执行不会覆盖较新的用户行为。 */
 @Service
@@ -40,6 +41,7 @@ public class ProfileDecayJob {
    * 返回真正写成功的数量，版本冲突表示已有新行为，不作为任务失败重试旧数据。
    */
   @Transactional
+  @Scheduled(cron = "${cinewise.profile.decay-cron:0 15 2 * * *}")
   public int executeOnce() {
     Instant now = clock.instant();
     LocalDateTime nowUtc = LocalDateTime.ofInstant(now, ZoneOffset.UTC);
