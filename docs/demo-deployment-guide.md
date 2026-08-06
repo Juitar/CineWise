@@ -78,6 +78,8 @@ AUTH_COOKIE_SECURE=false
 
 启用对象存储时再填写 `MINIO_ENDPOINT`、最小权限 `MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY` 和 `MINIO_BUCKET`。`MINIO_ENDPOINT` 必须是 API 地址而不是 9001 Console 地址；不得使用 MinIO root 管理员凭据。
 
+启用高德天气查询时，仅在应用服务器被 Git 忽略的 `.env` 填写 `AMAP_WEATHER_ENABLED=true` 与实际 `AMAP_WEATHER_KEY`。真实 Key 不得写入仓库、环境模板或部署日志；未配置或 Provider 不可用时，出行建议必须降级，不能影响购票主链路。
+
 首次准备服务器时，由 A 手工执行并确认：
 
 ```bash
