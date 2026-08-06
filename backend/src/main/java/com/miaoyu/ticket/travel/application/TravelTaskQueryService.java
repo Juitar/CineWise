@@ -101,7 +101,8 @@ public class TravelTaskQueryService {
                     new MovieSummary(Long.toString(movie.movieId()), movie.title(), movie.posterUrl(),
                             movie.contentSource(), movie.contentDataTime()),
                     new CinemaSummary(Long.toString(cinema.cinemaId()), cinema.name(), cinema.area(),
-                            cinema.address(), cinema.source(), cinema.dataTime(), cinema.expiresAt(), cinema.expired()));
+                            cinema.address(), cinema.source(), cinema.dataTime(), cinema.expiresAt(),
+                            cinema.expired()));
         } catch (BusinessException exception) {
             if (exception.getErrorCode() == TravelErrorCode.DEPENDENCY_UNAVAILABLE) {
                 throw exception;

@@ -52,7 +52,8 @@ public class TravelTaskController {
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "返回订单、影片和影院公开摘要",
                 content = @Content(examples = @ExampleObject(name = "task-detail-success",
-                        value = "{\"code\":0,\"data\":{\"taskId\":\"90001\",\"status\":\"READY\",\"order\":{},\"movie\":{},\"cinema\":{}}}"))),
+                        value = "{\"code\":0,\"data\":{\"taskId\":\"90001\",\"status\":\"READY\","
+                                + "\"order\":{},\"movie\":{},\"cinema\":{}}}"))),
         @ApiResponse(responseCode = "404", description = "207001 任务不存在或无权访问"),
         @ApiResponse(responseCode = "503", description = "207004 订单或内容摘要不可用")
     })
@@ -72,7 +73,10 @@ public class TravelTaskController {
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "返回类型化天气和交通建议",
                 content = @Content(examples = @ExampleObject(name = "advice-weather-normal",
-                        value = "{\"code\":0,\"data\":{\"available\":true,\"taskId\":\"90001\",\"taskStatus\":\"READY\",\"weather\":{\"condition\":\"多云\"},\"advice\":[{\"type\":\"TRANSPORT\",\"text\":\"提前到场\"}],\"source\":\"AMAP_WEATHER\",\"isExpired\":false,\"degraded\":false}}"))),
+                        value = "{\"code\":0,\"data\":{\"available\":true,\"taskId\":\"90001\","
+                                + "\"taskStatus\":\"READY\",\"weather\":{\"condition\":\"多云\"},"
+                                + "\"advice\":[{\"type\":\"TRANSPORT\",\"text\":\"提前到场\"}],"
+                                + "\"source\":\"AMAP_WEATHER\",\"isExpired\":false,\"degraded\":false}}"))),
         @ApiResponse(responseCode = "404", description = "207001 任务不存在或无权访问")
     })
     public Result<TravelAdviceResponse> getAdvice(@PathVariable String taskId) {

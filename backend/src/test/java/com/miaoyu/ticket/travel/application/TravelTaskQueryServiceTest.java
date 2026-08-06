@@ -75,7 +75,8 @@ class TravelTaskQueryServiceTest {
     @Test
     void givenCancelledTaskAndAvailablePublicSummaries_whenReadingDetails_thenKeepCancelledStatus() {
         StubRepository repository = new StubRepository(task(1L, TravelTaskStatus.CANCELLED));
-        TravelTaskQueryService service = detailedService(repository, availableOrder(), availableMovies(), availableCinemas());
+        TravelTaskQueryService service = detailedService(
+                repository, availableOrder(), availableMovies(), availableCinemas());
 
         TravelTaskQueryService.TravelTaskDetails details = service.getMyTaskDetails("90001");
 
@@ -94,7 +95,8 @@ class TravelTaskQueryServiceTest {
             }
             @Override public Optional<ContentSeedCatalog> findChangshaLivePurchaseCatalog() { return Optional.empty(); }
         };
-        TravelTaskQueryService service = detailedService(repository, availableOrder(), unavailableMovies, availableCinemas());
+        TravelTaskQueryService service = detailedService(
+                repository, availableOrder(), unavailableMovies, availableCinemas());
 
         assertThatThrownBy(() -> service.getMyTaskDetails("90001"))
                 .isInstanceOfSatisfying(BusinessException.class,
