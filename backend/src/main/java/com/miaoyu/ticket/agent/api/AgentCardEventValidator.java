@@ -47,7 +47,8 @@ public final class AgentCardEventValidator {
             case "PLAN_CARD" -> planCard(payload);
             case "PROGRESS" -> required(payload, "stage") && required(payload, "status")
                     ? render(type) : rejected("PROGRESS 缺少 stage 或 status");
-            case "ERROR" -> required(payload, "code") && required(payload, "message") && payload.path("retryable").isBoolean()
+            case "ERROR" -> required(payload, "code") && required(payload, "message")
+                    && payload.path("retryable").isBoolean()
                     ? render(type) : rejected("ERROR 字段无效");
             default -> safeText("未知卡片类型");
         };

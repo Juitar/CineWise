@@ -28,14 +28,16 @@ class AgentCardEventValidatorTest {
 
     @Test
     void shouldSafelyDowngradeUnknownEventAndPayloadTypes() throws Exception {
-        assertThat(validate("unknown-event-type.json").decision()).isEqualTo(AgentCardEventValidator.Decision.SAFE_TEXT);
+        assertThat(validate("unknown-event-type.json").decision())
+                .isEqualTo(AgentCardEventValidator.Decision.SAFE_TEXT);
         assertThat(validate("unknown-payload-type.json").decision())
                 .isEqualTo(AgentCardEventValidator.Decision.SAFE_TEXT);
     }
 
     @Test
     void shouldRejectMissingOrWrongTypedFields() throws Exception {
-        for (String fixture : List.of("missing-outer-field.json", "missing-payload-field.json", "wrong-field-type.json")) {
+        for (String fixture : List.of("missing-outer-field.json", "missing-payload-field.json",
+                "wrong-field-type.json")) {
             assertThat(validate(fixture).decision()).isEqualTo(AgentCardEventValidator.Decision.REJECT);
         }
     }

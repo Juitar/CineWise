@@ -63,7 +63,8 @@ class AgentInteractionRuntimeServiceTest {
         assertThat(replay.events()).extracting(AgentInteractionRuntimeService.EventView::eventType)
                 .containsExactly("message.error", "run.complete");
         verify(replayService).replay("session-1", 0L);
-        verifyNoInteractions(submissionService, sessionCreationService, sessionManagementService, runCancellationService,
+        verifyNoInteractions(submissionService, sessionCreationService, sessionManagementService,
+                runCancellationService,
                 confirmationService);
     }
 

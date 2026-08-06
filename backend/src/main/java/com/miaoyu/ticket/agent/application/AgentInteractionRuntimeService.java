@@ -131,7 +131,8 @@ public class AgentInteractionRuntimeService {
     private EventView event(com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEvent event, AgentRun run) {
         JsonNode payload = refreshConfirmationCard(event.type(), payload(event.payload().value()));
         payload = safeCardPayload(event, run, payload);
-        return new EventView(Long.toString(event.eventId()), event.sessionId(), event.runId(), run.planId(), run.planVersion(),
+        return new EventView(Long.toString(event.eventId()), event.sessionId(), event.runId(), run.planId(),
+                run.planVersion(),
                 nodeId(payload), event.type().wireValue(), displayText(event.type().wireValue()), payload,
                 time(event.createTime()));
     }
