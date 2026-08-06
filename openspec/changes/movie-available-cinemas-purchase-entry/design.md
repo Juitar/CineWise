@@ -1,16 +1,26 @@
 # 设计：影片可售影院入口
 
-## 当前阻塞
+## A 侧实现状态
 
-`backend/src/main/java/com/miaoyu/ticket/ticketing/api/ShowController.java` 目前只有 `queryAvailableMovies`，前端 `frontend/src/modules/ticketing/api.ts` 只有 `getAvailableMovies`；A 正在提供 `available-cinemas` Controller、Application Service、公开 DTO、OpenAPI 和固定夹具。`cinema-detail-purchase-entry` 明确覆盖相反方向，不覆盖本 change。
+`backend/src/main/java/com/miaoyu/ticket/ticketing/api/ShowController.java` 已提供 `available-cinemas` Controller、Application Service、公开 DTO、OpenAPI 注解、固定夹具和契约测试。`cinema-detail-purchase-entry` 明确覆盖相反方向，不覆盖本 change。
+
+最终 A 侧契约如下：
+
+- 请求：`GET /api/v1/shows/available-cinemas?movieId={movieId}&page={page}&size={size}`；`movieId` 为无前导零的正十进制字符串，`page` 默认 1，`size` 默认 20，最大 50。
+- 权限：匿名可读；仅该精确 GET 路径公开，其他写方法和未列出的场次路径仍受安全链保护。
+- 可售条件：业务时区 `Asia/Shanghai` 未来 7 天窗口内，场次 `status=ON_SALE`、`startTime > dataAt/now`，且至少存在一张 `AVAILABLE` 座位；按最近开场时间、影院 ID稳定排序。
+- 成功响应：`Result<PageResult<AvailableCinemaResponse>>`。记录包含 `cinemaId`（字符串）、影院摘要、`availableShowCount`、`nearestStartTime`、`contentSource/contentDataTime/contentExpiresAt/contentExpired`、`scheduleSource/scheduleDataTime`。
+- 空结果：返回 HTTP 200、`code=0` 和空 `records`；不生成购票事实。
+- 错误：非法 ID/分页参数为 `100001/400`；票务查询不可用为 `306003/503`；D 的内容摘要不可用保持其公开错误码（当前夹具为 `303004/503`），不得转为空结果。
+- 购票跳转：C 只能使用返回的字符串 `movieId` 与 `cinemaId` 组合进入 `/shows?movieId={movieId}&cinemaId={cinemaId}`；A 返回的统计和最近开场时间仅用于入口展示，场次页必须重新查询权威场次。
 
 ## 已确认的安全规则
 
 A 已确认 `GET /api/v1/shows/available-cinemas?movieId=&page=&size=` 是匿名公开只读查询。C 仅在唯一 `applicationSecurityFilterChain` 的现有场次 GET 白名单增加精确路径 `/api/v1/shows/available-cinemas`，与 `/available-movies`、`/available-dates` 保持一致。该修改不放开 POST、PUT、PATCH、DELETE 或其他 `/api/v1/shows/**` 路径，也不修改 JWT、Cookie、CSRF 或其他过滤链配置。
 
-## A/D 必须确认的接口
+## A/D 已确认的接口
 
-在实现前书面确认：
+以下规则已由 A 的 #124 PR、固定夹具/HTTP 测试及 D 的公开端口确认：
 
 1. A 已确认方法和路径为 `GET /api/v1/shows/available-cinemas?movieId=&page=&size=`，并由 C 放入现有匿名 GET 白名单。
 2. `movieId` 是否只接受正十进制字符串，以及 `page/size` 的取值范围。
