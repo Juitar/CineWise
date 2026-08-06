@@ -7,7 +7,8 @@ import java.util.Objects;
 
 /** A 的场次事实与内容类型、评分合并后的只读候选，供后续过滤和评分使用。 */
 public record RankedRecommendationCandidate(
-        String movieId, String cinemaId, String showId, BigDecimal price, Instant startTime, Instant endTime,
+        String movieId, String movieName, String cinemaId, String cinemaName, String showId, BigDecimal price,
+        Instant startTime, Instant endTime,
         List<String> genres, BigDecimal rating, int availableSeatCount, String source, Instant dataAt,
         Instant expiresAt) {
 
@@ -15,8 +16,17 @@ public record RankedRecommendationCandidate(
     public RankedRecommendationCandidate(
             String movieId, String cinemaId, String showId, BigDecimal price, Instant startTime, Instant endTime,
             List<String> genres, BigDecimal rating, String source, Instant dataAt, Instant expiresAt) {
-        this(movieId, cinemaId, showId, price, startTime, endTime, genres, rating, Integer.MAX_VALUE, source,
-                dataAt, expiresAt);
+        this(movieId, null, cinemaId, null, showId, price, startTime, endTime, genres, rating, Integer.MAX_VALUE,
+                source, dataAt, expiresAt);
+    }
+
+    /** 兼容已有过滤测试和适配器夹具携带余座字段的构造方式。 */
+    public RankedRecommendationCandidate(
+            String movieId, String cinemaId, String showId, BigDecimal price, Instant startTime, Instant endTime,
+            List<String> genres, BigDecimal rating, int availableSeatCount, String source, Instant dataAt,
+            Instant expiresAt) {
+        this(movieId, null, cinemaId, null, showId, price, startTime, endTime, genres, rating, availableSeatCount,
+                source, dataAt, expiresAt);
     }
 
     /** 此处只检查候选是否可被后续规则消费，不修改 A 返回的票务事实。 */

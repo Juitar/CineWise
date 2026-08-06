@@ -6,8 +6,15 @@ import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationQueryService;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
+import com.miaoyu.ticket.recommendation.application.PersonalizedRecommendationQueryService;
+import com.miaoyu.ticket.recommendation.domain.RecommendationEvidence;
+import com.miaoyu.ticket.recommendation.domain.RecommendationPlan;
+import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * D 提供给 B 的推荐工具适配器。
@@ -44,9 +51,18 @@ public class RankMoviePlanTool {
     public static final String TARGET_NAME = "rankMoviePlan";
 
     private final FixedRecommendationQueryService queryService;
+    private final PersonalizedRecommendationQueryService personalizedQueryService;
 
+    @Autowired
     public RankMoviePlanTool(FixedRecommendationQueryService queryService) {
+        this(queryService, null);
+    }
+
+    /** 新版完整条件查询；旧构造器保留给现有 B 测试和兼容入口。 */
+    public RankMoviePlanTool(FixedRecommendationQueryService queryService,
+            PersonalizedRecommendationQueryService personalizedQueryService) {
         this.queryService = queryService;
+        this.personalizedQueryService = personalizedQueryService;
     }
 
     /**
@@ -89,5 +105,49 @@ public class RankMoviePlanTool {
                 context.stateVersion(),
                 result.dataAt(),
                 result.expiresAt());
+    }
+
+    /**
+     * 新版只读结果入口。旧 execute 保留给 B 迁移期间的 Agent 代码，两个入口共享同一份查询事实。
+     *
+     * <p>这里仅把固定查询结果转换成公开方案；名称、评分、距离和预计路程没有可靠来源时保持空值，
+     * 不能用业务 ID、直线距离或模型输出补造展示事实。</p>
+     */
+    public ToolResult<RecommendationPlanResult> executeRecommendationPlan(
+            ToolContext context, RankMoviePlanCommand command) {
+        Objects.requireNonNull(context, "context 不能为空");
+        Objects.requireNonNull(command, "command 不能为空");
+        if (!TARGET_NAME.equals(context.targetName())) {
+            return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INVALID_PARAMETER.code(), false, false,
+                    "CHECK_TOOL_TARGET", false, null, context.stateVersion(), null, null);
+        }
+        RecommendationPlanResult result;
+        if (personalizedQueryService != null && command.cityCode() != null) {
+            result = personalizedQueryService.query(command.toConstraints());
+        } else {
+            FixedRecommendationResult fixed = queryService.query(command.toQuery());
+            result = toPlanResult(fixed);
+        }
+        return new ToolResult<>(ToolStatus.SUCCESS, result, null, false, false, "RENDER_RESULT",
+                result.degraded(), result.degraded() ? "RECOMMENDATION_DEGRADED" : null,
+                context.stateVersion(), result.dataAt(), result.expiresAt());
+    }
+
+    private static RecommendationPlanResult toPlanResult(FixedRecommendationResult fixed) {
+        List<RecommendationPlan> plans = fixed.candidates().stream()
+                .filter(candidate -> candidate.purchaseEligible() && !candidate.isExpired())
+                .filter(candidate -> candidate.showId() != null && candidate.price() != null
+                        && candidate.startTime() != null)
+                .map(candidate -> new RecommendationPlan(
+                        RecommendationPlan.PlanType.COMPREHENSIVE, candidate.movieId(), null, candidate.cinemaId(),
+                        null, candidate.showId(), new BigDecimal(candidate.price()), candidate.startTime(), null, null,
+                        null, 0D, List.of("固定推荐结果"),
+                        List.of(new RecommendationEvidence("showtime", candidate.showId(), candidate.source(),
+                                candidate.startTime(), fixed.expiresAt())), candidate.source(), fixed.dataAt(),
+                        fixed.expiresAt(), true))
+                .toList();
+        boolean degraded = fixed.isExpired() || !fixed.purchaseEligible() || !fixed.missingFactors().isEmpty();
+        return new RecommendationPlanResult("1.0", fixed.algorithmVersion(), plans, fixed.missingFactors(), null,
+                fixed.profileApplied(), fixed.source(), fixed.dataAt(), fixed.expiresAt(), degraded);
     }
 }

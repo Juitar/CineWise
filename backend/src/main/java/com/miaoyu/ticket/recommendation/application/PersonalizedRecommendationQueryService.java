@@ -81,15 +81,25 @@ public class PersonalizedRecommendationQueryService {
                         .map(RecommendationContentCandidateQueryService.CinemaCandidate::cinemaId)
                         .collect(java.util.stream.Collectors.toUnmodifiableSet()));
         Map<String, MovieContent> movies = loadMovies();
+        Map<String, String> cinemaNames = cinemas.stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
+                cinema -> Long.toString(cinema.cinemaId()),
+                RecommendationContentCandidateQueryService.CinemaCandidate::name,
+                (left, right) -> left));
         List<RankedRecommendationCandidate> candidates = batch.candidates().stream()
-                .map(candidate -> enrich(candidate, movies.get(candidate.movieId())))
+                .map(candidate -> enrich(candidate, movies.get(candidate.movieId()),
+                        cinemaNames.get(candidate.cinemaId())))
                 .flatMap(java.util.Optional::stream)
                 .toList();
         if (candidates.isEmpty()) {
             String source = batch.candidates().isEmpty()
                     ? "TICKETING" : batch.candidates().getFirst().source();
             return record(emptyResult(
-                    source, now, now.plusSeconds(60), batch.truncated(), List.of("SHOWTIME"), null));
+                    source,
+                    now,
+                    now.plusSeconds(60),
+                    batch.truncated(),
+                    List.of("SHOWTIME"),
+                    null));
         }
 
         List<RecommendationPlan> plans = RecommendationPlanRanker.rank(candidates, constraints, clock);
@@ -126,7 +136,7 @@ public class PersonalizedRecommendationQueryService {
     }
 
     private java.util.Optional<RankedRecommendationCandidate> enrich(
-            RankedRecommendationCandidate showtimeCandidate, MovieContent movie) {
+            RankedRecommendationCandidate showtimeCandidate, MovieContent movie, String cinemaName) {
         if (movie == null) {
             // 没有内容资料时不能把空类型当成“符合类型”，直接排除该可售场次。
             return java.util.Optional.empty();
@@ -134,9 +144,10 @@ public class PersonalizedRecommendationQueryService {
         try {
             List<String> genres = objectMapper.readValue(movie.genresJson(), new TypeReference<>() { });
             return java.util.Optional.of(new RankedRecommendationCandidate(
-                    showtimeCandidate.movieId(), showtimeCandidate.cinemaId(), showtimeCandidate.showId(),
-                    showtimeCandidate.price(), showtimeCandidate.startTime(), showtimeCandidate.endTime(), genres,
-                    movie.rating(), showtimeCandidate.availableSeatCount(), showtimeCandidate.source(),
+                    showtimeCandidate.movieId(), movie.title(), showtimeCandidate.cinemaId(), cinemaName,
+                    showtimeCandidate.showId(), showtimeCandidate.price(), showtimeCandidate.startTime(),
+                    showtimeCandidate.endTime(), genres, movie.rating(), showtimeCandidate.availableSeatCount(),
+                    showtimeCandidate.source(),
                     showtimeCandidate.dataAt(),
                     showtimeCandidate.expiresAt()));
         } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {

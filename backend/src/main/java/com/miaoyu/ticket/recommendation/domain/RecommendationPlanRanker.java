@@ -88,8 +88,10 @@ public final class RecommendationPlanRanker {
 
     private static RecommendationPlan toPlan(Scored scored, RecommendationPlan.PlanType type) {
         RankedRecommendationCandidate candidate = scored.candidate();
-        return new RecommendationPlan(type, candidate.movieId(), candidate.cinemaId(), candidate.showId(),
-                candidate.price(), candidate.startTime(), scored.score(), List.of("符合" + type.name() + "排序"),
+        return new RecommendationPlan(type, candidate.movieId(), candidate.movieName(), candidate.cinemaId(),
+                candidate.cinemaName(), candidate.showId(), candidate.price(), candidate.startTime(),
+                candidate.rating(),
+                null, null, scored.score(), List.of("符合" + type.name() + "排序"),
                 List.of(new RecommendationEvidence("showtime", candidate.showId(), candidate.source(),
                         candidate.dataAt(), candidate.expiresAt())), candidate.source(), candidate.dataAt(),
                 candidate.expiresAt(), true);
@@ -98,8 +100,10 @@ public final class RecommendationPlanRanker {
     private static RecommendationPlan nearestPlan(
             RankedRecommendationCandidate candidate, java.util.Map<String, Integer> distanceMeters) {
         int distance = distanceMeters.get(candidate.cinemaId());
-        return new RecommendationPlan(RecommendationPlan.PlanType.NEAREST, candidate.movieId(), candidate.cinemaId(),
-                candidate.showId(), candidate.price(), candidate.startTime(), 100D,
+        return new RecommendationPlan(RecommendationPlan.PlanType.NEAREST, candidate.movieId(), candidate.movieName(),
+                candidate.cinemaId(), candidate.cinemaName(), candidate.showId(), candidate.price(),
+                candidate.startTime(),
+                candidate.rating(), distance, null, 100D,
                 List.of("直线距离约 " + distance + " 米"),
                 List.of(new RecommendationEvidence("distanceMeters", Integer.toString(distance), candidate.source(),
                         candidate.dataAt(), candidate.expiresAt())), candidate.source(), candidate.dataAt(),
