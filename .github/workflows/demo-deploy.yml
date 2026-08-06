@@ -172,6 +172,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+      - name: Build production assets for browser tests
+        run: pnpm build
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Run production browser flow tests
