@@ -1,0 +1,53 @@
+package com.miaoyu.ticket.recommendation.application;
+
+import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
+import com.miaoyu.ticket.recommendation.domain.CinemaDistanceSelector.Coordinate;
+import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.stereotype.Service;
+
+/** 一次性位置上下文只在进程内短暂保存，避免精确位置进入任何持久化介质。 */
+@Service
+public class DistanceContextService {
+    private static final long TTL_SECONDS = 300L;
+    private final CurrentUserAccessor currentUserAccessor;
+    private final Clock clock;
+    private final Map<String, Context> contexts = new ConcurrentHashMap<>();
+
+    public DistanceContextService(CurrentUserAccessor currentUserAccessor, Clock clock) {
+        this.currentUserAccessor = currentUserAccessor;
+        this.clock = clock;
+    }
+
+    /** B 使用可信 runId 创建不含位置的关联 ID，随后才允许 C 上传一次坐标。 */
+    public CreatedContext create(String runId) {
+        long userId = currentUserAccessor.requireCurrentUserId();
+        Instant expiresAt = clock.instant().plusSeconds(TTL_SECONDS);
+        String id = UUID.randomUUID().toString();
+        contexts.put(id, new Context(userId, runId, expiresAt, null, false));
+        return new CreatedContext(id, expiresAt);
+    }
+
+    /** C 直接上传本次坐标；重复、过期或归属不符均不暴露具体原因。 */
+    public boolean upload(String contextId, BigDecimal longitude, BigDecimal latitude) {
+        long userId = currentUserAccessor.requireCurrentUserId();
+        Coordinate coordinate = new Coordinate(longitude, latitude);
+        return contexts.computeIfPresent(contextId, (id, context) -> context.userId() == userId
+                && !context.expiresAt().isBefore(clock.instant()) && !context.used()
+                ? new Context(context.userId(), context.runId(), context.expiresAt(), coordinate, false) : context) != null;
+    }
+
+    /** 推荐工具只用可信 runId 消费坐标一次；没有上下文时调用方继续普通推荐。 */
+    public Coordinate consume(String contextId, String runId) {
+        Context context = contexts.remove(contextId);
+        if (context == null || !context.runId().equals(runId) || context.expiresAt().isBefore(clock.instant())) return null;
+        return context.coordinate();
+    }
+
+    public record CreatedContext(String distanceContextId, Instant expiresAt) { }
+    private record Context(long userId, String runId, Instant expiresAt, Coordinate coordinate, boolean used) { }
+}
