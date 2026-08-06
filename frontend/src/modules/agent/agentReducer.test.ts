@@ -47,7 +47,7 @@ describe('Agent reducer 新 SSE 协议', () => {
     expect(result.projection.lastEventId).toBe('42');
   });
 
-  it('展示 SELECT_SEATS 入口但只使用完整外层计划字段和 businessRef.showId', () => {
+  it('展示 SELECT_SEATS 入口并使用已校验的 businessRef 三个 ID', () => {
     const result = consumeAgentEvent(
       createAgentProjection('session-1'),
       parseAgentEvent(selectSeatsCard),
@@ -56,41 +56,56 @@ describe('Agent reducer 新 SSE 协议', () => {
     expect(result.projection.items[0]).toEqual(
       expect.objectContaining({ kind: 'business-intent', text: '已确认场次，可选座' }),
     );
-    expect(result.projection.items[0].fields).toEqual([{ label: '场次 ID', value: '70001' }]);
-    expect(result.projection.items[0].selectSeatsPath).toBe('/shows/70001/seats');
-  });
-
-  it('只使用已校验的十进制 showId，不补齐影片、影院或交易参数', () => {
-    expect(buildAgentSelectSeatsPath('70001')).toBe('/shows/70001/seats');
-  });
-
-  it('SELECT_SEATS 缺少 showId 时拒绝且不推进游标', () => {
-    const invalid = consumeAgentEvent(
-      createAgentProjection('session-1'),
-      parseAgentEvent({
-        ...selectSeatsCard,
-        payload: { type: 'BUSINESS_INTENT', payload: { intent: 'SELECT_SEATS', businessRef: {} } },
-      }),
+    expect(result.projection.items[0].fields).toEqual([
+      { label: '场次 ID', value: '70001' },
+      { label: '影片 ID', value: '10001' },
+      { label: '影院 ID', value: '20001' },
+    ]);
+    expect(result.projection.items[0].selectSeatsPath).toBe(
+      '/shows/70001/seats?movieId=10001&cinemaId=20001',
     );
-    expect(invalid.outcome).toBe('rejected');
-    expect(invalid.projection.lastEventId).toBe('0');
   });
 
-  it('SELECT_SEATS 使用非十进制 showId 时拒绝、不显示入口且不推进游标', () => {
-    const invalid = consumeAgentEvent(
-      createAgentProjection('session-1'),
-      parseAgentEvent({
-        ...selectSeatsCard,
-        payload: {
-          type: 'BUSINESS_INTENT',
-          payload: { intent: 'SELECT_SEATS', businessRef: { showId: 'show-70001' } },
-        },
-      }),
+  it('只使用已校验的十进制 ID，不补齐其他交易参数', () => {
+    expect(buildAgentSelectSeatsPath('70001', '10001', '20001')).toBe(
+      '/shows/70001/seats?movieId=10001&cinemaId=20001',
     );
-    expect(invalid.outcome).toBe('rejected');
-    expect(invalid.projection.items).toHaveLength(0);
-    expect(invalid.projection.lastEventId).toBe('0');
   });
+
+  it.each(['showId', 'movieId', 'cinemaId'])(
+    'SELECT_SEATS 缺少 %s 时拒绝且不推进游标',
+    (missingKey) => {
+      const businessRef = { showId: '70001', movieId: '10001', cinemaId: '20001' };
+      delete businessRef[missingKey as keyof typeof businessRef];
+      const invalid = consumeAgentEvent(
+        createAgentProjection('session-1'),
+        parseAgentEvent({
+          ...selectSeatsCard,
+          payload: { type: 'BUSINESS_INTENT', payload: { intent: 'SELECT_SEATS', businessRef } },
+        }),
+      );
+      expect(invalid.outcome).toBe('rejected');
+      expect(invalid.projection.lastEventId).toBe('0');
+    },
+  );
+
+  it.each(['showId', 'movieId', 'cinemaId'])(
+    'SELECT_SEATS 使用非法 %s 时拒绝、不显示入口且不推进游标',
+    (invalidKey) => {
+      const businessRef = { showId: '70001', movieId: '10001', cinemaId: '20001' };
+      businessRef[invalidKey as keyof typeof businessRef] = 'show-70001';
+      const invalid = consumeAgentEvent(
+        createAgentProjection('session-1'),
+        parseAgentEvent({
+          ...selectSeatsCard,
+          payload: { type: 'BUSINESS_INTENT', payload: { intent: 'SELECT_SEATS', businessRef } },
+        }),
+      );
+      expect(invalid.outcome).toBe('rejected');
+      expect(invalid.projection.items).toHaveLength(0);
+      expect(invalid.projection.lastEventId).toBe('0');
+    },
+  );
 
   it('重复事件和旧计划迟到事件不推进游标', () => {
     const first = consumeAgentEvent(createAgentProjection('session-1'), parseAgentEvent(planCard));

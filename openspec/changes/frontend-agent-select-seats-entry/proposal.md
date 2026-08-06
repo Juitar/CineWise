@@ -5,8 +5,8 @@ B 已将 `card + BUSINESS_INTENT + SELECT_SEATS` 合入 `dev`，A 已提供受�
 ## What Changes
 
 - 对已通过 C 校验的 `SELECT_SEATS` 卡片显示“去选座”入口。
-- 入口只使用无前导零的正十进制 `businessRef.showId` 构造 `/shows/{showId}/seats`，不猜测或补齐影片、影院、价格、座位和订单参数。
-- 缺少完整外层计划字段或 `showId` 的卡片维持安全错误/占位，不显示入口。
+- 入口只使用无前导零的正十进制 `businessRef.showId`、`movieId` 和 `cinemaId` 构造 `/shows/{showId}/seats?movieId={movieId}&cinemaId={cinemaId}`，不猜测或补齐其他参数。
+- 缺少完整外层计划字段或任一业务 ID 的卡片维持安全错误/占位，不显示入口。
 
 ## Non-Goals
 

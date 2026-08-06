@@ -10,6 +10,9 @@
   "displayText": "已确认场次，可选座",
   "payload": {
     "type": "BUSINESS_INTENT",
-    "payload": { "intent": "SELECT_SEATS", "businessRef": { "showId": "70001" } }
+    "payload": {
+      "intent": "SELECT_SEATS",
+      "businessRef": { "showId": "70001", "movieId": "10001", "cinemaId": "20001" }
+    }
   }
 }

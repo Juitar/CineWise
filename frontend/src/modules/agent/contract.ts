@@ -27,7 +27,8 @@ const CARD_PAYLOAD_TYPES = new Set<AgentCardPayloadType>([
 const LOCATION_AUTHORIZATION_STATES = new Set(['NOT_REQUESTED', 'GRANTED', 'DENIED', 'EXPIRED']);
 const BUSINESS_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const DECIMAL_ID_PATTERN = /^(0|[1-9]\d*)$/;
-const SHOW_ID_PATTERN = /^[1-9]\d*$/;
+const POSITIVE_JAVA_LONG_PATTERN = /^[1-9]\d*$/;
+const JAVA_LONG_MAX = '9223372036854775807';
 
 export class AgentContractError extends Error {
   constructor(message = 'Agent 服务返回的数据格式不正确') {
@@ -281,8 +282,16 @@ function validateBusinessIntent(payload: Record<string, unknown>): void {
   const nested = record(payload.payload);
   if (nested.intent !== 'SELECT_SEATS') throw new AgentContractError();
   const businessRef = record(nested.businessRef);
-  const showId = text(businessRef.showId);
-  if (!SHOW_ID_PATTERN.test(showId)) throw new AgentContractError();
+  for (const key of ['showId', 'movieId', 'cinemaId'] as const) {
+    const id = text(businessRef[key]);
+    if (
+      !POSITIVE_JAVA_LONG_PATTERN.test(id) ||
+      id.length > JAVA_LONG_MAX.length ||
+      (id.length === JAVA_LONG_MAX.length && id > JAVA_LONG_MAX)
+    ) {
+      throw new AgentContractError();
+    }
+  }
 }
 
 function validateToolPayload(event: AgentEvent): void {
