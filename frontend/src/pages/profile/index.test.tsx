@@ -56,10 +56,10 @@ describe('ProfilePage', () => {
     expect(screen.getByRole('link', { name: '查看隐私说明' })).toHaveAttribute('href', '/privacy');
   });
 
-  it('不展示尚未接入的订单、观影记录和画像数据', () => {
+  it('显示可进入真实订单列表的入口，不展示未接入的记录和画像数据', () => {
     render(<ProfilePage />);
 
-    expect(screen.queryByText('我的订单')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '我的订单' })).toHaveAttribute('href', '/orders');
     expect(screen.queryByText('我的观影记录')).not.toBeInTheDocument();
     expect(screen.queryByText('AI 观影画像')).not.toBeInTheDocument();
     expect(screen.queryByText('星际穿越')).not.toBeInTheDocument();
@@ -81,6 +81,7 @@ describe('ProfilePage', () => {
     render(<ProfilePage />);
 
     expect(screen.getByRole('alert')).toHaveTextContent('暂时无法读取个人资料');
+    expect(screen.queryByRole('link', { name: '我的订单' })).not.toBeInTheDocument();
     expect(screen.queryByText('演示用户')).not.toBeInTheDocument();
   });
 });
