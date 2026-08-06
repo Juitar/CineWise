@@ -12,6 +12,7 @@ import com.miaoyu.ticket.recommendation.domain.RecommendationPlan;
 import com.miaoyu.ticket.recommendation.domain.RecommendationPlanRanker;
 import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
 import com.miaoyu.ticket.recommendation.domain.RecommendationRelaxationAdvisor;
+import com.miaoyu.ticket.recommendation.domain.RelaxationSuggestion;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -135,7 +136,7 @@ public class PersonalizedRecommendationQueryService {
             return java.util.Optional.of(new RankedRecommendationCandidate(
                     showtimeCandidate.movieId(), showtimeCandidate.cinemaId(), showtimeCandidate.showId(),
                     showtimeCandidate.price(), showtimeCandidate.startTime(), showtimeCandidate.endTime(), genres,
-                    movie.rating(), showtimeCandidate.source(), showtimeCandidate.dataAt(),
+                    movie.rating(), showtimeCandidate.availableSeatCount(), showtimeCandidate.source(), showtimeCandidate.dataAt(),
                     showtimeCandidate.expiresAt()));
         } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
             // 损坏内容资料不能降级为无类型影片，否则会绕过用户的类型和排除条件。
@@ -146,7 +147,7 @@ public class PersonalizedRecommendationQueryService {
     private static RecommendationPlanResult emptyResult(
             String source, Instant dataAt, Instant expiresAt, boolean degraded,
             List<String> missingFactors,
-            com.miaoyu.ticket.recommendation.domain.RelaxationSuggestion suggestion) {
+            RelaxationSuggestion suggestion) {
         return new RecommendationPlanResult(ALGORITHM_VERSION, List.of(), missingFactors, suggestion, source,
                 dataAt, expiresAt, degraded);
     }

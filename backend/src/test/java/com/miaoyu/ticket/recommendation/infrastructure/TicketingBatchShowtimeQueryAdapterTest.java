@@ -28,6 +28,7 @@ class TicketingBatchShowtimeQueryAdapterTest {
         assertThat(result.candidates()).singleElement().satisfies(candidate -> {
             assertThat(candidate.showId()).isEqualTo("3");
             assertThat(candidate.price()).isEqualByComparingTo("39.90");
+            assertThat(candidate.availableSeatCount()).isEqualTo(20);
             // 既保留 MOCK 大类，也保留 A 给出的 demo-seed 具体来源。
             assertThat(candidate.source()).isEqualTo("TICKETING:MOCK:seed");
         });

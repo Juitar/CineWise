@@ -38,6 +38,9 @@ public final class RecommendationCandidateFilter {
         if (constraints.cinemaId() != null && !constraints.cinemaId().equals(candidate.cinemaId())) {
             return false;
         }
+        if (candidate.availableSeatCount() < constraints.ticketCount()) {
+            return false;
+        }
         if (!constraints.genres().isEmpty()
                 && candidate.genres().stream().noneMatch(constraints.genres()::contains)) {
             return false;

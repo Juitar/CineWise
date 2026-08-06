@@ -39,6 +39,7 @@ public class TicketingBatchShowtimeQueryAdapter implements RecommendationBatchSh
                         Long.toString(show.cinemaId()), Long.toString(show.showId()), show.price(),
                         show.startTime().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toInstant(),
                         show.endTime().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toInstant(), List.of(), null,
+                        show.availableSeatCount(),
                         "TICKETING:" + show.dataType() + ":" + show.source(),
                         show.dataAt().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toInstant(),
                         show.expiresAt().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toInstant()))

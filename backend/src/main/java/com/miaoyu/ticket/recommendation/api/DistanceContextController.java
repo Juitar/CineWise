@@ -23,8 +23,18 @@ public class DistanceContextController {
 
     @PostMapping("/{distanceContextId}/location")
     public Result<Void> upload(@PathVariable String distanceContextId, @RequestBody LocationRequest request) {
-        if (!distanceContextService.upload(distanceContextId, request.longitude(), request.latitude())) {
+        DistanceContextService.UploadResult result;
+        try {
+            result = distanceContextService.upload(distanceContextId, request.longitude(), request.latitude());
+        } catch (IllegalArgumentException exception) {
+            // 经纬度范围错误属于客户端参数错误，不能让领域校验异常落入全局 500。
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        if (result == DistanceContextService.UploadResult.NOT_FOUND) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        if (result == DistanceContextService.UploadResult.CONFLICT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT);
         }
         return Result.success();
     }
