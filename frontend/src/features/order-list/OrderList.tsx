@@ -20,6 +20,9 @@ export interface OrderSummaryItem {
   status: OrderStatus;
   expireTime?: string;
   cinemaName?: string;
+  cinemaArea?: string;
+  cinemaAddress?: string;
+  posterUrl?: string | null;
 }
 
 export interface OrderListProps {
@@ -164,11 +167,16 @@ export const OrderList: React.FC<OrderListProps> = ({
               </div>
 
               <div className="order-card-body">
+                {item.posterUrl && (
+                  <img className="order-card-poster" src={item.posterUrl} alt="" />
+                )}
                 <div className="order-card-movie">{item.showTitle}</div>
                 <div className="order-card-info">
                   {item.showId && <span>场次编号：{item.showId}</span>}
                   <span>场次：{item.showTime}</span>
                   {item.cinemaName && <span>影院：{item.cinemaName}</span>}
+                  {item.cinemaArea && <span>区域：{item.cinemaArea}</span>}
+                  {item.cinemaAddress && <span>地址：{item.cinemaAddress}</span>}
                 </div>
               </div>
 

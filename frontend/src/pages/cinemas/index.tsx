@@ -82,7 +82,7 @@ export default function CinemasPage() {
           <header className="cinemas-heading-row">
             <div>
               <h1>影院列表</h1>
-              <p>当前城市：长沙。影院基础信息来自后端内容服务。</p>
+              <p>当前城市代码：{query.location}。影院基础信息来自后端内容服务。</p>
             </div>
             <Search
               allowClear

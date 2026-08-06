@@ -1,11 +1,14 @@
 package com.miaoyu.ticket.ticketing.api;
 
 import com.miaoyu.ticket.common.api.Result;
+import com.miaoyu.ticket.common.api.PageResult;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.ticketing.application.AvailableDateQueryService;
 import com.miaoyu.ticket.ticketing.application.AvailableMovieQueryService;
+import com.miaoyu.ticket.ticketing.application.AvailableCinemaQueryService;
+import com.miaoyu.ticket.ticketing.application.AvailableCinemaView;
 import com.miaoyu.ticket.ticketing.application.SeatMapView;
 import com.miaoyu.ticket.ticketing.application.SeatQueryService;
 import com.miaoyu.ticket.ticketing.application.ShowQuery;
@@ -19,6 +22,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.regex.Pattern;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,20 +35,38 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/shows")
 public class ShowController {
 
+    /** REST 与 Agent 路由共用的业务 ID 规范，禁止前导零造成同一 BIGINT 的多种文本形式。 */
+    private static final Pattern CANONICAL_BUSINESS_ID = Pattern.compile("[1-9]\\d*");
+
     private final AvailableDateQueryService availableDateQueryService;
     private final AvailableMovieQueryService availableMovieQueryService;
+    private final AvailableCinemaQueryService availableCinemaQueryService;
     private final ShowQueryService showQueryService;
     private final SeatQueryService seatQueryService;
 
     public ShowController(
             AvailableDateQueryService availableDateQueryService,
             AvailableMovieQueryService availableMovieQueryService,
+            AvailableCinemaQueryService availableCinemaQueryService,
             ShowQueryService showQueryService,
             SeatQueryService seatQueryService) {
         this.availableDateQueryService = availableDateQueryService;
         this.availableMovieQueryService = availableMovieQueryService;
+        this.availableCinemaQueryService = availableCinemaQueryService;
         this.showQueryService = showQueryService;
         this.seatQueryService = seatQueryService;
+    }
+
+    /** 影片页面只取得满足当前可售条件的影院；后续场次页仍重新读取权威库存。 */
+    @GetMapping("/available-cinemas")
+    @Operation(summary = "查询指定影片未来七天的可售影院")
+    public Result<PageResult<AvailableCinemaResponse>> queryAvailableCinemas(
+            @RequestParam String movieId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        PageResult<AvailableCinemaView> result = availableCinemaQueryService.queryAvailableCinemas(movieId, page, size);
+        return Result.success(new PageResult<>(result.total(), result.page(), result.size(), result.records().stream()
+                .map(this::toAvailableCinemaResponse).toList()));
     }
 
     /** 影院详情页一次取得有排期的影片，避免前端下载全量影片后逐项探测场次。 */
@@ -116,16 +138,26 @@ public class ShowController {
         return Result.success(toResponse(seatQueryService.querySeatMap(parseBusinessId(showId))));
     }
 
+    /**
+     * 在 REST 边界统一收紧业务 ID。
+     *
+     * Long.parseLong 会接受前导零；如果不先校验，`01` 与 `1` 会指向同一场次，
+     * 从而破坏 B 的 Agent 卡片、C 的前端路由和 A 的公开响应之间的一致 ID 表示。
+     */
     private long parseBusinessId(String value) {
+        if (value == null || !CANONICAL_BUSINESS_ID.matcher(value).matches()) {
+            throw invalidBusinessId();
+        }
         try {
             long id = Long.parseLong(value);
-            if (id <= 0) {
-                throw new NumberFormatException("ID must be positive");
-            }
             return id;
         } catch (NumberFormatException exception) {
-            throw new BusinessException(CommonErrorCode.INVALID_PARAMETER, "业务ID必须是正整数");
+            throw invalidBusinessId();
         }
+    }
+
+    private BusinessException invalidBusinessId() {
+        return new BusinessException(CommonErrorCode.INVALID_PARAMETER, "业务ID必须是无前导零的正整数");
     }
 
     private ShowSummaryResponse toResponse(ShowSummaryView view) {
@@ -146,6 +178,13 @@ public class ShowController {
                 view.dataType(),
                 view.stateVersion(),
                 toOffsetDateTime(view.updatedAt()));
+    }
+
+    private AvailableCinemaResponse toAvailableCinemaResponse(AvailableCinemaView view) {
+        return new AvailableCinemaResponse(Long.toString(view.cinemaId()), view.name(), view.address(),
+                view.availableShowCount(), toOffsetDateTime(view.nearestStartTime()), view.contentSource(),
+                toOffsetDateTime(view.contentDataTime()), toOffsetDateTime(view.contentExpiresAt()),
+                view.contentExpired(), view.scheduleSource(), toOffsetDateTime(view.scheduleDataTime()));
     }
 
     private SeatMapResponse toResponse(SeatMapView view) {
@@ -171,6 +210,7 @@ public class ShowController {
     }
 
     private OffsetDateTime toOffsetDateTime(java.time.LocalDateTime value) {
-        return value.atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime();
+        // 内容来源的时效字段允许为空，A 必须保留缺失事实，不能构造虚假的更新时间或过期时间。
+        return value == null ? null : value.atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime();
     }
 }

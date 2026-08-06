@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
@@ -127,6 +128,23 @@ public class ProfileBehaviorRecorder {
     return recordForUser(userId, command, null, null);
   }
 
+  /**
+   * B 在用户最终接受已保存方案后调用；这里只记录最小 PLAN 反馈，不把 planId 当成偏好标签值。
+   * 方案中的影片类型、影院等事实没有经过 D 的可靠映射时，不能凭 UUID 生成长期画像标签。
+   */
+  @Transactional
+  public RecordResult recordPlanAccepted(String eventId, String planId, LocalDateTime occurredAt) {
+    return record(new BehaviorCommand(eventId, ProfileBehaviorEventType.ACCEPT_PLAN,
+        ProfileBehaviorTargetType.PLAN, planId, null, null, occurredAt));
+  }
+
+  /** B 在用户最终拒绝已保存方案后调用；拒绝反馈同样只保留可去重的最小事件摘要。 */
+  @Transactional
+  public RecordResult recordPlanRejected(String eventId, String planId, LocalDateTime occurredAt) {
+    return record(new BehaviorCommand(eventId, ProfileBehaviorEventType.REJECT_PLAN,
+        ProfileBehaviorTargetType.PLAN, planId, null, null, occurredAt));
+  }
+
   /** A 的支付事件是受信任来源；消费线程没有用户登录上下文，只使用事件中的用户和订单字段。 */
   @Transactional
   public RecordResult recordPayment(PaymentSucceededEvent event) {
@@ -223,7 +241,8 @@ public class ProfileBehaviorRecorder {
   private void validate(BehaviorCommand command) {
     if (command.eventId() == null || command.eventId().isBlank() || command.eventId().length() > 64
         || command.targetId() == null || command.targetId().isBlank()
-        || (command.eventType() != ProfileBehaviorEventType.PAID_ORDER
+        || command.occurredAt() == null
+        || (requiresTag(command.eventType())
             && (command.tagType() == null || command.tagValue() == null))
         || (command.eventType() == ProfileBehaviorEventType.PAID_ORDER
             && (command.tagType() != null || command.tagValue() != null))) {
@@ -236,6 +255,27 @@ public class ProfileBehaviorRecorder {
     };
     if (!validTarget) {
       throw new BusinessException(ProfileErrorCode.INVALID_EVENT);
+    }
+    if ((command.eventType() == ProfileBehaviorEventType.ACCEPT_PLAN
+        || command.eventType() == ProfileBehaviorEventType.REJECT_PLAN)
+        && !isCanonicalLowerUuid(command.targetId())) {
+      throw new BusinessException(ProfileErrorCode.INVALID_EVENT);
+    }
+  }
+
+  /** 只有影片行为具备 D 可直接使用的标签证据；PLAN 反馈先只记录事件。 */
+  private boolean requiresTag(ProfileBehaviorEventType eventType) {
+    return eventType == ProfileBehaviorEventType.CLICK
+        || eventType == ProfileBehaviorEventType.FAVORITE
+        || eventType == ProfileBehaviorEventType.NOT_INTERESTED;
+  }
+
+  /** 方案 ID 必须使用 B 生成的标准小写 UUID，避免把临时文本或模型字段写入行为记录。 */
+  private boolean isCanonicalLowerUuid(String value) {
+    try {
+      return UUID.fromString(value).toString().equals(value);
+    } catch (IllegalArgumentException exception) {
+      return false;
     }
   }
 

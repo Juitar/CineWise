@@ -205,15 +205,20 @@ describe('Agent 事件投影', () => {
         createAgentProjection('session-example-1'),
         parseAgentEvent(value),
       );
-      expect(result.outcome).toBe('applied');
-      expect(result.projection.lastEventId).toBe(value.eventId);
-      expect(result.projection.items[0]).toEqual(
-        expect.objectContaining({
-          kind: 'card-placeholder',
-          text: expect.stringContaining('安全隐藏'),
-        }),
-      );
-      expect(JSON.stringify(result.projection)).not.toMatch(/unsafe|<b>/);
+      if (value.eventType === 'card.future') {
+        expect(result.outcome).toBe('ignored');
+        expect(result.projection.lastEventId).not.toBe(value.eventId);
+      } else {
+        expect(result.outcome).toBe('applied');
+        expect(result.projection.lastEventId).toBe(value.eventId);
+        expect(result.projection.items[0]).toEqual(
+          expect.objectContaining({
+            kind: 'card-placeholder',
+            text: expect.stringContaining('安全隐藏'),
+          }),
+        );
+        expect(JSON.stringify(result.projection)).not.toMatch(/unsafe|<b>/);
+      }
     },
   );
 

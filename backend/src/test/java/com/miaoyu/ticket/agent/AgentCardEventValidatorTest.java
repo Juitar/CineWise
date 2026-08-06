@@ -57,6 +57,52 @@ class AgentCardEventValidatorTest {
     }
 
     @Test
+    void shouldRenderSeatSelectionBusinessIntentCardWithCompleteBusinessReference() throws Exception {
+        JsonNode seatSelection = fixture("plan-card.json").deepCopy();
+        ObjectNode payload = (ObjectNode) seatSelection.path("payload");
+        payload.removeAll();
+        payload.put("type", "BUSINESS_INTENT");
+        ObjectNode intent = payload.putObject("payload");
+        intent.put("intent", "SELECT_SEATS");
+        ObjectNode businessRef = intent.putObject("businessRef");
+        businessRef.put("showId", "70001");
+        businessRef.put("movieId", "10001");
+        businessRef.put("cinemaId", "20001");
+
+        assertThat(AgentCardEventValidator.validate(seatSelection).decision())
+                .isEqualTo(AgentCardEventValidator.Decision.RENDER);
+    }
+
+    @Test
+    void shouldRejectSeatSelectionBusinessReferenceWithMissingOrInvalidIds() throws Exception {
+        for (String field : List.of("showId", "movieId", "cinemaId")) {
+            JsonNode missing = selectSeatsCard();
+            ((ObjectNode) missing.path("payload").path("payload").path("businessRef")).remove(field);
+            assertThat(AgentCardEventValidator.validate(missing).decision())
+                    .isEqualTo(AgentCardEventValidator.Decision.REJECT);
+        }
+        for (String invalidValue : List.of("show-70001", "070001", "0", "-1", "", "not-a-number",
+                "9223372036854775808")) {
+            JsonNode invalid = selectSeatsCard();
+            ((ObjectNode) invalid.path("payload").path("payload").path("businessRef"))
+                    .put("showId", invalidValue);
+            assertThat(AgentCardEventValidator.validate(invalid).decision())
+                    .isEqualTo(AgentCardEventValidator.Decision.REJECT);
+        }
+        for (String field : List.of("movieId", "cinemaId")) {
+            JsonNode invalid = selectSeatsCard();
+            ((ObjectNode) invalid.path("payload").path("payload").path("businessRef"))
+                    .put(field, "show-70001");
+            assertThat(AgentCardEventValidator.validate(invalid).decision())
+                    .isEqualTo(AgentCardEventValidator.Decision.REJECT);
+        }
+        JsonNode numericShowId = selectSeatsCard();
+        ((ObjectNode) numericShowId.path("payload").path("payload").path("businessRef")).put("showId", 70001);
+        assertThat(AgentCardEventValidator.validate(numericShowId).decision())
+                .isEqualTo(AgentCardEventValidator.Decision.REJECT);
+    }
+
+    @Test
     void shouldRejectInvalidLocationPermissionAuthorizationFields() throws Exception {
         assertThat(validate("invalid-location-authorization.json").decision())
                 .isEqualTo(AgentCardEventValidator.Decision.REJECT);
@@ -107,6 +153,20 @@ class AgentCardEventValidatorTest {
 
     private AgentCardEventValidator.ValidationResult validate(String fixtureName) throws Exception {
         return AgentCardEventValidator.validate(fixture(fixtureName));
+    }
+
+    private JsonNode selectSeatsCard() throws Exception {
+        JsonNode seatSelection = fixture("plan-card.json").deepCopy();
+        ObjectNode payload = (ObjectNode) seatSelection.path("payload");
+        payload.removeAll();
+        payload.put("type", "BUSINESS_INTENT");
+        ObjectNode intent = payload.putObject("payload");
+        intent.put("intent", "SELECT_SEATS");
+        ObjectNode businessRef = intent.putObject("businessRef");
+        businessRef.put("showId", "70001");
+        businessRef.put("movieId", "10001");
+        businessRef.put("cinemaId", "20001");
+        return seatSelection;
     }
 
     private JsonNode fixture(String fixtureName) throws Exception {

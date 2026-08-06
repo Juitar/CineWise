@@ -2,6 +2,7 @@ package com.miaoyu.ticket;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import javax.sql.DataSource;
@@ -37,5 +38,15 @@ class CineWiseApplicationTest {
     @Test
     void shouldDenyNonPublicEndpointByDefault() throws Exception {
         mockMvc.perform(get("/api/v1/not-implemented")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldAllowAnonymousGetForAvailableCinemasBeforeControllerIsMerged() throws Exception {
+        mockMvc.perform(get("/api/v1/shows/available-cinemas")
+                        .queryParam("movieId", "1")
+                .queryParam("page", "1")
+                .queryParam("size", "20"))
+                .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotIn(401, 403));
+        mockMvc.perform(post("/api/v1/shows/available-cinemas")).andExpect(status().isForbidden());
     }
 }

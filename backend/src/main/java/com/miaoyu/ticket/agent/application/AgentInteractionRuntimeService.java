@@ -244,6 +244,9 @@ public class AgentInteractionRuntimeService {
             case "step.start" -> "步骤执行中";
             case "step.complete" -> "步骤已完成";
             case "step.failed" -> "步骤执行失败";
+            case "tool.start" -> "工具执行中";
+            case "tool.complete" -> "工具执行完成";
+            case "tool.error" -> "工具执行失败";
             case "tool.result" -> "已获得推荐结果";
             case "card" -> "已生成推荐卡片";
             case "message.complete" -> "已生成回复";

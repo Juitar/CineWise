@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * C 消费卡片前使用的固定协议校验器。
@@ -13,7 +14,8 @@ import java.util.List;
  */
 public final class AgentCardEventValidator {
     private static final List<String> CARD_TYPES =
-            List.of("TEXT", "QUESTION", "MOVIE_CARD", "PLAN_CARD", "PROGRESS", "ERROR");
+            List.of("TEXT", "QUESTION", "MOVIE_CARD", "PLAN_CARD", "BUSINESS_INTENT", "PROGRESS", "ERROR");
+    private static final Pattern POSITIVE_LONG_DECIMAL = Pattern.compile("[1-9]\\d*");
 
     private AgentCardEventValidator() {
     }
@@ -45,6 +47,7 @@ public final class AgentCardEventValidator {
             case "QUESTION" -> question(payload);
             case "MOVIE_CARD" -> movieCard(payload);
             case "PLAN_CARD" -> planCard(event, payload);
+            case "BUSINESS_INTENT" -> businessIntent(event, payload);
             case "PROGRESS" -> required(payload, "stage") && required(payload, "status")
                     ? render(type) : rejected("PROGRESS 缺少 stage 或 status");
             case "ERROR" -> required(payload, "code") && required(payload, "message")
@@ -84,6 +87,31 @@ public final class AgentCardEventValidator {
                 && required(payload, "source")
                 && time(payload, "dataAt") && time(payload, "expiresAt") && payload.path("degraded").isBoolean()
                 ? render("PLAN_CARD") : rejected("PLAN_CARD 字段无效");
+    }
+
+    private static ValidationResult businessIntent(JsonNode event, JsonNode payload) {
+        JsonNode nested = payload.path("payload");
+        JsonNode businessRef = nested.path("businessRef");
+        return hasPlanContext(event) && "SELECT_SEATS".equals(nested.path("intent").asText())
+                && validPositiveLongDecimal(businessRef, "showId")
+                && validPositiveLongDecimal(businessRef, "movieId")
+                && validPositiveLongDecimal(businessRef, "cinemaId")
+                ? render("BUSINESS_INTENT") : rejected("SELECT_SEATS 卡片字段无效");
+    }
+
+    private static boolean validPositiveLongDecimal(JsonNode node, String field) {
+        if (!text(node, field)) {
+            return false;
+        }
+        String value = node.path(field).asText();
+        if (!POSITIVE_LONG_DECIMAL.matcher(value).matches()) {
+            return false;
+        }
+        try {
+            return Long.parseLong(value) > 0L;
+        } catch (NumberFormatException exception) {
+            return false;
+        }
     }
 
     /** 计划卡片只有携带当前计划标识和正版本号时，C 才能安全处理旧版本和续传。 */

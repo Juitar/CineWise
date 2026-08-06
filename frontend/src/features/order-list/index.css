@@ -98,6 +98,14 @@
   margin-bottom: 12px;
 }
 
+.order-card-poster {
+  width: 48px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #f5f5f5;
+}
+
 .order-card-movie {
   font-size: 16px;
   font-weight: 600;

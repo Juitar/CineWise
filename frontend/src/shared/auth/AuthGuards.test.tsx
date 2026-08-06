@@ -76,6 +76,16 @@ describe('认证路由守卫', () => {
     );
   });
 
+  it('匿名用户直接访问订单列表时不暴露受保护内容并保留订单回跳地址', () => {
+    mocks.location.hash = '';
+    mocks.location.pathname = '/orders';
+    mocks.location.search = '';
+    render(<RequireAuth>我的订单</RequireAuth>);
+
+    expect(screen.getByTestId('navigate')).toHaveTextContent('/login?returnUrl=%2Forders');
+    expect(screen.queryByText('我的订单')).not.toBeInTheDocument();
+  });
+
   it('已登录用户可以进入用户页面', () => {
     mocks.auth.status = 'authenticated';
     mocks.auth.currentUser = user;

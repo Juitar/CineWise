@@ -304,6 +304,14 @@
   margin-right: 8px;
 }
 
+.login-input-antd.ant-input-password .ant-input-password-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
 .verify-code-group .ant-input-affix-wrapper {
   padding-right: 8px;
 }

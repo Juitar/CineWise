@@ -1,0 +1,13 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "taskId": "90001",
+    "status": "READY",
+    "triggerAt": "2026-08-05T17:00:00+08:00",
+    "version": 1,
+    "order": { "orderId": "80001", "orderNo": "ORD-80001", "showId": "70001", "showStartTime": "2026-08-05T19:00:00+08:00" },
+    "movie": { "movieId": "10001", "title": "示例影片", "posterUrl": null, "source": "DEMO_CONTENT_V1", "dataAt": "2026-08-04T08:00:00+08:00" },
+    "cinema": { "cinemaId": "20001", "name": "示例影院", "area": "岳麓区", "address": "示例路 1 号", "source": "LIVE_CONTENT", "dataAt": "2026-08-04T08:00:00+08:00", "expiresAt": "2026-08-11T08:00:00+08:00", "isExpired": false }
+  }
+}

@@ -20,6 +20,7 @@ const CARD_PAYLOAD_TYPES = new Set<AgentCardPayloadType>([
   'QUESTION',
   'MOVIE_CARD',
   'PLAN_CARD',
+  'BUSINESS_INTENT',
   'PROGRESS',
   'ERROR',
 ]);
@@ -211,7 +212,6 @@ function validateRecommendationItem(value: unknown, type: 'MOVIE_CARD' | 'PLAN_C
   const item = record(value);
   businessId(item.movieId);
   if (type === 'PLAN_CARD') {
-    text(item.planKey);
     businessId(item.cinemaId);
   }
   optionalText(item, 'title');
@@ -275,6 +275,36 @@ function validateRecommendation(
   optionalText(payload, 'fallbackType');
 }
 
+function validateBusinessIntent(payload: Record<string, unknown>): void {
+  if (payload.type !== 'BUSINESS_INTENT') throw new AgentContractError();
+  const nested = record(payload.payload);
+  if (nested.intent !== 'SELECT_SEATS') throw new AgentContractError();
+  const businessRef = record(nested.businessRef);
+  businessId(businessRef.showId);
+}
+
+function validateToolPayload(event: AgentEvent): void {
+  const payload = event.payload;
+  text(payload.toolName);
+  text(payload.displayText);
+  if (event.eventType === 'tool.complete') {
+    boolean(payload.degraded);
+    optionalText(payload, 'fallbackType');
+    if ('dataAt' in payload && payload.dataAt !== null) dateText(payload.dataAt);
+    return;
+  }
+  if (event.eventType === 'tool.start') return;
+  const errorCode = payload.errorCode;
+  if (
+    !(typeof errorCode === 'string' && errorCode.length > 0) &&
+    !(typeof errorCode === 'number' && Number.isSafeInteger(errorCode) && errorCode >= 0)
+  ) {
+    throw new AgentContractError();
+  }
+  boolean(payload.retryable);
+  boolean(payload.replanSuggested);
+}
+
 /** 按 db7b622 的白名单校验卡片；未知类型安全降级，已知类型不完整则拒绝。 */
 export function validateAgentCardEvent(event: AgentEvent): AgentCardValidation {
   if (event.eventType !== 'card') return { decision: 'safe-text' };
@@ -289,6 +319,11 @@ export function validateAgentCardEvent(event: AgentEvent): AgentCardValidation {
     if (type === 'MOVIE_CARD' || type === 'PLAN_CARD') businessId(event.planId);
     if (type === 'TEXT') text(event.payload.text);
     if (type === 'QUESTION') validateQuestion(event.payload as Record<string, unknown>);
+    if (type === 'BUSINESS_INTENT') {
+      if (!event.nodeId || !event.planId || event.planVersion === null)
+        throw new AgentContractError();
+      validateBusinessIntent(event.payload as Record<string, unknown>);
+    }
     if (type === 'MOVIE_CARD' || type === 'PLAN_CARD') {
       validateRecommendation(event.payload as Record<string, unknown>, type);
     }
@@ -304,6 +339,16 @@ export function validateAgentCardEvent(event: AgentEvent): AgentCardValidation {
     return { decision: 'render', payloadType: type as AgentCardPayloadType };
   } catch {
     return { decision: 'reject' };
+  }
+}
+
+export function validateAgentToolEvent(event: AgentEvent): boolean {
+  if (!['tool.start', 'tool.complete', 'tool.error'].includes(event.eventType)) return false;
+  try {
+    validateToolPayload(event);
+    return true;
+  } catch {
+    return false;
   }
 }
 

@@ -73,6 +73,13 @@ springdoc:
 cinewise:
   agent:
     event-cleanup-cron: "${AGENT_EVENT_CLEANUP_CRON:0 30 2 * * *}"
+    deepseek:
+      # 真实调用只由部署环境显式打开；默认 Mock 保障本地和单元测试不访问外部模型。
+      enabled: ${DEEPSEEK_ENABLED:false}
+      api-key: ${DEEPSEEK_API_KEY:}
+      model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+      timeout: ${DEEPSEEK_TIMEOUT:5s}
   content:
     demo-ttl: 6h
     cache-ttl: 6h

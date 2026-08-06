@@ -2,11 +2,20 @@ import { TabBar } from 'antd-mobile';
 import React from 'react';
 import { useLocation, useNavigate } from 'umi';
 
-import { FilmIcon, UserIcon } from '../../shared/components/icons/layout-icons';
+import {
+  FilmIcon,
+  HomeIcon,
+  MapPinIcon,
+  OrderIcon,
+  UserIcon,
+} from '../../shared/components/icons/layout-icons';
+import { useAuth } from '../../shared/auth/AuthProvider';
 
 export const MobileTabBar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { currentUser, status } = useAuth();
+  const isAuthenticated = status === 'authenticated' && currentUser !== null;
 
   const setRouteActive = (value: string) => {
     navigate(value);
@@ -16,7 +25,7 @@ export const MobileTabBar: React.FC = () => {
     {
       key: '/',
       title: '首页',
-      icon: <FilmIcon size={24} />,
+      icon: <HomeIcon size={24} />,
     },
     {
       key: '/movies',
@@ -26,8 +35,17 @@ export const MobileTabBar: React.FC = () => {
     {
       key: '/cinemas',
       title: '影院',
-      icon: <FilmIcon size={24} />,
+      icon: <MapPinIcon size={24} />,
     },
+    ...(isAuthenticated
+      ? [
+          {
+            key: '/orders',
+            title: '订单',
+            icon: <OrderIcon size={24} />,
+          },
+        ]
+      : []),
     {
       key: '/profile',
       title: '我的',

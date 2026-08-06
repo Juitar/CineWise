@@ -13,6 +13,9 @@ export interface ElectronicTicketCardProps {
   showId?: string;
   showTime?: string;
   cinemaName?: string;
+  cinemaArea?: string;
+  cinemaAddress?: string;
+  posterUrl?: string | null;
   seatLabels?: string[];
   issuedAt?: string;
   qrPayload?: string;
@@ -34,6 +37,9 @@ export const ElectronicTicketCard: React.FC<ElectronicTicketCardProps> = ({
   showId,
   showTime = '时间待定',
   cinemaName = '未知影院',
+  cinemaArea,
+  cinemaAddress,
+  posterUrl,
   seatLabels = [],
   issuedAt,
   qrPayload,
@@ -84,6 +90,7 @@ export const ElectronicTicketCard: React.FC<ElectronicTicketCardProps> = ({
       {/* 电子票主卡部（头部与影片详情） */}
       <div className="ticket-card-main">
         <div className="ticket-main-header">
+          {posterUrl && <img className="ticket-movie-poster" src={posterUrl} alt="" />}
           <h2 className="ticket-movie-title">{showTitle}</h2>
           <div className="ticket-status-area">{renderStatusBadge()}</div>
         </div>
@@ -99,6 +106,18 @@ export const ElectronicTicketCard: React.FC<ElectronicTicketCardProps> = ({
             <span className="ticket-info-label">影院：</span>
             <span className="ticket-info-value">{cinemaName}</span>
           </div>
+          {cinemaArea && (
+            <div className="ticket-info-item">
+              <span className="ticket-info-label">区域：</span>
+              <span className="ticket-info-value">{cinemaArea}</span>
+            </div>
+          )}
+          {cinemaAddress && (
+            <div className="ticket-info-item">
+              <span className="ticket-info-label">地址：</span>
+              <span className="ticket-info-value">{cinemaAddress}</span>
+            </div>
+          )}
           <div className="ticket-info-item">
             <span className="ticket-info-label">场次：</span>
             <span className="ticket-info-value">{showTime}</span>
