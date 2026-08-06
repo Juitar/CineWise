@@ -5,7 +5,6 @@ import com.miaoyu.ticket.agent.domain.plan.CandidatePlan;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationResult;
 import com.miaoyu.ticket.agent.domain.run.ExecutionRunState;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
-import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
 import java.util.List;
 import java.util.Objects;
 
@@ -25,7 +24,7 @@ public record MinimalReadOnlyAgentResult(
         CandidatePlan candidatePlan,
         PlanValidationResult validationResult,
         ExecutionRunState state,
-        List<ToolResult<FixedRecommendationResult>> toolResults,
+        List<ToolResult<?>> toolResults,
         ReplyGenerationResponse reply) {
 
     public MinimalReadOnlyAgentResult {

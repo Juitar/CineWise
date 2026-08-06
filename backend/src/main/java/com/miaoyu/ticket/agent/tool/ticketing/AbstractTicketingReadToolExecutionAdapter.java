@@ -72,6 +72,10 @@ abstract class AbstractTicketingReadToolExecutionAdapter<C extends ToolCommand, 
             // 模型或旧计划的输入不合法时禁止访问票务服务，也不能把解析异常写入 Agent 事件。
             ToolResult<R> failure = invalidParameterResult(context);
             return new ExecutionResult(stateMachine.recordToolResult(runningState, node.nodeId(), failure), failure);
+        } catch (RuntimeException exception) {
+            // 业务 Tool 的未预期异常统一为不可重试失败，不能把内部异常信息写入 Agent 结果。
+            ToolResult<R> failure = exceptionResult(context);
+            return new ExecutionResult(stateMachine.recordToolResult(runningState, node.nodeId(), failure), failure);
         }
     }
 
@@ -165,6 +169,21 @@ abstract class AbstractTicketingReadToolExecutionAdapter<C extends ToolCommand, 
                 false,
                 false,
                 "CHECK_INPUT",
+                false,
+                null,
+                context.stateVersion(),
+                null,
+                null);
+    }
+
+    private ToolResult<R> exceptionResult(ToolContext context) {
+        return new ToolResult<>(
+                ToolStatus.FAILED,
+                null,
+                CommonErrorCode.INTERNAL_ERROR.code(),
+                false,
+                false,
+                "TOOL_EXCEPTION",
                 false,
                 null,
                 context.stateVersion(),

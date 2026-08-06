@@ -46,7 +46,7 @@ import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.agent.application.tool.AgentToolDefinitions;
-import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
+import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
 import com.miaoyu.ticket.ticketing.api.QueryShowsToolResult;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import java.time.Clock;
@@ -183,10 +183,10 @@ class AgentRunResultTransactionTest {
         ExecutionPlanStateMachine machine = new ExecutionPlanStateMachine(
                 new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan())));
         var running = machine.startNode(machine.initialize(plan), "rank");
-        ToolResult<FixedRecommendationResult> success = new ToolResult<>(
+        ToolResult<RecommendationPlanResult> success = new ToolResult<>(
                 ToolStatus.SUCCESS,
-                new FixedRecommendationResult("v1", List.of(), false, List.of("SHOWTIME"), "fixture",
-                        Instant.parse("2026-08-04T00:00:00Z"), Instant.parse("2026-08-04T01:00:00Z"), false),
+                new RecommendationPlanResult("1.0", "v1", List.of(), List.of("SHOWTIME"), null, false, "fixture",
+                        Instant.parse("2026-08-04T00:00:00Z"), Instant.parse("2026-08-04T01:00:00Z"), true),
                 null, false, false, null, false, null, 1L, null, null);
         var completed = machine.recordToolResult(running, "rank", success);
         when(fixture.runRepository().updateTerminalWithCas(any(), eq(0L))).thenReturn(true);
@@ -202,7 +202,7 @@ class AgentRunResultTransactionTest {
                 + "\"displayText\":\"正在整理推荐方案\",\"degraded\":false}";
         assertEquals(expectedCompletePayload, completePayload.getValue().value());
 
-        ToolResult<FixedRecommendationResult> failure = new ToolResult<>(
+        ToolResult<RecommendationPlanResult> failure = new ToolResult<>(
                 ToolStatus.FAILED, null, 306002, false, false, "CHECK_INPUT", false, null, 1L, null, null);
         var failedState = machine.recordToolResult(
                 machine.startNode(machine.initialize(plan), "rank"), "rank", failure);
