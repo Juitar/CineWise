@@ -75,6 +75,42 @@ class MultiToolSupervisorTest {
     }
 
     @Test
+    void shouldSkipWaitingConfirmationAndWriteNodeWhenRankMoviePlanFinallyFails() {
+        ToolRegistry registry = new ToolRegistry(List.of(
+                AgentToolDefinitions.rankMoviePlan(), AgentToolDefinitions.createOrder()));
+        PlanSchemaValidator validator = new PlanSchemaValidator(registry);
+        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry);
+        ModelGateway gateway = Mockito.mock(ModelGateway.class);
+        RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
+        when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
+        CandidatePlan plan = candidatePlan();
+        when(gateway.generatePlan(any()))
+                .thenReturn(new PlanGenerationResponse(plan, validator.validate(plan, context())));
+        when(adapter.execute(any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class))).thenAnswer(invocation -> {
+            var request = invocation.getArgument(0, ReadOnlyToolExecutionAdapter.ExecutionRequest.class);
+            var running = stateMachine.startNode(request.state(), request.nodeId());
+            ToolResult<FixedRecommendationResult> failure = new ToolResult<>(
+                    ToolStatus.FAILED, null, 306002, false, false, "CHECK_INPUT", false, null, 1L, null, null);
+            return new ReadOnlyToolExecutionAdapter.ExecutionResult(
+                    stateMachine.recordToolResult(running, request.nodeId(), failure), failure);
+        });
+
+        MultiToolSupervisor supervisor = new MultiToolSupervisor(
+                gateway, registry, validator, stateMachine, List.of(adapter));
+        var result = supervisor.run(new MultiToolSupervisorRequest(
+                "request-failed", "推荐并建单", context(), "run-failed", "trace-failed", 3_000L));
+
+        assertThat(result.state().nodeState("rank").status())
+                .isEqualTo(com.miaoyu.ticket.agent.domain.plan.PlanNodeStatus.FAILED);
+        assertThat(result.state().nodeState("confirm").status())
+                .isEqualTo(com.miaoyu.ticket.agent.domain.plan.PlanNodeStatus.SKIPPED);
+        assertThat(result.state().nodeState("write").status())
+                .isEqualTo(com.miaoyu.ticket.agent.domain.plan.PlanNodeStatus.SKIPPED);
+        assertThat(result.state().nodeState("confirm").skipReason()).isEqualTo("UPSTREAM_FAILED");
+        assertThat(result.state().nodeState("write").attemptCount()).isZero();
+    }
+
+    @Test
     void shouldRaisePlanVersionAndPreserveCompletedReadOnlyNodeWhenReplanning() {
         ToolRegistry registry = new ToolRegistry(List.of(
                 AgentToolDefinitions.rankMoviePlan(), AgentToolDefinitions.createOrder()));

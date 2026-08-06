@@ -185,8 +185,10 @@ public final class ExecutionNodeState {
     }
 
     ExecutionNodeState skipForUpstreamFailure(String sourceNodeId) {
-        // 只允许跳过尚未开始节点，运行中节点必须等待自己的真实结果而不能被强制覆盖。
-        requireStatus(PlanNodeStatus.PENDING);
+        // 确认节点虽处于等待确认，但尚未开始工具调用；上游失败时必须与 PENDING 一样安全跳过。
+        if (status != PlanNodeStatus.PENDING && status != PlanNodeStatus.WAITING_CONFIRMATION) {
+            throw new IllegalStateException("节点 " + nodeId + " 当前状态为 " + status + "，不能执行该操作");
+        }
         if (sourceNodeId == null || sourceNodeId.isBlank()) {
             // 跳过根因是审计和错误展示依据，不能留下不可追溯的 SKIPPED 状态。
             throw new IllegalArgumentException("跳过来源节点不能为空");
