@@ -50,7 +50,7 @@ class ContentSummaryQueryPortIntegrationTest {
         assertThat(summary.name()).isEqualTo("摘要影城");
         assertThat(summary.area()).isEqualTo("西湖区");
         assertThat(summary.address()).isEqualTo("测试路 1 号");
-        assertThat(summary.dataSource()).isEqualTo("test-provider");
+        assertThat(summary.source()).isEqualTo("test-provider");
         assertThat(summary.dataTime()).isEqualTo(dataTime);
         assertThat(summary.expiresAt()).isEqualTo(dataTime.plusHours(6));
         assertThat(summary.expired()).isFalse();

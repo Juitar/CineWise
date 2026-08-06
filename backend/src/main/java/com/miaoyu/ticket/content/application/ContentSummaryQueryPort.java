@@ -57,7 +57,7 @@ public interface ContentSummaryQueryPort {
             String name,
             String area,
             String address,
-            String dataSource,
+            String source,
             LocalDateTime dataTime,
             LocalDateTime expiresAt,
             boolean expired) {
