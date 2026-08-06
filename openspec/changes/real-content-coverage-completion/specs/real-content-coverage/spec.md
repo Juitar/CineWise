@@ -247,7 +247,7 @@ POST 响应和按请求查询统一返回 `syncId/clientRequestId/cityName/statu
 
 ### Requirement: 真实内容迁移必须保持历史内容与同步记录兼容
 
-A 已正式分配 V014，V013 已预留。A 必须在授权 V014 执行前确认 V013 的最终处理和执行顺序。迁移 SHALL 仅新增 `movie` 的可空资料字段、`content_identity_mapping`、`cinema.city_name/provider_city_id` 和 `data_sync_log.city_name/provider_city_id/failure_category/lease_owner/lease_until`，不得修改 V001～V012、不得建立物理外键、不得写入演示种子或按地址、名称、区域、坐标猜测历史城市/身份。V014 SQL 草案必须先由 A 静态复核，本次不得执行。
+A 已正式分配 V014。`V013__add_travel_task_cinema_id.sql` 已进入 `dev`；A 在授权 V014 验证或发布前，必须确认 V013 的最终验证结果、checksum 与执行顺序，且 V014 必须在 V013 之后执行。迁移 SHALL 仅新增 `movie` 的可空资料字段、`content_identity_mapping`、`cinema.city_name/provider_city_id` 和 `data_sync_log.city_name/provider_city_id/failure_category/lease_owner/lease_until`，不得修改 V001～V013、不得建立物理外键、不得写入演示种子或按地址、名称、区域、坐标猜测历史城市/身份。V014 SQL 草案必须先由 A 静态复核，本次不得执行。
 
 `content_identity_mapping` 必须以 `provider/resource_type/external_id` 唯一标识外部身份，以生成的 ACTIVE 内部内容 ID 约束同一 Provider、资源类型和内部内容最多一个 ACTIVE 外部 ID；`ACTIVE` 映射不得有失效字段，`INVALID` 映射必须有固定失效分类和失效时间。V014 只建表，不做 SQL 回填；D 在迁移后以 V001 的 `source + source_movie_id/source_cinema_id` 运行受控、可重复的应用回填，并将批次、成功数和冲突数记入同步审计。`movie.release_status` 只能为 `NOW_SHOWING`、`COMING_SOON` 或 `NULL`。`data_sync_log` 必须保留 V004 的计数约束：三个计数非负，且 `success_count+failure_count<=total_count`。V014 仅增加 PENDING 的零计数和全空字段规则，并允许 `lease_owner/lease_until` 成对为空或非空；它保留当前 RUNNING、FAILED/PARTIAL 的写入形态，避免未升级的同步代码被 CHECK 拒绝。D 发布新同步写入器、完成共享库只读预检和历史兼容处理后，V015 才收紧为：RUNNING 必须有 90 秒租约且每 20 秒按持有者续租；FAILED/PARTIAL 必须有错误码和固定失败分类；SUCCESS 不得有错误字段；终态持有者和租约均为空。FAILED 允许 `total_count=0/success_count=0/failure_count=0`，用于尚未获得候选项即失败的外部请求，但仍必须有错误码和失败分类。续租及资料/终态写入均须命中当前未到期持有者；真正过期的 RUNNING 才可转为 `FAILED + INTERNAL`，且不重调 Provider。公开接口不得返回 Provider 城市 ID 或持有者。
 

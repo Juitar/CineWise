@@ -131,7 +131,7 @@ C 负责移除首页/影院页的静态影片和影院数据，并用模块 API�
 
 迁移发布顺序是：V014 先新增全部可空列、新表、索引与兼容 CHECK；随后发布能够兼容新旧字段的 D 代码和受控身份映射回填；在共享库完成只读预检及历史兼容处理后，V015 再收紧同步状态 CHECK。失败或冲突不通过 SQL 回滚历史数据，而是保留旧字段和最近成功快照；后续结构调整只能新增前向迁移。
 
-当前已发布迁移目录最高为 V012；V013 已预留，A 已分配本 change 使用 V014。A 必须在授权 V014 执行前确认 V013 的最终处理和执行顺序，避免后续补入较低版本迁移。上述四类结构设计和过期版本描述更新完成后，D 才可提交 `V014` SQL 草案给 A 静态复核；草案通过后，A 再明确授权使用 `cinewise_migration_check + cinewise_migrator` 执行首次 migrate、validate、重复 migrate、结构/索引/CHECK、历史兼容和清理规则验证。本次不执行。`movie_tag`、`recommendation_record` 不属于本次申请，推荐历史另建 change 后再设计。
+当前已发布迁移目录最高为 V013，且 `V013__add_travel_task_cinema_id.sql` 已进入 `dev`；A 已分配本 change 使用 V014。A 在授权 V014 验证或发布前，必须确认 V013 的最终验证结果、checksum 与执行顺序；V014 必须在 V013 之后执行。上述四类结构设计和过期版本描述更新完成后，D 才可提交 `V014` SQL 草案给 A 静态复核；草案通过后，A 再明确授权使用 `cinewise_migration_check + cinewise_migrator` 执行首次 migrate、validate、重复 migrate、结构/索引/CHECK、历史兼容和清理规则验证。本次不执行。`movie_tag`、`recommendation_record` 不属于本次申请，推荐历史另建 change 后再设计。
 
 ## Verification
 
