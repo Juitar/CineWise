@@ -39,7 +39,9 @@ import org.springframework.transaction.support.TransactionTemplate;
         "cinewise.auth.audit-hash-secret=content-lease-mysql-it-audit-secret-at-least-32-bytes"
 })
 class ContentSyncLeaseMySqlConcurrencyIntegrationTest {
-    private static final String DATABASE = "cinewise_content_lease_check";
+    /** 默认保持原有专用库；A 提供其它隔离库时通过环境变量切换，不把库名写死到测试逻辑。 */
+    private static final String DATABASE = System.getenv().getOrDefault("CINEWISE_CONTENT_MYSQL_DATABASE",
+            "cinewise_content_lease_check");
     private static final long SYNC_ID = 9_300_001L;
     private static final long SNAPSHOT_ID = 9_300_002L;
     private static final String REQUEST_ID = "content-lease-lock-it";

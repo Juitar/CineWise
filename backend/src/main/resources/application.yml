@@ -90,6 +90,7 @@ cinewise:
       requests-per-minute: 10
       retry-count: 1
       retry-backoff: 200ms
+      sync-cities: ${CINEWISE_CONTENT_NETSTART_SYNC_CITIES:长沙}
   travel:
     weather:
       amap:
