@@ -16,6 +16,7 @@ import java.util.List;
  */
 public record DemoContentCatalog(
         String version,
+        String checkedAt,
         String source,
         ContentSourceType sourceType,
         List<MovieContent> movies,

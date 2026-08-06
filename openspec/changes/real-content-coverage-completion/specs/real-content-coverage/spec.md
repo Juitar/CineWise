@@ -20,7 +20,7 @@
 
 ### Requirement: 地点字符串必须经本地城市目录解析为 Provider 城市标识
 
-系统 SHALL 将 NetStart `cities.json` 的经核验最小城市目录作为版本化本地 JSON 随应用发布。应用启动时必须校验每条城市名和 Provider `ci` 非空且唯一，并构建只读索引；地点解析、页面查询和同步不得在用户请求中访问 NetStart 城市列表。C 使用 `POST /api/v1/content/cities/resolve` 提交 `{locationText:string}`，响应固定为 `{status:"RESOLVED"|"UNRECOGNIZED"|"SELECTION_REQUIRED", cityName:string|null}`；只有 `RESOLVED` 返回 `cityName`。D 只能在唯一城市名匹配时得到 Provider `ci`。公开结果不返回候选地点、`providerCityId` 或 `ci`，地点原文不能持久化。
+系统 SHALL 将 NetStart `cities.json` 的经核验最小城市目录作为版本化本地 JSON 随应用发布。应用启动时必须校验每条城市名和 Provider `ci` 非空且唯一，并构建只读索引；地点解析、页面查询和同步不得在用户请求中访问 NetStart 城市列表。C 使用 `POST /api/v1/content/cities/resolve` 提交 `{locationText:string}`，响应固定为 `{status:"RESOLVED"|"UNRECOGNIZED"|"SELECTION_REQUIRED", cityName:string|null}`；只有 `RESOLVED` 返回 `cityName`。D 只能在唯一城市名匹配时得到 Provider `ci`。公开结果不返回候选地点、`providerCityId` 或 `ci`，地点原文不能持久化。目录损坏或无法读取时返回 `503/303004`，与正常的 `UNRECOGNIZED` 区分。
 
 #### Scenario: 地点字符串解析为长沙
 
@@ -35,6 +35,13 @@
 - **WHEN** C 或 B 请求城市解析
 - **THEN** D 返回明确的不可用或需选择结果
 - **AND** 不调用影院 Provider，不以相近名称、地址或坐标猜测城市
+
+#### Scenario: 城市目录不可用
+
+- **GIVEN** 随应用发布的城市目录损坏、缺少元数据或城市名、`ci` 存在重复
+- **WHEN** C 或 B 请求城市解析
+- **THEN** D 返回 `503/303004`，不将其表示为 `UNRECOGNIZED`
+- **AND** 响应和日志不包含地点原文、候选列表或 Provider 原始内容
 
 #### Scenario: 用户查询已同步城市的真实影院
 

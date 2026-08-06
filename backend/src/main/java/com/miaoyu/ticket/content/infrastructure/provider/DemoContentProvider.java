@@ -1,6 +1,5 @@
 package com.miaoyu.ticket.content.infrastructure.provider;
 
-import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.content.application.ContentProperties;
 import com.miaoyu.ticket.content.application.ContentIdentityLookupPort;
 import com.miaoyu.ticket.content.application.ContentProvider;
@@ -14,7 +13,6 @@ import com.miaoyu.ticket.content.domain.ContentItem;
 import com.miaoyu.ticket.content.domain.ContentResourceType;
 import com.miaoyu.ticket.content.domain.ContentSource;
 import com.miaoyu.ticket.content.domain.MovieContent;
-import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +33,6 @@ public class DemoContentProvider implements ContentProvider {
     private final DemoContentCatalogProvider catalogProvider;
     private final ContentProperties properties;
     private final ContentIdentityLookupPort identityLookupPort;
-    private final Clock clock;
 
     /**
      * 注入版本目录、可调有效期和业务时钟。
@@ -45,12 +42,10 @@ public class DemoContentProvider implements ContentProvider {
     public DemoContentProvider(
             DemoContentCatalogProvider catalogProvider,
             ContentProperties properties,
-            ContentIdentityLookupPort identityLookupPort,
-            Clock clock) {
+            ContentIdentityLookupPort identityLookupPort) {
         this.catalogProvider = catalogProvider;
         this.properties = properties;
         this.identityLookupPort = identityLookupPort;
-        this.clock = clock;
     }
 
     /**
@@ -77,7 +72,8 @@ public class DemoContentProvider implements ContentProvider {
             return Optional.empty();
         }
         content = attachActualIds(query.resourceType(), content, query.contentId());
-        LocalDateTime dataTime = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
+        // Demo 的检查时间属于目录版本，不能在每次浏览时伪造为“刚同步”。
+        LocalDateTime dataTime = LocalDateTime.parse(catalog.checkedAt());
         ContentSource source = new ContentSource(catalog.source(), catalog.sourceType());
         return Optional.of(new ContentResult<>(
                 content,

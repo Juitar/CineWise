@@ -52,6 +52,8 @@ NetStart `cities.json` 已实测返回 1151 条 `id/nm/py`，其中长沙为 `70
 
 C 的手动选择或浏览器侧已经得到的地点信息通过 `POST /api/v1/content/cities/resolve` 向 D 传临时 `{locationText}`，避免它进入 URL。D 按规范化后的地点字符串匹配本地城市名：唯一命中才返回 `RESOLVED + cityName` 并在内部取得 `ci`；零命中返回 `UNRECOGNIZED`，多命中返回 `SELECTION_REQUIRED`。公开响应不返回候选地点、`providerCityId` 或 `ci`；页面会话只能保存返回的城市名。
 
+目录加载失败、元数据缺失或城市名/`ci` 重复时，应用保留“城市目录不可用”状态，不记录原始文件内容或地点文本；解析请求返回 `503/303004`。这与目录可用但地点无匹配的 `UNRECOGNIZED` 不同，页面应提示稍后重试。
+
 B 的对话地点信息只作为该次 D 城市解析调用的内存参数，调用结束立即丢弃。Agent 会持久化用户消息，因此 B 必须在保存用户消息、事件、槽位快照、长期上下文、日志和缓存前剔除或替换原始地点文本；不能只依靠 D 的 DTO 不落库。地点原文、浏览器位置和候选列表不得写入 MySQL、Redis、日志、快照、URL、画像或 Agent 轨迹；允许保存城市名或标准 `cityCode`，但不保存经纬度或 NetStart 内部城市 ID。
 
 `ci` 仅用于 D 调用 NetStart，不能返回给 C/B。页面查询和展示只使用城市名；影院持久化与同步审计另存规范化 `city_name` 和 `provider_city_id`，不再把中国行政区划代码作为新城市资料的前置条件。影院坐标仅映射 Provider 已给出的合法静态经纬度，不能通过地点字符串或地址猜测。

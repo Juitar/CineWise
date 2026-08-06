@@ -14,18 +14,12 @@ import com.miaoyu.ticket.content.domain.ContentResourceType;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
 import com.miaoyu.ticket.content.domain.MovieContent;
 import com.miaoyu.ticket.content.domain.CinemaContent;
-import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.DefaultResourceLoader;
 
 class DemoContentProviderTest {
-
-    private static final Clock FIXED_CLOCK = Clock.fixed(
-            Instant.parse("2026-08-03T01:02:03Z"), ZoneId.of("Asia/Shanghai"));
 
     private final DemoContentCatalogProvider catalogProvider = new ClasspathDemoContentCatalogProvider(
             new com.fasterxml.jackson.databind.ObjectMapper(), new DefaultResourceLoader());
@@ -37,7 +31,7 @@ class DemoContentProviderTest {
     };
     private final DemoContentProvider provider = new DemoContentProvider(
             catalogProvider, new ContentProperties(Duration.ofHours(6), Duration.ofHours(6), Duration.ofDays(7)),
-            identityLookupPort, FIXED_CLOCK);
+            identityLookupPort);
 
     @Test
     void givenSameCatalogQueryAndClock_whenQueryMoviesTwice_thenContentOrderAndSourceEnvelopeStayStable() {
@@ -52,8 +46,8 @@ class DemoContentProviderTest {
                 .containsExactly("mock-movie-01");
         assertThat(first.source().name()).isEqualTo("DEMO_CONTENT");
         assertThat(first.source().type()).isEqualTo(ContentSourceType.MOCK);
-        assertThat(first.dataTime()).isEqualTo("2026-08-03T09:02:03");
-        assertThat(first.expiresAt()).isEqualTo("2026-08-03T15:02:03");
+        assertThat(first.dataTime()).isEqualTo("2026-08-01T00:00:00");
+        assertThat(first.expiresAt()).isEqualTo("2026-08-01T06:00:00");
         assertThat(first.expired()).isFalse();
         assertThat(first.degraded()).isTrue();
         assertThat(first.fallbackType()).isEqualTo(ContentFallbackType.MOCK);

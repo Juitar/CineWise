@@ -4,7 +4,6 @@ import com.miaoyu.ticket.content.application.ContentSummaryQueryPort;
 import com.miaoyu.ticket.ticketing.application.ShowContextQueryService;
 import com.miaoyu.ticket.ticketing.application.ShowContextView;
 import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -50,9 +49,10 @@ public class TravelEventContextResolver {
         if (show.showId() != order.showId() || show.cinemaId() <= 0) {
             return Optional.empty();
         }
-        Map<Long, ContentSummaryQueryPort.CinemaSummary> summaries =
-                contentSummaryQueryPort.findCinemaSummaries(Set.of(show.cinemaId()));
-        ContentSummaryQueryPort.CinemaSummary cinema = summaries.get(show.cinemaId());
+        ContentSummaryQueryPort.CinemaSummary cinema = contentSummaryQueryPort
+                .findCinemaSummaries(Set.of(show.cinemaId()))
+                .findByCinemaId(show.cinemaId())
+                .orElse(null);
         if (!isUsable(cinema)) {
             return Optional.empty();
         }

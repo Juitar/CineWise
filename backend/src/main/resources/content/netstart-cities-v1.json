@@ -1,0 +1,4611 @@
+{
+  "catalogVersion": "v1",
+  "source": "NetStart cities.json",
+  "checkedAt": "2026-08-05",
+  "cities": [
+  {
+    "cityName": "北京",
+    "providerCityId": "1"
+  },
+  {
+    "cityName": "上海",
+    "providerCityId": "10"
+  },
+  {
+    "cityName": "广州",
+    "providerCityId": "20"
+  },
+  {
+    "cityName": "深圳",
+    "providerCityId": "30"
+  },
+  {
+    "cityName": "天津",
+    "providerCityId": "40"
+  },
+  {
+    "cityName": "西安",
+    "providerCityId": "42"
+  },
+  {
+    "cityName": "福州",
+    "providerCityId": "44"
+  },
+  {
+    "cityName": "重庆",
+    "providerCityId": "45"
+  },
+  {
+    "cityName": "杭州",
+    "providerCityId": "50"
+  },
+  {
+    "cityName": "宁波",
+    "providerCityId": "51"
+  },
+  {
+    "cityName": "无锡",
+    "providerCityId": "52"
+  },
+  {
+    "cityName": "南京",
+    "providerCityId": "55"
+  },
+  {
+    "cityName": "合肥",
+    "providerCityId": "56"
+  },
+  {
+    "cityName": "武汉",
+    "providerCityId": "57"
+  },
+  {
+    "cityName": "成都",
+    "providerCityId": "59"
+  },
+  {
+    "cityName": "青岛",
+    "providerCityId": "60"
+  },
+  {
+    "cityName": "厦门",
+    "providerCityId": "62"
+  },
+  {
+    "cityName": "大连",
+    "providerCityId": "65"
+  },
+  {
+    "cityName": "沈阳",
+    "providerCityId": "66"
+  },
+  {
+    "cityName": "长沙",
+    "providerCityId": "70"
+  },
+  {
+    "cityName": "郑州",
+    "providerCityId": "73"
+  },
+  {
+    "cityName": "石家庄",
+    "providerCityId": "76"
+  },
+  {
+    "cityName": "苏州",
+    "providerCityId": "80"
+  },
+  {
+    "cityName": "淄博",
+    "providerCityId": "81"
+  },
+  {
+    "cityName": "南通",
+    "providerCityId": "82"
+  },
+  {
+    "cityName": "南昌",
+    "providerCityId": "83"
+  },
+  {
+    "cityName": "保定",
+    "providerCityId": "84"
+  },
+  {
+    "cityName": "蚌埠",
+    "providerCityId": "88"
+  },
+  {
+    "cityName": "常州",
+    "providerCityId": "89"
+  },
+  {
+    "cityName": "大庆",
+    "providerCityId": "90"
+  },
+  {
+    "cityName": "东莞",
+    "providerCityId": "91"
+  },
+  {
+    "cityName": "佛山",
+    "providerCityId": "92"
+  },
+  {
+    "cityName": "桂林",
+    "providerCityId": "93"
+  },
+  {
+    "cityName": "海口",
+    "providerCityId": "94"
+  },
+  {
+    "cityName": "葫芦岛",
+    "providerCityId": "95"
+  },
+  {
+    "cityName": "济南",
+    "providerCityId": "96"
+  },
+  {
+    "cityName": "焦作",
+    "providerCityId": "97"
+  },
+  {
+    "cityName": "锦州",
+    "providerCityId": "98"
+  },
+  {
+    "cityName": "南宁",
+    "providerCityId": "99"
+  },
+  {
+    "cityName": "太原",
+    "providerCityId": "101"
+  },
+  {
+    "cityName": "芜湖",
+    "providerCityId": "102"
+  },
+  {
+    "cityName": "新乡",
+    "providerCityId": "103"
+  },
+  {
+    "cityName": "烟台",
+    "providerCityId": "104"
+  },
+  {
+    "cityName": "哈尔滨",
+    "providerCityId": "105"
+  },
+  {
+    "cityName": "廊坊",
+    "providerCityId": "106"
+  },
+  {
+    "cityName": "贵阳",
+    "providerCityId": "107"
+  },
+  {
+    "cityName": "珠海",
+    "providerCityId": "108"
+  },
+  {
+    "cityName": "齐齐哈尔",
+    "providerCityId": "109"
+  },
+  {
+    "cityName": "泉州",
+    "providerCityId": "110"
+  },
+  {
+    "cityName": "三亚",
+    "providerCityId": "111"
+  },
+  {
+    "cityName": "温州",
+    "providerCityId": "112"
+  },
+  {
+    "cityName": "中山",
+    "providerCityId": "113"
+  },
+  {
+    "cityName": "昆明",
+    "providerCityId": "114"
+  },
+  {
+    "cityName": "九江",
+    "providerCityId": "115"
+  },
+  {
+    "cityName": "长春",
+    "providerCityId": "116"
+  },
+  {
+    "cityName": "汕头",
+    "providerCityId": "117"
+  },
+  {
+    "cityName": "徐州",
+    "providerCityId": "119"
+  },
+  {
+    "cityName": "扬州",
+    "providerCityId": "120"
+  },
+  {
+    "cityName": "唐山",
+    "providerCityId": "121"
+  },
+  {
+    "cityName": "秦皇岛",
+    "providerCityId": "122"
+  },
+  {
+    "cityName": "邯郸",
+    "providerCityId": "123"
+  },
+  {
+    "cityName": "邢台",
+    "providerCityId": "124"
+  },
+  {
+    "cityName": "张家口",
+    "providerCityId": "125"
+  },
+  {
+    "cityName": "承德",
+    "providerCityId": "126"
+  },
+  {
+    "cityName": "沧州",
+    "providerCityId": "127"
+  },
+  {
+    "cityName": "衡水",
+    "providerCityId": "128"
+  },
+  {
+    "cityName": "大同",
+    "providerCityId": "129"
+  },
+  {
+    "cityName": "阳泉",
+    "providerCityId": "130"
+  },
+  {
+    "cityName": "长治",
+    "providerCityId": "131"
+  },
+  {
+    "cityName": "晋城",
+    "providerCityId": "132"
+  },
+  {
+    "cityName": "朔州",
+    "providerCityId": "133"
+  },
+  {
+    "cityName": "晋中",
+    "providerCityId": "134"
+  },
+  {
+    "cityName": "运城",
+    "providerCityId": "135"
+  },
+  {
+    "cityName": "忻州",
+    "providerCityId": "136"
+  },
+  {
+    "cityName": "临汾",
+    "providerCityId": "137"
+  },
+  {
+    "cityName": "吕梁",
+    "providerCityId": "138"
+  },
+  {
+    "cityName": "呼和浩特",
+    "providerCityId": "139"
+  },
+  {
+    "cityName": "包头",
+    "providerCityId": "140"
+  },
+  {
+    "cityName": "乌海",
+    "providerCityId": "141"
+  },
+  {
+    "cityName": "赤峰",
+    "providerCityId": "142"
+  },
+  {
+    "cityName": "通辽",
+    "providerCityId": "143"
+  },
+  {
+    "cityName": "鄂尔多斯",
+    "providerCityId": "144"
+  },
+  {
+    "cityName": "呼伦贝尔",
+    "providerCityId": "145"
+  },
+  {
+    "cityName": "巴彦淖尔",
+    "providerCityId": "146"
+  },
+  {
+    "cityName": "乌兰察布",
+    "providerCityId": "147"
+  },
+  {
+    "cityName": "兴安盟",
+    "providerCityId": "148"
+  },
+  {
+    "cityName": "锡林郭勒",
+    "providerCityId": "149"
+  },
+  {
+    "cityName": "阿拉善盟",
+    "providerCityId": "150"
+  },
+  {
+    "cityName": "鞍山",
+    "providerCityId": "151"
+  },
+  {
+    "cityName": "抚顺",
+    "providerCityId": "152"
+  },
+  {
+    "cityName": "本溪",
+    "providerCityId": "153"
+  },
+  {
+    "cityName": "丹东",
+    "providerCityId": "154"
+  },
+  {
+    "cityName": "营口",
+    "providerCityId": "155"
+  },
+  {
+    "cityName": "阜新",
+    "providerCityId": "156"
+  },
+  {
+    "cityName": "辽阳",
+    "providerCityId": "157"
+  },
+  {
+    "cityName": "盘锦",
+    "providerCityId": "158"
+  },
+  {
+    "cityName": "铁岭",
+    "providerCityId": "159"
+  },
+  {
+    "cityName": "朝阳",
+    "providerCityId": "160"
+  },
+  {
+    "cityName": "吉林",
+    "providerCityId": "161"
+  },
+  {
+    "cityName": "四平",
+    "providerCityId": "162"
+  },
+  {
+    "cityName": "辽源",
+    "providerCityId": "163"
+  },
+  {
+    "cityName": "通化",
+    "providerCityId": "164"
+  },
+  {
+    "cityName": "白山",
+    "providerCityId": "165"
+  },
+  {
+    "cityName": "松原",
+    "providerCityId": "166"
+  },
+  {
+    "cityName": "白城",
+    "providerCityId": "167"
+  },
+  {
+    "cityName": "延边",
+    "providerCityId": "168"
+  },
+  {
+    "cityName": "鸡西",
+    "providerCityId": "169"
+  },
+  {
+    "cityName": "鹤岗",
+    "providerCityId": "170"
+  },
+  {
+    "cityName": "双鸭山",
+    "providerCityId": "171"
+  },
+  {
+    "cityName": "伊春",
+    "providerCityId": "172"
+  },
+  {
+    "cityName": "佳木斯",
+    "providerCityId": "173"
+  },
+  {
+    "cityName": "七台河",
+    "providerCityId": "174"
+  },
+  {
+    "cityName": "牡丹江",
+    "providerCityId": "175"
+  },
+  {
+    "cityName": "黑河",
+    "providerCityId": "176"
+  },
+  {
+    "cityName": "绥化",
+    "providerCityId": "177"
+  },
+  {
+    "cityName": "大兴安岭",
+    "providerCityId": "178"
+  },
+  {
+    "cityName": "连云港",
+    "providerCityId": "179"
+  },
+  {
+    "cityName": "淮安",
+    "providerCityId": "180"
+  },
+  {
+    "cityName": "盐城",
+    "providerCityId": "181"
+  },
+  {
+    "cityName": "镇江",
+    "providerCityId": "182"
+  },
+  {
+    "cityName": "泰州",
+    "providerCityId": "183"
+  },
+  {
+    "cityName": "宿迁",
+    "providerCityId": "184"
+  },
+  {
+    "cityName": "嘉兴",
+    "providerCityId": "185"
+  },
+  {
+    "cityName": "湖州",
+    "providerCityId": "186"
+  },
+  {
+    "cityName": "绍兴",
+    "providerCityId": "187"
+  },
+  {
+    "cityName": "金华",
+    "providerCityId": "188"
+  },
+  {
+    "cityName": "衢州",
+    "providerCityId": "189"
+  },
+  {
+    "cityName": "舟山",
+    "providerCityId": "190"
+  },
+  {
+    "cityName": "台州",
+    "providerCityId": "191"
+  },
+  {
+    "cityName": "丽水",
+    "providerCityId": "192"
+  },
+  {
+    "cityName": "淮南",
+    "providerCityId": "193"
+  },
+  {
+    "cityName": "马鞍山",
+    "providerCityId": "194"
+  },
+  {
+    "cityName": "淮北",
+    "providerCityId": "195"
+  },
+  {
+    "cityName": "铜陵",
+    "providerCityId": "196"
+  },
+  {
+    "cityName": "安庆",
+    "providerCityId": "197"
+  },
+  {
+    "cityName": "黄山",
+    "providerCityId": "198"
+  },
+  {
+    "cityName": "滁州",
+    "providerCityId": "199"
+  },
+  {
+    "cityName": "阜阳",
+    "providerCityId": "200"
+  },
+  {
+    "cityName": "宿州",
+    "providerCityId": "201"
+  },
+  {
+    "cityName": "巢湖",
+    "providerCityId": "202"
+  },
+  {
+    "cityName": "六安",
+    "providerCityId": "203"
+  },
+  {
+    "cityName": "亳州",
+    "providerCityId": "204"
+  },
+  {
+    "cityName": "池州",
+    "providerCityId": "205"
+  },
+  {
+    "cityName": "宣城",
+    "providerCityId": "206"
+  },
+  {
+    "cityName": "莆田",
+    "providerCityId": "207"
+  },
+  {
+    "cityName": "三明",
+    "providerCityId": "208"
+  },
+  {
+    "cityName": "漳州",
+    "providerCityId": "209"
+  },
+  {
+    "cityName": "南平",
+    "providerCityId": "210"
+  },
+  {
+    "cityName": "龙岩",
+    "providerCityId": "211"
+  },
+  {
+    "cityName": "宁德",
+    "providerCityId": "212"
+  },
+  {
+    "cityName": "景德镇",
+    "providerCityId": "213"
+  },
+  {
+    "cityName": "萍乡",
+    "providerCityId": "214"
+  },
+  {
+    "cityName": "新余",
+    "providerCityId": "215"
+  },
+  {
+    "cityName": "鹰潭",
+    "providerCityId": "216"
+  },
+  {
+    "cityName": "赣州",
+    "providerCityId": "217"
+  },
+  {
+    "cityName": "吉安",
+    "providerCityId": "218"
+  },
+  {
+    "cityName": "宜春",
+    "providerCityId": "219"
+  },
+  {
+    "cityName": "抚州",
+    "providerCityId": "220"
+  },
+  {
+    "cityName": "上饶",
+    "providerCityId": "221"
+  },
+  {
+    "cityName": "枣庄",
+    "providerCityId": "222"
+  },
+  {
+    "cityName": "东营",
+    "providerCityId": "223"
+  },
+  {
+    "cityName": "潍坊",
+    "providerCityId": "224"
+  },
+  {
+    "cityName": "济宁",
+    "providerCityId": "225"
+  },
+  {
+    "cityName": "泰安",
+    "providerCityId": "226"
+  },
+  {
+    "cityName": "威海",
+    "providerCityId": "227"
+  },
+  {
+    "cityName": "日照",
+    "providerCityId": "228"
+  },
+  {
+    "cityName": "莱芜",
+    "providerCityId": "229"
+  },
+  {
+    "cityName": "临沂",
+    "providerCityId": "230"
+  },
+  {
+    "cityName": "德州",
+    "providerCityId": "231"
+  },
+  {
+    "cityName": "聊城",
+    "providerCityId": "232"
+  },
+  {
+    "cityName": "滨州",
+    "providerCityId": "233"
+  },
+  {
+    "cityName": "菏泽",
+    "providerCityId": "234"
+  },
+  {
+    "cityName": "开封",
+    "providerCityId": "235"
+  },
+  {
+    "cityName": "洛阳",
+    "providerCityId": "236"
+  },
+  {
+    "cityName": "平顶山",
+    "providerCityId": "237"
+  },
+  {
+    "cityName": "安阳",
+    "providerCityId": "238"
+  },
+  {
+    "cityName": "鹤壁",
+    "providerCityId": "239"
+  },
+  {
+    "cityName": "濮阳",
+    "providerCityId": "240"
+  },
+  {
+    "cityName": "许昌",
+    "providerCityId": "241"
+  },
+  {
+    "cityName": "漯河",
+    "providerCityId": "242"
+  },
+  {
+    "cityName": "三门峡",
+    "providerCityId": "243"
+  },
+  {
+    "cityName": "南阳",
+    "providerCityId": "244"
+  },
+  {
+    "cityName": "商丘",
+    "providerCityId": "245"
+  },
+  {
+    "cityName": "信阳",
+    "providerCityId": "246"
+  },
+  {
+    "cityName": "周口",
+    "providerCityId": "247"
+  },
+  {
+    "cityName": "驻马店",
+    "providerCityId": "248"
+  },
+  {
+    "cityName": "济源",
+    "providerCityId": "249"
+  },
+  {
+    "cityName": "黄石",
+    "providerCityId": "250"
+  },
+  {
+    "cityName": "十堰",
+    "providerCityId": "251"
+  },
+  {
+    "cityName": "宜昌",
+    "providerCityId": "252"
+  },
+  {
+    "cityName": "襄阳",
+    "providerCityId": "253"
+  },
+  {
+    "cityName": "鄂州",
+    "providerCityId": "254"
+  },
+  {
+    "cityName": "荆门",
+    "providerCityId": "255"
+  },
+  {
+    "cityName": "孝感",
+    "providerCityId": "256"
+  },
+  {
+    "cityName": "荆州",
+    "providerCityId": "257"
+  },
+  {
+    "cityName": "黄冈",
+    "providerCityId": "258"
+  },
+  {
+    "cityName": "咸宁",
+    "providerCityId": "259"
+  },
+  {
+    "cityName": "随州",
+    "providerCityId": "260"
+  },
+  {
+    "cityName": "恩施",
+    "providerCityId": "261"
+  },
+  {
+    "cityName": "株洲",
+    "providerCityId": "263"
+  },
+  {
+    "cityName": "湘潭",
+    "providerCityId": "264"
+  },
+  {
+    "cityName": "衡阳",
+    "providerCityId": "265"
+  },
+  {
+    "cityName": "邵阳",
+    "providerCityId": "266"
+  },
+  {
+    "cityName": "岳阳",
+    "providerCityId": "267"
+  },
+  {
+    "cityName": "常德",
+    "providerCityId": "268"
+  },
+  {
+    "cityName": "张家界",
+    "providerCityId": "269"
+  },
+  {
+    "cityName": "益阳",
+    "providerCityId": "270"
+  },
+  {
+    "cityName": "郴州",
+    "providerCityId": "271"
+  },
+  {
+    "cityName": "永州",
+    "providerCityId": "272"
+  },
+  {
+    "cityName": "怀化",
+    "providerCityId": "273"
+  },
+  {
+    "cityName": "娄底",
+    "providerCityId": "274"
+  },
+  {
+    "cityName": "湘西",
+    "providerCityId": "275"
+  },
+  {
+    "cityName": "韶关",
+    "providerCityId": "276"
+  },
+  {
+    "cityName": "江门",
+    "providerCityId": "277"
+  },
+  {
+    "cityName": "湛江",
+    "providerCityId": "278"
+  },
+  {
+    "cityName": "茂名",
+    "providerCityId": "279"
+  },
+  {
+    "cityName": "肇庆",
+    "providerCityId": "280"
+  },
+  {
+    "cityName": "惠州",
+    "providerCityId": "281"
+  },
+  {
+    "cityName": "梅州",
+    "providerCityId": "282"
+  },
+  {
+    "cityName": "汕尾",
+    "providerCityId": "283"
+  },
+  {
+    "cityName": "河源",
+    "providerCityId": "284"
+  },
+  {
+    "cityName": "阳江",
+    "providerCityId": "285"
+  },
+  {
+    "cityName": "清远",
+    "providerCityId": "286"
+  },
+  {
+    "cityName": "潮州",
+    "providerCityId": "287"
+  },
+  {
+    "cityName": "揭阳",
+    "providerCityId": "288"
+  },
+  {
+    "cityName": "云浮",
+    "providerCityId": "289"
+  },
+  {
+    "cityName": "柳州",
+    "providerCityId": "290"
+  },
+  {
+    "cityName": "梧州",
+    "providerCityId": "291"
+  },
+  {
+    "cityName": "北海",
+    "providerCityId": "292"
+  },
+  {
+    "cityName": "防城港",
+    "providerCityId": "293"
+  },
+  {
+    "cityName": "钦州",
+    "providerCityId": "294"
+  },
+  {
+    "cityName": "贵港",
+    "providerCityId": "295"
+  },
+  {
+    "cityName": "玉林",
+    "providerCityId": "296"
+  },
+  {
+    "cityName": "百色",
+    "providerCityId": "297"
+  },
+  {
+    "cityName": "贺州",
+    "providerCityId": "298"
+  },
+  {
+    "cityName": "河池",
+    "providerCityId": "299"
+  },
+  {
+    "cityName": "来宾",
+    "providerCityId": "300"
+  },
+  {
+    "cityName": "崇左",
+    "providerCityId": "301"
+  },
+  {
+    "cityName": "自贡",
+    "providerCityId": "302"
+  },
+  {
+    "cityName": "攀枝花",
+    "providerCityId": "303"
+  },
+  {
+    "cityName": "泸州",
+    "providerCityId": "304"
+  },
+  {
+    "cityName": "德阳",
+    "providerCityId": "305"
+  },
+  {
+    "cityName": "绵阳",
+    "providerCityId": "306"
+  },
+  {
+    "cityName": "广元",
+    "providerCityId": "307"
+  },
+  {
+    "cityName": "遂宁",
+    "providerCityId": "308"
+  },
+  {
+    "cityName": "内江",
+    "providerCityId": "309"
+  },
+  {
+    "cityName": "乐山",
+    "providerCityId": "310"
+  },
+  {
+    "cityName": "南充",
+    "providerCityId": "311"
+  },
+  {
+    "cityName": "眉山",
+    "providerCityId": "312"
+  },
+  {
+    "cityName": "宜宾",
+    "providerCityId": "313"
+  },
+  {
+    "cityName": "广安",
+    "providerCityId": "314"
+  },
+  {
+    "cityName": "达州",
+    "providerCityId": "315"
+  },
+  {
+    "cityName": "雅安",
+    "providerCityId": "316"
+  },
+  {
+    "cityName": "巴中",
+    "providerCityId": "317"
+  },
+  {
+    "cityName": "资阳",
+    "providerCityId": "318"
+  },
+  {
+    "cityName": "阿坝",
+    "providerCityId": "319"
+  },
+  {
+    "cityName": "甘孜",
+    "providerCityId": "320"
+  },
+  {
+    "cityName": "凉山",
+    "providerCityId": "321"
+  },
+  {
+    "cityName": "六盘水",
+    "providerCityId": "322"
+  },
+  {
+    "cityName": "遵义",
+    "providerCityId": "323"
+  },
+  {
+    "cityName": "安顺",
+    "providerCityId": "324"
+  },
+  {
+    "cityName": "铜仁",
+    "providerCityId": "325"
+  },
+  {
+    "cityName": "黔西南",
+    "providerCityId": "326"
+  },
+  {
+    "cityName": "毕节",
+    "providerCityId": "327"
+  },
+  {
+    "cityName": "黔东南",
+    "providerCityId": "328"
+  },
+  {
+    "cityName": "黔南",
+    "providerCityId": "329"
+  },
+  {
+    "cityName": "曲靖",
+    "providerCityId": "330"
+  },
+  {
+    "cityName": "玉溪",
+    "providerCityId": "331"
+  },
+  {
+    "cityName": "保山",
+    "providerCityId": "332"
+  },
+  {
+    "cityName": "昭通",
+    "providerCityId": "333"
+  },
+  {
+    "cityName": "丽江",
+    "providerCityId": "334"
+  },
+  {
+    "cityName": "普洱",
+    "providerCityId": "335"
+  },
+  {
+    "cityName": "临沧",
+    "providerCityId": "336"
+  },
+  {
+    "cityName": "楚雄",
+    "providerCityId": "337"
+  },
+  {
+    "cityName": "红河",
+    "providerCityId": "338"
+  },
+  {
+    "cityName": "文山",
+    "providerCityId": "339"
+  },
+  {
+    "cityName": "西双版纳",
+    "providerCityId": "340"
+  },
+  {
+    "cityName": "大理",
+    "providerCityId": "341"
+  },
+  {
+    "cityName": "德宏",
+    "providerCityId": "342"
+  },
+  {
+    "cityName": "怒江",
+    "providerCityId": "343"
+  },
+  {
+    "cityName": "迪庆",
+    "providerCityId": "344"
+  },
+  {
+    "cityName": "拉萨",
+    "providerCityId": "345"
+  },
+  {
+    "cityName": "昌都",
+    "providerCityId": "346"
+  },
+  {
+    "cityName": "山南",
+    "providerCityId": "347"
+  },
+  {
+    "cityName": "日喀则",
+    "providerCityId": "348"
+  },
+  {
+    "cityName": "那曲",
+    "providerCityId": "349"
+  },
+  {
+    "cityName": "阿里",
+    "providerCityId": "350"
+  },
+  {
+    "cityName": "林芝",
+    "providerCityId": "351"
+  },
+  {
+    "cityName": "铜川",
+    "providerCityId": "352"
+  },
+  {
+    "cityName": "宝鸡",
+    "providerCityId": "353"
+  },
+  {
+    "cityName": "咸阳",
+    "providerCityId": "354"
+  },
+  {
+    "cityName": "渭南",
+    "providerCityId": "355"
+  },
+  {
+    "cityName": "延安",
+    "providerCityId": "356"
+  },
+  {
+    "cityName": "汉中",
+    "providerCityId": "357"
+  },
+  {
+    "cityName": "榆林",
+    "providerCityId": "358"
+  },
+  {
+    "cityName": "安康",
+    "providerCityId": "359"
+  },
+  {
+    "cityName": "商洛",
+    "providerCityId": "360"
+  },
+  {
+    "cityName": "兰州",
+    "providerCityId": "361"
+  },
+  {
+    "cityName": "金昌",
+    "providerCityId": "362"
+  },
+  {
+    "cityName": "白银",
+    "providerCityId": "363"
+  },
+  {
+    "cityName": "天水",
+    "providerCityId": "364"
+  },
+  {
+    "cityName": "武威",
+    "providerCityId": "365"
+  },
+  {
+    "cityName": "张掖",
+    "providerCityId": "366"
+  },
+  {
+    "cityName": "平凉",
+    "providerCityId": "367"
+  },
+  {
+    "cityName": "酒泉",
+    "providerCityId": "368"
+  },
+  {
+    "cityName": "庆阳",
+    "providerCityId": "369"
+  },
+  {
+    "cityName": "定西",
+    "providerCityId": "370"
+  },
+  {
+    "cityName": "陇南",
+    "providerCityId": "371"
+  },
+  {
+    "cityName": "临夏",
+    "providerCityId": "372"
+  },
+  {
+    "cityName": "甘南",
+    "providerCityId": "373"
+  },
+  {
+    "cityName": "西宁",
+    "providerCityId": "374"
+  },
+  {
+    "cityName": "海东",
+    "providerCityId": "375"
+  },
+  {
+    "cityName": "海北",
+    "providerCityId": "376"
+  },
+  {
+    "cityName": "黄南",
+    "providerCityId": "377"
+  },
+  {
+    "cityName": "海南州",
+    "providerCityId": "378"
+  },
+  {
+    "cityName": "玉树",
+    "providerCityId": "380"
+  },
+  {
+    "cityName": "海西",
+    "providerCityId": "381"
+  },
+  {
+    "cityName": "银川",
+    "providerCityId": "382"
+  },
+  {
+    "cityName": "石嘴山",
+    "providerCityId": "383"
+  },
+  {
+    "cityName": "吴忠",
+    "providerCityId": "384"
+  },
+  {
+    "cityName": "固原",
+    "providerCityId": "385"
+  },
+  {
+    "cityName": "中卫",
+    "providerCityId": "386"
+  },
+  {
+    "cityName": "乌鲁木齐",
+    "providerCityId": "387"
+  },
+  {
+    "cityName": "克拉玛依",
+    "providerCityId": "388"
+  },
+  {
+    "cityName": "吐鲁番",
+    "providerCityId": "389"
+  },
+  {
+    "cityName": "哈密",
+    "providerCityId": "390"
+  },
+  {
+    "cityName": "昌吉",
+    "providerCityId": "391"
+  },
+  {
+    "cityName": "博尔塔拉",
+    "providerCityId": "392"
+  },
+  {
+    "cityName": "巴州",
+    "providerCityId": "393"
+  },
+  {
+    "cityName": "阿克苏",
+    "providerCityId": "394"
+  },
+  {
+    "cityName": "喀什地区",
+    "providerCityId": "396"
+  },
+  {
+    "cityName": "和田",
+    "providerCityId": "397"
+  },
+  {
+    "cityName": "伊犁",
+    "providerCityId": "398"
+  },
+  {
+    "cityName": "塔城",
+    "providerCityId": "399"
+  },
+  {
+    "cityName": "阿勒泰",
+    "providerCityId": "400"
+  },
+  {
+    "cityName": "昆山",
+    "providerCityId": "403"
+  },
+  {
+    "cityName": "江阴",
+    "providerCityId": "404"
+  },
+  {
+    "cityName": "义乌",
+    "providerCityId": "405"
+  },
+  {
+    "cityName": "顺德",
+    "providerCityId": "406"
+  },
+  {
+    "cityName": "石河子",
+    "providerCityId": "408"
+  },
+  {
+    "cityName": "嘉峪关",
+    "providerCityId": "409"
+  },
+  {
+    "cityName": "仙桃",
+    "providerCityId": "412"
+  },
+  {
+    "cityName": "富阳",
+    "providerCityId": "416"
+  },
+  {
+    "cityName": "峨眉山",
+    "providerCityId": "417"
+  },
+  {
+    "cityName": "琼海",
+    "providerCityId": "418"
+  },
+  {
+    "cityName": "张家港",
+    "providerCityId": "419"
+  },
+  {
+    "cityName": "晋江市",
+    "providerCityId": "420"
+  },
+  {
+    "cityName": "从化",
+    "providerCityId": "421"
+  },
+  {
+    "cityName": "常熟",
+    "providerCityId": "422"
+  },
+  {
+    "cityName": "海宁",
+    "providerCityId": "424"
+  },
+  {
+    "cityName": "桐乡",
+    "providerCityId": "425"
+  },
+  {
+    "cityName": "涿州",
+    "providerCityId": "426"
+  },
+  {
+    "cityName": "涪陵",
+    "providerCityId": "427"
+  },
+  {
+    "cityName": "万州",
+    "providerCityId": "428"
+  },
+  {
+    "cityName": "迁安",
+    "providerCityId": "430"
+  },
+  {
+    "cityName": "丹阳",
+    "providerCityId": "431"
+  },
+  {
+    "cityName": "太仓",
+    "providerCityId": "432"
+  },
+  {
+    "cityName": "吴江",
+    "providerCityId": "433"
+  },
+  {
+    "cityName": "敦煌",
+    "providerCityId": "434"
+  },
+  {
+    "cityName": "靖江",
+    "providerCityId": "439"
+  },
+  {
+    "cityName": "石狮",
+    "providerCityId": "440"
+  },
+  {
+    "cityName": "武夷山",
+    "providerCityId": "443"
+  },
+  {
+    "cityName": "武安",
+    "providerCityId": "449"
+  },
+  {
+    "cityName": "溧阳",
+    "providerCityId": "450"
+  },
+  {
+    "cityName": "慈溪",
+    "providerCityId": "451"
+  },
+  {
+    "cityName": "长兴",
+    "providerCityId": "452"
+  },
+  {
+    "cityName": "兖州",
+    "providerCityId": "453"
+  },
+  {
+    "cityName": "宜兴",
+    "providerCityId": "454"
+  },
+  {
+    "cityName": "东阳",
+    "providerCityId": "455"
+  },
+  {
+    "cityName": "上虞",
+    "providerCityId": "456"
+  },
+  {
+    "cityName": "温岭",
+    "providerCityId": "457"
+  },
+  {
+    "cityName": "永康",
+    "providerCityId": "458"
+  },
+  {
+    "cityName": "余姚",
+    "providerCityId": "459"
+  },
+  {
+    "cityName": "金坛",
+    "providerCityId": "460"
+  },
+  {
+    "cityName": "临海",
+    "providerCityId": "461"
+  },
+  {
+    "cityName": "福清",
+    "providerCityId": "462"
+  },
+  {
+    "cityName": "长乐",
+    "providerCityId": "463"
+  },
+  {
+    "cityName": "章丘区",
+    "providerCityId": "465"
+  },
+  {
+    "cityName": "阳朔",
+    "providerCityId": "466"
+  },
+  {
+    "cityName": "德清",
+    "providerCityId": "467"
+  },
+  {
+    "cityName": "诸暨",
+    "providerCityId": "468"
+  },
+  {
+    "cityName": "瑞安",
+    "providerCityId": "469"
+  },
+  {
+    "cityName": "乐清",
+    "providerCityId": "470"
+  },
+  {
+    "cityName": "惠东",
+    "providerCityId": "471"
+  },
+  {
+    "cityName": "惠阳",
+    "providerCityId": "472"
+  },
+  {
+    "cityName": "凯里",
+    "providerCityId": "473"
+  },
+  {
+    "cityName": "仁怀",
+    "providerCityId": "475"
+  },
+  {
+    "cityName": "兰溪",
+    "providerCityId": "476"
+  },
+  {
+    "cityName": "大丰",
+    "providerCityId": "477"
+  },
+  {
+    "cityName": "东台",
+    "providerCityId": "478"
+  },
+  {
+    "cityName": "婺源",
+    "providerCityId": "479"
+  },
+  {
+    "cityName": "凤凰",
+    "providerCityId": "480"
+  },
+  {
+    "cityName": "腾冲",
+    "providerCityId": "482"
+  },
+  {
+    "cityName": "九寨沟",
+    "providerCityId": "483"
+  },
+  {
+    "cityName": "香格里拉",
+    "providerCityId": "484"
+  },
+  {
+    "cityName": "井冈山",
+    "providerCityId": "485"
+  },
+  {
+    "cityName": "武当山",
+    "providerCityId": "486"
+  },
+  {
+    "cityName": "神农架",
+    "providerCityId": "487"
+  },
+  {
+    "cityName": "嘉善",
+    "providerCityId": "489"
+  },
+  {
+    "cityName": "安吉",
+    "providerCityId": "490"
+  },
+  {
+    "cityName": "当阳",
+    "providerCityId": "491"
+  },
+  {
+    "cityName": "龙口",
+    "providerCityId": "492"
+  },
+  {
+    "cityName": "邳州",
+    "providerCityId": "493"
+  },
+  {
+    "cityName": "枣阳",
+    "providerCityId": "494"
+  },
+  {
+    "cityName": "寿光",
+    "providerCityId": "495"
+  },
+  {
+    "cityName": "青州",
+    "providerCityId": "496"
+  },
+  {
+    "cityName": "荣成",
+    "providerCityId": "497"
+  },
+  {
+    "cityName": "文登",
+    "providerCityId": "498"
+  },
+  {
+    "cityName": "乳山",
+    "providerCityId": "499"
+  },
+  {
+    "cityName": "启东",
+    "providerCityId": "500"
+  },
+  {
+    "cityName": "如皋",
+    "providerCityId": "501"
+  },
+  {
+    "cityName": "开平",
+    "providerCityId": "502"
+  },
+  {
+    "cityName": "台山",
+    "providerCityId": "503"
+  },
+  {
+    "cityName": "鹤山",
+    "providerCityId": "504"
+  },
+  {
+    "cityName": "桦甸",
+    "providerCityId": "505"
+  },
+  {
+    "cityName": "海城",
+    "providerCityId": "506"
+  },
+  {
+    "cityName": "曲阜",
+    "providerCityId": "507"
+  },
+  {
+    "cityName": "邹平",
+    "providerCityId": "508"
+  },
+  {
+    "cityName": "耒阳",
+    "providerCityId": "509"
+  },
+  {
+    "cityName": "江山",
+    "providerCityId": "510"
+  },
+  {
+    "cityName": "宁海",
+    "providerCityId": "512"
+  },
+  {
+    "cityName": "乐昌",
+    "providerCityId": "513"
+  },
+  {
+    "cityName": "英德",
+    "providerCityId": "514"
+  },
+  {
+    "cityName": "句容",
+    "providerCityId": "515"
+  },
+  {
+    "cityName": "伊川",
+    "providerCityId": "516"
+  },
+  {
+    "cityName": "兴化",
+    "providerCityId": "517"
+  },
+  {
+    "cityName": "泰兴",
+    "providerCityId": "518"
+  },
+  {
+    "cityName": "海门区",
+    "providerCityId": "519"
+  },
+  {
+    "cityName": "宁乡",
+    "providerCityId": "520"
+  },
+  {
+    "cityName": "高邮",
+    "providerCityId": "521"
+  },
+  {
+    "cityName": "仪征",
+    "providerCityId": "522"
+  },
+  {
+    "cityName": "新泰",
+    "providerCityId": "523"
+  },
+  {
+    "cityName": "平湖",
+    "providerCityId": "524"
+  },
+  {
+    "cityName": "湘阴",
+    "providerCityId": "525"
+  },
+  {
+    "cityName": "诸城",
+    "providerCityId": "526"
+  },
+  {
+    "cityName": "昌邑",
+    "providerCityId": "527"
+  },
+  {
+    "cityName": "偃师",
+    "providerCityId": "528"
+  },
+  {
+    "cityName": "莱州",
+    "providerCityId": "529"
+  },
+  {
+    "cityName": "嵊州",
+    "providerCityId": "530"
+  },
+  {
+    "cityName": "沭阳",
+    "providerCityId": "531"
+  },
+  {
+    "cityName": "射阳",
+    "providerCityId": "532"
+  },
+  {
+    "cityName": "滨海",
+    "providerCityId": "533"
+  },
+  {
+    "cityName": "响水",
+    "providerCityId": "534"
+  },
+  {
+    "cityName": "阜宁",
+    "providerCityId": "535"
+  },
+  {
+    "cityName": "建湖",
+    "providerCityId": "536"
+  },
+  {
+    "cityName": "临清",
+    "providerCityId": "537"
+  },
+  {
+    "cityName": "三河",
+    "providerCityId": "538"
+  },
+  {
+    "cityName": "东港",
+    "providerCityId": "539"
+  },
+  {
+    "cityName": "奉化",
+    "providerCityId": "540"
+  },
+  {
+    "cityName": "广饶",
+    "providerCityId": "541"
+  },
+  {
+    "cityName": "临安",
+    "providerCityId": "542"
+  },
+  {
+    "cityName": "辛集",
+    "providerCityId": "543"
+  },
+  {
+    "cityName": "晋州",
+    "providerCityId": "544"
+  },
+  {
+    "cityName": "肥城",
+    "providerCityId": "545"
+  },
+  {
+    "cityName": "普宁",
+    "providerCityId": "546"
+  },
+  {
+    "cityName": "南沙",
+    "providerCityId": "547"
+  },
+  {
+    "cityName": "新沂",
+    "providerCityId": "548"
+  },
+  {
+    "cityName": "滕州",
+    "providerCityId": "549"
+  },
+  {
+    "cityName": "潜江",
+    "providerCityId": "550"
+  },
+  {
+    "cityName": "乌镇",
+    "providerCityId": "551"
+  },
+  {
+    "cityName": "登封",
+    "providerCityId": "552"
+  },
+  {
+    "cityName": "巩义",
+    "providerCityId": "553"
+  },
+  {
+    "cityName": "桐庐",
+    "providerCityId": "554"
+  },
+  {
+    "cityName": "新郑",
+    "providerCityId": "555"
+  },
+  {
+    "cityName": "新密",
+    "providerCityId": "556"
+  },
+  {
+    "cityName": "荥阳",
+    "providerCityId": "557"
+  },
+  {
+    "cityName": "庄河",
+    "providerCityId": "558"
+  },
+  {
+    "cityName": "扬中",
+    "providerCityId": "559"
+  },
+  {
+    "cityName": "西塘",
+    "providerCityId": "560"
+  },
+  {
+    "cityName": "莱阳",
+    "providerCityId": "561"
+  },
+  {
+    "cityName": "兴宁",
+    "providerCityId": "562"
+  },
+  {
+    "cityName": "漠河",
+    "providerCityId": "563"
+  },
+  {
+    "cityName": "华阴",
+    "providerCityId": "564"
+  },
+  {
+    "cityName": "密山",
+    "providerCityId": "566"
+  },
+  {
+    "cityName": "陆丰",
+    "providerCityId": "567"
+  },
+  {
+    "cityName": "额尔古纳",
+    "providerCityId": "568"
+  },
+  {
+    "cityName": "韶山",
+    "providerCityId": "569"
+  },
+  {
+    "cityName": "桂平",
+    "providerCityId": "570"
+  },
+  {
+    "cityName": "儋州",
+    "providerCityId": "571"
+  },
+  {
+    "cityName": "满洲里",
+    "providerCityId": "572"
+  },
+  {
+    "cityName": "海阳",
+    "providerCityId": "573"
+  },
+  {
+    "cityName": "新民",
+    "providerCityId": "574"
+  },
+  {
+    "cityName": "霸州",
+    "providerCityId": "575"
+  },
+  {
+    "cityName": "都江堰",
+    "providerCityId": "576"
+  },
+  {
+    "cityName": "永城",
+    "providerCityId": "577"
+  },
+  {
+    "cityName": "天门",
+    "providerCityId": "578"
+  },
+  {
+    "cityName": "侯马",
+    "providerCityId": "579"
+  },
+  {
+    "cityName": "项城",
+    "providerCityId": "580"
+  },
+  {
+    "cityName": "公主岭",
+    "providerCityId": "581"
+  },
+  {
+    "cityName": "平度",
+    "providerCityId": "582"
+  },
+  {
+    "cityName": "胶州",
+    "providerCityId": "583"
+  },
+  {
+    "cityName": "梅河口",
+    "providerCityId": "584"
+  },
+  {
+    "cityName": "彭州",
+    "providerCityId": "585"
+  },
+  {
+    "cityName": "招远",
+    "providerCityId": "586"
+  },
+  {
+    "cityName": "蓬莱区",
+    "providerCityId": "587"
+  },
+  {
+    "cityName": "安丘",
+    "providerCityId": "588"
+  },
+  {
+    "cityName": "高密",
+    "providerCityId": "589"
+  },
+  {
+    "cityName": "汨罗",
+    "providerCityId": "590"
+  },
+  {
+    "cityName": "遵化",
+    "providerCityId": "591"
+  },
+  {
+    "cityName": "吴川",
+    "providerCityId": "592"
+  },
+  {
+    "cityName": "广汉",
+    "providerCityId": "593"
+  },
+  {
+    "cityName": "建德",
+    "providerCityId": "594"
+  },
+  {
+    "cityName": "藁城",
+    "providerCityId": "595"
+  },
+  {
+    "cityName": "灵宝",
+    "providerCityId": "596"
+  },
+  {
+    "cityName": "永济",
+    "providerCityId": "597"
+  },
+  {
+    "cityName": "河津",
+    "providerCityId": "598"
+  },
+  {
+    "cityName": "大石桥",
+    "providerCityId": "599"
+  },
+  {
+    "cityName": "大冶",
+    "providerCityId": "600"
+  },
+  {
+    "cityName": "高平",
+    "providerCityId": "601"
+  },
+  {
+    "cityName": "宝应",
+    "providerCityId": "602"
+  },
+  {
+    "cityName": "库尔勒",
+    "providerCityId": "603"
+  },
+  {
+    "cityName": "孝义",
+    "providerCityId": "604"
+  },
+  {
+    "cityName": "简阳",
+    "providerCityId": "605"
+  },
+  {
+    "cityName": "冷水江",
+    "providerCityId": "606"
+  },
+  {
+    "cityName": "文昌",
+    "providerCityId": "607"
+  },
+  {
+    "cityName": "禹城",
+    "providerCityId": "608"
+  },
+  {
+    "cityName": "禹州",
+    "providerCityId": "609"
+  },
+  {
+    "cityName": "明光",
+    "providerCityId": "610"
+  },
+  {
+    "cityName": "乐陵",
+    "providerCityId": "611"
+  },
+  {
+    "cityName": "钟祥",
+    "providerCityId": "612"
+  },
+  {
+    "cityName": "沙河",
+    "providerCityId": "613"
+  },
+  {
+    "cityName": "湘乡",
+    "providerCityId": "614"
+  },
+  {
+    "cityName": "汝州",
+    "providerCityId": "616"
+  },
+  {
+    "cityName": "浏阳",
+    "providerCityId": "617"
+  },
+  {
+    "cityName": "龙海",
+    "providerCityId": "618"
+  },
+  {
+    "cityName": "醴陵",
+    "providerCityId": "619"
+  },
+  {
+    "cityName": "莱西",
+    "providerCityId": "620"
+  },
+  {
+    "cityName": "南安",
+    "providerCityId": "621"
+  },
+  {
+    "cityName": "伊宁",
+    "providerCityId": "622"
+  },
+  {
+    "cityName": "海安",
+    "providerCityId": "623"
+  },
+  {
+    "cityName": "苍南",
+    "providerCityId": "624"
+  },
+  {
+    "cityName": "宜城",
+    "providerCityId": "625"
+  },
+  {
+    "cityName": "天长",
+    "providerCityId": "626"
+  },
+  {
+    "cityName": "长葛",
+    "providerCityId": "627"
+  },
+  {
+    "cityName": "廉江",
+    "providerCityId": "628"
+  },
+  {
+    "cityName": "高碑店",
+    "providerCityId": "629"
+  },
+  {
+    "cityName": "个旧",
+    "providerCityId": "630"
+  },
+  {
+    "cityName": "高州",
+    "providerCityId": "631"
+  },
+  {
+    "cityName": "乐平",
+    "providerCityId": "632"
+  },
+  {
+    "cityName": "四会",
+    "providerCityId": "633"
+  },
+  {
+    "cityName": "阆中",
+    "providerCityId": "634"
+  },
+  {
+    "cityName": "东兴",
+    "providerCityId": "635"
+  },
+  {
+    "cityName": "介休",
+    "providerCityId": "636"
+  },
+  {
+    "cityName": "原平",
+    "providerCityId": "637"
+  },
+  {
+    "cityName": "盖州",
+    "providerCityId": "638"
+  },
+  {
+    "cityName": "瑞金",
+    "providerCityId": "639"
+  },
+  {
+    "cityName": "兴城",
+    "providerCityId": "641"
+  },
+  {
+    "cityName": "调兵山",
+    "providerCityId": "642"
+  },
+  {
+    "cityName": "奎屯",
+    "providerCityId": "643"
+  },
+  {
+    "cityName": "沁阳",
+    "providerCityId": "644"
+  },
+  {
+    "cityName": "霍州",
+    "providerCityId": "645"
+  },
+  {
+    "cityName": "崇州",
+    "providerCityId": "646"
+  },
+  {
+    "cityName": "邛崃",
+    "providerCityId": "647"
+  },
+  {
+    "cityName": "松滋",
+    "providerCityId": "648"
+  },
+  {
+    "cityName": "黄骅",
+    "providerCityId": "650"
+  },
+  {
+    "cityName": "灯塔",
+    "providerCityId": "651"
+  },
+  {
+    "cityName": "鹿泉",
+    "providerCityId": "652"
+  },
+  {
+    "cityName": "赤壁",
+    "providerCityId": "653"
+  },
+  {
+    "cityName": "枝江",
+    "providerCityId": "654"
+  },
+  {
+    "cityName": "利川",
+    "providerCityId": "655"
+  },
+  {
+    "cityName": "宜都",
+    "providerCityId": "656"
+  },
+  {
+    "cityName": "瑞昌",
+    "providerCityId": "657"
+  },
+  {
+    "cityName": "沅江",
+    "providerCityId": "658"
+  },
+  {
+    "cityName": "老河口",
+    "providerCityId": "659"
+  },
+  {
+    "cityName": "淳安",
+    "providerCityId": "660"
+  },
+  {
+    "cityName": "邓州",
+    "providerCityId": "662"
+  },
+  {
+    "cityName": "漳浦",
+    "providerCityId": "663"
+  },
+  {
+    "cityName": "即墨",
+    "providerCityId": "664"
+  },
+  {
+    "cityName": "凤城",
+    "providerCityId": "665"
+  },
+  {
+    "cityName": "洮南",
+    "providerCityId": "666"
+  },
+  {
+    "cityName": "武穴",
+    "providerCityId": "667"
+  },
+  {
+    "cityName": "麻城",
+    "providerCityId": "668"
+  },
+  {
+    "cityName": "舒兰",
+    "providerCityId": "669"
+  },
+  {
+    "cityName": "凌海",
+    "providerCityId": "670"
+  },
+  {
+    "cityName": "樟树",
+    "providerCityId": "671"
+  },
+  {
+    "cityName": "化州",
+    "providerCityId": "672"
+  },
+  {
+    "cityName": "桐城",
+    "providerCityId": "673"
+  },
+  {
+    "cityName": "滦南",
+    "providerCityId": "674"
+  },
+  {
+    "cityName": "灵山",
+    "providerCityId": "675"
+  },
+  {
+    "cityName": "汾阳",
+    "providerCityId": "677"
+  },
+  {
+    "cityName": "集安",
+    "providerCityId": "678"
+  },
+  {
+    "cityName": "大通",
+    "providerCityId": "679"
+  },
+  {
+    "cityName": "万宁",
+    "providerCityId": "680"
+  },
+  {
+    "cityName": "北流",
+    "providerCityId": "681"
+  },
+  {
+    "cityName": "讷河",
+    "providerCityId": "682"
+  },
+  {
+    "cityName": "连州",
+    "providerCityId": "683"
+  },
+  {
+    "cityName": "舞钢",
+    "providerCityId": "684"
+  },
+  {
+    "cityName": "海林",
+    "providerCityId": "685"
+  },
+  {
+    "cityName": "东方",
+    "providerCityId": "686"
+  },
+  {
+    "cityName": "南雄",
+    "providerCityId": "687"
+  },
+  {
+    "cityName": "陵水",
+    "providerCityId": "688"
+  },
+  {
+    "cityName": "阜康",
+    "providerCityId": "689"
+  },
+  {
+    "cityName": "临江",
+    "providerCityId": "690"
+  },
+  {
+    "cityName": "古交",
+    "providerCityId": "691"
+  },
+  {
+    "cityName": "象山",
+    "providerCityId": "692"
+  },
+  {
+    "cityName": "玉环市",
+    "providerCityId": "693"
+  },
+  {
+    "cityName": "孟州",
+    "providerCityId": "694"
+  },
+  {
+    "cityName": "修武",
+    "providerCityId": "695"
+  },
+  {
+    "cityName": "温县",
+    "providerCityId": "696"
+  },
+  {
+    "cityName": "武陟",
+    "providerCityId": "697"
+  },
+  {
+    "cityName": "博爱",
+    "providerCityId": "698"
+  },
+  {
+    "cityName": "安岳",
+    "providerCityId": "699"
+  },
+  {
+    "cityName": "承德县",
+    "providerCityId": "700"
+  },
+  {
+    "cityName": "鄱阳",
+    "providerCityId": "701"
+  },
+  {
+    "cityName": "格尔木",
+    "providerCityId": "702"
+  },
+  {
+    "cityName": "连江",
+    "providerCityId": "724"
+  },
+  {
+    "cityName": "蛟河",
+    "providerCityId": "725"
+  },
+  {
+    "cityName": "海盐",
+    "providerCityId": "726"
+  },
+  {
+    "cityName": "齐河",
+    "providerCityId": "727"
+  },
+  {
+    "cityName": "夏津",
+    "providerCityId": "728"
+  },
+  {
+    "cityName": "信宜",
+    "providerCityId": "729"
+  },
+  {
+    "cityName": "浦江",
+    "providerCityId": "730"
+  },
+  {
+    "cityName": "北碚",
+    "providerCityId": "731"
+  },
+  {
+    "cityName": "合川",
+    "providerCityId": "732"
+  },
+  {
+    "cityName": "永川",
+    "providerCityId": "733"
+  },
+  {
+    "cityName": "新化",
+    "providerCityId": "734"
+  },
+  {
+    "cityName": "丰城",
+    "providerCityId": "735"
+  },
+  {
+    "cityName": "邵东市",
+    "providerCityId": "736"
+  },
+  {
+    "cityName": "昌乐",
+    "providerCityId": "737"
+  },
+  {
+    "cityName": "东平",
+    "providerCityId": "738"
+  },
+  {
+    "cityName": "临朐",
+    "providerCityId": "739"
+  },
+  {
+    "cityName": "清丰",
+    "providerCityId": "740"
+  },
+  {
+    "cityName": "南乐",
+    "providerCityId": "741"
+  },
+  {
+    "cityName": "范县",
+    "providerCityId": "742"
+  },
+  {
+    "cityName": "台前",
+    "providerCityId": "743"
+  },
+  {
+    "cityName": "乐亭",
+    "providerCityId": "744"
+  },
+  {
+    "cityName": "滦州市",
+    "providerCityId": "745"
+  },
+  {
+    "cityName": "曹妃甸",
+    "providerCityId": "746"
+  },
+  {
+    "cityName": "乌苏",
+    "providerCityId": "747"
+  },
+  {
+    "cityName": "开州区",
+    "providerCityId": "748"
+  },
+  {
+    "cityName": "仁寿",
+    "providerCityId": "749"
+  },
+  {
+    "cityName": "电白",
+    "providerCityId": "750"
+  },
+  {
+    "cityName": "灌云",
+    "providerCityId": "751"
+  },
+  {
+    "cityName": "灌南",
+    "providerCityId": "752"
+  },
+  {
+    "cityName": "赣榆",
+    "providerCityId": "753"
+  },
+  {
+    "cityName": "东海",
+    "providerCityId": "754"
+  },
+  {
+    "cityName": "睢县",
+    "providerCityId": "755"
+  },
+  {
+    "cityName": "建阳",
+    "providerCityId": "756"
+  },
+  {
+    "cityName": "正定",
+    "providerCityId": "757"
+  },
+  {
+    "cityName": "淮阳区",
+    "providerCityId": "758"
+  },
+  {
+    "cityName": "太和",
+    "providerCityId": "759"
+  },
+  {
+    "cityName": "泗阳",
+    "providerCityId": "760"
+  },
+  {
+    "cityName": "磐石",
+    "providerCityId": "761"
+  },
+  {
+    "cityName": "沙湾",
+    "providerCityId": "762"
+  },
+  {
+    "cityName": "永年",
+    "providerCityId": "763"
+  },
+  {
+    "cityName": "仙居",
+    "providerCityId": "764"
+  },
+  {
+    "cityName": "定州",
+    "providerCityId": "765"
+  },
+  {
+    "cityName": "栾城",
+    "providerCityId": "766"
+  },
+  {
+    "cityName": "磁县",
+    "providerCityId": "767"
+  },
+  {
+    "cityName": "涉县",
+    "providerCityId": "768"
+  },
+  {
+    "cityName": "无为市",
+    "providerCityId": "769"
+  },
+  {
+    "cityName": "阳城",
+    "providerCityId": "770"
+  },
+  {
+    "cityName": "高安",
+    "providerCityId": "771"
+  },
+  {
+    "cityName": "汉阴",
+    "providerCityId": "772"
+  },
+  {
+    "cityName": "湾沚区",
+    "providerCityId": "773"
+  },
+  {
+    "cityName": "繁昌区",
+    "providerCityId": "774"
+  },
+  {
+    "cityName": "南陵",
+    "providerCityId": "775"
+  },
+  {
+    "cityName": "襄垣",
+    "providerCityId": "776"
+  },
+  {
+    "cityName": "平原",
+    "providerCityId": "777"
+  },
+  {
+    "cityName": "云阳",
+    "providerCityId": "778"
+  },
+  {
+    "cityName": "宁阳",
+    "providerCityId": "779"
+  },
+  {
+    "cityName": "广德市",
+    "providerCityId": "780"
+  },
+  {
+    "cityName": "宁国",
+    "providerCityId": "781"
+  },
+  {
+    "cityName": "天台",
+    "providerCityId": "782"
+  },
+  {
+    "cityName": "宝丰",
+    "providerCityId": "783"
+  },
+  {
+    "cityName": "叶县",
+    "providerCityId": "784"
+  },
+  {
+    "cityName": "郏县",
+    "providerCityId": "785"
+  },
+  {
+    "cityName": "鲁山",
+    "providerCityId": "786"
+  },
+  {
+    "cityName": "共青城",
+    "providerCityId": "787"
+  },
+  {
+    "cityName": "金堂",
+    "providerCityId": "788"
+  },
+  {
+    "cityName": "灵石",
+    "providerCityId": "789"
+  },
+  {
+    "cityName": "太谷区",
+    "providerCityId": "790"
+  },
+  {
+    "cityName": "临漳",
+    "providerCityId": "791"
+  },
+  {
+    "cityName": "肥乡区",
+    "providerCityId": "792"
+  },
+  {
+    "cityName": "含山",
+    "providerCityId": "793"
+  },
+  {
+    "cityName": "和县",
+    "providerCityId": "794"
+  },
+  {
+    "cityName": "长垣市",
+    "providerCityId": "795"
+  },
+  {
+    "cityName": "神木市",
+    "providerCityId": "796"
+  },
+  {
+    "cityName": "绥中",
+    "providerCityId": "797"
+  },
+  {
+    "cityName": "成安",
+    "providerCityId": "798"
+  },
+  {
+    "cityName": "户县",
+    "providerCityId": "799"
+  },
+  {
+    "cityName": "辉县",
+    "providerCityId": "800"
+  },
+  {
+    "cityName": "昌黎",
+    "providerCityId": "801"
+  },
+  {
+    "cityName": "宣威",
+    "providerCityId": "802"
+  },
+  {
+    "cityName": "易县",
+    "providerCityId": "803"
+  },
+  {
+    "cityName": "上高",
+    "providerCityId": "804"
+  },
+  {
+    "cityName": "平潭",
+    "providerCityId": "805"
+  },
+  {
+    "cityName": "怀仁市",
+    "providerCityId": "806"
+  },
+  {
+    "cityName": "安平",
+    "providerCityId": "807"
+  },
+  {
+    "cityName": "临潼",
+    "providerCityId": "808"
+  },
+  {
+    "cityName": "蓝田",
+    "providerCityId": "809"
+  },
+  {
+    "cityName": "霞浦",
+    "providerCityId": "810"
+  },
+  {
+    "cityName": "岑溪",
+    "providerCityId": "811"
+  },
+  {
+    "cityName": "藤县",
+    "providerCityId": "812"
+  },
+  {
+    "cityName": "宁晋",
+    "providerCityId": "813"
+  },
+  {
+    "cityName": "宜阳",
+    "providerCityId": "814"
+  },
+  {
+    "cityName": "林州",
+    "providerCityId": "815"
+  },
+  {
+    "cityName": "滑县",
+    "providerCityId": "816"
+  },
+  {
+    "cityName": "汤阴",
+    "providerCityId": "817"
+  },
+  {
+    "cityName": "新安",
+    "providerCityId": "818"
+  },
+  {
+    "cityName": "石泉",
+    "providerCityId": "819"
+  },
+  {
+    "cityName": "宁津",
+    "providerCityId": "820"
+  },
+  {
+    "cityName": "中牟",
+    "providerCityId": "821"
+  },
+  {
+    "cityName": "阎良",
+    "providerCityId": "822"
+  },
+  {
+    "cityName": "隆昌市",
+    "providerCityId": "823"
+  },
+  {
+    "cityName": "泗洪",
+    "providerCityId": "824"
+  },
+  {
+    "cityName": "惠安",
+    "providerCityId": "825"
+  },
+  {
+    "cityName": "卫辉",
+    "providerCityId": "826"
+  },
+  {
+    "cityName": "封丘",
+    "providerCityId": "827"
+  },
+  {
+    "cityName": "新乡县",
+    "providerCityId": "828"
+  },
+  {
+    "cityName": "原阳",
+    "providerCityId": "829"
+  },
+  {
+    "cityName": "单县",
+    "providerCityId": "830"
+  },
+  {
+    "cityName": "监利市",
+    "providerCityId": "831"
+  },
+  {
+    "cityName": "韩城",
+    "providerCityId": "832"
+  },
+  {
+    "cityName": "沛县",
+    "providerCityId": "833"
+  },
+  {
+    "cityName": "邹城",
+    "providerCityId": "834"
+  },
+  {
+    "cityName": "郸城",
+    "providerCityId": "835"
+  },
+  {
+    "cityName": "大荔",
+    "providerCityId": "836"
+  },
+  {
+    "cityName": "蒲城",
+    "providerCityId": "837"
+  },
+  {
+    "cityName": "孟津",
+    "providerCityId": "838"
+  },
+  {
+    "cityName": "鹿邑",
+    "providerCityId": "839"
+  },
+  {
+    "cityName": "沈丘",
+    "providerCityId": "840"
+  },
+  {
+    "cityName": "赵县",
+    "providerCityId": "841"
+  },
+  {
+    "cityName": "盘州市",
+    "providerCityId": "842"
+  },
+  {
+    "cityName": "盱眙",
+    "providerCityId": "843"
+  },
+  {
+    "cityName": "安溪",
+    "providerCityId": "844"
+  },
+  {
+    "cityName": "三门",
+    "providerCityId": "845"
+  },
+  {
+    "cityName": "牟平",
+    "providerCityId": "846"
+  },
+  {
+    "cityName": "平江",
+    "providerCityId": "847"
+  },
+  {
+    "cityName": "眉县",
+    "providerCityId": "848"
+  },
+  {
+    "cityName": "濮阳县",
+    "providerCityId": "849"
+  },
+  {
+    "cityName": "乌拉特前旗",
+    "providerCityId": "850"
+  },
+  {
+    "cityName": "横店",
+    "providerCityId": "851"
+  },
+  {
+    "cityName": "博兴",
+    "providerCityId": "852"
+  },
+  {
+    "cityName": "徐闻",
+    "providerCityId": "853"
+  },
+  {
+    "cityName": "高阳",
+    "providerCityId": "854"
+  },
+  {
+    "cityName": "华亭市",
+    "providerCityId": "856"
+  },
+  {
+    "cityName": "夏邑",
+    "providerCityId": "857"
+  },
+  {
+    "cityName": "柘城",
+    "providerCityId": "858"
+  },
+  {
+    "cityName": "虞城",
+    "providerCityId": "859"
+  },
+  {
+    "cityName": "民权",
+    "providerCityId": "860"
+  },
+  {
+    "cityName": "扶风",
+    "providerCityId": "861"
+  },
+  {
+    "cityName": "丰县",
+    "providerCityId": "862"
+  },
+  {
+    "cityName": "浚县",
+    "providerCityId": "863"
+  },
+  {
+    "cityName": "淇县",
+    "providerCityId": "864"
+  },
+  {
+    "cityName": "全椒",
+    "providerCityId": "865"
+  },
+  {
+    "cityName": "高陵",
+    "providerCityId": "866"
+  },
+  {
+    "cityName": "洪洞",
+    "providerCityId": "867"
+  },
+  {
+    "cityName": "柳河",
+    "providerCityId": "868"
+  },
+  {
+    "cityName": "抚松",
+    "providerCityId": "869"
+  },
+  {
+    "cityName": "西乡",
+    "providerCityId": "870"
+  },
+  {
+    "cityName": "江津",
+    "providerCityId": "871"
+  },
+  {
+    "cityName": "渑池",
+    "providerCityId": "872"
+  },
+  {
+    "cityName": "安宁",
+    "providerCityId": "873"
+  },
+  {
+    "cityName": "达拉特旗",
+    "providerCityId": "874"
+  },
+  {
+    "cityName": "睢宁",
+    "providerCityId": "875"
+  },
+  {
+    "cityName": "玉山",
+    "providerCityId": "876"
+  },
+  {
+    "cityName": "茌平区",
+    "providerCityId": "877"
+  },
+  {
+    "cityName": "阳谷",
+    "providerCityId": "878"
+  },
+  {
+    "cityName": "土默特右旗",
+    "providerCityId": "879"
+  },
+  {
+    "cityName": "垦利",
+    "providerCityId": "880"
+  },
+  {
+    "cityName": "河口",
+    "providerCityId": "881"
+  },
+  {
+    "cityName": "巨野",
+    "providerCityId": "882"
+  },
+  {
+    "cityName": "曹县",
+    "providerCityId": "883"
+  },
+  {
+    "cityName": "郓城",
+    "providerCityId": "884"
+  },
+  {
+    "cityName": "西平",
+    "providerCityId": "885"
+  },
+  {
+    "cityName": "上蔡",
+    "providerCityId": "886"
+  },
+  {
+    "cityName": "泌阳",
+    "providerCityId": "887"
+  },
+  {
+    "cityName": "富顺",
+    "providerCityId": "888"
+  },
+  {
+    "cityName": "临猗",
+    "providerCityId": "889"
+  },
+  {
+    "cityName": "准格尔旗",
+    "providerCityId": "891"
+  },
+  {
+    "cityName": "新乐",
+    "providerCityId": "892"
+  },
+  {
+    "cityName": "平山",
+    "providerCityId": "893"
+  },
+  {
+    "cityName": "辉南",
+    "providerCityId": "894"
+  },
+  {
+    "cityName": "遂昌",
+    "providerCityId": "895"
+  },
+  {
+    "cityName": "梁山",
+    "providerCityId": "896"
+  },
+  {
+    "cityName": "微山",
+    "providerCityId": "897"
+  },
+  {
+    "cityName": "汶上",
+    "providerCityId": "898"
+  },
+  {
+    "cityName": "嘉祥",
+    "providerCityId": "899"
+  },
+  {
+    "cityName": "金乡",
+    "providerCityId": "900"
+  },
+  {
+    "cityName": "伊金霍洛旗",
+    "providerCityId": "901"
+  },
+  {
+    "cityName": "利津",
+    "providerCityId": "902"
+  },
+  {
+    "cityName": "新昌",
+    "providerCityId": "903"
+  },
+  {
+    "cityName": "武城",
+    "providerCityId": "904"
+  },
+  {
+    "cityName": "临邑",
+    "providerCityId": "905"
+  },
+  {
+    "cityName": "绵竹",
+    "providerCityId": "906"
+  },
+  {
+    "cityName": "石岛",
+    "providerCityId": "907"
+  },
+  {
+    "cityName": "杨陵",
+    "providerCityId": "908"
+  },
+  {
+    "cityName": "城固",
+    "providerCityId": "909"
+  },
+  {
+    "cityName": "大竹",
+    "providerCityId": "910"
+  },
+  {
+    "cityName": "公安",
+    "providerCityId": "911"
+  },
+  {
+    "cityName": "龙泉",
+    "providerCityId": "912"
+  },
+  {
+    "cityName": "缙云",
+    "providerCityId": "913"
+  },
+  {
+    "cityName": "栖霞",
+    "providerCityId": "914"
+  },
+  {
+    "cityName": "彬州市",
+    "providerCityId": "915"
+  },
+  {
+    "cityName": "费县",
+    "providerCityId": "916"
+  },
+  {
+    "cityName": "任丘",
+    "providerCityId": "917"
+  },
+  {
+    "cityName": "京山市",
+    "providerCityId": "918"
+  },
+  {
+    "cityName": "陵川",
+    "providerCityId": "919"
+  },
+  {
+    "cityName": "薛城",
+    "providerCityId": "920"
+  },
+  {
+    "cityName": "佛冈",
+    "providerCityId": "921"
+  },
+  {
+    "cityName": "青田",
+    "providerCityId": "922"
+  },
+  {
+    "cityName": "平泉市",
+    "providerCityId": "923"
+  },
+  {
+    "cityName": "丰宁",
+    "providerCityId": "924"
+  },
+  {
+    "cityName": "宽城",
+    "providerCityId": "925"
+  },
+  {
+    "cityName": "围场",
+    "providerCityId": "926"
+  },
+  {
+    "cityName": "江油",
+    "providerCityId": "927"
+  },
+  {
+    "cityName": "洪湖",
+    "providerCityId": "928"
+  },
+  {
+    "cityName": "清河",
+    "providerCityId": "929"
+  },
+  {
+    "cityName": "隆尧",
+    "providerCityId": "930"
+  },
+  {
+    "cityName": "内丘",
+    "providerCityId": "931"
+  },
+  {
+    "cityName": "南宫",
+    "providerCityId": "932"
+  },
+  {
+    "cityName": "雷州",
+    "providerCityId": "934"
+  },
+  {
+    "cityName": "栾川",
+    "providerCityId": "935"
+  },
+  {
+    "cityName": "西华",
+    "providerCityId": "936"
+  },
+  {
+    "cityName": "扶沟",
+    "providerCityId": "937"
+  },
+  {
+    "cityName": "龙游",
+    "providerCityId": "938"
+  },
+  {
+    "cityName": "兰陵",
+    "providerCityId": "939"
+  },
+  {
+    "cityName": "沂水",
+    "providerCityId": "940"
+  },
+  {
+    "cityName": "莒南",
+    "providerCityId": "941"
+  },
+  {
+    "cityName": "郯城",
+    "providerCityId": "942"
+  },
+  {
+    "cityName": "沂南",
+    "providerCityId": "943"
+  },
+  {
+    "cityName": "蒙阴",
+    "providerCityId": "944"
+  },
+  {
+    "cityName": "大洼",
+    "providerCityId": "945"
+  },
+  {
+    "cityName": "璧山",
+    "providerCityId": "946"
+  },
+  {
+    "cityName": "铜梁",
+    "providerCityId": "947"
+  },
+  {
+    "cityName": "江都",
+    "providerCityId": "948"
+  },
+  {
+    "cityName": "浠水",
+    "providerCityId": "949"
+  },
+  {
+    "cityName": "平邑",
+    "providerCityId": "950"
+  },
+  {
+    "cityName": "临沭",
+    "providerCityId": "951"
+  },
+  {
+    "cityName": "博山",
+    "providerCityId": "952"
+  },
+  {
+    "cityName": "什邡",
+    "providerCityId": "953"
+  },
+  {
+    "cityName": "长汀",
+    "providerCityId": "954"
+  },
+  {
+    "cityName": "上杭",
+    "providerCityId": "955"
+  },
+  {
+    "cityName": "金湖",
+    "providerCityId": "956"
+  },
+  {
+    "cityName": "香河",
+    "providerCityId": "957"
+  },
+  {
+    "cityName": "于都",
+    "providerCityId": "958"
+  },
+  {
+    "cityName": "信丰",
+    "providerCityId": "959"
+  },
+  {
+    "cityName": "平舆",
+    "providerCityId": "960"
+  },
+  {
+    "cityName": "新蔡",
+    "providerCityId": "961"
+  },
+  {
+    "cityName": "同安",
+    "providerCityId": "962"
+  },
+  {
+    "cityName": "集美",
+    "providerCityId": "963"
+  },
+  {
+    "cityName": "海沧",
+    "providerCityId": "964"
+  },
+  {
+    "cityName": "嵩县",
+    "providerCityId": "965"
+  },
+  {
+    "cityName": "汝阳",
+    "providerCityId": "966"
+  },
+  {
+    "cityName": "瓦房店",
+    "providerCityId": "967"
+  },
+  {
+    "cityName": "潮安",
+    "providerCityId": "970"
+  },
+  {
+    "cityName": "大邑",
+    "providerCityId": "971"
+  },
+  {
+    "cityName": "平阳",
+    "providerCityId": "972"
+  },
+  {
+    "cityName": "武义",
+    "providerCityId": "973"
+  },
+  {
+    "cityName": "砀山",
+    "providerCityId": "974"
+  },
+  {
+    "cityName": "霍邱",
+    "providerCityId": "975"
+  },
+  {
+    "cityName": "涟水",
+    "providerCityId": "976"
+  },
+  {
+    "cityName": "珲春",
+    "providerCityId": "977"
+  },
+  {
+    "cityName": "敦化",
+    "providerCityId": "978"
+  },
+  {
+    "cityName": "内黄",
+    "providerCityId": "979"
+  },
+  {
+    "cityName": "凤台",
+    "providerCityId": "980"
+  },
+  {
+    "cityName": "长寿",
+    "providerCityId": "981"
+  },
+  {
+    "cityName": "舒城",
+    "providerCityId": "982"
+  },
+  {
+    "cityName": "周至",
+    "providerCityId": "985"
+  },
+  {
+    "cityName": "平遥",
+    "providerCityId": "987"
+  },
+  {
+    "cityName": "如东",
+    "providerCityId": "988"
+  },
+  {
+    "cityName": "恩平",
+    "providerCityId": "989"
+  },
+  {
+    "cityName": "开化",
+    "providerCityId": "990"
+  },
+  {
+    "cityName": "平果市",
+    "providerCityId": "991"
+  },
+  {
+    "cityName": "射洪市",
+    "providerCityId": "992"
+  },
+  {
+    "cityName": "常山",
+    "providerCityId": "993"
+  },
+  {
+    "cityName": "宾阳",
+    "providerCityId": "994"
+  },
+  {
+    "cityName": "武鸣",
+    "providerCityId": "995"
+  },
+  {
+    "cityName": "溆浦",
+    "providerCityId": "996"
+  },
+  {
+    "cityName": "芷江",
+    "providerCityId": "997"
+  },
+  {
+    "cityName": "庆云",
+    "providerCityId": "998"
+  },
+  {
+    "cityName": "东光",
+    "providerCityId": "999"
+  },
+  {
+    "cityName": "金沙",
+    "providerCityId": "1001"
+  },
+  {
+    "cityName": "开阳",
+    "providerCityId": "1002"
+  },
+  {
+    "cityName": "泾县",
+    "providerCityId": "1003"
+  },
+  {
+    "cityName": "潜山市",
+    "providerCityId": "1004"
+  },
+  {
+    "cityName": "怀宁",
+    "providerCityId": "1005"
+  },
+  {
+    "cityName": "威宁",
+    "providerCityId": "1006"
+  },
+  {
+    "cityName": "织金",
+    "providerCityId": "1007"
+  },
+  {
+    "cityName": "安化",
+    "providerCityId": "1008"
+  },
+  {
+    "cityName": "桃源",
+    "providerCityId": "1009"
+  },
+  {
+    "cityName": "澧县",
+    "providerCityId": "1010"
+  },
+  {
+    "cityName": "辽中",
+    "providerCityId": "1011"
+  },
+  {
+    "cityName": "任泽区",
+    "providerCityId": "1012"
+  },
+  {
+    "cityName": "南和区",
+    "providerCityId": "1013"
+  },
+  {
+    "cityName": "舞阳",
+    "providerCityId": "1014"
+  },
+  {
+    "cityName": "商河",
+    "providerCityId": "1015"
+  },
+  {
+    "cityName": "泗水",
+    "providerCityId": "1017"
+  },
+  {
+    "cityName": "赤水",
+    "providerCityId": "1018"
+  },
+  {
+    "cityName": "无极",
+    "providerCityId": "1019"
+  },
+  {
+    "cityName": "青县",
+    "providerCityId": "1020"
+  },
+  {
+    "cityName": "淅川",
+    "providerCityId": "1021"
+  },
+  {
+    "cityName": "社旗",
+    "providerCityId": "1022"
+  },
+  {
+    "cityName": "万荣",
+    "providerCityId": "1023"
+  },
+  {
+    "cityName": "泗县",
+    "providerCityId": "1024"
+  },
+  {
+    "cityName": "万载",
+    "providerCityId": "1025"
+  },
+  {
+    "cityName": "新干",
+    "providerCityId": "1026"
+  },
+  {
+    "cityName": "宜丰",
+    "providerCityId": "1027"
+  },
+  {
+    "cityName": "吉安县",
+    "providerCityId": "1028"
+  },
+  {
+    "cityName": "吉水县",
+    "providerCityId": "1029"
+  },
+  {
+    "cityName": "泰和县",
+    "providerCityId": "1030"
+  },
+  {
+    "cityName": "奉新",
+    "providerCityId": "1031"
+  },
+  {
+    "cityName": "江川县",
+    "providerCityId": "1032"
+  },
+  {
+    "cityName": "兴国县",
+    "providerCityId": "1033"
+  },
+  {
+    "cityName": "罗平县",
+    "providerCityId": "1034"
+  },
+  {
+    "cityName": "道县",
+    "providerCityId": "1035"
+  },
+  {
+    "cityName": "新田",
+    "providerCityId": "1036"
+  },
+  {
+    "cityName": "涟源市",
+    "providerCityId": "1037"
+  },
+  {
+    "cityName": "江华瑶族自治县",
+    "providerCityId": "1038"
+  },
+  {
+    "cityName": "深州市",
+    "providerCityId": "1039"
+  },
+  {
+    "cityName": "庐江县",
+    "providerCityId": "1040"
+  },
+  {
+    "cityName": "铜鼓",
+    "providerCityId": "1041"
+  },
+  {
+    "cityName": "怀远县",
+    "providerCityId": "1042"
+  },
+  {
+    "cityName": "营山县",
+    "providerCityId": "1043"
+  },
+  {
+    "cityName": "田东县",
+    "providerCityId": "1044"
+  },
+  {
+    "cityName": "上林县",
+    "providerCityId": "1045"
+  },
+  {
+    "cityName": "威县",
+    "providerCityId": "1046"
+  },
+  {
+    "cityName": "永安",
+    "providerCityId": "1047"
+  },
+  {
+    "cityName": "漳平",
+    "providerCityId": "1048"
+  },
+  {
+    "cityName": "武平县",
+    "providerCityId": "1049"
+  },
+  {
+    "cityName": "寻乌县",
+    "providerCityId": "1050"
+  },
+  {
+    "cityName": "祥云县",
+    "providerCityId": "1051"
+  },
+  {
+    "cityName": "方城",
+    "providerCityId": "1052"
+  },
+  {
+    "cityName": "南部县",
+    "providerCityId": "1053"
+  },
+  {
+    "cityName": "太康县",
+    "providerCityId": "1054"
+  },
+  {
+    "cityName": "商水县",
+    "providerCityId": "1055"
+  },
+  {
+    "cityName": "临颍",
+    "providerCityId": "1056"
+  },
+  {
+    "cityName": "襄城县",
+    "providerCityId": "1057"
+  },
+  {
+    "cityName": "鄢陵",
+    "providerCityId": "1058"
+  },
+  {
+    "cityName": "晋宁区",
+    "providerCityId": "1059"
+  },
+  {
+    "cityName": "蓝山",
+    "providerCityId": "1060"
+  },
+  {
+    "cityName": "江永",
+    "providerCityId": "1061"
+  },
+  {
+    "cityName": "双峰",
+    "providerCityId": "1062"
+  },
+  {
+    "cityName": "新宁",
+    "providerCityId": "1063"
+  },
+  {
+    "cityName": "隆回",
+    "providerCityId": "1064"
+  },
+  {
+    "cityName": "会泽县",
+    "providerCityId": "1065"
+  },
+  {
+    "cityName": "富源县",
+    "providerCityId": "1066"
+  },
+  {
+    "cityName": "遂川",
+    "providerCityId": "1067"
+  },
+  {
+    "cityName": "安福",
+    "providerCityId": "1068"
+  },
+  {
+    "cityName": "永丰",
+    "providerCityId": "1069"
+  },
+  {
+    "cityName": "分宜",
+    "providerCityId": "1070"
+  },
+  {
+    "cityName": "上栗",
+    "providerCityId": "1071"
+  },
+  {
+    "cityName": "永新",
+    "providerCityId": "1072"
+  },
+  {
+    "cityName": "芦溪",
+    "providerCityId": "1073"
+  },
+  {
+    "cityName": "泊头市",
+    "providerCityId": "1074"
+  },
+  {
+    "cityName": "南皮县",
+    "providerCityId": "1075"
+  },
+  {
+    "cityName": "大安市",
+    "providerCityId": "1076"
+  },
+  {
+    "cityName": "莎车县",
+    "providerCityId": "1077"
+  },
+  {
+    "cityName": "慈利",
+    "providerCityId": "1078"
+  },
+  {
+    "cityName": "卢氏县",
+    "providerCityId": "1079"
+  },
+  {
+    "cityName": "河间市",
+    "providerCityId": "1080"
+  },
+  {
+    "cityName": "肃宁县",
+    "providerCityId": "1081"
+  },
+  {
+    "cityName": "献县",
+    "providerCityId": "1082"
+  },
+  {
+    "cityName": "隆化县",
+    "providerCityId": "1083"
+  },
+  {
+    "cityName": "扶绥县",
+    "providerCityId": "1084"
+  },
+  {
+    "cityName": "建水县",
+    "providerCityId": "1085"
+  },
+  {
+    "cityName": "合浦县",
+    "providerCityId": "1086"
+  },
+  {
+    "cityName": "洛宁",
+    "providerCityId": "1087"
+  },
+  {
+    "cityName": "衡阳县",
+    "providerCityId": "1088"
+  },
+  {
+    "cityName": "祁东县",
+    "providerCityId": "1089"
+  },
+  {
+    "cityName": "衡山县",
+    "providerCityId": "1090"
+  },
+  {
+    "cityName": "衡东县",
+    "providerCityId": "1091"
+  },
+  {
+    "cityName": "常宁市",
+    "providerCityId": "1092"
+  },
+  {
+    "cityName": "资兴市",
+    "providerCityId": "1093"
+  },
+  {
+    "cityName": "永兴县",
+    "providerCityId": "1094"
+  },
+  {
+    "cityName": "汝城县",
+    "providerCityId": "1095"
+  },
+  {
+    "cityName": "攸县",
+    "providerCityId": "1096"
+  },
+  {
+    "cityName": "茶陵",
+    "providerCityId": "1097"
+  },
+  {
+    "cityName": "博罗县",
+    "providerCityId": "1098"
+  },
+  {
+    "cityName": "永顺县",
+    "providerCityId": "1099"
+  },
+  {
+    "cityName": "长丰县",
+    "providerCityId": "1100"
+  },
+  {
+    "cityName": "容县",
+    "providerCityId": "1101"
+  },
+  {
+    "cityName": "博白县",
+    "providerCityId": "1102"
+  },
+  {
+    "cityName": "潢川县",
+    "providerCityId": "1103"
+  },
+  {
+    "cityName": "固始县",
+    "providerCityId": "1104"
+  },
+  {
+    "cityName": "贺兰县",
+    "providerCityId": "1105"
+  },
+  {
+    "cityName": "平罗县",
+    "providerCityId": "1106"
+  },
+  {
+    "cityName": "庆安县",
+    "providerCityId": "1107"
+  },
+  {
+    "cityName": "商城县",
+    "providerCityId": "1108"
+  },
+  {
+    "cityName": "尉氏县",
+    "providerCityId": "1109"
+  },
+  {
+    "cityName": "兰考县",
+    "providerCityId": "1110"
+  },
+  {
+    "cityName": "通许县",
+    "providerCityId": "1111"
+  },
+  {
+    "cityName": "宁陵",
+    "providerCityId": "1112"
+  },
+  {
+    "cityName": "桑植",
+    "providerCityId": "1113"
+  },
+  {
+    "cityName": "荣昌区",
+    "providerCityId": "1114"
+  },
+  {
+    "cityName": "杞县",
+    "providerCityId": "1115"
+  },
+  {
+    "cityName": "蒙自市",
+    "providerCityId": "1116"
+  },
+  {
+    "cityName": "石门",
+    "providerCityId": "1118"
+  },
+  {
+    "cityName": "临澧",
+    "providerCityId": "1119"
+  },
+  {
+    "cityName": "鄯善县",
+    "providerCityId": "1120"
+  },
+  {
+    "cityName": "利辛",
+    "providerCityId": "1121"
+  },
+  {
+    "cityName": "蒙城",
+    "providerCityId": "1122"
+  },
+  {
+    "cityName": "新洲区",
+    "providerCityId": "1123"
+  },
+  {
+    "cityName": "汉南区",
+    "providerCityId": "1124"
+  },
+  {
+    "cityName": "南郑区",
+    "providerCityId": "1125"
+  },
+  {
+    "cityName": "阿勒泰市",
+    "providerCityId": "1126"
+  },
+  {
+    "cityName": "酉阳土家族苗族自治县",
+    "providerCityId": "1127"
+  },
+  {
+    "cityName": "武隆县",
+    "providerCityId": "1128"
+  },
+  {
+    "cityName": "秀山土家族苗族自治县",
+    "providerCityId": "1129"
+  },
+  {
+    "cityName": "海伦市",
+    "providerCityId": "1130"
+  },
+  {
+    "cityName": "青冈县",
+    "providerCityId": "1131"
+  },
+  {
+    "cityName": "通海县",
+    "providerCityId": "1132"
+  },
+  {
+    "cityName": "灵丘县",
+    "providerCityId": "1133"
+  },
+  {
+    "cityName": "鄄城县",
+    "providerCityId": "1134"
+  },
+  {
+    "cityName": "通榆县",
+    "providerCityId": "1135"
+  },
+  {
+    "cityName": "唐河",
+    "providerCityId": "1136"
+  },
+  {
+    "cityName": "新野",
+    "providerCityId": "1137"
+  },
+  {
+    "cityName": "禄丰县",
+    "providerCityId": "1138"
+  },
+  {
+    "cityName": "岐山县",
+    "providerCityId": "1139"
+  },
+  {
+    "cityName": "扎兰屯市",
+    "providerCityId": "1140"
+  },
+  {
+    "cityName": "北镇市",
+    "providerCityId": "1141"
+  },
+  {
+    "cityName": "肥西县",
+    "providerCityId": "1142"
+  },
+  {
+    "cityName": "溧水区",
+    "providerCityId": "1143"
+  },
+  {
+    "cityName": "泸县",
+    "providerCityId": "1144"
+  },
+  {
+    "cityName": "合江县",
+    "providerCityId": "1145"
+  },
+  {
+    "cityName": "靖边",
+    "providerCityId": "1146"
+  },
+  {
+    "cityName": "洛川县",
+    "providerCityId": "1147"
+  },
+  {
+    "cityName": "繁峙县",
+    "providerCityId": "1148"
+  },
+  {
+    "cityName": "仙游县",
+    "providerCityId": "1149"
+  },
+  {
+    "cityName": "苍溪县",
+    "providerCityId": "1150"
+  },
+  {
+    "cityName": "应县",
+    "providerCityId": "1151"
+  },
+  {
+    "cityName": "凤翔县",
+    "providerCityId": "1152"
+  },
+  {
+    "cityName": "嘉鱼县",
+    "providerCityId": "1153"
+  },
+  {
+    "cityName": "绥德县",
+    "providerCityId": "1155"
+  },
+  {
+    "cityName": "平阴县",
+    "providerCityId": "1156"
+  },
+  {
+    "cityName": "长清区",
+    "providerCityId": "1157"
+  },
+  {
+    "cityName": "沙县",
+    "providerCityId": "1158"
+  },
+  {
+    "cityName": "阳山县",
+    "providerCityId": "1159"
+  },
+  {
+    "cityName": "榆树市",
+    "providerCityId": "1160"
+  },
+  {
+    "cityName": "沅陵县",
+    "providerCityId": "1162"
+  },
+  {
+    "cityName": "罗定市",
+    "providerCityId": "1163"
+  },
+  {
+    "cityName": "崇明区",
+    "providerCityId": "1164"
+  },
+  {
+    "cityName": "北安市",
+    "providerCityId": "1165"
+  },
+  {
+    "cityName": "嫩江市",
+    "providerCityId": "1166"
+  },
+  {
+    "cityName": "新津区",
+    "providerCityId": "1167"
+  },
+  {
+    "cityName": "定安县",
+    "providerCityId": "1168"
+  },
+  {
+    "cityName": "永登县",
+    "providerCityId": "1169"
+  },
+  {
+    "cityName": "琼中",
+    "providerCityId": "1170"
+  },
+  {
+    "cityName": "乐东",
+    "providerCityId": "1171"
+  },
+  {
+    "cityName": "额敏县",
+    "providerCityId": "1172"
+  },
+  {
+    "cityName": "光泽",
+    "providerCityId": "1174"
+  },
+  {
+    "cityName": "平陆县",
+    "providerCityId": "1175"
+  },
+  {
+    "cityName": "深泽县",
+    "providerCityId": "1176"
+  },
+  {
+    "cityName": "垫江",
+    "providerCityId": "1177"
+  },
+  {
+    "cityName": "梁平",
+    "providerCityId": "1178"
+  },
+  {
+    "cityName": "忠县",
+    "providerCityId": "1179"
+  },
+  {
+    "cityName": "石柱",
+    "providerCityId": "1180"
+  },
+  {
+    "cityName": "鱼台县",
+    "providerCityId": "1181"
+  },
+  {
+    "cityName": "宜州区",
+    "providerCityId": "1182"
+  },
+  {
+    "cityName": "临高县",
+    "providerCityId": "1183"
+  },
+  {
+    "cityName": "罗源县",
+    "providerCityId": "1184"
+  },
+  {
+    "cityName": "环县",
+    "providerCityId": "1185"
+  },
+  {
+    "cityName": "义马市",
+    "providerCityId": "1186"
+  },
+  {
+    "cityName": "五常市",
+    "providerCityId": "1187"
+  },
+  {
+    "cityName": "祁县",
+    "providerCityId": "1188"
+  },
+  {
+    "cityName": "邵武",
+    "providerCityId": "1189"
+  },
+  {
+    "cityName": "寿县",
+    "providerCityId": "1192"
+  },
+  {
+    "cityName": "巴彦县",
+    "providerCityId": "1193"
+  },
+  {
+    "cityName": "精河县",
+    "providerCityId": "1194"
+  },
+  {
+    "cityName": "福安",
+    "providerCityId": "1195"
+  },
+  {
+    "cityName": "柘荣",
+    "providerCityId": "1196"
+  },
+  {
+    "cityName": "靖西市",
+    "providerCityId": "1197"
+  },
+  {
+    "cityName": "永嘉县",
+    "providerCityId": "1198"
+  },
+  {
+    "cityName": "盂县",
+    "providerCityId": "1199"
+  },
+  {
+    "cityName": "中江县",
+    "providerCityId": "1200"
+  },
+  {
+    "cityName": "成武县",
+    "providerCityId": "1201"
+  },
+  {
+    "cityName": "福鼎市",
+    "providerCityId": "1202"
+  },
+  {
+    "cityName": "东明县",
+    "providerCityId": "1203"
+  },
+  {
+    "cityName": "定陶区",
+    "providerCityId": "1204"
+  },
+  {
+    "cityName": "澄江市",
+    "providerCityId": "1205"
+  },
+  {
+    "cityName": "旺苍县",
+    "providerCityId": "1207"
+  },
+  {
+    "cityName": "定边县",
+    "providerCityId": "1208"
+  },
+  {
+    "cityName": "府谷县",
+    "providerCityId": "1209"
+  },
+  {
+    "cityName": "勐腊县",
+    "providerCityId": "1210"
+  },
+  {
+    "cityName": "三台县",
+    "providerCityId": "1211"
+  },
+  {
+    "cityName": "安州区",
+    "providerCityId": "1212"
+  },
+  {
+    "cityName": "旬阳县",
+    "providerCityId": "1213"
+  },
+  {
+    "cityName": "平昌县",
+    "providerCityId": "1214"
+  },
+  {
+    "cityName": "通江县",
+    "providerCityId": "1215"
+  },
+  {
+    "cityName": "米易县",
+    "providerCityId": "1216"
+  },
+  {
+    "cityName": "望奎县",
+    "providerCityId": "1217"
+  },
+  {
+    "cityName": "宜良县",
+    "providerCityId": "1218"
+  },
+  {
+    "cityName": "闽侯县",
+    "providerCityId": "1219"
+  },
+  {
+    "cityName": "青阳县",
+    "providerCityId": "1220"
+  },
+  {
+    "cityName": "明水县",
+    "providerCityId": "1222"
+  },
+  {
+    "cityName": "武冈市",
+    "providerCityId": "1223"
+  },
+  {
+    "cityName": "宁远县",
+    "providerCityId": "1224"
+  },
+  {
+    "cityName": "陆川县",
+    "providerCityId": "1225"
+  },
+  {
+    "cityName": "平南县",
+    "providerCityId": "1226"
+  },
+  {
+    "cityName": "康县",
+    "providerCityId": "1227"
+  },
+  {
+    "cityName": "山丹县",
+    "providerCityId": "1228"
+  },
+  {
+    "cityName": "阿荣旗",
+    "providerCityId": "1229"
+  },
+  {
+    "cityName": "奉节",
+    "providerCityId": "1230"
+  },
+  {
+    "cityName": "丰都",
+    "providerCityId": "1231"
+  },
+  {
+    "cityName": "彭水苗族土家族自治县",
+    "providerCityId": "1232"
+  },
+  {
+    "cityName": "大厂回族自治县",
+    "providerCityId": "1233"
+  },
+  {
+    "cityName": "横山区",
+    "providerCityId": "1234"
+  },
+  {
+    "cityName": "光山县",
+    "providerCityId": "1239"
+  },
+  {
+    "cityName": "绥宁县",
+    "providerCityId": "1240"
+  },
+  {
+    "cityName": "肥东县",
+    "providerCityId": "1241"
+  },
+  {
+    "cityName": "定远县",
+    "providerCityId": "1242"
+  },
+  {
+    "cityName": "大悟县",
+    "providerCityId": "1243"
+  },
+  {
+    "cityName": "孝昌县",
+    "providerCityId": "1244"
+  },
+  {
+    "cityName": "安陆市",
+    "providerCityId": "1245"
+  },
+  {
+    "cityName": "镇雄县",
+    "providerCityId": "1246"
+  },
+  {
+    "cityName": "临泉县",
+    "providerCityId": "1247"
+  },
+  {
+    "cityName": "息县",
+    "providerCityId": "1248"
+  },
+  {
+    "cityName": "双城",
+    "providerCityId": "1249"
+  },
+  {
+    "cityName": "遂平",
+    "providerCityId": "1250"
+  },
+  {
+    "cityName": "禄劝彝族苗族自治县",
+    "providerCityId": "1254"
+  },
+  {
+    "cityName": "武定",
+    "providerCityId": "1255"
+  },
+  {
+    "cityName": "屯昌县",
+    "providerCityId": "1256"
+  },
+  {
+    "cityName": "普兰店",
+    "providerCityId": "1258"
+  },
+  {
+    "cityName": "中宁县",
+    "providerCityId": "1259"
+  },
+  {
+    "cityName": "清镇",
+    "providerCityId": "1260"
+  },
+  {
+    "cityName": "萧县",
+    "providerCityId": "1261"
+  },
+  {
+    "cityName": "瑞丽",
+    "providerCityId": "1262"
+  },
+  {
+    "cityName": "九台",
+    "providerCityId": "1263"
+  },
+  {
+    "cityName": "南川",
+    "providerCityId": "1264"
+  },
+  {
+    "cityName": "綦江",
+    "providerCityId": "1265"
+  },
+  {
+    "cityName": "清徐",
+    "providerCityId": "1266"
+  },
+  {
+    "cityName": "迁西县",
+    "providerCityId": "1267"
+  },
+  {
+    "cityName": "大足区",
+    "providerCityId": "1268"
+  },
+  {
+    "cityName": "澄迈县",
+    "providerCityId": "1269"
+  },
+  {
+    "cityName": "嵩明县",
+    "providerCityId": "1270"
+  },
+  {
+    "cityName": "德惠市",
+    "providerCityId": "1271"
+  },
+  {
+    "cityName": "石林彝族自治县",
+    "providerCityId": "1272"
+  },
+  {
+    "cityName": "玉田县",
+    "providerCityId": "1273"
+  },
+  {
+    "cityName": "固安县",
+    "providerCityId": "1274"
+  },
+  {
+    "cityName": "东坑镇",
+    "providerCityId": "1275"
+  },
+  {
+    "cityName": "企石镇",
+    "providerCityId": "1276"
+  },
+  {
+    "cityName": "谢岗镇",
+    "providerCityId": "1277"
+  },
+  {
+    "cityName": "阿城区",
+    "providerCityId": "1280"
+  },
+  {
+    "cityName": "灵武市",
+    "providerCityId": "1281"
+  },
+  {
+    "cityName": "门头沟区",
+    "providerCityId": "1283"
+  },
+  {
+    "cityName": "青铜峡市",
+    "providerCityId": "1284"
+  },
+  {
+    "cityName": "东阿县",
+    "providerCityId": "1285"
+  },
+  {
+    "cityName": "莘县",
+    "providerCityId": "1286"
+  },
+  {
+    "cityName": "黔江区",
+    "providerCityId": "1287"
+  },
+  {
+    "cityName": "泾阳县",
+    "providerCityId": "1288"
+  },
+  {
+    "cityName": "三原县",
+    "providerCityId": "1289"
+  },
+  {
+    "cityName": "高淳区",
+    "providerCityId": "1290"
+  },
+  {
+    "cityName": "昌江黎族自治县",
+    "providerCityId": "1291"
+  },
+  {
+    "cityName": "开远市",
+    "providerCityId": "1293"
+  },
+  {
+    "cityName": "兴义市",
+    "providerCityId": "1294"
+  },
+  {
+    "cityName": "昆玉市",
+    "providerCityId": "1298"
+  },
+  {
+    "cityName": "乌兰浩特市",
+    "providerCityId": "1299"
+  },
+  {
+    "cityName": "农安县",
+    "providerCityId": "1300"
+  },
+  {
+    "cityName": "平定县",
+    "providerCityId": "1301"
+  },
+  {
+    "cityName": "华容",
+    "providerCityId": "8001"
+  }
+  ]
+}

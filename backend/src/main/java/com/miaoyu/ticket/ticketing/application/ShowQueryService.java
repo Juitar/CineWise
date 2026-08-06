@@ -8,7 +8,6 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -59,7 +58,7 @@ public class ShowQueryService {
         Set<Long> cinemaIds = snapshots.stream()
                 .map(ShowQueryRepository.ShowSnapshot::cinemaId)
                 .collect(Collectors.toUnmodifiableSet());
-        Map<Long, ContentSummaryQueryPort.CinemaSummary> cinemaSummaries =
+        ContentSummaryQueryPort.CinemaSummaryBatch cinemaSummaries =
                 contentSummaryQueryPort.findCinemaSummaries(cinemaIds);
         return snapshots.stream()
                 .map(snapshot -> toView(snapshot, cinemaSummaries))
@@ -77,8 +76,8 @@ public class ShowQueryService {
 
     private ShowSummaryView toView(
             ShowQueryRepository.ShowSnapshot snapshot,
-            Map<Long, ContentSummaryQueryPort.CinemaSummary> cinemaSummaries) {
-        ContentSummaryQueryPort.CinemaSummary cinema = cinemaSummaries.get(snapshot.cinemaId());
+            ContentSummaryQueryPort.CinemaSummaryBatch cinemaSummaries) {
+        ContentSummaryQueryPort.CinemaSummary cinema = cinemaSummaries.findByCinemaId(snapshot.cinemaId()).orElse(null);
         if (cinema == null) {
             throw new BusinessException(TicketingErrorCode.QUERY_UNAVAILABLE);
         }
