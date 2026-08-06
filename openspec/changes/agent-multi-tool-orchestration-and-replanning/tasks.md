@@ -22,6 +22,6 @@
 ## 4. 集成与验证（B / C）
 
 - [x] 4.1 使用确定性 `ModelGateway` 测试替身完成多工具和重规划验证；验证：`MultiToolSupervisorTest` 与状态机测试通过。
-- [ ] 4.2 运行 GitHub Actions `Backend MySQL Integration` 的 `mysql-integration`，记录运行编号、空库/重复初始化、CAS、重规划版本、事件顺序和结果未知恢复结果；验证：CI job 通过。（B；无法读取/触发时保留未勾选）
-- [ ] 4.3 完成 C 卡片 payload 合入后的安全字段接入；验证：由 C 的 payload change 合入后联调。 （C；当前不做）
+- [x] 4.2 运行 GitHub Actions `Backend MySQL Integration` 的 `mysql-integration`，记录运行编号、空库/重复初始化、CAS、重规划版本、事件顺序和结果未知恢复结果；验证：GitHub Actions #162 通过。（B）
+- [x] 4.3 完成 C 卡片 payload 合入后的安全字段接入；验证：`AgentPersistenceJsonFactoryTest` 与事件相关测试通过。 （B / C）
 - [x] 4.4 运行 `backend/mvnw.cmd verify`、严格 OpenSpec 校验、`git diff --check` 和变更文件核对；验证：502 项测试通过、27 项按环境跳过，Checkstyle 与 SpotBugs 通过。

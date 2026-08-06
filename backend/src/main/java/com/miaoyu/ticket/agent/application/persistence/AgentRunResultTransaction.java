@@ -149,11 +149,15 @@ public class AgentRunResultTransaction {
             recordToolEvents(session, run, result, List.of(), null);
         }
         AgentReplyMessageType replyType = result.reply().messageType();
-        runtimeEventService.append(session, run,
-                replyType == AgentReplyMessageType.MOVIE_CARD || replyType == AgentReplyMessageType.PLAN_CARD
-                        ? AgentEventType.CARD : replyType == AgentReplyMessageType.ERROR
-                                ? AgentEventType.MESSAGE_ERROR : AgentEventType.MESSAGE_COMPLETE,
-                jsonFactory.eventPayload(Map.of("messageType", replyType.name())));
+        boolean isCardReply = replyType == AgentReplyMessageType.MOVIE_CARD
+                || replyType == AgentReplyMessageType.PLAN_CARD;
+        AgentEventType replyEvent = isCardReply
+                ? AgentEventType.CARD : replyType == AgentReplyMessageType.ERROR
+                        ? AgentEventType.MESSAGE_ERROR : AgentEventType.MESSAGE_COMPLETE;
+        AgentStoredJson replyEventPayload = replyEvent == AgentEventType.CARD
+                ? jsonFactory.cardPayload(result.reply())
+                : jsonFactory.eventPayload(Map.of("messageType", replyType.name()));
+        runtimeEventService.append(session, run, replyEvent, replyEventPayload);
         if (run.status().isTerminal()) {
             runtimeEventService.append(session, run, AgentEventType.RUN_COMPLETE,
                     jsonFactory.eventPayload(Map.of("status", run.status().name())));
