@@ -60,7 +60,7 @@ Redis 缓存键为 `profile:{userId}:v:{version}`，并设置有限 TTL。标签
 
 行为调用方必须提供已由自身权限和业务规则校验的事实，D 不查询 A/B/C 的 Entity、Mapper、Repository 或 Controller 来补齐数据。A 只能通过已提交的 `PaymentSucceededEvent` 写入 `PAID_ORDER`；B 只能通过 D 的 `ProfileBehaviorRecorder` 写入已确认方案的 `ACCEPT_PLAN/REJECT_PLAN`；C 的本人页面行为只能通过其已认证线程调用 D 的类型化 Application API，并由 D 从 `CurrentUserAccessor` 取得用户。`CLICK`、`FAVORITE`、`NOT_INTERESTED` 仅作用于 `MOVIE`，`ACCEPT_PLAN`、`REJECT_PLAN` 仅作用于 `PLAN`，`PAID_ORDER` 仅作用于 `SHOW`。其中 `PLAN` 的 `target_id` 必须是 B 提供的稳定 `planId`，不能是模型文本或临时槽位；B 未提供前不得写入这两类事件。
 
-`PAID_ORDER` 仅消费 A 已确认且已提交的 `PaymentSucceededEvent`，最小字段映射为 `event_id=eventId`、`user_id=userId`、`target_type=SHOW`、`target_id=showId`、`order_id=orderId`、`order_version=orderVersion`、`occurred_at=occurredAt`。D 以 `eventId` 去重并归一化写入行为事件，不持久化 `cinemaArea`、`startAt` 等出行字段，也不得仅凭 `showId` 推导影片类型、影院等标签。
+`PAID_ORDER` 仅消费 A 已确认且已提交的 `PaymentSucceededEvent`，最小字段映射为 `event_id=eventId`、`user_id=userId`、`target_type=SHOW`、`target_id=showId`、`order_id=orderId`、`order_version=orderVersion`、`occurred_at=occurredAt`。D 以 `eventId` 去重并归一化写入行为事件，不持久化 `cinemaId`、`cinemaArea`、`startAt` 等出行字段，也不得仅凭 `showId` 推导影片类型、影院等标签。事件的 `payload_json` 只保存 `{"changed":true|false}`，用于同一 `eventId` 重放原处理结果，不保存原始 payload。
 
 24 小时归一化由 D 的应用层短事务完成，不依赖无法表达滚动 24 小时窗口的数据库唯一键：先锁定当前用户的 `user_preference` 行，再按 `(user_id, event_type, target_type, target_id)` 查询近 24 小时事件；每个新的 `eventId` 都保存最小行为摘要，窗口内已有同类目标时不再累计权重或更新行为标签。同一 `eventId` 的唯一键冲突必须读取并返回原处理结果；事件摘要、行为标签更新和去重结果在同一事务内提交，失败时整体回滚，不留下半条记录。测试必须覆盖两个不同 `eventId` 并发提交同一归一化键时只累计一次、同一 `eventId` 重放返回原结果，以及事务失败后重试不留下事件或权重残留。
 

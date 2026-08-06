@@ -32,7 +32,8 @@ public interface ProfileBehaviorEventRepository {
       Long orderId,
       Long orderVersion,
       LocalDateTime occurredAt,
-      LocalDateTime createdAt) { }
+      LocalDateTime createdAt,
+      boolean changed) { }
 
   record Snapshot(
       String eventId,
@@ -40,5 +41,6 @@ public interface ProfileBehaviorEventRepository {
       ProfileBehaviorEventType eventType,
       ProfileBehaviorTargetType targetType,
       String targetId,
-      LocalDateTime occurredAt) { }
+      LocalDateTime occurredAt,
+      boolean changed) { }
 }

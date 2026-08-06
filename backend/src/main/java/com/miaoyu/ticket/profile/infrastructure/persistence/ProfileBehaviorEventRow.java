@@ -9,4 +9,5 @@ public record ProfileBehaviorEventRow(
     String eventType,
     String targetType,
     String targetId,
-    LocalDateTime occurredAt) { }
+    LocalDateTime occurredAt,
+    String payloadJson) { }
