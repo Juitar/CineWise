@@ -144,9 +144,9 @@ class DemoSeedInitializerTest {
     private void assertSeedCounts() {
         assertThat(count("movie")).isEqualTo(10);
         assertThat(count("cinema")).isEqualTo(4);
-        assertThat(count("auditorium")).isEqualTo(8);
-        assertThat(count("movie_show")).isEqualTo(168);
-        assertThat(count("show_seat")).isEqualTo(13_440);
+        assertThat(countFixedAuditoriums()).isEqualTo(8);
+        assertThat(countFixedShows()).isEqualTo(168);
+        assertThat(countFixedSeats()).isEqualTo(13_440);
     }
 
     private void assertContentSourceIdentity() {
@@ -161,18 +161,57 @@ class DemoSeedInitializerTest {
     }
 
     private void assertScheduleWindow() {
-        Timestamp firstShow = jdbcTemplate.queryForObject(
-                "SELECT MIN(start_time) FROM movie_show",
-                Timestamp.class);
-        Timestamp lastShow = jdbcTemplate.queryForObject(
-                "SELECT MAX(start_time) FROM movie_show",
-                Timestamp.class);
+        Timestamp firstShow = jdbcTemplate.queryForObject("""
+                SELECT MIN(ms.start_time)
+                  FROM movie_show ms
+                  JOIN cinema c ON c.id = ms.cinema_id
+                 WHERE c.source = 'demo-seed'
+                   AND ms.source = 'demo-seed'
+                """, Timestamp.class);
+        Timestamp lastShow = jdbcTemplate.queryForObject("""
+                SELECT MAX(ms.start_time)
+                  FROM movie_show ms
+                  JOIN cinema c ON c.id = ms.cinema_id
+                 WHERE c.source = 'demo-seed'
+                   AND ms.source = 'demo-seed'
+                """, Timestamp.class);
         assertThat(firstShow).isEqualTo(Timestamp.valueOf("2026-08-02 09:30:00"));
         assertThat(lastShow).isEqualTo(Timestamp.valueOf("2026-08-08 19:30:00"));
     }
 
     private long count(String tableName) {
         return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName, Long.class);
+    }
+
+    /** 固定种子与 LIVE 购票扩展共用票务表，测试只统计 DEMO_CONTENT 影院的票务数据。 */
+    private long countFixedAuditoriums() {
+        return jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM auditorium a
+                  JOIN cinema c ON c.id = a.cinema_id
+                 WHERE c.source = 'demo-seed'
+                """, Long.class);
+    }
+
+    private long countFixedShows() {
+        return jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM movie_show ms
+                  JOIN cinema c ON c.id = ms.cinema_id
+                 WHERE c.source = 'demo-seed'
+                   AND ms.source = 'demo-seed'
+                """, Long.class);
+    }
+
+    private long countFixedSeats() {
+        return jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM show_seat ss
+                  JOIN movie_show ms ON ms.id = ss.show_id
+                  JOIN cinema c ON c.id = ms.cinema_id
+                 WHERE c.source = 'demo-seed'
+                   AND ms.source = 'demo-seed'
+                """, Long.class);
     }
 
     @TestConfiguration(proxyBeanMethods = false)
