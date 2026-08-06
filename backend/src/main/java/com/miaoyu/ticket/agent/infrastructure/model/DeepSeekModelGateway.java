@@ -59,7 +59,17 @@ public final class DeepSeekModelGateway implements ModelGateway {
         PlanGenerationRequest planRequest = Objects.requireNonNull(request, "request 不能为空");
         JsonNode content = complete(PLAN_SYSTEM_PROMPT, object("input", PromptSanitizer.sanitize(planRequest.input()),
                 "slots", PromptSanitizer.sanitizeSlots(planRequest.confirmedSlots()),
-                "allowTools", planRequest.allowedToolNames()));
+                "allowTools", planRequest.allowedToolNames(),
+                "profileTags", planRequest.profileTags().stream()
+                        .map(tag -> Map.of(
+                                "type", PromptSanitizer.sanitize(tag.type()),
+                                "value", PromptSanitizer.sanitize(tag.value()),
+                                "polarity", PromptSanitizer.sanitize(tag.polarity()),
+                                "weight", PromptSanitizer.sanitize(tag.weight()),
+                                "confidence", PromptSanitizer.sanitize(tag.confidence()),
+                                "source", PromptSanitizer.sanitize(tag.source()),
+                                "updatedAt", PromptSanitizer.sanitize(tag.updatedAt())))
+                        .toList()));
         CandidatePlan plan = parsePlan(content);
         PlanValidationContext context = new PlanValidationContext(
                 planRequest.confirmedSlots().entrySet().stream()

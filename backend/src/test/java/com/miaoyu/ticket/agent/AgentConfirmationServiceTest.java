@@ -34,6 +34,7 @@ import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.auth.application.RoleCode;
+import com.miaoyu.ticket.profile.application.ProfileBehaviorRecorder;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -48,6 +49,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /** Mock 适配测试证明确认、并发胜者读取和未知恢复都不会重发建单。 */
 class AgentConfirmationServiceTest {
@@ -85,10 +87,28 @@ class AgentConfirmationServiceTest {
     }
 
     @Test
+    void shouldRecordOnlyCasSavedAcceptedAndRejectedFeedbackUsingUtcTime() {
+        ProfileBehaviorRecorder recorder = Mockito.mock(ProfileBehaviorRecorder.class);
+        AgentConfirmationService accepted = service(new InMemoryRepository(action()),
+                new CountingTool(success("order")),
+                true, recorder);
+        accepted.confirm("action-1", true, "trace");
+        Mockito.verify(recorder).recordPlanAccepted("action-1", "plan-1",
+                LocalDateTime.of(2026, 8, 5, 2, 0, 2));
+        AgentConfirmationService rejected = service(new InMemoryRepository(action()),
+                new CountingTool(success("order")),
+                true, recorder);
+        rejected.confirm("action-1", false, "trace");
+        Mockito.verify(recorder).recordPlanRejected("action-1", "plan-1",
+                LocalDateTime.of(2026, 8, 5, 2, 0, 2));
+    }
+
+    @Test
     void shouldRecoverUnknownOnlyWithOriginalIdentifiersWithoutExecutingAgain() {
         InMemoryRepository repository = new InMemoryRepository(action());
         CountingTool tool = new CountingTool(processing());
-        AgentConfirmationService service = service(repository, tool, true);
+        ProfileBehaviorRecorder recorder = Mockito.mock(ProfileBehaviorRecorder.class);
+        AgentConfirmationService service = service(repository, tool, true, recorder);
 
         AgentConfirmationResult unknown = service.confirm("action-1", true, "trace-1");
         tool.queryResult = success("order-1");
@@ -100,6 +120,11 @@ class AgentConfirmationServiceTest {
         assertEquals(1, tool.queryCalls);
         assertEquals(tool.firstContext.clientRequestId(), tool.queryContext.clientRequestId());
         assertEquals(tool.firstContext.idempotencyKey(), tool.queryContext.idempotencyKey());
+        Mockito.verify(recorder).recordPlanAccepted("action-1", "plan-1",
+                LocalDateTime.of(2026, 8, 5, 2, 0, 2));
+
+        service.recover("action-1", "trace-1");
+        Mockito.verifyNoMoreInteractions(recorder);
     }
 
     @Test
@@ -241,6 +266,16 @@ class AgentConfirmationServiceTest {
         CurrentUserAccessor userAccessor = () -> new CurrentUser(9L, RoleCode.USER, 1L);
         Clock clock = Clock.fixed(Instant.parse("2026-08-05T02:00:02Z"), ZoneId.of("Asia/Shanghai"));
         return new AgentConfirmationService(repository, facts, tool, action -> { }, userAccessor, clock);
+    }
+
+    private static AgentConfirmationService service(AgentConfirmationActionRepository repository, CountingTool tool,
+            boolean businessDataValid, ProfileBehaviorRecorder recorder) {
+        AgentConfirmationFactsProvider facts = (action, userId) -> new AgentConfirmationValidationContext(userId,
+                AgentRunStatus.RUNNING, action.planId(), action.planVersion(), PlanNodeStatus.WAITING_CONFIRMATION,
+                action.parameterHash(), businessDataValid, NOW.plusSeconds(1));
+        return new AgentConfirmationService(repository, facts, tool, action -> { },
+                () -> new CurrentUser(9L, RoleCode.USER, 1L),
+                Clock.fixed(Instant.parse("2026-08-05T02:00:02Z"), ZoneId.of("Asia/Shanghai")), recorder);
     }
 
     private static AgentConfirmationAction action() {

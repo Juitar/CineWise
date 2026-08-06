@@ -2,6 +2,7 @@ package com.miaoyu.ticket.agent.application.model;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.List;
 
 /**
  * 应用层向模型网关发出的候选计划请求，只携带本次任务已确认的槽位。
@@ -18,7 +19,13 @@ public record PlanGenerationRequest(
         String clientRequestId,
         String input,
         Map<String, String> confirmedSlots,
-        Set<String> allowedToolNames) {
+        Set<String> allowedToolNames,
+        List<ProfileContextTag> profileTags) {
+
+    public PlanGenerationRequest(String clientRequestId, String input, Map<String, String> confirmedSlots,
+            Set<String> allowedToolNames) {
+        this(clientRequestId, input, confirmedSlots, allowedToolNames, List.of());
+    }
 
     public PlanGenerationRequest {
         if (clientRequestId == null || clientRequestId.isBlank()) {
@@ -31,5 +38,6 @@ public record PlanGenerationRequest(
         confirmedSlots = confirmedSlots == null ? Map.of() : Map.copyOf(confirmedSlots);
         // 复制白名单保证本次计划生成期间权限不因外部集合被修改而扩大。
         allowedToolNames = allowedToolNames == null ? Set.of() : Set.copyOf(allowedToolNames);
+        profileTags = profileTags == null ? List.of() : List.copyOf(profileTags);
     }
 }
