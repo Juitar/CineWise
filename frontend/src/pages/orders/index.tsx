@@ -44,7 +44,7 @@ export default function OrdersPage() {
     status: order.status,
     expireTime: order.expireTime,
     posterUrl: content.moviesById.get(order.movieId)?.posterUrl,
-    cinemaName: content.cinemasById.get(order.cinemaId)?.name,
+    cinemaName: content.cinemasById.get(order.cinemaId)?.name ?? '影院信息暂不可用',
     cinemaArea: content.cinemasById.get(order.cinemaId)?.area ?? undefined,
     cinemaAddress: content.cinemasById.get(order.cinemaId)?.address ?? undefined,
   }));
@@ -56,6 +56,12 @@ export default function OrdersPage() {
         <OrderContentNotice
           isLoading={content.isLoading}
           hasUnavailableContent={content.hasUnavailableContent}
+          movieFreshness={records
+            .map((order) => content.moviesById.get(order.movieId))
+            .filter((movie): movie is NonNullable<typeof movie> => Boolean(movie))}
+          cinemaFreshness={records
+            .map((order) => content.cinemasById.get(order.cinemaId))
+            .filter((cinema): cinema is NonNullable<typeof cinema> => Boolean(cinema))}
           onRetry={content.refresh}
         />
         <OrderList

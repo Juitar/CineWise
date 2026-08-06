@@ -76,6 +76,7 @@ describe('订单详情交易时间展示', () => {
 
     expect(screen.getByText('2026-08-10 14:00')).toBeInTheDocument();
     expect(screen.getByText('2026-08-05 12:00')).toBeInTheDocument();
+    expect(screen.getByText('影院：影院信息暂不可用')).toBeInTheDocument();
     expect(screen.queryByText('2026-08-05T04:00:00Z')).not.toBeInTheDocument();
   });
 

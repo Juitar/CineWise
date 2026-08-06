@@ -8,6 +8,12 @@
   gap: 8px;
 }
 
+.order-content-freshness {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 @media (max-width: 1023px) {
   .order-content-notice-description {
     align-items: flex-start;

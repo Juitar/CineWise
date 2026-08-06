@@ -59,6 +59,7 @@ describe('个人订单列表场次上下文', () => {
 
     expect(screen.getByText(/场次：2026-08-10 14:30/)).toBeInTheDocument();
     expect(screen.getByText('影片信息暂不可用')).toBeInTheDocument();
+    expect(screen.getByText('影院：影院信息暂不可用')).toBeInTheDocument();
     expect(screen.getByText(/场次编号：11/)).toBeInTheDocument();
     expect(screen.getByLabelText('按下单日期筛选订单')).toBeInTheDocument();
     expect(screen.getByText('下单日期：')).toBeInTheDocument();

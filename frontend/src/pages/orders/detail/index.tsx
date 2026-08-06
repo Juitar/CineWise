@@ -63,6 +63,8 @@ export default function OrderDetailPage() {
         <OrderContentNotice
           isLoading={content.isLoading}
           hasUnavailableContent={content.hasUnavailableContent}
+          movieFreshness={movie ? [movie] : []}
+          cinemaFreshness={cinema ? [cinema] : []}
           onRetry={content.refresh}
         />
         <OrderDetail
@@ -73,7 +75,7 @@ export default function OrderDetailPage() {
           showTime={formatOrderDateTime(order?.showStartTime)}
           seatLabels={order?.seatIds}
           posterUrl={movie?.posterUrl}
-          cinemaName={cinema?.name}
+          cinemaName={cinema?.name ?? '影院信息暂不可用'}
           cinemaArea={cinema?.area ?? undefined}
           cinemaAddress={cinema?.address ?? undefined}
           ticketCount={order?.ticketCount ?? 0}
