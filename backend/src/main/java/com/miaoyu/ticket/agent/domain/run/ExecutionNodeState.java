@@ -98,11 +98,12 @@ public final class ExecutionNodeState {
     }
 
     static ExecutionNodeState initial(ExecutionPlanNode node) {
-        // 计划节点的初始状态由校验器确定，状态机不在此处替换 PENDING 或确认标记。
+        // 确认节点只等待用户动作，不会被只读调度器自动开始。
         Objects.requireNonNull(node, "计划节点不能为空");
         return new ExecutionNodeState(
                 node.nodeId(),
-                node.status(),
+                node.type() == com.miaoyu.ticket.agent.domain.plan.PlanNodeType.CONFIRM_ACTION
+                        ? PlanNodeStatus.WAITING_CONFIRMATION : node.status(),
                 0,
                 0,
                 null,
@@ -114,7 +115,9 @@ public final class ExecutionNodeState {
 
     ExecutionNodeState start() {
         // 只有 PENDING 可开始，防止重复调用把同一个工具节点并发执行两次。
-        requireStatus(PlanNodeStatus.PENDING);
+        if (status != PlanNodeStatus.PENDING && status != PlanNodeStatus.WAITING_CONFIRMATION) {
+            throw new IllegalStateException("节点 " + nodeId + " 当前状态为 " + status + "，不能执行该操作");
+        }
         return new ExecutionNodeState(
                 nodeId,
                 PlanNodeStatus.RUNNING,
@@ -182,8 +185,10 @@ public final class ExecutionNodeState {
     }
 
     ExecutionNodeState skipForUpstreamFailure(String sourceNodeId) {
-        // 只允许跳过尚未开始节点，运行中节点必须等待自己的真实结果而不能被强制覆盖。
-        requireStatus(PlanNodeStatus.PENDING);
+        // 确认节点虽处于等待确认，但尚未开始工具调用；上游失败时必须与 PENDING 一样安全跳过。
+        if (status != PlanNodeStatus.PENDING && status != PlanNodeStatus.WAITING_CONFIRMATION) {
+            throw new IllegalStateException("节点 " + nodeId + " 当前状态为 " + status + "，不能执行该操作");
+        }
         if (sourceNodeId == null || sourceNodeId.isBlank()) {
             // 跳过根因是审计和错误展示依据，不能留下不可追溯的 SKIPPED 状态。
             throw new IllegalArgumentException("跳过来源节点不能为空");

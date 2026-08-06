@@ -40,19 +40,13 @@ public record AgentRunStep(
         }
         requireText(nodeId, "节点 ID");
         Objects.requireNonNull(nodeType, "节点类型不能为空");
-        if (nodeType == PlanNodeType.CONFIRM_ACTION) {
-            throw new IllegalArgumentException("V008 不保存确认节点");
-        }
         Objects.requireNonNull(dependsOn, "节点依赖快照不能为空");
         Objects.requireNonNull(inputRefs, "节点输入引用快照不能为空");
         Objects.requireNonNull(status, "节点状态不能为空");
-        if (status == PlanNodeStatus.WAITING_CONFIRMATION) {
-            throw new IllegalArgumentException("V008 不保存等待确认状态");
-        }
         Objects.requireNonNull(failurePolicy, "失败策略不能为空");
         validateCounters(attemptCount, retryCount);
         validateRecovery(status, recoveryPending);
-        validateStateTime(status, attemptCount, startedAt, finishedAt);
+        validateStateTime(nodeType, status, attemptCount, retryCount, startedAt, finishedAt);
         validateSkip(status, autoSkipped, skipReason, skipSourceNodeId);
         Objects.requireNonNull(slotSnapshot, "槽位快照不能为空");
         if (version < 0) {
@@ -79,7 +73,12 @@ public record AgentRunStep(
     }
 
     private static void validateStateTime(
-            PlanNodeStatus status, int attemptCount, LocalDateTime startedAt, LocalDateTime finishedAt) {
+            PlanNodeType nodeType,
+            PlanNodeStatus status,
+            int attemptCount,
+            int retryCount,
+            LocalDateTime startedAt,
+            LocalDateTime finishedAt) {
         boolean isPending = status == PlanNodeStatus.PENDING
                 && startedAt == null
                 && finishedAt == null
@@ -88,6 +87,12 @@ public record AgentRunStep(
                 && startedAt != null
                 && finishedAt == null
                 && attemptCount >= 1;
+        boolean isWaitingConfirmation = status == PlanNodeStatus.WAITING_CONFIRMATION
+                && nodeType == PlanNodeType.CONFIRM_ACTION
+                && startedAt == null
+                && finishedAt == null
+                && attemptCount == 0
+                && retryCount == 0;
         boolean isFinished = (status == PlanNodeStatus.SUCCESS || status == PlanNodeStatus.FAILED)
                 && startedAt != null
                 && finishedAt != null
@@ -97,7 +102,7 @@ public record AgentRunStep(
                 && startedAt == null
                 && finishedAt != null
                 && attemptCount == 0;
-        if (!(isPending || isRunning || isFinished || isSkipped)) {
+        if (!(isPending || isWaitingConfirmation || isRunning || isFinished || isSkipped)) {
             throw new IllegalArgumentException("步骤状态、时间和尝试次数不一致");
         }
     }

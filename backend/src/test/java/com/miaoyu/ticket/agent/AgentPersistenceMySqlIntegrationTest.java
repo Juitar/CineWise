@@ -9,7 +9,6 @@ import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationFactsPr
 import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationService;
 import com.miaoyu.ticket.agent.application.confirmation.CreateOrderToolAdapter;
 import com.miaoyu.ticket.agent.application.confirmation.CreateOrderToolResult;
-import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
 import com.miaoyu.ticket.agent.application.persistence.AgentInitialRunResult;
 import com.miaoyu.ticket.agent.application.persistence.AgentInitialRunTransaction;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionCommand;
@@ -19,10 +18,11 @@ import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeEventService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunCancellationService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionManagementService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
-import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
-import com.miaoyu.ticket.agent.application.reply.ErrorReplyFacts;
-import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentResult;
-import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentService;
+import com.miaoyu.ticket.agent.application.model.ModelGateway;
+import com.miaoyu.ticket.agent.application.model.PlanGenerationResponse;
+import com.miaoyu.ticket.agent.application.tool.RankMoviePlanExecutionAdapter;
+import com.miaoyu.ticket.agent.application.tool.ReadOnlyToolExecutionAdapter;
+import com.miaoyu.ticket.agent.application.tool.AgentToolDefinitions;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEvent;
@@ -30,6 +30,11 @@ import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSessionStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlan;
+import com.miaoyu.ticket.agent.domain.plan.CandidatePlanNode;
+import com.miaoyu.ticket.agent.domain.plan.FailurePolicy;
+import com.miaoyu.ticket.agent.domain.plan.InputReference;
+import com.miaoyu.ticket.agent.domain.plan.InputReferenceSource;
+import com.miaoyu.ticket.agent.domain.plan.PlanNodeType;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationContext;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationIssue;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationIssueCode;
@@ -44,6 +49,11 @@ import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationValidationCo
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.agent.domain.tool.ToolContext;
+import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
+import com.miaoyu.ticket.agent.domain.run.ExecutionPlanStateMachine;
+import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
+import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
+import java.time.LocalDate;
 import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.auth.application.RoleCode;
@@ -140,7 +150,10 @@ class AgentPersistenceMySqlIntegrationTest {
     private CreateOrderTool createOrderTool;
 
     @Autowired
-    private MinimalReadOnlyAgentService minimalReadOnlyAgentService;
+    private ModelGateway modelGateway;
+
+    @Autowired
+    private RankMoviePlanExecutionAdapter rankMoviePlanExecutionAdapter;
 
     private AtomicBoolean toolCalledInsideTransaction;
 
@@ -167,7 +180,9 @@ class AgentPersistenceMySqlIntegrationTest {
                 """, Integer.class)).isEqualTo(1);
         cleanupFixtures();
         toolCalledInsideTransaction = new AtomicBoolean(true);
-        Mockito.reset(minimalReadOnlyAgentService);
+        Mockito.reset(modelGateway, rankMoviePlanExecutionAdapter);
+        // Supervisor 在 Spring 上下文创建时按 targetName 建立只读适配器表；reset 后必须恢复这个固定类型标识。
+        Mockito.when(rankMoviePlanExecutionAdapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
     }
 
     @AfterEach
@@ -240,7 +255,7 @@ class AgentPersistenceMySqlIntegrationTest {
     @Test
     void shouldReturnWinnerForConcurrentSameClientRequestId() throws Exception {
         insertSession(FIRST_SESSION_ID, FIRST_SESSION);
-        Mockito.when(minimalReadOnlyAgentService.run(Mockito.any())).thenReturn(invalidResult());
+        Mockito.when(modelGateway.generatePlan(Mockito.any())).thenReturn(invalidResult());
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
@@ -267,7 +282,7 @@ class AgentPersistenceMySqlIntegrationTest {
     @Test
     void shouldCallReadOnlyAgentOutsideDatabaseTransactionAndPersistFailureResult() {
         insertSession(FIRST_SESSION_ID, FIRST_SESSION);
-        Mockito.when(minimalReadOnlyAgentService.run(Mockito.any())).thenAnswer(invocation -> {
+        Mockito.when(modelGateway.generatePlan(Mockito.any())).thenAnswer(invocation -> {
             toolCalledInsideTransaction.set(TransactionSynchronizationManager.isActualTransactionActive());
             return invalidResult();
         });
@@ -279,6 +294,32 @@ class AgentPersistenceMySqlIntegrationTest {
         assertThat(result.snapshot().messages()).hasSize(2);
         assertThat(sessionRepository.findBySessionIdAndUserId(FIRST_SESSION, USER_ID).orElseThrow().activeRunId())
                 .isNull();
+    }
+
+    @Test
+    void shouldExecuteRankMoviePlanThroughSupervisorAndPersistPlanVersionFromSubmission() {
+        insertSession(FIRST_SESSION_ID, FIRST_SESSION);
+        PlanValidationContext context = rankValidationContext();
+        CandidatePlan plan = new CandidatePlan("supervisor-plan", 1, List.of(new CandidatePlanNode(
+                "rank", PlanNodeType.CALL_TOOL, RankMoviePlanTool.TARGET_NAME,
+                List.of(slotReference("movieId"), slotReference("cinemaId"), slotReference("date")),
+                List.of(), FailurePolicy.FAIL)));
+        Mockito.when(modelGateway.generatePlan(Mockito.any())).thenReturn(new PlanGenerationResponse(
+                plan, PlanValidationResult.invalid(List.of(new PlanValidationIssue(
+                        PlanValidationIssueCode.TOOL_NOT_FOUND, "ignored", "ignored", "ignored")))));
+        Mockito.when(rankMoviePlanExecutionAdapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
+        Mockito.when(rankMoviePlanExecutionAdapter.execute(
+                        Mockito.any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class)))
+                .thenAnswer(invocation -> successfulRankResult(invocation.getArgument(0)));
+
+        AgentMessageSubmissionResult result = messageSubmissionService.submit(new AgentMessageSubmissionCommand(
+                FIRST_SESSION, "推荐电影", "supervisor-request", context.slotSnapshot(), context, 3_000L));
+
+        assertThat(result.snapshot().run().planId()).isEqualTo("supervisor-plan");
+        assertThat(result.snapshot().run().planVersion()).isEqualTo(1);
+        assertThat(result.snapshot().steps()).extracting(step -> step.nodeId()).containsExactly("rank");
+        Mockito.verify(rankMoviePlanExecutionAdapter)
+                .execute(Mockito.any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class));
     }
 
     @Test
@@ -494,16 +535,34 @@ class AgentPersistenceMySqlIntegrationTest {
                 sessionId, "推荐电影", requestId, slots, new PlanValidationContext(Map.of(), Map.of(), slots), 3000L);
     }
 
-    private static MinimalReadOnlyAgentResult invalidResult() {
-        return new MinimalReadOnlyAgentResult(
-                new CandidatePlan("candidate-1", 1, List.of()),
+    private static PlanGenerationResponse invalidResult() {
+        CandidatePlan candidatePlan = new CandidatePlan("candidate-1", 1, List.of(new CandidatePlanNode(
+                "invalid", PlanNodeType.CALL_TOOL, "unknownTool", List.of(), List.of(), FailurePolicy.FAIL)));
+        return new PlanGenerationResponse(candidatePlan,
                 PlanValidationResult.invalid(List.of(new PlanValidationIssue(
-                        PlanValidationIssueCode.TOOL_NOT_FOUND, "rank", "targetName", "ignored"))),
-                null,
-                List.of(),
-                new ReplyGenerationResponse(
-                        "当前请求无法安全执行", AgentReplyMessageType.ERROR,
-                        new ErrorReplyFacts(null, List.of("TOOL_NOT_FOUND"))));
+                        PlanValidationIssueCode.TOOL_NOT_FOUND, "rank", "targetName", "ignored"))));
+    }
+
+    private static PlanValidationContext rankValidationContext() {
+        return new PlanValidationContext(
+                Map.of("movieId", String.class, "cinemaId", String.class, "date", LocalDate.class),
+                Map.of(), new SlotSnapshot(1L, Map.of(
+                        "movieId", "1", "cinemaId", "2", "date", "2026-08-06")));
+    }
+
+    private static InputReference slotReference(String name) {
+        return new InputReference(name, InputReferenceSource.SLOT, name);
+    }
+
+    private static ReadOnlyToolExecutionAdapter.ExecutionResult successfulRankResult(
+            ReadOnlyToolExecutionAdapter.ExecutionRequest request) {
+        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(
+                new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan())));
+        var running = stateMachine.startNode(request.state(), request.nodeId());
+        ToolResult<FixedRecommendationResult> toolResult = new ToolResult<>(
+                ToolStatus.SUCCESS, null, null, false, false, "CONTINUE", false, null, 1L, null, null);
+        return new ReadOnlyToolExecutionAdapter.ExecutionResult(
+                stateMachine.recordToolResult(running, request.nodeId(), toolResult), toolResult);
     }
 
     private void insertSession(long id, String sessionId) {
@@ -562,8 +621,17 @@ class AgentPersistenceMySqlIntegrationTest {
 
         @Bean
         @Primary
-        MinimalReadOnlyAgentService agentPersistenceMinimalReadOnlyAgentService() {
-            return Mockito.mock(MinimalReadOnlyAgentService.class);
+        ModelGateway agentPersistenceModelGateway() {
+            return Mockito.mock(ModelGateway.class);
+        }
+
+        @Bean
+        @Primary
+        RankMoviePlanExecutionAdapter agentPersistenceRankMoviePlanExecutionAdapter() {
+            RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
+            // 该适配器的目标名是类型边界，不应由每个 MySQL 测试重复决定。
+            Mockito.when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
+            return adapter;
         }
 
         @Bean

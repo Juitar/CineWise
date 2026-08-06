@@ -137,8 +137,9 @@ public class AgentController {
         SseEmitter emitter = new SseEmitter(30_000L);
         AtomicReference<ScheduledFuture<?>> heartbeat = new AtomicReference<>();
         Runnable cancelHeartbeat = () -> cancelHeartbeat(heartbeat);
+        SseDisconnectHandler disconnectHandler = new SseDisconnectHandler(cancelHeartbeat);
         emitter.onCompletion(cancelHeartbeat);
-        emitter.onError(error -> cancelHeartbeat.run());
+        emitter.onError(error -> disconnectHandler.onDisconnected());
         emitter.onTimeout(() -> {
             cancelHeartbeat.run();
             emitter.complete();

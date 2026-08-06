@@ -52,9 +52,10 @@ public class AgentRunCancellationService {
         }
         LocalDateTime now = now();
         stepRepository.findByRunId(run.id()).stream()
-                .filter(step -> step.status() == PlanNodeStatus.PENDING)
+                .filter(step -> step.status() == PlanNodeStatus.PENDING
+                        || step.status() == PlanNodeStatus.WAITING_CONFIRMATION)
                 .forEach(step -> stepRepository.updateWithCas(
-                        cancelledStep(step, now), step.version(), PlanNodeStatus.PENDING));
+                        cancelledStep(step, now), step.version(), step.status()));
         AgentRun cancelled = cancelledRun(run, now);
         if (!runRepository.updateTerminalWithCas(cancelled, run.version())) {
             return runRepository.findByRunIdAndUserId(runId, userId)

@@ -1,6 +1,10 @@
 package com.miaoyu.ticket.agent.application.persistence;
 
 import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentResult;
+import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorResult;
+import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
+import com.miaoyu.ticket.agent.application.reply.ErrorReplyFacts;
+import com.miaoyu.ticket.agent.application.reply.ProgressReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
 import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
@@ -17,6 +21,7 @@ import com.miaoyu.ticket.agent.domain.plan.PlanNodeStatus;
 import com.miaoyu.ticket.agent.domain.run.ExecutionNodeState;
 import com.miaoyu.ticket.agent.domain.run.ExecutionRunState;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
+import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import java.time.Clock;
@@ -91,6 +96,43 @@ public class AgentRunResultTransaction {
         return nextRun;
     }
 
+    /**
+     * 保存生产提交入口的多工具快照。当前唯一可执行工具是 rankMoviePlan，结果类型仍受白名单约束；
+     * 对外只写安全进度或安全错误，不保存模型原文和完整工具响应。
+     */
+    @Transactional
+    public AgentRun record(AgentRun run, MultiToolSupervisorResult result) {
+        return record(run, asMinimalResult(result));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static MinimalReadOnlyAgentResult asMinimalResult(MultiToolSupervisorResult result) {
+        Objects.requireNonNull(result, "运行结果不能为空");
+        List<com.miaoyu.ticket.agent.domain.tool.ToolResult<FixedRecommendationResult>> toolResults =
+                result.toolResults()
+                .stream()
+                .map(item -> (com.miaoyu.ticket.agent.domain.tool.ToolResult<FixedRecommendationResult>) item.result())
+                .toList();
+        ReplyGenerationResponse reply;
+        if (!result.validation().isValid()) {
+            reply = new ReplyGenerationResponse(
+                    "当前请求无法安全执行", AgentReplyMessageType.ERROR,
+                    new ErrorReplyFacts(null, List.of("PLAN_REJECTED")));
+        } else {
+            String nodeId = result.state().plan().nodes().stream()
+                    .filter(node -> result.state().nodeState(node.nodeId()).status()
+                            == PlanNodeStatus.WAITING_CONFIRMATION
+                            || result.state().nodeState(node.nodeId()).status() == PlanNodeStatus.RUNNING)
+                    .map(ExecutionPlanNode::nodeId)
+                    .findFirst()
+                    .orElse("plan");
+            reply = new ReplyGenerationResponse(
+                    "计划已保存，请等待下一步操作。", AgentReplyMessageType.PROGRESS, new ProgressReplyFacts(nodeId));
+        }
+        return new MinimalReadOnlyAgentResult(
+                result.candidatePlan(), result.validation(), result.state(), toolResults, reply);
+    }
+
     /** 主控或只读工具异常后，用新的短事务写入安全错误并释放仍指向本运行的会话。 */
     @Transactional
     public void recordFailure(AgentRun run) {
@@ -149,11 +191,15 @@ public class AgentRunResultTransaction {
             recordToolEvents(session, run, result, List.of(), null);
         }
         AgentReplyMessageType replyType = result.reply().messageType();
-        runtimeEventService.append(session, run,
-                replyType == AgentReplyMessageType.MOVIE_CARD || replyType == AgentReplyMessageType.PLAN_CARD
-                        ? AgentEventType.CARD : replyType == AgentReplyMessageType.ERROR
-                                ? AgentEventType.MESSAGE_ERROR : AgentEventType.MESSAGE_COMPLETE,
-                jsonFactory.eventPayload(Map.of("messageType", replyType.name())));
+        boolean isCardReply = replyType == AgentReplyMessageType.MOVIE_CARD
+                || replyType == AgentReplyMessageType.PLAN_CARD;
+        AgentEventType replyEvent = isCardReply
+                ? AgentEventType.CARD : replyType == AgentReplyMessageType.ERROR
+                        ? AgentEventType.MESSAGE_ERROR : AgentEventType.MESSAGE_COMPLETE;
+        AgentStoredJson replyEventPayload = replyEvent == AgentEventType.CARD
+                ? jsonFactory.cardPayload(result.reply())
+                : jsonFactory.eventPayload(Map.of("messageType", replyType.name()));
+        runtimeEventService.append(session, run, replyEvent, replyEventPayload);
         if (run.status().isTerminal()) {
             runtimeEventService.append(session, run, AgentEventType.RUN_COMPLETE,
                     jsonFactory.eventPayload(Map.of("status", run.status().name())));
@@ -185,7 +231,7 @@ public class AgentRunResultTransaction {
             case SUCCESS, SKIPPED -> AgentEventType.STEP_COMPLETE;
             case FAILED -> AgentEventType.STEP_FAILED;
             case RUNNING -> AgentEventType.STEP_START;
-            case PENDING -> null;
+            case PENDING, WAITING_CONFIRMATION -> null;
             default -> null;
         };
         if (type != null) {
@@ -203,7 +249,10 @@ public class AgentRunResultTransaction {
     }
 
     private static LocalDateTime startedAt(PlanNodeStatus status, LocalDateTime now) {
-        return status == PlanNodeStatus.PENDING || status == PlanNodeStatus.SKIPPED ? null : now;
+        return status == PlanNodeStatus.PENDING
+                        || status == PlanNodeStatus.WAITING_CONFIRMATION
+                        || status == PlanNodeStatus.SKIPPED
+                ? null : now;
     }
 
     private static LocalDateTime finishedAt(PlanNodeStatus status, LocalDateTime now) {
@@ -218,6 +267,10 @@ public class AgentRunResultTransaction {
             return AgentRunStatus.FAILED;
         }
         if (state.nodeStates().values().stream().anyMatch(node -> node.status() == PlanNodeStatus.RUNNING)) {
+            return AgentRunStatus.RUNNING;
+        }
+        if (state.nodeStates().values().stream()
+                .anyMatch(node -> node.status() == PlanNodeStatus.WAITING_CONFIRMATION)) {
             return AgentRunStatus.RUNNING;
         }
         if (state.nodeStates().values().stream().anyMatch(node -> node.status() == PlanNodeStatus.PENDING)) {

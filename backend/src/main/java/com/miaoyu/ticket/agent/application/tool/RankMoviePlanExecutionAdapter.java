@@ -31,7 +31,7 @@ import java.util.Set;
  * <p>这里不提供“按工具名执行”的通用入口。目标工具、Command 和结果类型都通过构造器与 Java 类型固定，
  * 因此模型计划中的字符串不能被解释成 Bean 名、反射类名或其他跨模块调用。
  */
-public final class RankMoviePlanExecutionAdapter {
+public final class RankMoviePlanExecutionAdapter implements ReadOnlyToolExecutionAdapter {
     /**
      * D 当前公开 Command 允许的全部输入名。
      *
@@ -83,6 +83,18 @@ public final class RankMoviePlanExecutionAdapter {
         // 状态机决定 SUCCESS、PROCESSING、FAILED 与一次重试的状态语义；适配器不擅自修改结果状态。
         return new RankMoviePlanExecutionResult(
                 stateMachine.recordToolResult(runningState, node.nodeId(), toolResult), toolResult);
+    }
+
+    @Override
+    public String targetName() {
+        return RankMoviePlanTool.TARGET_NAME;
+    }
+
+    @Override
+    public ReadOnlyToolExecutionAdapter.ExecutionResult execute(ReadOnlyToolExecutionAdapter.ExecutionRequest request) {
+        RankMoviePlanExecutionResult result = execute(new RankMoviePlanExecutionRequest(
+                request.state(), request.nodeId(), request.runId(), request.traceId(), request.remainingDeadlineMs()));
+        return new ReadOnlyToolExecutionAdapter.ExecutionResult(result.state(), result.toolResult());
     }
 
     private static ExecutionPlanNode requireRunnableRankMoviePlanNode(

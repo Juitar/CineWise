@@ -84,6 +84,18 @@ public final class ExecutionRunState {
         return new ExecutionRunState(plan, nodeStates, replanCount + 1);
     }
 
+    static ExecutionRunState replanned(
+            ExecutionPlan plan, Map<String, ExecutionNodeState> preservedStates, int replanCount) {
+        Objects.requireNonNull(plan, "重规划运行计划不能为空");
+        Map<String, ExecutionNodeState> nextStates = new LinkedHashMap<>();
+        for (ExecutionPlanNode node : plan.nodes()) {
+            // 只有状态机筛选出的成功节点可复用；其余新节点必须从新计划的初始状态开始。
+            ExecutionNodeState preserved = preservedStates.get(node.nodeId());
+            nextStates.put(node.nodeId(), preserved == null ? ExecutionNodeState.initial(node) : preserved);
+        }
+        return new ExecutionRunState(plan, nextStates, replanCount);
+    }
+
     private static Map<String, ExecutionNodeState> copyAndValidateNodeStates(
             ExecutionPlan plan, Map<String, ExecutionNodeState> nodeStates) {
         Objects.requireNonNull(nodeStates, "节点状态不能为空");
