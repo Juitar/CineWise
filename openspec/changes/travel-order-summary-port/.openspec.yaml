@@ -1,0 +1,4 @@
+name: travel-order-summary-port
+description: 为出行模块提供本人订单场次摘要的公开应用端口
+owner: A
+status: in-progress

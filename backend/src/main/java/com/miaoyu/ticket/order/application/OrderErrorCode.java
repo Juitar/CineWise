@@ -10,7 +10,8 @@ public enum OrderErrorCode implements ErrorCode {
     ORDER_EXPIRED(205003, "订单已过期", HttpStatus.CONFLICT),
     CONFIRMATION_INVALID(205004, "确认凭证无效", HttpStatus.UNPROCESSABLE_ENTITY),
     IDEMPOTENCY_PARAMETER_MISMATCH(205005, "幂等请求参数不一致", HttpStatus.CONFLICT),
-    ORDER_NOT_REFUNDABLE(205006, "订单不可退", HttpStatus.CONFLICT);
+    ORDER_NOT_REFUNDABLE(205006, "订单不可退", HttpStatus.CONFLICT),
+    ORDER_QUERY_UNAVAILABLE(305001, "订单信息查询暂不可用", HttpStatus.SERVICE_UNAVAILABLE);
 
     private final int code;
     private final String message;
