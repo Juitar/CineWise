@@ -113,6 +113,7 @@ class TravelTaskApplicationServiceTest {
                 eventId,
                 orderId,
                 "80001",
+                "60001",
                 "70001",
                 "西湖区",
                 startAt,
@@ -122,7 +123,7 @@ class TravelTaskApplicationServiceTest {
 
     private OrderInvalidated invalidatedEvent(String eventId, String orderId, long orderVersion) {
         return new OrderInvalidated(
-                eventId, orderId, "80001", "70001", "西湖区",
+                eventId, orderId, "80001", "60001", "70001", "西湖区",
                 OffsetDateTime.parse("2026-08-05T19:00:00+08:00"), orderVersion,
                 OffsetDateTime.parse("2026-08-04T08:10:00+08:00"), "REFUNDED");
     }

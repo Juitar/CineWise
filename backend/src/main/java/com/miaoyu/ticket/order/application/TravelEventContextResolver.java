@@ -46,13 +46,21 @@ public class TravelEventContextResolver {
         }
 
         ShowContextView show = showContext.get();
+        // cinemaId是A拥有的场次关联事实；非法值不能用内容摘要或默认值掩盖。
+        if (show.showId() != order.showId() || show.cinemaId() <= 0) {
+            return Optional.empty();
+        }
         Map<Long, ContentSummaryQueryPort.CinemaSummary> summaries =
                 contentSummaryQueryPort.findCinemaSummaries(Set.of(show.cinemaId()));
         ContentSummaryQueryPort.CinemaSummary cinema = summaries.get(show.cinemaId());
         if (!isUsable(cinema)) {
             return Optional.empty();
         }
-        return Optional.of(new TravelEventContext(show.showId(), cinema.area().trim(), show.startTime()));
+        return Optional.of(new TravelEventContext(
+                show.showId(),
+                show.cinemaId(),
+                cinema.area().trim(),
+                show.startTime()));
     }
 
     /** 过期标识由D按统一Clock计算，A不自行重算另一套内容有效期。 */
@@ -65,8 +73,15 @@ public class TravelEventContextResolver {
 
     /**
      * 进入交易事务的不可变快照，仅包含冻结事件仍缺少的场次展示字段。
-     * showId用于在锁单后再次核对上下文归属，避免预查询结果被错误绑定到另一场次。
+     * showId用于在锁单后再次核对上下文归属；cinemaId保持A权威场次关联，避免预查询结果被错误绑定
+     * 到另一场次或由内容模块推测影院ID。
      */
-    public record TravelEventContext(long showId, String cinemaArea, LocalDateTime startAt) {
+    public record TravelEventContext(long showId, long cinemaId, String cinemaArea, LocalDateTime startAt) {
+
+        public TravelEventContext {
+            if (showId <= 0 || cinemaId <= 0) {
+                throw new IllegalArgumentException("出行事件上下文包含非法场次或影院标识");
+            }
+        }
     }
 }

@@ -123,6 +123,8 @@ class PaymentIntegrationTest {
             assertThat(event.eventId()).matches("[0-9a-f-]{36}");
             assertThat(event.orderId()).isEqualTo(Long.toString(order.orderId()));
             assertThat(event.showId()).isEqualTo(Long.toString(order.showId()));
+            assertThat(event.cinemaId()).isEqualTo(Long.toString(findCinemaId(order.showId())));
+            assertThat(event.cinemaId()).matches("[1-9][0-9]*");
             assertThat(event.userId()).isEqualTo(Long.toString(USER_A));
             assertThat(event.cinemaArea()).isNotBlank();
             assertThat(event.startAt().getOffset().getTotalSeconds()).isEqualTo(8 * 60 * 60);

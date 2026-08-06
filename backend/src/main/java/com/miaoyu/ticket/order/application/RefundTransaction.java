@@ -179,6 +179,7 @@ public class RefundTransaction {
                 UUID.randomUUID().toString(),
                 Long.toString(originalOrder.orderId()),
                 Long.toString(originalOrder.showId()),
+                Long.toString(context.cinemaId()),
                 Long.toString(originalOrder.userId()),
                 context.cinemaArea(),
                 context.startAt().atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime(),
