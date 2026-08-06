@@ -45,8 +45,9 @@ import com.miaoyu.ticket.recommendation.api.RankMoviePlanCommand;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationCatalog;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationQueryService;
-import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
-import com.miaoyu.ticket.recommendation.application.RecommendationCandidate;
+import com.miaoyu.ticket.recommendation.domain.RecommendationEvidence;
+import com.miaoyu.ticket.recommendation.domain.RecommendationPlan;
+import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
 import com.miaoyu.ticket.recommendation.domain.PurchaseCandidateValidator.PurchaseCandidate;
 import com.miaoyu.ticket.agent.infrastructure.model.MockModelGateway;
 import java.lang.reflect.RecordComponent;
@@ -122,9 +123,9 @@ class MinimalReadOnlyAgentServiceTest {
         ToolRegistry registry = registry();
         MockModelGateway gateway = mockGateway(registry);
         Map<String, String> slots = Map.of(
-                "movieId", "101",
-                "cinemaId", "201",
+                "cityCode", "430100",
                 "date", "2026-08-04",
+                "ticketCount", "1",
                 "timeFrom", "18:00",
                 "timeTo", "20:00");
         PlanGenerationRequest request = new PlanGenerationRequest(
@@ -139,19 +140,19 @@ class MinimalReadOnlyAgentServiceTest {
         assertThat(first.candidatePlan().nodes()).extracting("nodeId")
                 .containsExactly("rank-movie-plan", "render-result");
         assertThat(first.candidatePlan().nodes().getFirst().inputRefs()).extracting("inputName")
-                .containsExactly("movieId", "cinemaId", "date", "timeFrom", "timeTo");
+                .containsExactly("cityCode", "date", "ticketCount", "timeFrom", "timeTo");
 
         PlanGenerationResponse unpairedTime = gateway.generatePlan(new PlanGenerationRequest(
                 "request-1",
                 "今晚看电影",
                 Map.of(
-                        "movieId", "101",
-                        "cinemaId", "201",
+                        "cityCode", "430100",
                         "date", "2026-08-04",
+                        "ticketCount", "1",
                         "timeFrom", "18:00"),
                 Set.of(RankMoviePlanTool.TARGET_NAME)));
         assertThat(unpairedTime.candidatePlan().nodes().getFirst().inputRefs()).extracting("inputName")
-                .containsExactly("movieId", "cinemaId", "date");
+                .containsExactly("cityCode", "date", "ticketCount");
 
         PlanGenerationResponse disallowed = gateway.generatePlan(new PlanGenerationRequest(
                 "request-1", "今晚看电影", slots, Set.of()));
@@ -165,13 +166,13 @@ class MinimalReadOnlyAgentServiceTest {
                 "movieId", "101", "cinemaId", "201")));
 
         assertThat(result.reply().messageType()).isEqualTo(AgentReplyMessageType.QUESTION);
-        assertThat(result.reply().payload()).isEqualTo(new QuestionReplyFacts("date"));
+        assertThat(result.reply().payload()).isEqualTo(new QuestionReplyFacts("cityCode"));
         assertThat(result.candidatePlan().nodes()).singleElement().satisfies(node -> {
             assertThat(node.type()).isEqualTo(PlanNodeType.ASK_USER);
             assertThat(result.state().nodeState(node.nodeId()).status()).isEqualTo(PlanNodeStatus.SUCCESS);
         });
         assertThat(result.toolResults()).isEmpty();
-        verify(tool, never()).execute(any(), any());
+        verify(tool, never()).executeRecommendationPlan(any(), any());
     }
 
     @Test
@@ -181,7 +182,7 @@ class MinimalReadOnlyAgentServiceTest {
                 "101",
                 "201",
                 "45.00",
-                NOW.plusSeconds(3_600),
+                NOW.plusSeconds(300),
                 NOW.plusSeconds(1_800),
                 "TICKETING:MOCK");
         RankMoviePlanTool tool = realTool(List.of(candidate));
@@ -191,7 +192,8 @@ class MinimalReadOnlyAgentServiceTest {
         assertThat(result.validationResult().isValid()).isTrue();
         assertThat(result.toolResults()).singleElement().satisfies(toolResult -> {
             assertThat(toolResult.status()).isEqualTo(ToolStatus.SUCCESS);
-            assertThat(toolResult.data().purchaseEligible()).isTrue();
+            assertThat(((com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult) toolResult.data()).plans())
+                    .isNotEmpty();
         });
         assertThat(result.reply().messageType()).isEqualTo(AgentReplyMessageType.PLAN_CARD);
         assertThat(result.reply().payload()).isInstanceOf(RecommendationReplyFacts.class);
@@ -199,7 +201,7 @@ class MinimalReadOnlyAgentServiceTest {
         assertThat(facts.candidates()).singleElement().satisfies(replyCandidate -> {
             assertThat(replyCandidate.showId()).isEqualTo("301");
             assertThat(replyCandidate.price()).isEqualTo("45.00");
-            assertThat(replyCandidate.startTime()).isEqualTo(NOW.plusSeconds(3_600));
+            assertThat(replyCandidate.startTime()).isEqualTo(NOW.plusSeconds(300));
         });
         assertThat(result.state().nodeState("rank-movie-plan").status()).isEqualTo(PlanNodeStatus.SUCCESS);
         assertThat(result.state().nodeState("render-result").status()).isEqualTo(PlanNodeStatus.SUCCESS);
@@ -214,11 +216,7 @@ class MinimalReadOnlyAgentServiceTest {
         assertThat(facts.purchaseEligible()).isFalse();
         assertThat(facts.missingFactors()).containsExactly("SHOWTIME");
         assertThat(facts.degraded()).isTrue();
-        assertThat(facts.candidates()).singleElement().satisfies(candidate -> {
-            assertThat(candidate.showId()).isNull();
-            assertThat(candidate.price()).isNull();
-            assertThat(candidate.startTime()).isNull();
-        });
+        assertThat(facts.candidates()).isEmpty();
         assertThat(result.state().nodeState("rank-movie-plan").status()).isEqualTo(PlanNodeStatus.SUCCESS);
     }
 
@@ -246,14 +244,14 @@ class MinimalReadOnlyAgentServiceTest {
         assertThat(result.state()).isNull();
         assertThat(result.toolResults()).isEmpty();
         assertThat(result.reply().messageType()).isEqualTo(AgentReplyMessageType.ERROR);
-        verify(tool, never()).execute(any(), any());
+        verify(tool, never()).executeRecommendationPlan(any(), any());
     }
 
     @Test
     void shouldReturnStableParameterErrorWithoutCallingD() {
         RankMoviePlanTool tool = mock(RankMoviePlanTool.class);
         Map<String, String> invalidSlots = Map.of(
-                "movieId", "101", "cinemaId", "201", "date", "not-a-date");
+                "cityCode", "430100", "ticketCount", "1", "date", "not-a-date");
 
         MinimalReadOnlyAgentResult result = service(tool).run(request(invalidSlots));
 
@@ -265,13 +263,13 @@ class MinimalReadOnlyAgentServiceTest {
         assertThat(result.reply().messageType()).isEqualTo(AgentReplyMessageType.ERROR);
         assertThat(result.reply().payload()).isEqualTo(new ErrorReplyFacts(100001, List.of()));
         assertThat(result.state().nodeState("render-result").status()).isEqualTo(PlanNodeStatus.SKIPPED);
-        verify(tool, never()).execute(any(), any());
+        verify(tool, never()).executeRecommendationPlan(any(), any());
     }
 
     @Test
     void shouldRetryOnceThenRenderSuccessOrReturnFinalError() {
         RankMoviePlanTool succeedsOnRetry = mock(RankMoviePlanTool.class);
-        when(succeedsOnRetry.execute(any(ToolContext.class), any(RankMoviePlanCommand.class)))
+        when(succeedsOnRetry.executeRecommendationPlan(any(ToolContext.class), any(RankMoviePlanCommand.class)))
                 .thenReturn(retryableFailure(), successfulToolResult());
 
         MinimalReadOnlyAgentResult recovered = service(succeedsOnRetry).run(request(completeSlots()));
@@ -279,10 +277,11 @@ class MinimalReadOnlyAgentServiceTest {
         assertThat(recovered.reply().messageType()).isEqualTo(AgentReplyMessageType.PLAN_CARD);
         assertThat(recovered.toolResults()).hasSize(2);
         assertThat(recovered.state().nodeState("rank-movie-plan").attemptCount()).isEqualTo(2);
-        verify(succeedsOnRetry, times(2)).execute(any(ToolContext.class), any(RankMoviePlanCommand.class));
+        verify(succeedsOnRetry, times(2)).executeRecommendationPlan(
+                any(ToolContext.class), any(RankMoviePlanCommand.class));
 
         RankMoviePlanTool alwaysFails = mock(RankMoviePlanTool.class);
-        when(alwaysFails.execute(any(ToolContext.class), any(RankMoviePlanCommand.class)))
+        when(alwaysFails.executeRecommendationPlan(any(ToolContext.class), any(RankMoviePlanCommand.class)))
                 .thenReturn(retryableFailure());
         MinimalReadOnlyAgentResult failed = service(alwaysFails).run(request(completeSlots()));
 
@@ -290,13 +289,14 @@ class MinimalReadOnlyAgentServiceTest {
         assertThat(failed.toolResults()).hasSize(2);
         assertThat(failed.state().nodeState("rank-movie-plan").status()).isEqualTo(PlanNodeStatus.FAILED);
         assertThat(failed.state().nodeState("render-result").status()).isEqualTo(PlanNodeStatus.SKIPPED);
-        verify(alwaysFails, times(2)).execute(any(ToolContext.class), any(RankMoviePlanCommand.class));
+        verify(alwaysFails, times(2)).executeRecommendationPlan(
+                any(ToolContext.class), any(RankMoviePlanCommand.class));
     }
 
     @Test
     void shouldContinueIndependentBranchAfterAnotherBranchFails() {
         RankMoviePlanTool tool = mock(RankMoviePlanTool.class);
-        when(tool.execute(any(ToolContext.class), any(RankMoviePlanCommand.class)))
+        when(tool.executeRecommendationPlan(any(ToolContext.class), any(RankMoviePlanCommand.class)))
                 .thenReturn(nonRetryableFailure(), successfulToolResult());
         ToolRegistry registry = registry();
         PlanSchemaValidator validator = new PlanSchemaValidator(registry);
@@ -313,7 +313,7 @@ class MinimalReadOnlyAgentServiceTest {
         assertThat(result.state().nodeState("rank-ok").status()).isEqualTo(PlanNodeStatus.SUCCESS);
         assertThat(result.state().nodeState("render-ok").status()).isEqualTo(PlanNodeStatus.SUCCESS);
         assertThat(result.reply().messageType()).isEqualTo(AgentReplyMessageType.PLAN_CARD);
-        verify(tool, times(2)).execute(any(ToolContext.class), any(RankMoviePlanCommand.class));
+        verify(tool, times(2)).executeRecommendationPlan(any(ToolContext.class), any(RankMoviePlanCommand.class));
     }
 
     @Test
@@ -332,7 +332,7 @@ class MinimalReadOnlyAgentServiceTest {
     @Test
     void shouldStopRoundWhenToolIsProcessing() {
         RankMoviePlanTool tool = mock(RankMoviePlanTool.class);
-        ToolResult<FixedRecommendationResult> processing = new ToolResult<>(
+        ToolResult<RecommendationPlanResult> processing = new ToolResult<>(
                 ToolStatus.PROCESSING,
                 null,
                 null,
@@ -344,7 +344,8 @@ class MinimalReadOnlyAgentServiceTest {
                 1L,
                 null,
                 null);
-        when(tool.execute(any(ToolContext.class), any(RankMoviePlanCommand.class))).thenReturn(processing);
+        when(tool.executeRecommendationPlan(
+                any(ToolContext.class), any(RankMoviePlanCommand.class))).thenReturn(processing);
 
         MinimalReadOnlyAgentResult result = service(tool).run(request(completeSlots()));
 
@@ -352,7 +353,7 @@ class MinimalReadOnlyAgentServiceTest {
         assertThat(result.reply().payload()).isEqualTo(new ProgressReplyFacts("rank-movie-plan"));
         assertThat(result.state().nodeState("rank-movie-plan").status()).isEqualTo(PlanNodeStatus.RUNNING);
         assertThat(result.state().nodeState("render-result").status()).isEqualTo(PlanNodeStatus.PENDING);
-        verify(tool).execute(any(ToolContext.class), any(RankMoviePlanCommand.class));
+        verify(tool).executeRecommendationPlan(any(ToolContext.class), any(RankMoviePlanCommand.class));
     }
 
     private static MinimalReadOnlyAgentService service(RankMoviePlanTool tool) {
@@ -369,7 +370,8 @@ class MinimalReadOnlyAgentServiceTest {
                 registry,
                 validator,
                 stateMachine,
-                new RankMoviePlanExecutionAdapter(tool, stateMachine));
+                new RankMoviePlanExecutionAdapter(tool, stateMachine),
+                Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static MockModelGateway mockGateway(ToolRegistry registry) {
@@ -386,6 +388,7 @@ class MinimalReadOnlyAgentServiceTest {
                 name -> switch (name) {
                     case "date" -> LocalDate.class;
                     case "timeFrom", "timeTo" -> LocalTime.class;
+                    case "ticketCount" -> Integer.class;
                     default -> String.class;
                 }));
         return new MinimalReadOnlyAgentRequest(
@@ -402,7 +405,9 @@ class MinimalReadOnlyAgentServiceTest {
     }
 
     private static Map<String, String> completeSlots() {
-        return Map.of("movieId", "101", "cinemaId", "201", "date", "2026-08-04");
+        return Map.of(
+                "cityCode", "430100", "date", "2026-08-04", "ticketCount", "1",
+                "movieId", "101", "cinemaId", "201");
     }
 
     private static RankMoviePlanTool realTool(List<PurchaseCandidate> candidates) {
@@ -413,7 +418,7 @@ class MinimalReadOnlyAgentServiceTest {
                 Clock.fixed(NOW, ZoneOffset.UTC)));
     }
 
-    private static ToolResult<FixedRecommendationResult> retryableFailure() {
+    private static ToolResult<RecommendationPlanResult> retryableFailure() {
         return new ToolResult<>(
                 ToolStatus.FAILED,
                 null,
@@ -428,7 +433,7 @@ class MinimalReadOnlyAgentServiceTest {
                 null);
     }
 
-    private static ToolResult<FixedRecommendationResult> nonRetryableFailure() {
+    private static ToolResult<RecommendationPlanResult> nonRetryableFailure() {
         return new ToolResult<>(
                 ToolStatus.FAILED,
                 null,
@@ -445,9 +450,9 @@ class MinimalReadOnlyAgentServiceTest {
 
     private static CandidatePlan independentBranchPlan() {
         List<InputReference> inputs = List.of(
-                new InputReference("movieId", InputReferenceSource.SLOT, "movieId"),
-                new InputReference("cinemaId", InputReferenceSource.SLOT, "cinemaId"),
-                new InputReference("date", InputReferenceSource.SLOT, "date"));
+                new InputReference("cityCode", InputReferenceSource.SLOT, "cityCode"),
+                new InputReference("date", InputReferenceSource.SLOT, "date"),
+                new InputReference("ticketCount", InputReferenceSource.SLOT, "ticketCount"));
         return new CandidatePlan(
                 "independent-plan",
                 1,
@@ -482,24 +487,16 @@ class MinimalReadOnlyAgentServiceTest {
                                 FailurePolicy.FAIL)));
     }
 
-    private static ToolResult<FixedRecommendationResult> successfulToolResult() {
-        FixedRecommendationResult data = new FixedRecommendationResult(
-                "fixed-rec-v1",
-                List.of(new RecommendationCandidate(
-                        "101",
-                        "201",
-                        "301",
-                        "45.00",
-                        NOW.plusSeconds(3_600),
-                        "TICKETING:MOCK",
-                        false,
-                        true)),
-                true,
-                List.of(),
-                "FIXED_RECOMMENDATION",
-                NOW,
-                NOW.plusSeconds(1_800),
-                false);
+    private static ToolResult<RecommendationPlanResult> successfulToolResult() {
+        RecommendationPlanResult data = new RecommendationPlanResult(
+                "1.0", "fixed-rec-v1", List.of(new RecommendationPlan(
+                        RecommendationPlan.PlanType.COMPREHENSIVE,
+                        "101", null, "201", null, "301", new java.math.BigDecimal("45.00"),
+                        NOW.plusSeconds(900), null, null, null, 0D, List.of("fixture"),
+                        List.of(new RecommendationEvidence(
+                                "showtime", "301", "TICKETING:MOCK", NOW, NOW.plusSeconds(1_800))),
+                        "TICKETING:MOCK", NOW, NOW.plusSeconds(1_800), true)),
+                List.of(), null, false, "FIXED_RECOMMENDATION", NOW, NOW.plusSeconds(1_800), false);
         return new ToolResult<>(
                 ToolStatus.SUCCESS,
                 data,

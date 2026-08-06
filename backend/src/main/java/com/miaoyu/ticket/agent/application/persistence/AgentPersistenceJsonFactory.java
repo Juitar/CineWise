@@ -61,7 +61,10 @@ public class AgentPersistenceJsonFactory {
                     "type", "BUSINESS_INTENT",
                     "payload", Map.of(
                             "intent", "SELECT_SEATS",
-                            "businessRef", Map.of("showId", facts.showId()))));
+                            "businessRef", Map.of(
+                                    "showId", facts.showId(),
+                                    "movieId", facts.movieId(),
+                                    "cinemaId", facts.cinemaId()))));
         }
         if (!(reply.payload() instanceof RecommendationReplyFacts facts)) {
             throw new IllegalArgumentException("只有推荐或选座回复可以生成卡片事件");

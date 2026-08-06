@@ -76,7 +76,7 @@ public class AgentToolConfiguration {
     /**
      * 通过构造器明确绑定 D 的公开推荐工具，不提供字符串路由入口。
      *
-     * <p>适配器只调用 {@code RankMoviePlanTool.execute(context, command)}；它不能调用 D 的 Controller、
+     * <p>适配器只调用 {@code RankMoviePlanTool.executeRecommendationPlan(context, command)}；它不能调用 D 的 Controller、
      * Repository 或持久化对象，也不参与计划生成和状态机推进。
      */
     @Bean

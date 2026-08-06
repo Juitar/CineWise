@@ -275,8 +275,8 @@ class MultiToolSupervisorTest {
                         Map.of(), Map.of(), new SlotSnapshot(1L, Map.of())),
                 "run-question", "trace-question", 3_000L));
 
-        assertThat(result.safeNextAction()).isEqualTo("QUESTION:movieId");
-        assertThat(result.state().nodeState("ask-movieId").status())
+        assertThat(result.safeNextAction()).isEqualTo("QUESTION:cityCode");
+        assertThat(result.state().nodeState("ask-cityCode").status())
                 .isEqualTo(com.miaoyu.ticket.agent.domain.plan.PlanNodeStatus.SUCCESS);
         Mockito.verify(adapter, Mockito.never())
                 .execute(any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class));
@@ -319,9 +319,7 @@ class MultiToolSupervisorTest {
         return new CandidatePlan("plan-1", 1, List.of(
                 new CandidatePlanNode(
                         "rank", PlanNodeType.CALL_TOOL, RankMoviePlanTool.TARGET_NAME,
-                        List.of(new InputReference("movieId", InputReferenceSource.SLOT, "movieId"),
-                                new InputReference("cinemaId", InputReferenceSource.SLOT, "cinemaId"),
-                                new InputReference("date", InputReferenceSource.SLOT, "date")),
+                        rankInputReferences(),
                         List.of(), FailurePolicy.FAIL),
                 new CandidatePlanNode("confirm", PlanNodeType.CONFIRM_ACTION, null, List.of(), List.of("rank"),
                         FailurePolicy.FAIL),
@@ -335,19 +333,27 @@ class MultiToolSupervisorTest {
     private static CandidatePlanNode rankNode(String nodeId) {
         return new CandidatePlanNode(
                 nodeId, PlanNodeType.CALL_TOOL, RankMoviePlanTool.TARGET_NAME,
-                List.of(new InputReference("movieId", InputReferenceSource.SLOT, "movieId"),
-                        new InputReference("cinemaId", InputReferenceSource.SLOT, "cinemaId"),
-                        new InputReference("date", InputReferenceSource.SLOT, "date")),
+                rankInputReferences(),
                 List.of(), FailurePolicy.FAIL);
     }
 
     private static PlanValidationContext context() {
         return new PlanValidationContext(
-                Map.of("movieId", String.class, "cinemaId", String.class, "date", LocalDate.class,
-                        "showId", String.class, "seatIds", List.class),
+                Map.of("cityCode", String.class, "date", LocalDate.class, "ticketCount", Integer.class,
+                        "movieId", String.class, "cinemaId", String.class, "showId", String.class,
+                        "seatIds", List.class),
                 Map.of(),
                 new SlotSnapshot(1L, Map.of(
-                        "movieId", "1", "cinemaId", "2", "date", "2026-08-06", "showId", "3",
-                        "seatIds", "4,5")));
+                        "cityCode", "430100", "ticketCount", "1", "movieId", "1", "cinemaId", "2",
+                        "date", "2026-08-06", "showId", "3", "seatIds", "4,5")));
+    }
+
+    private static List<InputReference> rankInputReferences() {
+        return List.of(
+                new InputReference("cityCode", InputReferenceSource.SLOT, "cityCode"),
+                new InputReference("date", InputReferenceSource.SLOT, "date"),
+                new InputReference("ticketCount", InputReferenceSource.SLOT, "ticketCount"),
+                new InputReference("movieId", InputReferenceSource.SLOT, "movieId"),
+                new InputReference("cinemaId", InputReferenceSource.SLOT, "cinemaId"));
     }
 }
