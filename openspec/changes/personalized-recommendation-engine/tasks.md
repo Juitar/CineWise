@@ -13,7 +13,7 @@
 - [x] 2.4 D 实现最多一项放宽建议与无可购候选降级；验证：`RecommendationRelaxationAdvisorTest` 验证仅在移除预算后恢复候选时返回预算建议，规则不修改原条件、不创建订单、不锁座、不支付。
 - [x] 2.5 D 在 A 已确认的公开 API 上实现候选适配器；验证：`TicketingBatchShowtimeQueryAdapterTest` 验证场次、金额、来源和 `truncated` 原样映射，适配器只依赖 `SaleableShowBatchQueryService`，不保存第二份票务事实。
 - [x] 2.6 D 实现按城市解析影院候选的内容公开应用 API；验证：`RecommendationContentCandidateQueryServiceTest` 覆盖影院 ID、名称、来源和时效映射，内容查询异常继续由内容模块返回稳定错误。
-- [x] 2.7 D 实现 Haversine 直线距离计算、一次性位置上下文、最近 10 家预筛、距离上限过滤和 `NEAREST` 方案；验证：`CinemaDistanceSelectorTest`、`DistanceContextServiceTest`、`RecommendationPlanRankerTest` 覆盖距离上限、单次消费和最近方案；不调用高德、不持久化位置。
+- [ ] 2.7 D 已实现 Haversine 直线距离计算、一次性位置上下文、最近 10 家预筛、距离上限过滤和 `NEAREST` 方案的领域组件；待 B 在可信 `ToolContext` 传入已确认的 `distanceContextId` 与距离偏好后，D 才能在推荐查询中消费一次性坐标、先筛选影院再调用 A，并完成实际调用验证。当前验证仅覆盖 `CinemaDistanceSelectorTest`、`DistanceContextServiceTest`、`RecommendationPlanRankerTest` 的组件规则；不调用高德、不持久化位置。
 
 ## 3. 推荐指标
 
