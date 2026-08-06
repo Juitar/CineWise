@@ -442,7 +442,7 @@ class AgentPersistenceMySqlIntegrationTest {
 
     @Test
     void shouldRejectPendingActionBeforeCreateOrderToolWritesOrderOrLocksSeat() {
-        AgentConfirmationAction pending = action("action-tool-authorization-rejected");
+        AgentConfirmationAction pending = action("123e4567-e89b-42d3-a456-426614174001");
         actionRepository.insert(pending);
         int ordersBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ticket_order", Integer.class);
         int orderSeatsBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ticket_order_seat", Integer.class);
