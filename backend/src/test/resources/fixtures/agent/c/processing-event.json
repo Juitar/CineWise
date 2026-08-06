@@ -2,6 +2,7 @@
   "eventId": "40",
   "sessionId": "session-example-1",
   "runId": "run-example-1",
+  "planId": "plan-example-1",
   "planVersion": 1,
   "nodeId": "rank-movie",
   "eventType": "step.start",

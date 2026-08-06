@@ -1,0 +1,1 @@
+{"eventId":"49","eventType":"card","sessionId":"session-example-1","runId":"run-example-1","occurredAt":"2026-08-05T10:00:08+08:00","planId":"plan-example-1","planVersion":1,"nodeId":"rank-movie","displayText":"暂时无法完成","payload":{"type":"ERROR","code":"306002","message":"推荐服务暂不可用","retryable":true}}

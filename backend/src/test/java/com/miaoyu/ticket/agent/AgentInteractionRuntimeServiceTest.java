@@ -18,7 +18,12 @@ import com.miaoyu.ticket.agent.application.persistence.AgentRunCancellationServi
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionCreationService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionManagementService;
 import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
+import com.miaoyu.ticket.agent.domain.persistence.AgentRequestHash;
+import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
+import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEvent;
+import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
+import com.miaoyu.ticket.agent.domain.persistence.AgentSessionStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationAction;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentActionWriteIdentifiers;
@@ -50,6 +55,7 @@ class AgentInteractionRuntimeServiceTest {
                 new AgentStoredJson("{\"status\":\"FAILED\"}"), time.plusDays(30), time);
         when(replayService.replay("session-1", 0L))
                 .thenReturn(new AgentEventReplayService.ReplayResult(List.of(error, complete), false, 9L));
+        stubRun(queryService);
 
         var replay = service.replayPersistedEvents("session-1", 0L);
 
@@ -57,8 +63,9 @@ class AgentInteractionRuntimeServiceTest {
         assertThat(replay.events()).extracting(AgentInteractionRuntimeService.EventView::eventType)
                 .containsExactly("message.error", "run.complete");
         verify(replayService).replay("session-1", 0L);
-        verifyNoInteractions(submissionService, queryService, sessionCreationService, sessionManagementService,
-                runCancellationService, confirmationService);
+        verifyNoInteractions(submissionService, sessionCreationService, sessionManagementService,
+                runCancellationService,
+                confirmationService);
     }
 
     @Test
@@ -85,6 +92,7 @@ class AgentInteractionRuntimeServiceTest {
                 .expire(time.plusMinutes(5));
         when(replayService.replay("session-1", 0L))
                 .thenReturn(new AgentEventReplayService.ReplayResult(List.of(card), false, 8L));
+        stubRun(queryService);
         when(confirmationService.refreshForCurrentUser("action-1")).thenReturn(Optional.of(expired));
 
         var replay = service.replayPersistedEvents("session-1", 0L);
@@ -120,6 +128,7 @@ class AgentInteractionRuntimeServiceTest {
         AgentConfirmationAction succeeded = unknown.markSucceeded("order-1", time.plusSeconds(3));
         when(replayService.replay("session-1", 0L))
                 .thenReturn(new AgentEventReplayService.ReplayResult(List.of(card), false, 8L));
+        stubRun(queryService);
         when(confirmationService.refreshForCurrentUser("action-1")).thenReturn(Optional.of(unknown));
         when(confirmationService.recover(org.mockito.ArgumentMatchers.eq("action-1"),
                 org.mockito.ArgumentMatchers.anyString()))
@@ -130,7 +139,7 @@ class AgentInteractionRuntimeServiceTest {
         assertThat(replay.events().getFirst().payload().path("status").asText()).isEqualTo("SUCCEEDED");
         verify(confirmationService).recover(org.mockito.ArgumentMatchers.eq("action-1"),
                 org.mockito.ArgumentMatchers.anyString());
-        verifyNoInteractions(submissionService, queryService, sessionCreationService, sessionManagementService,
+        verifyNoInteractions(submissionService, sessionCreationService, sessionManagementService,
                 runCancellationService);
     }
 
@@ -157,6 +166,7 @@ class AgentInteractionRuntimeServiceTest {
                 new ConfirmedOrderCommand("createOrder", "70001", List.of("2", "4")), time.plusMinutes(5), time);
         when(replayService.replay("session-1", 0L))
                 .thenReturn(new AgentEventReplayService.ReplayResult(List.of(card, card), false, 8L));
+        stubRun(queryService);
         when(confirmationService.refreshForCurrentUser("action-1")).thenReturn(Optional.of(pending));
 
         var replay = service.replayPersistedEvents("session-1", 0L);
@@ -167,5 +177,14 @@ class AgentInteractionRuntimeServiceTest {
                 org.mockito.ArgumentMatchers.anyString());
         verify(confirmationService, never()).confirm(org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.anyString());
+    }
+    private static void stubRun(AgentRuntimeQueryService queryService) {
+        LocalDateTime time = LocalDateTime.of(2026, 8, 5, 11, 20);
+        AgentRun run = new AgentRun(11L, "run-1", 10L, 9L, "request-1", new AgentRequestHash("v1", "a".repeat(64)),
+                "plan-1", 1, AgentRunStatus.RUNNING, "trace-1", time, null, 0L, time, time, time.plusDays(30));
+        AgentSession session = new AgentSession(10L, "session-1", 9L, null, AgentSessionStatus.ACTIVE, 11L,
+                0L, time, time, time.plusDays(30));
+        when(queryService.queryMyRun("run-1")).thenReturn(new AgentRuntimeQueryService.RuntimeView(run, session,
+                List.of(), List.of(), List.of(), 8L));
     }
 }

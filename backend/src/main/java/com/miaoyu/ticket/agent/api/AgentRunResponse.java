@@ -18,7 +18,8 @@ public record AgentRunResponse(String runId, String sessionId, String status, St
     }
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record EventSummary(String eventId, String sessionId, String runId, Integer planVersion, String nodeId,
+    public record EventSummary(String eventId, String sessionId, String runId, String planId, Integer planVersion,
+            String nodeId,
             String eventType, String displayText, JsonNode payload, OffsetDateTime occurredAt) {
     }
 }
