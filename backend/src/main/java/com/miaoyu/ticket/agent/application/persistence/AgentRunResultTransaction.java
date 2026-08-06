@@ -107,7 +107,7 @@ public class AgentRunResultTransaction {
     @Transactional
     public AgentRun record(AgentRun run, MultiToolSupervisorResult result) {
         Objects.requireNonNull(result, "运行结果不能为空");
-        return recordInternal(run, AgentRunReplyFactory.asMinimalResult(result), result.toolResults());
+        return recordInternal(run, AgentRunReplyFactory.asMinimalResult(result, clock.instant()), result.toolResults());
     }
 
 

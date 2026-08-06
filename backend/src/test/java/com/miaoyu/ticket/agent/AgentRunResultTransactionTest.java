@@ -47,10 +47,12 @@ import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.agent.application.tool.AgentToolDefinitions;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
+import com.miaoyu.ticket.ticketing.api.QueryShowsToolResult;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
@@ -219,6 +221,48 @@ class AgentRunResultTransactionTest {
         verify(fixture.messageRepository(), Mockito.times(2)).insert(messages.capture());
         assertEquals(AgentMessageType.MOVIE_CARD, messages.getAllValues().getFirst().type());
         assertEquals(AgentMessageType.ERROR, messages.getAllValues().getLast().type());
+    }
+
+    @Test
+    void shouldPersistSelectSeatsCardFromFreshQueryShowsResult() throws Exception {
+        Fixture fixture = fixture();
+        ExecutionPlan plan = new ExecutionPlan("plan-shows", 1, List.of(new ExecutionPlanNode(
+                "shows", PlanNodeType.CALL_TOOL, "queryShows", List.of(), List.of(), FailurePolicy.FAIL,
+                PlanNodeStatus.PENDING, false, false, null, null, new SlotSnapshot(3L, Map.of()))));
+        ExecutionPlanStateMachine machine = new ExecutionPlanStateMachine(
+                new ToolRegistry(List.of(AgentToolDefinitions.queryShows())));
+        Instant dataAt = Instant.parse("2026-08-04T02:00:00Z");
+        ToolResult<QueryShowsToolResult> success = new ToolResult<>(
+                ToolStatus.SUCCESS,
+                new QueryShowsToolResult(List.of(new QueryShowsToolResult.ShowItem(
+                        "70001", "101", "201", "测试影院", "301", "1号厅",
+                        OffsetDateTime.parse("2026-08-04T04:00:00+00:00"),
+                        OffsetDateTime.parse("2026-08-04T06:00:00+00:00"),
+                        OffsetDateTime.parse("2026-08-04T03:00:00+00:00"),
+                        "国语2D", "50.00", 20, "SCHEDULED", "NORMAL", 1,
+                        OffsetDateTime.parse("2026-08-04T02:00:00+00:00")))),
+                null, false, false, "VIEW_SHOWS", false, null, 3L, dataAt, dataAt.plusSeconds(60));
+        var running = machine.startNode(machine.initialize(plan), "shows");
+        var completed = machine.recordToolResult(running, "shows", success);
+        when(fixture.runRepository().updateTerminalWithCas(any(), eq(0L))).thenReturn(true);
+
+        fixture.transaction().record(run(), new MultiToolSupervisorResult(
+                new CandidatePlan("plan-shows", 1, List.of()), PlanValidationResult.valid(plan), completed,
+                List.of(new MultiToolSupervisorResult.NodeToolResult("shows", "queryShows", success)), false, null));
+
+        ArgumentCaptor<AgentMessage> message = ArgumentCaptor.forClass(AgentMessage.class);
+        verify(fixture.messageRepository()).insert(message.capture());
+        assertEquals(AgentMessageType.SELECT_SEATS, message.getValue().type());
+        ArgumentCaptor<AgentEventType> eventType = ArgumentCaptor.forClass(AgentEventType.class);
+        ArgumentCaptor<AgentStoredJson> eventPayload = ArgumentCaptor.forClass(AgentStoredJson.class);
+        verify(fixture.runtimeEventService(), Mockito.atLeastOnce()).append(
+                any(), any(), eventType.capture(), eventPayload.capture());
+        int cardIndex = eventType.getAllValues().indexOf(AgentEventType.CARD);
+        assertEquals(true, cardIndex >= 0);
+        var payload = new ObjectMapper().readTree(eventPayload.getAllValues().get(cardIndex).value());
+        assertEquals("BUSINESS_INTENT", payload.path("type").asText());
+        assertEquals("SELECT_SEATS", payload.path("payload").path("intent").asText());
+        assertEquals("70001", payload.path("payload").path("businessRef").path("showId").asText());
     }
 
     private static MinimalReadOnlyAgentResult result(

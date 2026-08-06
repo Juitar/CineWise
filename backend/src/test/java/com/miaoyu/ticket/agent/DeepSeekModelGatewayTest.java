@@ -92,4 +92,19 @@ class DeepSeekModelGatewayTest {
             server.stop(0);
         }
     }
+
+    @Test
+    void shouldAllowBlankKeyWhenMockIsEnabledButRejectItForRealGateway() {
+        DeepSeekProperties mockProperties = new DeepSeekProperties(
+                false, "", "deepseek-v4-flash", "https://api.deepseek.com", Duration.ofSeconds(2));
+
+        assertThatThrownBy(mockProperties::requireEnabledConfiguration)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("未开启 DeepSeek");
+        DeepSeekProperties enabledProperties = new DeepSeekProperties(
+                true, "", "deepseek-v4-flash", "https://api.deepseek.com", Duration.ofSeconds(2));
+        assertThatThrownBy(enabledProperties::requireEnabledConfiguration)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("DEEPSEEK_API_KEY");
+    }
 }

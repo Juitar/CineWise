@@ -6,9 +6,13 @@ import com.miaoyu.ticket.agent.application.reply.ProgressReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.QuestionReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.RecommendationReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.RecommendationReplyFactsMapper;
+import com.miaoyu.ticket.agent.application.reply.SelectSeatsReplyFacts;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
+import com.miaoyu.ticket.ticketing.api.QueryShowsTool;
+import com.miaoyu.ticket.ticketing.api.QueryShowsToolResult;
+import java.time.Instant;
 import java.util.List;
 
 /** 将多工具运行结果收窄为 B 自有的回复事实，隔离持久化层和业务 Owner DTO。 */
@@ -17,7 +21,8 @@ public final class AgentRunReplyFactory {
     }
 
     public static com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse from(
-            MultiToolSupervisorResult result) {
+            MultiToolSupervisorResult result, Instant now) {
+        java.util.Objects.requireNonNull(now, "当前时间不能为空");
         if (!result.validation().isValid()) {
             return new com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse(
                     "当前请求无法安全执行", AgentReplyMessageType.ERROR,
@@ -36,6 +41,11 @@ public final class AgentRunReplyFactory {
                     .findFirst().orElse("plan");
             return new com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse(
                     "推荐节点仍在处理中。", AgentReplyMessageType.PROGRESS, new ProgressReplyFacts(nodeId));
+        }
+        SelectSeatsReplyFacts selectSeats = lastFreshShow(result, now);
+        if (selectSeats != null) {
+            return new com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse(
+                    "已确认场次，请前往选座。", AgentReplyMessageType.SELECT_SEATS, selectSeats);
         }
         ToolResult<FixedRecommendationResult> recommendation = lastSuccessfulRecommendation(result);
         if (recommendation != null) {
@@ -60,12 +70,44 @@ public final class AgentRunReplyFactory {
 
     /** 将多工具结果组装成持久化层可接收的 B 结果对象；D 类型依赖停留在应用映射边界。 */
     @SuppressWarnings("unchecked")
-    public static MinimalReadOnlyAgentResult asMinimalResult(MultiToolSupervisorResult result) {
+    public static MinimalReadOnlyAgentResult asMinimalResult(MultiToolSupervisorResult result, Instant now) {
         List<ToolResult<FixedRecommendationResult>> toolResults = result.toolResults().stream()
                 .map(item -> (ToolResult<FixedRecommendationResult>) item.result())
                 .toList();
         return new MinimalReadOnlyAgentResult(
-                result.candidatePlan(), result.validation(), result.state(), toolResults, from(result));
+                result.candidatePlan(), result.validation(), result.state(), toolResults, from(result, now));
+    }
+
+    /**
+     * 选座入口只能来自本轮已成功的公开场次 Tool，并且整个结果窗口尚未过期。
+     * 不读取座位图，也不把 A 的完整场次 DTO 写入回复或 SSE。
+     */
+    private static SelectSeatsReplyFacts lastFreshShow(MultiToolSupervisorResult result, Instant now) {
+        for (int index = result.toolResults().size() - 1; index >= 0; index--) {
+            MultiToolSupervisorResult.NodeToolResult nodeResult = result.toolResults().get(index);
+            ToolResult<?> toolResult = nodeResult.result();
+            if (!QueryShowsTool.TARGET_NAME.equals(nodeResult.targetName())
+                    || toolResult.status() != ToolStatus.SUCCESS
+                    || !toolResult.hasFreshnessWindow()
+                    || !toolResult.expiresAt().isAfter(now)
+                    || !(toolResult.data() instanceof QueryShowsToolResult shows)) {
+                continue;
+            }
+            for (QueryShowsToolResult.ShowItem show : shows.shows()) {
+                if (isPositiveDecimalId(show.showId())) {
+                    return new SelectSeatsReplyFacts(show.showId());
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean isPositiveDecimalId(String value) {
+        try {
+            return value != null && Long.parseLong(value) > 0L;
+        } catch (NumberFormatException exception) {
+            return false;
+        }
     }
 
     @SuppressWarnings("unchecked")

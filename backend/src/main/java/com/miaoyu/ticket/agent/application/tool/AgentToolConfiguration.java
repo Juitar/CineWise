@@ -86,6 +86,7 @@ public class AgentToolConfiguration {
         @Bean
         ModelGateway deepSeekModelGateway(
                 DeepSeekProperties properties, ObjectMapper objectMapper, PlanSchemaValidator planSchemaValidator) {
+            properties.requireEnabledConfiguration();
             org.springframework.http.client.SimpleClientHttpRequestFactory requestFactory =
                     new org.springframework.http.client.SimpleClientHttpRequestFactory();
             requestFactory.setConnectTimeout(properties.timeout());
