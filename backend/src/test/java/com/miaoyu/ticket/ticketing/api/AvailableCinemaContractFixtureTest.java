@@ -27,6 +27,8 @@ class AvailableCinemaContractFixtureTest {
         assertThat(read("available-cinemas-empty.json").required("data").required("records")).isEmpty();
         assertThat(read("available-cinemas-invalid-parameter.json").required("code").asInt()).isEqualTo(100001);
         assertThat(read("available-cinemas-query-unavailable.json").required("code").asInt()).isEqualTo(306003);
+        assertThat(read("available-cinemas-content-unavailable.json").required("code").asInt())
+                .isEqualTo(303004);
     }
 
     private JsonNode read(String fileName) throws Exception {
