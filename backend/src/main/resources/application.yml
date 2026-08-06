@@ -91,6 +91,18 @@ cinewise:
       retry-count: 1
       retry-backoff: 200ms
   travel:
+    weather:
+      amap:
+        # 启用且 key 存在时才查询高德；key 仅从环境变量读取，禁止提交到仓库。
+        enabled: ${AMAP_WEATHER_ENABLED:false}
+        key: ${AMAP_WEATHER_KEY:}
+        cache-ttl: 15m
+        # 高德天气按行政区码查询；这里只登记当前 Demo 影院所在区域，不接收用户位置。
+        area-adcodes:
+          "[西湖区]": "330106"
+          "[滨江区]": "330108"
+          "[拱墅区]": "330105"
+          "[上城区]": "330102"
     food:
       radius-default-meters: ${TRAVEL_FOOD_RADIUS_DEFAULT_METERS:1000}
       radius-min-meters: ${TRAVEL_FOOD_RADIUS_MIN_METERS:300}

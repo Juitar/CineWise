@@ -20,6 +20,83 @@
 - **THEN** 结果标记 `isExpired=true` 并只作只读参考
 - **AND** 系统不将其作为新的当前路线、天气或提醒事实
 
+### Requirement: 已配置时按影院区域查询高德实时天气
+
+系统 SHALL 在配置有效的高德 Web 服务 `key` 且影院区域存在已登记行政区码时，调用高德天气查询接口获取实况天气。调用参数 MUST 使用影院区域对应的行政区码，不得使用用户精确位置、用户地址或路线数据；密钥不得写入日志、快照或响应。成功结果 MUST 标记 `source=AMAP_WEATHER`、`degraded=false`，并根据天气状况返回出行提醒建议。
+
+#### Scenario: 高德实况天气查询成功
+- **GIVEN** 高德天气开关已开启、`key` 已配置，且影院区域有对应行政区码
+- **WHEN** 系统为有效出行任务生成天气建议
+- **THEN** 系统使用该行政区码查询高德天气接口，并返回天气状况、气温、天气提醒和来源时效字段
+- **AND** 返回的 `source` 为 `AMAP_WEATHER`，`degraded=false`
+
+#### Scenario: 高德配置或查询不可用
+- **GIVEN** 高德 `key` 缺失、影院区域没有行政区码，或高德接口返回失败结果
+- **WHEN** 系统查询天气建议
+- **THEN** 系统继续按有效缓存、版本化 Demo、明确不可用的顺序返回
+- **AND** 系统不把 Demo 或缓存数据标记为高德实时天气
+
+### Requirement: 出行建议查询必须返回类型化页面数据
+
+`GET /api/v1/travel/tasks/{taskId}/advice` 和 `POST /api/v1/travel/tasks/{taskId}/advice/refresh` SHALL 返回类型化的 `TravelAdviceResponse`。前端不得解析 `weatherJson` 或 `adviceJson` 字符串；这两个旧字段在所有调用方迁移前仅作为兼容字段保留，C 的页面只消费以下类型化字段。
+
+| 字段 | 类型 | 规则 |
+| --- | --- | --- |
+| `available` | boolean | 尚未生成快照时为 `false`；其余情况为 `true`。 |
+| `weather` | object 或 null | 有天气事实时返回 `area`、`condition`、`risk`；天气不可用时为 `null`。 |
+| `advice` | array | 每项包含 `type` 和 `text`；`type` 仅为 `WEATHER` 或 `TRANSPORT`。有快照时至少返回一条 `TRANSPORT`。 |
+| `source` | string 或 null | 天气/建议来源，例如 `AMAP_WEATHER`、`DEMO_WEATHER_V1` 或 `UNAVAILABLE`。 |
+| `dataAt` | ISO-8601 时间或 null | 对外字段名固定为 `dataAt`，映射快照内部的 `dataTime`。 |
+| `expiresAt` | ISO-8601 时间或 null | 建议快照的失效时间。 |
+| `expired` | boolean | 快照失效或任务已取消时为 `true`。 |
+| `degraded` | boolean | 使用缓存、Demo 或天气不可用处理时为 `true`。 |
+| `fallbackType` | string 或 null | 降级类型；非降级结果为 `null`。 |
+
+类型化字段不返回用户精确位置、路线折线、途经点、邮箱、密钥或 Provider 原始 JSON。
+
+#### Scenario: 正常天气建议
+- **GIVEN** 本人任务已有未过期的真实天气建议快照
+- **WHEN** 用户查询建议
+- **THEN** 返回非空 `weather`、至少一条 `WEATHER` 和一条 `TRANSPORT` 建议
+- **AND** 返回 `source=AMAP_WEATHER`、`degraded=false`、`expired=false`
+
+#### Scenario: 天气不可用但通用建议可用
+- **GIVEN** 天气、缓存和 Demo 都不可用，但任务建议快照已生成
+- **WHEN** 用户查询建议
+- **THEN** 返回 `weather=null` 和至少一条 `TRANSPORT` 建议
+- **AND** 返回 `source=UNAVAILABLE`、`degraded=true`，不得编造天气状况
+
+#### Scenario: Demo 或缓存降级
+- **GIVEN** 系统使用版本化 Demo 或有效缓存生成建议
+- **WHEN** 用户查询建议
+- **THEN** 返回来源、`dataAt`、`expiresAt`、`degraded=true` 和对应 `fallbackType`
+- **AND** 前端可以据此展示“演示数据”或“非实时数据”，不得显示为高德实时天气
+
+#### Scenario: 过期或取消任务的既有建议
+- **GIVEN** 任务已取消，或建议快照超过 `expiresAt`
+- **WHEN** 用户查询既有建议
+- **THEN** 返回原有类型化 `weather` 和 `advice`
+- **AND** 返回 `expired=true`，前端只读展示且不得自动刷新
+
+#### Scenario: 本人校验与刷新异常
+- **GIVEN** 用户查询或刷新非本人任务
+- **WHEN** 系统校验任务归属
+- **THEN** 返回 HTTP 404 和 `207001`
+
+- **GIVEN** 用户刷新已取消任务、过期版本任务或五分钟内已刷新过的任务
+- **WHEN** 系统请求 `POST /api/v1/travel/tasks/{taskId}/advice/refresh`
+- **THEN** 分别返回 HTTP 409/`207002`、HTTP 409/`207003` 或 HTTP 429/`107001`
+
+### Requirement: 页面实现必须有固定建议响应夹具
+
+D SHALL 提供固定夹具和 OpenAPI 示例，覆盖正常天气、天气不可用、Demo 降级、过期建议和尚未生成建议五种响应。夹具的字段、来源、时间和错误码必须与 `TravelAdviceResponse` 一致；C 只依赖这些夹具和公开接口，不依赖数据库 JSON 字段或 D 的内部类。
+
+#### Scenario: C 使用固定夹具开发页面
+- **GIVEN** D 已提供五种建议响应夹具和对应 OpenAPI 示例
+- **WHEN** C 实现出行建议页面
+- **THEN** 页面只读取类型化 `weather`、`advice` 和来源时效字段
+- **AND** 页面不解析 `weatherJson`、`adviceJson`，也不读取 D 的数据库或内部类
+
 ### Requirement: 基础路线只能由用户主动发起且不保存精确位置
 
 系统 SHALL 仅在用户主动请求并确认第三方位置共享说明后，使用一次性设备位置或手动地点生成一条基础路线、预计耗时和预计出发时间。精确起点、路线折线和途经点 MUST 不写入 MySQL、Redis、日志、画像、建议快照、URL 或 Agent 轨迹，且不持续定位。
