@@ -84,7 +84,7 @@ RESULT_UNKNOWN --原键查询明确失败--> FAILED
 
 确认有效期从 action 创建时的服务端 `expire_at` 开始，到 `now >= expire_at` 即不可确认；过期转换为 `EXPIRED`。A 调用出现超时、断流或响应丢失时，以结果保存短事务写入 `RESULT_UNKNOWN`、`result_unknown_at=now`、`recovery_until=now+30天` 和固定恢复提示。恢复窗口内只能按同一 action 的原 `client_request_id` 查询；查询到明确结果后转为 `SUCCEEDED` 或 `FAILED` 并清除恢复窗口字段。窗口外不再调用建单或生成新键，清理任务只能删除已过 `recovery_until` 且仍为 `RESULT_UNKNOWN` 的记录，清理前必须保留原键供恢复。
 
-V011 已发布；原计划分配给邀请码种子的 V012 已取消，A 已将本表正式分配为 V012。A 已完成静态审查与 MySQL 8.4 迁移验证，并以 `ddd4fcf` 发布该迁移。B 不修改已发布 SQL；本 change 的 CAS、并发确认、结果未知恢复、回滚和重复初始化已由 GitHub Actions MySQL job `31025050412`（第 151 次）验证通过。
+V011 已发布；原计划分配给邀请码种子的 V012 已取消，A 已将本表正式分配为 V012。A 已完成静态审查与 MySQL 8.4 迁移验证，并以 `ddd4fcf` 发布该迁移。B 不修改已发布 SQL；本 change 的 CAS、并发确认、结果未知恢复、回滚和重复初始化已由 GitHub Actions MySQL job `31026148068`（第 154 次，重跑）验证通过。
 
 ### 4. 事务与 A 调用方向
 
@@ -107,7 +107,7 @@ SSE 复用 `card` 与 `tool.result` 等持久化事件类型：新增的确认�
 ## Risks / Trade-offs
 
 - [A 的公开建单 Tool 已落地但未调用 B 授权 Port] → B 的生产适配器已只依赖 `CreateOrderTool`，但当前 `CreateOrderTool.execute` 未注入或调用 `AgentActionAuthorizationPort`。A 必须在进入 `OrderApplicationService` 前补齐该调用；B 不改 A 的订单代码，也不把本 change 的 B 侧校验当作替代。
-- [MySQL CI 已验证] → `Backend MySQL Integration / mysql-integration` 运行 `31025050412`（第 151 次）通过，已覆盖空库 Flyway、重复初始化、action 创建/查询、CAS、重复确认、并发最多一次建单、结果未知恢复和回滚；后续生产 A/B 联调仍须在 A 接入授权 Port 后补充。
+- [MySQL CI 已验证] → `Backend MySQL Integration / mysql-integration` 运行 `31026148068`（第 154 次，重跑）通过，已覆盖空库 Flyway、重复初始化、action 创建/查询、CAS、重复确认、并发最多一次建单、结果未知恢复和回滚；后续生产 A/B 联调仍须在 A 接入授权 Port 后补充。
 - [写结果丢失] → 固定原 action 的键并查询；查不到结论保持 `RESULT_UNKNOWN`，宁可提示处理中也不重复建单。
 - [并发确认] → CAS 和唯一约束作为最终保证，单机锁和 SSE 状态不作为正确性依据；在 CI MySQL 8.4 验证并发。
 - [A API 最终需要同步身份] → `ToolContext` 已预留 run/node/trace/稳定键；A 必须确认 userId 如何在公开 API 内安全获得，B 不传递前端用户字段。
@@ -115,7 +115,7 @@ SSE 复用 `card` 与 `tool.result` 等持久化事件类型：新增的确认�
 ## Migration Plan
 
 1. V011 已发布，原 V012 邀请码种子已取消；A 已分配、审查并发布 V012（`ddd4fcf`）。B 不再修改该迁移。
-2. B 已在 GitHub Actions 的 `Backend MySQL Integration / mysql-integration` job 对空 `cinewise_agent_it` 验证首次 Flyway、重复启动、CAS、并发和恢复；运行 `31025050412`（第 151 次）通过。
+2. B 已在 GitHub Actions 的 `Backend MySQL Integration / mysql-integration` job 对空 `cinewise_agent_it` 验证首次 Flyway、重复启动、CAS、并发和恢复；运行 `31026148068`（第 154 次，重跑）通过。
 3. B 部署领域与适配器；确认卡只在服务端 action 持久化后发布。A 的生产适配器经接口测试后才启用。
 4. 回滚时停止创建新 action；已 `RESULT_UNKNOWN` 的 action 继续按原键查询，不删除记录、不生成替代键。
 

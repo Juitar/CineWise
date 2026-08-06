@@ -29,11 +29,11 @@
 
 ## 5. SSE、恢复与并发
 
-- [ ] 5.1 B：在持久化事件可用后发布安全确认卡和结果事件，先保存事实后回放；验证：payload 白名单、旧卡失效、重复事件和断线重连测试。
-- [ ] 5.2 B：实现结果未知恢复器，只按原键查询 A；本地 `AgentConfirmationServiceTest` 覆盖原键查询和不重发，`AgentInteractionRuntimeServiceTest` 覆盖 SSE 重放 `RESULT_UNKNOWN` 后只恢复查询并投影明确结果；因该路径会持久化恢复结果，仍待当前提交的 MySQL CI 验证后再勾选。
-- [x] 5.3 B：用真实持久化验证同 action 并发确认、CAS 冲突、胜者读取、终态不可重入和事务回滚不留半成品；验证：GitHub Actions MySQL 8.4 `AgentPersistenceMySqlIntegrationTest`，运行 `31025050412`（第 151 次）通过。
+- [x] 5.1 B：在持久化事件可用后发布安全确认卡和结果事件，先保存事实后回放；验证：`PersistentAgentConfirmationEventPublisherTest` 覆盖 payload 白名单，`AgentInteractionRuntimeServiceTest` 覆盖旧卡失效、重复卡和断线重放，Backend Verify `31026148341`（第 311 次）通过。
+- [x] 5.2 B：实现结果未知恢复器，只按原键查询 A；验证：`AgentConfirmationServiceTest` 覆盖原键查询和不重发，`AgentInteractionRuntimeServiceTest` 覆盖 SSE 重放 `RESULT_UNKNOWN` 后只恢复查询并投影明确结果；MySQL `31026148068`（第 154 次，重跑）通过。
+- [x] 5.3 B：用真实持久化验证同 action 并发确认、CAS 冲突、胜者读取、终态不可重入和事务回滚不留半成品；验证：GitHub Actions MySQL 8.4 `AgentPersistenceMySqlIntegrationTest`，运行 `31026148068`（第 154 次，重跑）通过。
 
 ## 6. MySQL CI 与交付检查
 
-- [x] 6.1 B/A：已在 `Backend MySQL Integration / mysql-integration` 的一次性 MySQL 8.4 `cinewise_agent_it` 执行空库 Flyway、重复启动、action 创建/查询/过期/重复确认/并发/CAS/未知恢复/回滚；运行 `31025050412`（第 151 次）通过。
-- [x] 6.2 B：完成本地相关单元和 H2 集成测试、`backend/mvnw.cmd verify`、严格 OpenSpec 校验、`git diff --check`、状态和变更范围核对；验证：本地 `verify` 通过，GitHub Actions Backend Verify `31025050850`（第 307 次）通过；未验证项已列为 A 授权 Port 和真实运行时 Command 来源。
+- [x] 6.1 B/A：已在 `Backend MySQL Integration / mysql-integration` 的一次性 MySQL 8.4 `cinewise_agent_it` 执行空库 Flyway、重复启动、action 创建/查询/过期/重复确认/并发/CAS/未知恢复/回滚；运行 `31026148068`（第 154 次，重跑）通过。
+- [x] 6.2 B：完成本地相关单元和 H2 集成测试、`backend/mvnw.cmd verify`、严格 OpenSpec 校验、`git diff --check`、状态和变更范围核对；验证：本地 `verify` 通过，GitHub Actions Backend Verify `31026148341`（第 311 次，重跑）通过；未验证项已列为 A 授权 Port 和真实运行时 Command 来源。
