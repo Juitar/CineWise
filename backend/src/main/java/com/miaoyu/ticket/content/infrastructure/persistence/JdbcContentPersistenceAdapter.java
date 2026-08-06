@@ -1,9 +1,12 @@
 package com.miaoyu.ticket.content.infrastructure.persistence;
 
 import com.miaoyu.ticket.content.application.ContentPersistencePort;
+import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -18,6 +21,8 @@ import org.springframework.stereotype.Repository;
 public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
 
     private final JdbcTemplate jdbcTemplate;
+    /** H2 测试固定停留在 V009；真实 MySQL 已发布 V014，因此按实际表结构选择兼容写入。 */
+    private volatile Boolean v014MovieColumnsAvailable;
 
     /**
      * 只接收 Spring 提供的数据访问对象。
@@ -38,19 +43,101 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
     public long ensureMovie(MovieRow row) {
         Long existingId = findMovieId(row.source(), row.sourceMovieId());
         if (existingId != null) {
+            updateMovie(existingId, row);
             return existingId;
         }
         try {
-            jdbcTemplate.update("""
-                    INSERT INTO movie (id, source_movie_id, title, genres_json, duration_minutes, rating,
-                    source_type, source, data_time, expires_at, version, deleted_at, create_time, update_time)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)
-                    """, row.id(), row.sourceMovieId(), row.title(), row.genresJson(), row.durationMinutes(),
-                    row.rating(), row.sourceType().name(), row.source(), timestamp(row.dataTime()),
-                    nullableTimestamp(row.expiresAt()), timestamp(row.dataTime()), timestamp(row.dataTime()));
+            insertMovie(row);
             return row.id();
         } catch (DuplicateKeyException duplicate) {
-            return requireMovieId(row.source(), row.sourceMovieId(), duplicate);
+            long existingAfterConflict = requireMovieId(row.source(), row.sourceMovieId(), duplicate);
+            updateMovie(existingAfterConflict, row);
+            return existingAfterConflict;
+        }
+    }
+
+    /** V014 可用时写完整影片资料；旧 H2 骨架只保留 V009 已有列，不能让测试环境误报 SQL 错误。 */
+    private void insertMovie(MovieRow row) {
+        if (hasV014MovieColumns()) {
+            jdbcTemplate.update("""
+                    INSERT INTO movie (id, source_movie_id, title, genres_json, duration_minutes, rating,
+                    poster_url, summary, release_status, release_date, source_type, source, data_time, expires_at,
+                    version, deleted_at, create_time, update_time)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)
+                    """, row.id(), row.sourceMovieId(), row.title(), row.genresJson(), row.durationMinutes(),
+                    row.rating(), row.posterUrl(), row.summary(), row.releaseStatus(), nullableDate(row.releaseDate()),
+                    row.sourceType().name(), row.source(), timestamp(row.dataTime()),
+                    nullableTimestamp(row.expiresAt()),
+                    timestamp(row.dataTime()), timestamp(row.dataTime()));
+            return;
+        }
+        jdbcTemplate.update("""
+                INSERT INTO movie (id, source_movie_id, title, genres_json, duration_minutes, rating,
+                source_type, source, data_time, expires_at, version, deleted_at, create_time, update_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)
+                """, row.id(), row.sourceMovieId(), row.title(), row.genresJson(), row.durationMinutes(),
+                row.rating(), row.sourceType().name(), row.source(), timestamp(row.dataTime()),
+                nullableTimestamp(row.expiresAt()), timestamp(row.dataTime()), timestamp(row.dataTime()));
+    }
+
+    /**
+     * 用来源身份定位的已有影片只能原地更新，不能新建第二个业务 ID。
+     *
+     * <p>Provider 有时不会返回海报、简介或上映资料；这些 null 代表本次缺失，不是要求删除旧资料，
+     * 所以四个可选字段使用 COALESCE 保留上一份已验证值。</p>
+     */
+    private void updateMovie(long existingId, MovieRow row) {
+        if (!hasV014MovieColumns()) {
+            updateLegacyMovie(existingId, row);
+            return;
+        }
+        jdbcTemplate.update("""
+                UPDATE movie
+                   SET title = ?, genres_json = ?, duration_minutes = ?, rating = ?,
+                       poster_url = COALESCE(?, poster_url), summary = COALESCE(?, summary),
+                       release_status = COALESCE(?, release_status), release_date = COALESCE(?, release_date),
+                       source_type = ?, data_time = ?, expires_at = ?, version = version + 1, update_time = ?
+                 WHERE id = ? AND source = ? AND source_movie_id = ?
+                """, row.title(), row.genresJson(), row.durationMinutes(), row.rating(), row.posterUrl(),
+                row.summary(), row.releaseStatus(), nullableDate(row.releaseDate()), row.sourceType().name(),
+                timestamp(row.dataTime()), nullableTimestamp(row.expiresAt()), timestamp(row.dataTime()), existingId,
+                row.source(), row.sourceMovieId());
+    }
+
+    /** V009 兼容路径只更新原有基础字段，供固定 H2 回归测试和短暂旧库过渡使用。 */
+    private void updateLegacyMovie(long existingId, MovieRow row) {
+        jdbcTemplate.update("""
+                UPDATE movie
+                   SET title = ?, genres_json = ?, duration_minutes = ?, rating = ?, source_type = ?,
+                       data_time = ?, expires_at = ?, version = version + 1, update_time = ?
+                 WHERE id = ? AND source = ? AND source_movie_id = ?
+                """, row.title(), row.genresJson(), row.durationMinutes(), row.rating(), row.sourceType().name(),
+                timestamp(row.dataTime()), nullableTimestamp(row.expiresAt()), timestamp(row.dataTime()), existingId,
+                row.source(), row.sourceMovieId());
+    }
+
+    /**
+     * V014 已发布到共享 MySQL，但 H2 测试 profile 按仓库规则仅执行到 V009。
+     *
+     * <p>检测结果在适配器生命周期内缓存，避免每次同步多做一次探测；缺列只走兼容 SQL，不将缺列当作
+     * Provider 失败或吞掉其他数据库异常。</p>
+     */
+    private boolean hasV014MovieColumns() {
+        Boolean cached = v014MovieColumnsAvailable;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            if (v014MovieColumnsAvailable != null) {
+                return v014MovieColumnsAvailable;
+            }
+            try {
+                jdbcTemplate.query("SELECT poster_url FROM movie WHERE 1 = 0", (resultSet, rowNumber) -> null);
+                v014MovieColumnsAvailable = true;
+            } catch (DataAccessException exception) {
+                v014MovieColumnsAvailable = false;
+            }
+            return v014MovieColumnsAvailable;
         }
     }
 
@@ -114,9 +201,23 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
     }
 
     /**
+     * 用本次目录给出的身份批量判断已完成影片。
+     *
+     * <p>SQL 参数始终由调用方生成占位符，外部身份不拼接进 SQL。空目录直接返回空集合，
+     * 这样 Provider 未给出候选时不会构造无意义的全表查询。</p>
+     */
+    @Override
+    public Set<String> findExistingMovieSourceIds(String source) {
+        return Set.copyOf(jdbcTemplate.query("SELECT source_movie_id FROM movie WHERE source = ? "
+                        + "AND source_movie_id IS NOT NULL AND deleted_at IS NULL",
+                (resultSet, rowNumber) -> resultSet.getString("source_movie_id"), source));
+    }
+
+    /**
      * 同来源与来源 ID 的查询只用于明确非空身份的内容，返回 null 代表还需首次插入。
      *
-     * <p>这里不对已存在记录更新标题或评分，防止固定种子在演示启动时覆盖真实 Provider 后续写入的内容。</p>
+     * <p>固定种子走独立的 ContentSeedRepository，不经过此适配器。这里的同来源更新只处理已经通过
+     * Provider 字段校验的真实资料，避免同步后快照已变而 movie 表仍停留在旧资料。</p>
      */
     private Long findMovieId(String source, String sourceMovieId) {
         return findId("SELECT id FROM movie WHERE source = ? AND source_movie_id = ?", source, sourceMovieId);
@@ -167,5 +268,10 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
     /** 只有 expiresAt 和 finishedAt 允许为空；其余审计时间由调用方明确提供。 */
     private Timestamp nullableTimestamp(LocalDateTime value) {
         return value == null ? null : timestamp(value);
+    }
+
+    /** V014 的上映日期是 SQL DATE；空值必须以 JDBC null 写入，不能用同步时间替代。 */
+    private Date nullableDate(java.time.LocalDate value) {
+        return value == null ? null : Date.valueOf(value);
     }
 }

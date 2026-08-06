@@ -9,6 +9,8 @@ import com.miaoyu.ticket.agent.application.tool.AgentToolConfiguration;
 import com.miaoyu.ticket.agent.domain.plan.PlanSchemaValidator;
 import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
+import com.miaoyu.ticket.ticketing.api.QueryAvailableDatesTool;
+import com.miaoyu.ticket.ticketing.api.QueryShowsTool;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
@@ -19,6 +21,8 @@ class AgentToolConfigurationTest {
     void shouldCreateOneTypedDependencyForMultiToolSupervisor() {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             context.registerBean(RankMoviePlanTool.class, () -> mock(RankMoviePlanTool.class));
+            context.registerBean(QueryAvailableDatesTool.class, () -> mock(QueryAvailableDatesTool.class));
+            context.registerBean(QueryShowsTool.class, () -> mock(QueryShowsTool.class));
             context.register(AgentToolConfiguration.class);
             context.refresh();
 

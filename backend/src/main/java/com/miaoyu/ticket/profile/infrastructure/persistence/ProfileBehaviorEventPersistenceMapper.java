@@ -12,7 +12,8 @@ public interface ProfileBehaviorEventPersistenceMapper {
   @Select(
       """
       SELECT event_id AS event_id, user_id AS user_id, event_type AS event_type,
-             target_type AS target_type, target_id AS target_id, occurred_at AS occurred_at
+             target_type AS target_type, target_id AS target_id, occurred_at AS occurred_at,
+             COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.changed')) = 'true', FALSE) AS changed
         FROM user_behavior_event WHERE event_id = #{eventId}
       """)
   ProfileBehaviorEventRow findByEventId(@Param("eventId") String eventId);
@@ -34,7 +35,14 @@ public interface ProfileBehaviorEventPersistenceMapper {
             INSERT INTO user_behavior_event (id, event_id, user_id, event_type, target_type, target_id,
                 order_id, order_version, session_id, payload_json, occurred_at, create_time)
             VALUES (#{event.id}, #{event.eventId}, #{event.userId}, #{event.eventType}, #{event.targetType},
-                #{event.targetId}, NULL, NULL, NULL, NULL, #{event.occurredAt}, #{event.createdAt})
+                #{event.targetId}, #{event.orderId}, #{event.orderVersion}, NULL,
+                CASE WHEN #{event.changed} THEN '{"changed":true}' ELSE '{"changed":false}' END,
+                #{event.occurredAt}, #{event.createdAt})
             """)
-    int insert(@Param("event") ProfileBehaviorEventRepository.NewEvent event);
+  int insert(@Param("event") ProfileBehaviorEventRepository.NewEvent event);
+
+  @org.apache.ibatis.annotations.Delete(
+      "DELETE FROM user_behavior_event WHERE occurred_at <= #{before} LIMIT #{limit}")
+  int cleanupBefore(
+      @Param("before") java.time.LocalDateTime before, @Param("limit") int limit);
 }

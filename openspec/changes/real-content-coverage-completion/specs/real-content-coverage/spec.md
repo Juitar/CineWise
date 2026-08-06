@@ -113,32 +113,25 @@
 - **THEN** 页面以城市名长沙查询影院并明确显示当前城市为长沙
 - **AND** 不把长沙或地点原文写入用户画像、账户资料或服务端持久化存储
 
-### Requirement: 首次回填近一年目录并按日增量更新
+### Requirement: 当前热映目录必须可恢复地分批同步
 
-实现前，D SHALL 实测并记录 Provider 是否能提供上映日期、近一年已上映范围、待映目录及分页/游标能力。只有已验证的能力才能决定回填范围；若 Provider 无法取得近一年完整范围，不得假称已完成近一年回填，必须在 change 中记录实际可取得范围并由 D、C 确认是否更换合法数据源。
+实现前，D SHALL 实测并记录 Provider 可取得的目录范围、上映日期及分页/游标能力。NetStart 当前只确认可取得热映目录，未确认近一年历史目录或可靠待映目录；系统不得假称已完成近一年回填。
 
-在能力验证通过后，系统 SHALL 在首次初始化时按上映日期回填近一年已上映影片，并同步 Provider 可取得的待映目录；对每部影片查询详情补齐基础字段。此后每天凌晨三点只增量处理新上映、待映状态/上映日期变化及已有影片资料变更。同步不得因为本地 10 req/min 保护值只固定处理前 8 部影片；应按 Provider 支持的分页/游标或可恢复分批游标，在不超过限流的前提下覆盖本轮目标目录。已同步的历史影片不得因不再热映而被本次增量同步删除。影片的上映状态和上映日期必须可区分热映与待映；同步失败、重复或字段不合格的记录不得覆盖已有合格快照。
+系统 SHALL 在首次或管理员受控同步时读取当前可取得的热映目录，并对每部影片分批查询详情补齐基础字段。同步不得因为本地 10 req/min 保护值只固定处理前 8 部影片；应保存已完成详情的稳定外部身份，并在不超过限流的前提下恢复未完成批次。页面只浏览已成功同步的本地热映目录；同步失败、重复或字段不合格的记录不得覆盖已有合格资料。
 
-#### Scenario: Provider 支持近一年分页回填
+#### Scenario: 当前热映目录跨批同步
 
-- **GIVEN** D 已验证 Provider 可按上映日期获取近一年影片，并可通过分页或游标继续读取
-- **WHEN** 系统首次执行内容目录初始化
-- **THEN** 系统从近一年范围按批次回填已上映影片，并保存可恢复的进度
-- **AND** 中断后恢复时不重复覆盖已通过校验的影片，也不因已不在热映目录而删除历史影片
-
-#### Scenario: 待映影片同步成功
-
-- **GIVEN** Provider 返回合格待映目录和影片详情
-- **WHEN** 每日或管理员受控同步执行
-- **THEN** 系统保存待映影片的标准化基础资料及来源、数据时间、有效期
-- **AND** 页面不能把待映影片表述为正在热映或可购
+- **GIVEN** Provider 返回当前热映目录，目录中有超过单分钟详情预算的有效影片身份
+- **WHEN** 系统首次或管理员受控同步执行
+- **THEN** 系统按不超过 10 req/min 的批次保存已完成详情，并记录未完成身份供后续恢复
+- **AND** 中断后恢复时不重复创建影片，也不把未完成身份伪造成已同步资料
 
 #### Scenario: Provider 不支持近一年完整范围
 
 - **GIVEN** D 实测发现 Provider 无法按上映日期、分页或游标取得近一年完整影片范围
-- **WHEN** D 准备启用首次目录回填
-- **THEN** 系统不把仅能取得的热映子集标为“近一年完整目录”
-- **AND** change 记录实际范围和数据源处理结论后，才能继续实施对应同步策略
+- **WHEN** 系统同步当前可取得热映目录
+- **THEN** 系统不把该目录标为“近一年完整目录”或可靠待映目录
+- **AND** 用户翻页只读取已同步的热映资料，不触发 Provider 调用
 
 ### Requirement: 真实基础资料必须保留两次成功版本且优先于 Demo
 
@@ -254,7 +247,7 @@ POST 响应和按请求查询统一返回 `syncId/clientRequestId/cityName/statu
 
 ### Requirement: 真实内容迁移必须保持历史内容与同步记录兼容
 
-A 已正式分配 V014。`V013__add_travel_task_cinema_id.sql` 已进入 `dev`；A 在授权 V014 验证或发布前，必须确认 V013 的最终验证结果、checksum 与执行顺序，且 V014 必须在 V013 之后执行。迁移 SHALL 仅新增 `movie` 的可空资料字段、`content_identity_mapping`、`cinema.city_name/provider_city_id` 和 `data_sync_log.city_name/provider_city_id/failure_category/lease_owner/lease_until`，不得修改 V001～V013、不得建立物理外键、不得写入演示种子或按地址、名称、区域、坐标猜测历史城市/身份。V014 SQL 草案必须先由 A 静态复核，本次不得执行。
+系统 MUST 保持 V014 前的影片、影院和同步记录可读取，并且不得通过后续代码或 SQL 修改已执行的 V014。V014 已在 V013 之后完成 A 静态复核、MySQL 8.4.11 空库验证和共享 `cinewise` 发布。迁移仅新增 `movie` 的可空资料字段、`content_identity_mapping`、`cinema.city_name/provider_city_id` 和 `data_sync_log.city_name/provider_city_id/failure_category/lease_owner/lease_until`，未修改 V001～V013、未建立物理外键、未写入演示种子或按地址、名称、区域、坐标猜测历史城市/身份。已执行 V014 SQL 自发布起冻结，后续调整必须使用更高版本的前向迁移。
 
 `content_identity_mapping` 必须以 `provider/resource_type/external_id` 唯一标识外部身份，以生成的 ACTIVE 内部内容 ID 约束同一 Provider、资源类型和内部内容最多一个 ACTIVE 外部 ID；`ACTIVE` 映射不得有失效字段，`INVALID` 映射必须有固定失效分类和失效时间。V014 只建表，不做 SQL 回填；D 在迁移后以 V001 的 `source + source_movie_id/source_cinema_id` 运行受控、可重复的应用回填，并将批次、成功数和冲突数记入同步审计。`movie.release_status` 只能为 `NOW_SHOWING`、`COMING_SOON` 或 `NULL`。`data_sync_log` 必须保留 V004 的计数约束：三个计数非负，且 `success_count+failure_count<=total_count`。V014 仅增加 PENDING 的零计数和全空字段规则，并允许 `lease_owner/lease_until` 成对为空或非空；它保留当前 RUNNING、FAILED/PARTIAL 的写入形态，避免未升级的同步代码被 CHECK 拒绝。D 发布新同步写入器、完成共享库只读预检和历史兼容处理后，V015 才收紧为：RUNNING 必须有 90 秒租约且每 20 秒按持有者续租；FAILED/PARTIAL 必须有错误码和固定失败分类；SUCCESS 不得有错误字段；终态持有者和租约均为空。FAILED 允许 `total_count=0/success_count=0/failure_count=0`，用于尚未获得候选项即失败的外部请求，但仍必须有错误码和失败分类。续租及资料/终态写入均须命中当前未到期持有者；真正过期的 RUNNING 才可转为 `FAILED + INTERNAL`，且不重调 Provider。公开接口不得返回 Provider 城市 ID 或持有者。
 
@@ -282,7 +275,7 @@ A 已正式分配 V014。`V013__add_travel_task_cinema_id.sql` 已进入 `dev`�
 #### Scenario: V014 保持旧同步日志兼容并允许 PENDING
 
 - **GIVEN** V004 已有未写入 `lease_owner/lease_until` 的 RUNNING 日志，或未写入 `failure_category`、`error_code` 的 FAILED/PARTIAL 日志
-- **WHEN** A 授权执行 V014 并由未升级的同步代码继续写入相同形态的日志
+- **WHEN** V014 已发布且未升级的同步代码继续写入相同形态的日志
 - **THEN** 旧记录和新写入均不被 V014 的 CHECK 拒绝
 - **AND** 新建 PENDING 仅在三个计数均为 0、错误字段和租约字段均为空时可写入
 

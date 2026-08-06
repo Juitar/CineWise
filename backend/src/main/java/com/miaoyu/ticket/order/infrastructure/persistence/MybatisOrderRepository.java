@@ -71,6 +71,20 @@ public class MybatisOrderRepository implements OrderRepository {
     }
 
     @Override
+    public Optional<TravelOrderSummarySnapshot> findTravelOrderSummaryByIdAndUserId(
+            long orderId,
+            long userId) {
+        return Optional.ofNullable(mapper.findTravelOrderSummaryByIdAndUserId(orderId, userId))
+                .map(row -> new TravelOrderSummarySnapshot(
+                        row.orderId(),
+                        row.orderNo(),
+                        row.showId(),
+                        row.movieId(),
+                        row.cinemaId(),
+                        row.showStartTime()));
+    }
+
+    @Override
     public List<Long> findSeatIds(long orderId) {
         return mapper.findSeatIds(orderId);
     }

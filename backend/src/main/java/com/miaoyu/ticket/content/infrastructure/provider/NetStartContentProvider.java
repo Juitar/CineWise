@@ -2,7 +2,6 @@ package com.miaoyu.ticket.content.infrastructure.provider;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
-import com.miaoyu.ticket.content.application.ContentProvider;
 import com.miaoyu.ticket.content.application.ContentQuery;
 import com.miaoyu.ticket.content.application.ContentResult;
 import com.miaoyu.ticket.content.application.LiveContentSyncPort;
@@ -16,6 +15,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.core.env.Environment;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
@@ -46,7 +46,7 @@ import org.springframework.web.client.RestClientResponseException;
  *
  * <p>同步不修改固定 Demo 文件，也不会把 Demo 结果写回 Redis，保证离线演示数据保持可预测。</p>
  */
-public final class NetStartContentProvider implements ContentProvider, LiveContentSyncPort {
+public final class NetStartContentProvider implements LiveContentSyncPort {
     private static final String PROVIDER = "NETSTART_MAOYAN";
     // 对页面和快照使用国家行政区划代码，不能把 NetStart 的 ci 当成业务城市代码。
     private static final String CHANGSHA_CITY_CODE = "430100";
@@ -71,7 +71,6 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
      * <p>页面不会调用此 Provider；空结果迫使后续同步用例显式提供经过限流、超时和重试控制的原始响应，
      * 防止开发人员绕过质量校验直接把第三方 JSON 暴露出去。</p>
      */
-    @Override
     public Optional<ContentResult<List<? extends ContentItem>>> query(ContentQuery query) {
         if (!properties.enabled() || !isLearningEnvironment() || !hasSupportedInput(query)) {
             return Optional.empty();
@@ -221,6 +220,66 @@ public final class NetStartContentProvider implements ContentProvider, LiveConte
         Outcome outcome = failureOutcome != null ? failureOutcome
                 : rejectedItemCount == 0 ? Outcome.SUCCESS : Outcome.FIELD_REJECTED;
         return new DailySyncBatch(synchronizedContent, attemptedCount, outcome, failureCode);
+    }
+
+    /**
+     * 当前热映目录的可恢复影片批次。
+     *
+     * <p>目录请求占用一次额度，其余九次最多请求九部尚未落库的详情。已完成身份由 MySQL 提供，
+     * 任务中断后再次读取目录并过滤即可继续；不保存原始目录、Provider URL 或用户请求参数。</p>
+     */
+    @Override
+    public DailySyncBatch fetchCurrentHotMovies(Set<String> completedSourceMovieIds) {
+        if (!properties.enabled() || !isLearningEnvironment()) {
+            return new DailySyncBatch(List.of(), 0, Outcome.PROVIDER_DISABLED, null);
+        }
+        RawFetchResult directory = fetchWithPolicy(new ContentQuery(
+                com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE, null, null, null));
+        if (directory.payload() == null) {
+            return new DailySyncBatch(List.of(), 1, directory.outcome(), directory.errorCode());
+        }
+        java.util.ArrayList<SynchronizedContent> accepted = new java.util.ArrayList<>();
+        int rejected = 0;
+        Outcome failureOutcome = null;
+        Integer failureCode = null;
+        // 目录已消耗一次请求；不在本轮等待配额恢复，避免管理员请求或调度线程长时间占用。
+        int detailBudget = Math.max(0, properties.requestsPerMinute() - 1);
+        int requested = 0;
+        for (JsonNode movie : directory.payload().path("movieList")) {
+            if (!movie.path("id").canConvertToLong()) {
+                rejected++;
+                continue;
+            }
+            String externalId = Long.toString(movie.path("id").longValue());
+            if (completedSourceMovieIds.contains(externalId)) {
+                continue;
+            }
+            if (requested++ >= detailBudget) {
+                break;
+            }
+            ContentQuery detailQuery = new ContentQuery(
+                    com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
+                    movie.path("id").longValue(), null, null);
+            RawFetchResult detail = fetchWithPolicy(detailQuery);
+            if (detail.payload() == null) {
+                rejected++;
+                failureOutcome = detail.outcome();
+                failureCode = detail.errorCode();
+                continue;
+            }
+            Optional<ContentResult<List<? extends ContentItem>>> normalized =
+                    normalizeAll(detailQuery, detail.payload());
+            if (normalized.isEmpty()) {
+                rejected++;
+            } else {
+                accepted.add(new SynchronizedContent(detailQuery, normalized.get()));
+            }
+        }
+        int acceptedCount = accepted.stream().mapToInt(content -> content.result().data().size()).sum();
+        int attempted = acceptedCount + rejected;
+        Outcome outcome = failureOutcome != null ? failureOutcome
+                : rejected == 0 ? Outcome.SUCCESS : Outcome.FIELD_REJECTED;
+        return new DailySyncBatch(accepted, attempted, outcome, failureCode);
     }
 
     /**

@@ -2,7 +2,9 @@ package com.miaoyu.ticket.content.application;
 
 import com.miaoyu.ticket.content.domain.ContentSourceType;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 /**
  * D 内容表的写入端口。
@@ -12,7 +14,12 @@ import java.time.LocalDateTime;
  */
 public interface ContentPersistencePort {
 
-    /** 保存或查回有非空来源 ID 的影片，返回本库实际主键。 */
+    /**
+     * 保存或更新有非空来源 ID 的影片，返回本库实际主键。
+     *
+     * <p>重复同步必须保留既有业务 ID，避免 A 已关联的场次失去影片引用；可选展示字段为 null 时表示
+     * 本次来源没有提供，不能据此清空已验证资料。</p>
+     */
     long ensureMovie(MovieRow row);
 
     /** 保存或查回有非空来源 ID 的影院，返回本库实际主键。 */
@@ -24,9 +31,22 @@ public interface ContentPersistencePort {
     /** 追加本次同步的统计日志；状态与数量关系同时由应用和数据库约束保护。 */
     void insertSyncLog(SyncLogRow row);
 
+    /**
+     * 返回本次目录中已经成功写入本地影片表的来源身份。
+     *
+     * <p>仅按来源和外部 ID 判断，绝不按标题猜测。未命中的身份仍需由后续受控批次请求详情，
+     * 因而不会把未完成项当作可以公开浏览的影片。</p>
+     */
+    default Set<String> findExistingMovieSourceIds(String source) {
+        // 旧的测试夹具和 V014 前的受控实现没有目录恢复查询；返回空集合只会多做幂等详情更新，
+        // 不会把尚未成功的身份写入公开目录。正式 JDBC 适配器会覆盖为真实的已完成身份查询。
+        return Set.of();
+    }
+
     /** 影片行只包含内容事实，不能携带场次、价格、座位或库存。 */
     record MovieRow(long id, String sourceMovieId, String title, String genresJson, int durationMinutes,
-                    BigDecimal rating, ContentSourceType sourceType, String source,
+                    BigDecimal rating, String posterUrl, String summary, String releaseStatus, LocalDate releaseDate,
+                    ContentSourceType sourceType, String source,
                     LocalDateTime dataTime, LocalDateTime expiresAt) {
     }
 

@@ -8,12 +8,15 @@ import com.miaoyu.ticket.content.domain.ContentSourceType;
 import com.miaoyu.ticket.content.domain.MovieContent;
 import java.util.ArrayList;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.BooleanSupplier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -93,12 +96,57 @@ public class ContentSyncService {
         LocalDateTime startedAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         LiveContentSyncPort.DailySyncBatch batch = provider.fetchForDailySync();
         // Spring 文档规定 TransactionTemplate 的 execute 回调才处于事务中；Provider 已在其外完成网络调用。
-        return transactionTemplate == null ? persistBatch(batch, startedAt)
-                : transactionTemplate.execute(status -> persistBatch(batch, startedAt));
+        return transactionTemplate == null ? persistBatch(batch, startedAt, () -> true)
+                : transactionTemplate.execute(status -> persistBatch(batch, startedAt, () -> true));
     }
 
+    /**
+     * 同步当前热映目录中尚未完成的详情。
+     *
+     * <p>先读取目录身份只是为了取得本地已完成集合；真正目录和详情仍由 Provider 在受控限流内读取。
+     * 已落库身份不会重复请求，未落库身份也不会提前进入公开影片目录。</p>
+     */
+    public int synchronizeCurrentHotMovies() {
+        return synchronizeCurrentHotMoviesWithResult().successCount();
+    }
+
+    /**
+     * 为管理员任务返回可脱敏审计的本轮统计。
+     *
+     * <p>Provider 仍在事务外执行，数据库写入只包围持久化步骤。调用方只能看到固定失败分类和数量，
+     * 不会接触外部 URL、原始 JSON 或影片目录内容。</p>
+     */
+    public CurrentHotMovieSyncResult synchronizeCurrentHotMoviesWithResult() {
+        return synchronizeCurrentHotMoviesWithResult(() -> true);
+    }
+
+    /**
+     * 管理员受控同步传入租约校验；普通每日同步没有管理员任务租约，使用永远允许的默认校验。
+     *
+     * <p>Provider 调用在事务外完成；Provider 返回后的每一次写入和事务提交前必须检查租约。校验失败会回滚本轮资料、快照和审计日志。</p>
+     */
+    public CurrentHotMovieSyncResult synchronizeCurrentHotMoviesWithResult(BooleanSupplier writeGuard) {
+        Set<String> completedSourceMovieIds = persistence.findExistingMovieSourceIds("NETSTART_MAOYAN");
+        LiveContentSyncPort.DailySyncBatch batch = provider.fetchCurrentHotMovies(completedSourceMovieIds);
+        // V014 没有专用队列表，所以每轮依据已成功落库的身份过滤目录；本轮未处理的身份保持不在该集合中，
+        // 下一次任务会继续请求它们。本轮仍由 ensureMovie 幂等保护重复并发执行。
+        LocalDateTime startedAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
+        int successCount = transactionTemplate == null ? persistBatch(batch, startedAt, writeGuard)
+                : transactionTemplate.execute(status -> persistBatch(batch, startedAt, writeGuard));
+        int totalCount = Math.max(batch.attemptedCount(), successCount);
+        return new CurrentHotMovieSyncResult(totalCount, successCount, totalCount - successCount, batch.outcome(),
+                batch.errorCode());
+    }
+
+    /** 管理接口只用此不可变统计映射任务状态，不能从中恢复第三方响应内容。 */
+    public record CurrentHotMovieSyncResult(int totalCount, int successCount, int failureCount,
+                                            LiveContentSyncPort.Outcome outcome, Integer errorCode) { }
+
     /** 该方法仅被事务模板回调调用，保证业务 ID、快照和审计日志要么一起提交，要么一起回滚。 */
-    private int persistBatch(LiveContentSyncPort.DailySyncBatch batch, LocalDateTime startedAt) {
+    private int persistBatch(LiveContentSyncPort.DailySyncBatch batch, LocalDateTime startedAt,
+                             BooleanSupplier writeGuard) {
+        requireWritePermission(writeGuard);
+        registerCommitGuard(writeGuard);
         List<LiveContentSyncPort.SynchronizedContent> contents = batch.contents();
         List<ContentItem> allItems = contents.stream().flatMap(content -> content.result().data().stream())
                 .map(item -> (ContentItem) item).toList();
@@ -114,26 +162,31 @@ public class ContentSyncService {
             if (content.result().source().type() != ContentSourceType.LIVE) {
                 continue;
             }
-            List<ContentItem> acceptedForQuery = content.result().data().stream()
-                    .filter(acceptedItems::contains).map(item -> persistAndAttachBusinessId(item, content.result()))
-                    .toList();
+            List<ContentItem> acceptedForQuery = new ArrayList<>();
+            for (ContentItem item : content.result().data()) {
+                if (acceptedItems.contains(item)) {
+                    requireWritePermission(writeGuard);
+                    acceptedForQuery.add(persistAndAttachBusinessId(item, content.result(), writeGuard));
+                }
+            }
             if (acceptedForQuery.isEmpty()) {
                 continue;
             }
             ContentResult<List<? extends ContentItem>> accepted = contentResult(acceptedForQuery, content.result());
-            savePublicQueries(content.query(), accepted, synchronizedMovies);
+            savePublicQueries(content.query(), accepted, synchronizedMovies, writeGuard);
             if (content.query().resourceType() == com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE) {
                 movieEnvelope = content.result();
             }
             synchronizedItemCount += acceptedForQuery.size();
         }
-        saveMovieListAfterSync(synchronizedMovies, movieEnvelope);
+        saveMovieListAfterSync(synchronizedMovies, movieEnvelope, writeGuard);
         // 审计只保存统计值和固定状态，不保存 Provider 原始 JSON、关键词或任何用户数据。
         LocalDateTime finishedAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         // V004 的计数约束要求 total = success + failure。Provider 的候选数与身份隔离后的条目数取较大值，
         // 既保留上游字段拒绝/请求失败，也保证额外隔离项不会让审计日志在真实 MySQL 中被 CHECK 拒绝。
         int totalItemCount = Math.max(batch.attemptedCount(), synchronizedItemCount + identityRejectedCount);
         int failureCount = totalItemCount - synchronizedItemCount;
+        requireWritePermission(writeGuard);
         persistence.insertSyncLog(new ContentPersistencePort.SyncLogRow(idGenerator.nextId(), "NETSTART_MAOYAN",
                 "DAILY_CONTENT", "daily-" + startedAt, statusOf(totalItemCount, synchronizedItemCount, failureCount),
                 batch.errorCode(), totalItemCount, synchronizedItemCount, failureCount, startedAt, finishedAt,
@@ -150,13 +203,13 @@ public class ContentSyncService {
      */
     private void savePublicQueries(ContentQuery providerQuery,
                                    ContentResult<List<? extends ContentItem>> accepted,
-                                   List<MovieContent> synchronizedMovies) {
+                                   List<MovieContent> synchronizedMovies, BooleanSupplier writeGuard) {
         if (providerQuery.resourceType() == com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE) {
             for (ContentItem item : accepted.data()) {
                 MovieContent movie = (MovieContent) item;
                 // 详情只接受内部 movieId；外部 sourceMovieId 不能成为页面快照键。
                 saveLiveResult(new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
-                        movie.movieId(), null, null), contentResult(List.of(movie), accepted));
+                        movie.movieId(), null, null), contentResult(List.of(movie), accepted), writeGuard);
                 synchronizedMovies.add(movie);
             }
             return;
@@ -164,22 +217,24 @@ public class ContentSyncService {
         // 同步搜索词只是向第三方缩小请求范围，不能要求页面带同一个词才能读取城市影院列表。
         ContentQuery cityListQuery = new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA,
                 null, providerQuery.cityCode(), null);
-        saveLiveResult(cityListQuery, accepted);
+        saveLiveResult(cityListQuery, accepted, writeGuard);
         for (ContentItem item : accepted.data()) {
             CinemaContent cinema = (CinemaContent) item;
             saveLiveResult(new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA,
-                    cinema.cinemaId(), null, null), contentResult(List.of(cinema), accepted));
+                    cinema.cinemaId(), null, null), contentResult(List.of(cinema), accepted), writeGuard);
         }
     }
 
     /** 同步完成后合并公开影片目录，局部 Provider 批次绝不能删掉已经同步的其余影片。 */
-    private void saveMovieListAfterSync(List<MovieContent> synchronizedMovies, ContentResult<?> envelope) {
+    private void saveMovieListAfterSync(List<MovieContent> synchronizedMovies, ContentResult<?> envelope,
+                                        BooleanSupplier writeGuard) {
         if (synchronizedMovies.isEmpty() || envelope == null) {
             return;
         }
         ContentQuery listQuery = new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
                 null, null, null);
-        saveLiveResult(listQuery, contentResult(mergeMovieDirectory(listQuery, synchronizedMovies), envelope));
+        saveLiveResult(listQuery, contentResult(mergeMovieDirectory(listQuery, synchronizedMovies), envelope),
+                writeGuard);
     }
 
     /**
@@ -203,9 +258,11 @@ public class ContentSyncService {
     }
 
     /** 快照先落 MySQL，缓存仍只在事务提交后更新，避免公开键在回滚后留下无法追溯的数据。 */
-    private void saveLiveResult(ContentQuery query, ContentResult<List<? extends ContentItem>> result) {
+    private void saveLiveResult(ContentQuery query, ContentResult<List<? extends ContentItem>> result,
+                                BooleanSupplier writeGuard) {
+        requireWritePermission(writeGuard);
         snapshots.save(query, result);
-        writeCacheAfterCommit(query, result);
+        writeCacheAfterCommit(query, result, writeGuard);
     }
 
     /**
@@ -220,10 +277,13 @@ public class ContentSyncService {
      * <p>持久化适配器以来源 ID 做幂等查询，重复同步只更新资料和时效，不创建新的业务对象。
      * 这保证前端已持有的 movieId/cinemaId 在 Provider 再次同步后仍然有效。</p>
      */
-    private ContentItem persistAndAttachBusinessId(ContentItem item, ContentResult<?> result) {
+    private ContentItem persistAndAttachBusinessId(ContentItem item, ContentResult<?> result,
+                                                   BooleanSupplier writeGuard) {
+        requireWritePermission(writeGuard);
         if (item instanceof MovieContent movie) {
             long movieId = persistence.ensureMovie(new ContentPersistencePort.MovieRow(idGenerator.nextId(),
                     movie.sourceMovieId(), movie.title(), movie.genresJson(), movie.durationMinutes(), movie.rating(),
+                    movie.posterUrl(), movie.summary(), movie.releaseStatus(), releaseDateOf(movie.releaseDate()),
                     result.source().type(), result.source().name(), result.dataTime(), result.expiresAt()));
             // 这四项属于 Provider 已校验过的可选展示资料，业务 ID 回填后仍要进入快照和 Redis。
             // 不能只保留落库的旧基础列，否则同步成功后前端会读到没有海报和简介的影片。
@@ -241,19 +301,55 @@ public class ContentSyncService {
     }
 
     /**
+     * Provider Mapper 已拒绝非法日期；这里仅把公开模型的 ISO 字符串转换为 V014 的 DATE 列类型。
+     *
+     * <p>空值表示来源未提供上映日期，不将它伪造成今天或同步日期；持久化适配器会保留历史合格值。</p>
+     */
+    private LocalDate releaseDateOf(String releaseDate) {
+        return releaseDate == null ? null : LocalDate.parse(releaseDate);
+    }
+
+    /**
      * Redis 不是事务事实；只有 MySQL 成功提交后才允许发布新的 LIVE 缓存。
      *
      * <p>事务同步已激活时，afterCommit 前绝不调用缓存端口，避免数据库回滚后页面仍读到
      * 无法追溯的 LIVE 内容。单元测试或无事务调用则直接写缓存，保持端口的可独立测试性。</p>
      */
-    private void writeCacheAfterCommit(ContentQuery query, ContentResult<List<? extends ContentItem>> result) {
+    private void writeCacheAfterCommit(ContentQuery query, ContentResult<List<? extends ContentItem>> result,
+                                       BooleanSupplier writeGuard) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            requireWritePermission(writeGuard);
             cache.save(query, result);
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override public void afterCommit() { cache.save(query, result); }
+            @Override public void afterCommit() {
+                // 已提交的 Redis 无法随事务回滚，失租后不得再由旧 Worker 发布。
+                if (writeGuard.getAsBoolean()) {
+                    cache.save(query, result);
+                }
+            }
         });
+    }
+
+    /** 在事务内抛出该异常会回滚本轮资料写入，管理员服务据此放弃旧任务的终态写入。 */
+    static final class LeaseLostException extends RuntimeException {
+        LeaseLostException() { super("同步任务已失去租约"); }
+    }
+
+    private void requireWritePermission(BooleanSupplier writeGuard) {
+        if (!writeGuard.getAsBoolean()) {
+            throw new LeaseLostException();
+        }
+    }
+
+    /** 覆盖“最后一行写入到提交前”的竞争窗口，避免旧 Worker 留下部分公开资料。 */
+    private void registerCommitGuard(BooleanSupplier writeGuard) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void beforeCommit(boolean readOnly) { requireWritePermission(writeGuard); }
+            });
+        }
     }
 
     /** 数据库现有四种状态已足够表达本轮结果，无须为了审计摘要新增字段或枚举值。 */
