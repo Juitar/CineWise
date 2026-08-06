@@ -52,16 +52,16 @@
 
 ### Requirement: 推荐结果必须说明是否实际使用画像
 
-推荐模块 SHALL 在自身结果中记录 `profileApplied`，并在为 true 时只记录本次采用的标签类型、值、极性和来源作为解释证据。该结果不得复制原始行为、完整 `ProfileSummary`、会话内容或精确位置。
+推荐模块 SHALL 在自身结果中记录 `usedProfile`，并在为 true 时只记录本次采用的标签类型、值、极性和来源作为解释证据。该结果不得复制原始行为、完整 `ProfileSummary`、会话内容或精确位置。
 
 #### Scenario: 使用长期偏好排序
 - **GIVEN** 个性化开启且存在可用标签
 - **WHEN** 推荐将某个标签作为评分特征
-- **THEN** 结果标记 `profileApplied=true` 并返回最小化的采用标签证据
+- **THEN** 结果标记 `usedProfile=true` 并返回最小化的采用标签证据
 - **AND** 用户可以知道本次参考了哪类偏好
 
 #### Scenario: 关闭个性化后推荐
 - **GIVEN** 用户关闭个性化
 - **WHEN** 推荐生成方案
-- **THEN** 结果标记 `profileApplied=false`
+- **THEN** 结果标记 `usedProfile=false`
 - **AND** 不读取、展示或使用任何长期标签

@@ -70,7 +70,7 @@ Redis 缓存键为 `profile:{userId}:v:{version}`，并设置有限 TTL。标签
 
 B 已确认方案反馈通过 D 在 `profile/application` 定义并实现的 `ProfileBehaviorRecorder` 调用：`recordPlanAccepted` 固定映射 `ACCEPT_PLAN/PLAN/planId`，`recordPlanRejected` 固定映射 `REJECT_PLAN/PLAN/planId`。`planId` 由 B 在服务端完成计划校验、准备持久化用户可见方案时生成，为 36 位小写 UUID；同一已保存方案及同一最终决定重试时复用原 `planId`、`eventId` 和 `occurredAt`。未确认、取消、过期或无效方案不调用 D；调用失败不改变 B 已保存的用户决定，且无认证后台线程不自动补发。实际确认后的 `CONVERSATION` 写工具、其注册和联调不属于当前 B 的 `agent-interaction-runtime` change，必须由 B、D、C 后续单独建跨模块 change。推荐只读取 `ProfileSummary`，并且仍以用户本轮明确要求优先。
 
-推荐结果必须记录本次 `profileApplied` 及实际采用的标签证据，便于向用户解释“本次参考了什么”；关闭开关、没有有效标签或画像读取失败时该值为 false。推荐记录不复制原始行为和完整画像，且画像服务不可用只降级为不使用长期特征，不阻断候选筛选与排序。
+推荐结果必须记录本次 `usedProfile` 及实际采用的标签证据，便于向用户解释“本次参考了什么”；关闭开关、没有有效标签或画像读取失败时该值为 false。推荐记录不复制原始行为和完整画像，且画像服务不可用只降级为不使用长期特征，不阻断候选筛选与排序。
 
 ### 6. 迁移申请与生命周期
 
