@@ -1,0 +1,21 @@
+.transaction-back-button-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  margin-bottom: 12px;
+}
+
+.transaction-back-button {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.transaction-back-button-label {
+  color: var(--cw-color-text-secondary, #666);
+  font-size: 14px;
+}

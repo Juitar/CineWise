@@ -3,6 +3,8 @@ import { useParams } from 'umi';
 import { ElectronicTicketCard } from '../../features/electronic-ticket-card/ElectronicTicketCard';
 import { useElectronicTicket, useOrder } from '../../modules/order/transaction-hooks';
 import { formatOrderDateTime } from '../../modules/order/formatters';
+import { history } from 'umi';
+import { TransactionBackButton } from '../../features/transaction-back-button/TransactionBackButton';
 import './index.css';
 
 /**
@@ -21,19 +23,29 @@ export default function TicketPage() {
 
   return (
     <div className="ticket-page-wrapper">
-      <ElectronicTicketCard
-        ticketCode={ticket?.ticketCode ?? ''}
-        orderNo={ticket?.orderNo ?? ''}
-        showTitle={ticket ? '影片信息暂不可用' : undefined}
-        showId={order?.showId ?? ticket?.showId}
-        showTime={formatOrderDateTime(order?.showStartTime)}
-        seatLabels={ticket?.seatIds}
-        issuedAt={ticket?.issuedAt ? formatOrderDateTime(ticket.issuedAt) : undefined}
-        status={ticket?.status ?? 'INVALIDATED'}
-        loading={loading}
-        error={error}
-        qrPayload={ticket?.qrPayload}
-      />
+      <div className="ticket-page-content">
+        <TransactionBackButton
+          onBack={() =>
+            history.push(
+              order?.orderNo ? `/orders/${encodeURIComponent(order.orderNo)}` : '/orders',
+            )
+          }
+          label={order?.orderNo ? '返回订单详情' : '返回订单列表'}
+        />
+        <ElectronicTicketCard
+          ticketCode={ticket?.ticketCode ?? ''}
+          orderNo={ticket?.orderNo ?? ''}
+          showTitle={ticket ? '影片信息暂不可用' : undefined}
+          showId={order?.showId ?? ticket?.showId}
+          showTime={formatOrderDateTime(order?.showStartTime)}
+          seatLabels={ticket?.seatIds}
+          issuedAt={ticket?.issuedAt ? formatOrderDateTime(ticket.issuedAt) : undefined}
+          status={ticket?.status ?? 'INVALIDATED'}
+          loading={loading}
+          error={error}
+          qrPayload={ticket?.qrPayload}
+        />
+      </div>
     </div>
   );
 }

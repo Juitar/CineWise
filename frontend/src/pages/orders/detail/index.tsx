@@ -8,6 +8,7 @@ import {
   usePaymentQuery,
 } from '../../../modules/order/transaction-hooks';
 import { formatOrderDateTime } from '../../../modules/order/formatters';
+import { TransactionBackButton } from '../../../features/transaction-back-button/TransactionBackButton';
 import './index.css';
 
 /**
@@ -50,36 +51,39 @@ export default function OrderDetailPage() {
 
   return (
     <div className="order-detail-page-wrapper">
-      <OrderDetail
-        orderNo={order?.orderNo ?? orderNo}
-        status={order?.status ?? 'PENDING_PAYMENT'}
-        showTitle={order ? '影片信息暂不可用' : undefined}
-        showId={order?.showId}
-        showTime={formatOrderDateTime(order?.showStartTime)}
-        seatLabels={order?.seatIds}
-        ticketCount={order?.ticketCount ?? 0}
-        unitPrice={order?.unitPrice ?? '0.00'}
-        totalAmount={order?.totalAmount ?? '0.00'}
-        expireTime={order?.expireTime ? formatOrderDateTime(order.expireTime) : undefined}
-        updatedAt={order?.updatedAt ? formatOrderDateTime(order.updatedAt) : undefined}
-        loading={orderQuery.loading}
-        error={
-          orderQuery.error?.message ?? cancellation.error?.message ?? paymentQuery.error?.message
-        }
-        onPay={() =>
-          history.push(
-            order?.status === 'PAYING'
-              ? `/payments/${encodeURIComponent(orderNo)}/result`
-              : `/payments/${encodeURIComponent(orderNo)}`,
-          )
-        }
-        onCancel={() => void handleCancel()}
-        onViewTicket={() => void handleViewTicket()}
-        onApplyRefund={() => history.push(`/orders/${encodeURIComponent(orderNo)}/refund`)}
-        onBackToHome={() => history.push('/')}
-        cancelResultUnknown={cancellation.resultUnknown}
-        onRecoverCancel={() => void recoverCancellation()}
-      />
+      <div className="order-detail-page-content">
+        <TransactionBackButton onBack={() => history.push('/orders')} label="返回订单列表" />
+        <OrderDetail
+          orderNo={order?.orderNo ?? orderNo}
+          status={order?.status ?? 'PENDING_PAYMENT'}
+          showTitle={order ? '影片信息暂不可用' : undefined}
+          showId={order?.showId}
+          showTime={formatOrderDateTime(order?.showStartTime)}
+          seatLabels={order?.seatIds}
+          ticketCount={order?.ticketCount ?? 0}
+          unitPrice={order?.unitPrice ?? '0.00'}
+          totalAmount={order?.totalAmount ?? '0.00'}
+          expireTime={order?.expireTime ? formatOrderDateTime(order.expireTime) : undefined}
+          updatedAt={order?.updatedAt ? formatOrderDateTime(order.updatedAt) : undefined}
+          loading={orderQuery.loading}
+          error={
+            orderQuery.error?.message ?? cancellation.error?.message ?? paymentQuery.error?.message
+          }
+          onPay={() =>
+            history.push(
+              order?.status === 'PAYING'
+                ? `/payments/${encodeURIComponent(orderNo)}/result`
+                : `/payments/${encodeURIComponent(orderNo)}`,
+            )
+          }
+          onCancel={() => void handleCancel()}
+          onViewTicket={() => void handleViewTicket()}
+          onApplyRefund={() => history.push(`/orders/${encodeURIComponent(orderNo)}/refund`)}
+          onBackToHome={() => history.push('/')}
+          cancelResultUnknown={cancellation.resultUnknown}
+          onRecoverCancel={() => void recoverCancellation()}
+        />
+      </div>
     </div>
   );
 }

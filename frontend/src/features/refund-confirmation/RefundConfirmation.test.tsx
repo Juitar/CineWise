@@ -72,6 +72,16 @@ describe('RefundConfirmation 组件', () => {
     expect(screen.queryByText('退款退款成功')).not.toBeInTheDocument();
   });
 
+  it('在不可退状态下不显示金额、确认框或退票提交入口', () => {
+    render(<RefundConfirmation {...defaultProps} status="NOT_REFUNDABLE" error="订单不可退" />);
+
+    expect(screen.getByText('当前订单不可退票')).toBeInTheDocument();
+    expect(screen.getByText('订单不可退')).toBeInTheDocument();
+    expect(screen.queryByText('¥ 78.00')).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '确认申请退票' })).not.toBeInTheDocument();
+  });
+
   it('在移动端 REQUESTED 状态下渲染 SpinLoading', () => {
     setMobileView(true);
     const { container } = render(<RefundConfirmation {...defaultProps} status="REQUESTED" />);

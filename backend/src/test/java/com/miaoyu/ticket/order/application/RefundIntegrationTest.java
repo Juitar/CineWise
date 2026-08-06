@@ -351,9 +351,10 @@ class RefundIntegrationTest {
     }
 
     @Test
-    void givenOriginalOrder_whenQueryAlternatives_thenReturnOnlyOtherFutureShowsOfSameMovie() {
+    void givenOriginalOrder_whenQueryAlternatives_thenReturnOnlyOtherFutureShowsOfSameMovieAndCinema() {
         PaidOrder paidOrder = createPaidOrder("refund-alternatives", 1);
         long originalMovieId = movieId(paidOrder.order().showId());
+        long originalCinemaId = cinemaId(paidOrder.order().showId());
 
         AlternativeShowsView result = refundApplicationService.queryAlternativeShows(
                 paidOrder.order().orderNo(),
@@ -364,6 +365,7 @@ class RefundIntegrationTest {
         assertThat(result.shows()).allSatisfy(show -> {
             assertThat(show.showId()).isNotEqualTo(paidOrder.order().showId());
             assertThat(show.movieId()).isEqualTo(originalMovieId);
+            assertThat(show.cinemaId()).isEqualTo(originalCinemaId);
             assertThat(show.status()).isEqualTo("ON_SALE");
             assertThat(show.startTime()).isAfter(FIXED_LOCAL_TIME);
             assertThat(movieId(show.showId())).isEqualTo(originalMovieId);

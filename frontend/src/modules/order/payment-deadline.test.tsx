@@ -56,6 +56,21 @@ describe('支付期限展示', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it('到期时只触发一次服务端订单刷新回调', () => {
+    const onReached = vi.fn();
+    renderHook(() => usePaymentDeadline('2026-08-10T13:00:01+08:00', true, onReached));
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(onReached).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(onReached).toHaveBeenCalledTimes(1);
+  });
+
   it('停用时不创建定时器', () => {
     const { result } = renderHook(() => usePaymentDeadline('2026-08-10T13:10:00+08:00', false));
     expect(result.current.text).toBe('10分00秒');
