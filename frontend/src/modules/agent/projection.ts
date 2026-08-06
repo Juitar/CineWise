@@ -20,6 +20,12 @@ export interface AgentDisplayItem {
   text: string;
   title?: string;
   fields?: readonly { label: string; value: string }[];
+  selectSeatsPath?: string;
+}
+
+/** 仅使用已校验的场次 ID 构造选座地址，不补齐其他业务参数。 */
+export function buildAgentSelectSeatsPath(showId: string): string {
+  return `/shows/${encodeURIComponent(showId)}/seats`;
 }
 
 export interface AgentProjection {
@@ -172,6 +178,7 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
       title: '已确认场次',
       text: '已确认场次，可选座',
       fields: [{ label: '场次 ID', value: businessRef.showId as string }],
+      selectSeatsPath: buildAgentSelectSeatsPath(businessRef.showId as string),
     };
   }
   if (type === 'PROGRESS') {

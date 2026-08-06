@@ -7,7 +7,7 @@ import toolComplete from './fixtures/tool-complete-degraded.json';
 import toolError from './fixtures/tool-error-replan.json';
 import toolStart from './fixtures/tool-start.json';
 import { parseAgentEvent } from './contract';
-import { consumeAgentEvent, createAgentProjection } from './projection';
+import { buildAgentSelectSeatsPath, consumeAgentEvent, createAgentProjection } from './projection';
 
 describe('Agent reducer 新 SSE 协议', () => {
   it('按 tool.start -> tool.error -> plan.replanned -> tool.complete 处理，tool.error 不结束运行', () => {
@@ -57,6 +57,11 @@ describe('Agent reducer 新 SSE 协议', () => {
       expect.objectContaining({ kind: 'business-intent', text: '已确认场次，可选座' }),
     );
     expect(result.projection.items[0].fields).toEqual([{ label: '场次 ID', value: 'show-70001' }]);
+    expect(result.projection.items[0].selectSeatsPath).toBe('/shows/show-70001/seats');
+  });
+
+  it('只编码 showId，不补齐影片、影院或交易参数', () => {
+    expect(buildAgentSelectSeatsPath('show / 1')).toBe('/shows/show%20%2F%201/seats');
   });
 
   it('SELECT_SEATS 缺少 showId 时拒绝且不推进游标', () => {
