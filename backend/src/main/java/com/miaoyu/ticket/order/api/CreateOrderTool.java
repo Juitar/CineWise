@@ -1,5 +1,8 @@
 package com.miaoyu.ticket.order.api;
 
+import com.miaoyu.ticket.agent.application.confirmation.AgentActionAuthorizationDeniedException;
+import com.miaoyu.ticket.agent.application.confirmation.AgentActionAuthorizationPort;
+import com.miaoyu.ticket.agent.application.confirmation.AgentActionAuthorizationRequest;
 import com.miaoyu.ticket.agent.domain.tool.ToolContext;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
@@ -8,6 +11,7 @@ import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.ticketing.application.TicketingErrorCode;
 import com.miaoyu.ticket.order.application.CreateOrderCommand;
+import com.miaoyu.ticket.order.application.OrderErrorCode;
 import com.miaoyu.ticket.order.application.OrderApplicationService;
 import com.miaoyu.ticket.order.application.OrderView;
 import java.math.RoundingMode;
@@ -40,9 +44,14 @@ public class CreateOrderTool {
     public static final String QUERY_ORIGINAL_ORDER = "QUERY_ORIGINAL_ORDER";
 
     private final OrderApplicationService orderApplicationService;
+    private final AgentActionAuthorizationPort agentActionAuthorizationPort;
 
-    public CreateOrderTool(OrderApplicationService orderApplicationService) {
-        this.orderApplicationService = orderApplicationService;
+    public CreateOrderTool(
+            OrderApplicationService orderApplicationService,
+            AgentActionAuthorizationPort agentActionAuthorizationPort) {
+        this.orderApplicationService = Objects.requireNonNull(orderApplicationService, "orderApplicationService 不能为空");
+        this.agentActionAuthorizationPort =
+                Objects.requireNonNull(agentActionAuthorizationPort, "agentActionAuthorizationPort 不能为空");
     }
 
     /**
@@ -84,6 +93,12 @@ public class CreateOrderTool {
         try {
             // 写请求标识由 B 在一次确认意图内保持稳定；缺失时不能临时生成替代 UUID。
             context.requireWriteRequestIdentifiers();
+            // B 拥有确认状态和计划事实；拒绝必须发生在 A 的订单事务、锁座和幂等写入之前。
+            agentActionAuthorizationPort.authorize(new AgentActionAuthorizationRequest(
+                    command.actionId(),
+                    context,
+                    command.showId(),
+                    command.seatIds()));
             // 此处只转换类型，排序、去重、金额和库存仍由 OrderApplicationService 重新校验。
             OrderView order = orderApplicationService.createOrder(new CreateOrderCommand(
                     command.parsedShowId(),
@@ -91,6 +106,9 @@ public class CreateOrderTool {
                     context.clientRequestId(),
                     context.idempotencyKey()));
             return success(order, context);
+        } catch (AgentActionAuthorizationDeniedException exception) {
+            // 不泄露 action 是否存在、归属或计划细节；确认失效绝不能降级为结果未知后重试建单。
+            return failed(OrderErrorCode.CONFIRMATION_INVALID.code(), context, "CHECK_CONFIRMATION");
         } catch (IllegalArgumentException exception) {
             // 参数失败不可重试；B 应重新检查受信任槽位与确认动作，而不是重复调用工具。
             return failed(CommonErrorCode.INVALID_PARAMETER.code(), context, "CHECK_INPUT");

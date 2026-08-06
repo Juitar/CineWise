@@ -4,6 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.miaoyu.ticket.agent.application.AgentErrorCode;
+import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationActionRepository;
+import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationFactsProvider;
+import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationService;
+import com.miaoyu.ticket.agent.application.confirmation.CreateOrderToolAdapter;
+import com.miaoyu.ticket.agent.application.confirmation.CreateOrderToolResult;
 import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
 import com.miaoyu.ticket.agent.application.persistence.AgentInitialRunResult;
 import com.miaoyu.ticket.agent.application.persistence.AgentInitialRunTransaction;
@@ -30,10 +35,21 @@ import com.miaoyu.ticket.agent.domain.plan.PlanValidationIssue;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationIssueCode;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationResult;
 import com.miaoyu.ticket.agent.domain.plan.SlotSnapshot;
+import com.miaoyu.ticket.agent.domain.plan.PlanNodeStatus;
+import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationAction;
+import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationActionStatus;
+import com.miaoyu.ticket.agent.domain.confirmation.AgentActionWriteIdentifiers;
+import com.miaoyu.ticket.agent.domain.confirmation.ConfirmedOrderCommand;
+import com.miaoyu.ticket.agent.domain.confirmation.AgentConfirmationValidationContext;
+import com.miaoyu.ticket.agent.domain.tool.ToolResult;
+import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
+import com.miaoyu.ticket.agent.domain.tool.ToolContext;
 import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.auth.application.RoleCode;
 import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.order.api.CreateOrderForAgentCommand;
+import com.miaoyu.ticket.order.api.CreateOrderTool;
 import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -44,6 +60,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -111,6 +128,18 @@ class AgentPersistenceMySqlIntegrationTest {
     private PlatformTransactionManager transactionManager;
 
     @Autowired
+    private AgentConfirmationActionRepository actionRepository;
+
+    @Autowired
+    private AgentConfirmationService confirmationService;
+
+    @Autowired
+    private CreateOrderToolAdapter createOrderToolAdapter;
+
+    @Autowired
+    private CreateOrderTool createOrderTool;
+
+    @Autowired
     private MinimalReadOnlyAgentService minimalReadOnlyAgentService;
 
     private AtomicBoolean toolCalledInsideTransaction;
@@ -130,6 +159,11 @@ class AgentPersistenceMySqlIntegrationTest {
                 SELECT COUNT(*)
                   FROM flyway_schema_history
                  WHERE version = '009' AND success = 1
+                """, Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM flyway_schema_history
+                 WHERE version = '012' AND success = 1
                 """, Integer.class)).isEqualTo(1);
         cleanupFixtures();
         toolCalledInsideTransaction = new AtomicBoolean(true);
@@ -325,6 +359,124 @@ class AgentPersistenceMySqlIntegrationTest {
         }
     }
 
+    @Test
+    void shouldPersistActionAndAllowOnlyOneCasClaim() {
+        AgentConfirmationAction pending = action("action-cas");
+        actionRepository.insert(pending);
+        assertThat(actionRepository.findByCreationKey(
+                pending.userId(), pending.agentRunId(), pending.planId(), pending.planVersion(), pending.nodeId(),
+                pending.command().toolName(), pending.parameterHash().value())).contains(pending);
+
+        AgentConfirmationAction claimed = pending.claim(
+                AgentActionWriteIdentifiers.forAction(pending.actionId()), LocalDateTime.now().withNano(0));
+        assertThat(actionRepository.compareAndSet(
+                pending.actionId(), pending.version(), pending.status(), claimed)).isTrue();
+        assertThat(actionRepository.compareAndSet(
+                pending.actionId(), pending.version(), pending.status(), claimed)).isFalse();
+
+        AgentConfirmationAction stored = actionRepository.findByActionId(pending.actionId()).orElseThrow();
+        assertThat(stored.status()).isEqualTo(AgentConfirmationActionStatus.EXECUTING);
+        assertThat(stored.writeIdentifiers().clientRequestId()).isEqualTo(claimed.writeIdentifiers().clientRequestId());
+        assertThat(stored.command().sortedSeatIds()).containsExactly("2", "4");
+    }
+
+    @Test
+    void shouldEnterResultUnknownWithOriginalKeysAndRollbackDoesNotLeaveAction() {
+        AgentConfirmationAction pending = action("action-unknown");
+        actionRepository.insert(pending);
+        AgentConfirmationAction claimed = pending.claim(
+                AgentActionWriteIdentifiers.forAction(pending.actionId()), LocalDateTime.now().withNano(0));
+        assertThat(actionRepository.compareAndSet(
+                pending.actionId(), pending.version(), pending.status(), claimed)).isTrue();
+        AgentConfirmationAction unknown = claimed.markResultUnknown("结果确认中", LocalDateTime.now().withNano(0));
+        assertThat(actionRepository.compareAndSet(
+                claimed.actionId(), claimed.version(), claimed.status(), unknown)).isTrue();
+        AgentConfirmationAction stored = actionRepository.findByActionId(pending.actionId()).orElseThrow();
+        assertThat(stored.status()).isEqualTo(AgentConfirmationActionStatus.RESULT_UNKNOWN);
+        assertThat(stored.recoveryUntil()).isEqualTo(stored.resultUnknownAt().plusDays(30));
+        assertThat(stored.writeIdentifiers()).isEqualTo(claimed.writeIdentifiers());
+
+        assertThatThrownBy(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            // 创建去重键包含 nodeId；使用独立节点确保真的进入插入和事务回滚分支。
+            actionRepository.insert(action("action-rollback", "confirm-order-rollback"));
+            throw new IllegalStateException("test rollback");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(actionRepository.findByActionId("action-rollback")).isEmpty();
+    }
+
+    @Test
+    void shouldInvokeCreateOrderOnlyOnceForConcurrentActionConfirmation() throws Exception {
+        AgentConfirmationAction pending = action("action-concurrent");
+        actionRepository.insert(pending);
+        AtomicInteger executions = new AtomicInteger();
+        Mockito.when(createOrderToolAdapter.execute(Mockito.eq("action-concurrent"), Mockito.any(), Mockito.any()))
+                .thenAnswer(invocation -> {
+                    toolCalledInsideTransaction.set(TransactionSynchronizationManager.isActualTransactionActive());
+                    executions.incrementAndGet();
+                    return new ToolResult<>(ToolStatus.SUCCESS, new CreateOrderToolResult("order-ref"), null,
+                            false, false, null, false, null, null, null, null);
+                });
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch start = new CountDownLatch(1);
+            Future<?> first = executor.submit(() -> {
+                start.await();
+                return confirmationService.confirm("action-concurrent", true, "trace-concurrent-1");
+            });
+            Future<?> second = executor.submit(() -> {
+                start.await();
+                return confirmationService.confirm("action-concurrent", true, "trace-concurrent-2");
+            });
+            start.countDown();
+            first.get();
+            second.get();
+
+            assertThat(executions).hasValue(1);
+            assertThat(toolCalledInsideTransaction).isFalse();
+            assertThat(actionRepository.findByActionId("action-concurrent").orElseThrow().status())
+                    .isEqualTo(AgentConfirmationActionStatus.SUCCEEDED);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void shouldRejectPendingActionBeforeCreateOrderToolWritesOrderOrLocksSeat() {
+        AgentConfirmationAction pending = action("123e4567-e89b-42d3-a456-426614174001");
+        actionRepository.insert(pending);
+        int ordersBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ticket_order", Integer.class);
+        int orderSeatsBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ticket_order_seat", Integer.class);
+        int lockedSeatsBefore = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM show_seat WHERE status = 'LOCKED'", Integer.class);
+        ToolContext context = new ToolContext(
+                pending.runId(),
+                pending.nodeId(),
+                pending.command().toolName(),
+                List.of(),
+                3_000L,
+                "trace-authorization-rejected",
+                "authorization-rejected-request",
+                "authorization-rejected-key",
+                pending.version());
+
+        ToolResult<?> result = createOrderTool.execute(
+                context,
+                new CreateOrderForAgentCommand(
+                        pending.actionId(),
+                        pending.command().showId(),
+                        pending.command().sortedSeatIds()));
+
+        assertThat(result.status()).isEqualTo(ToolStatus.FAILED);
+        assertThat(result.errorCode()).isEqualTo(205004);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ticket_order", Integer.class))
+                .isEqualTo(ordersBefore);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ticket_order_seat", Integer.class))
+                .isEqualTo(orderSeatsBefore);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM show_seat WHERE status = 'LOCKED'", Integer.class))
+                .isEqualTo(lockedSeatsBefore);
+    }
+
     private Callable<Attempt> submitAfterSignal(CountDownLatch start, String requestId) {
         return () -> {
             start.await();
@@ -365,6 +517,7 @@ class AgentPersistenceMySqlIntegrationTest {
     }
 
     private void cleanupFixtures() {
+        jdbcTemplate.update("DELETE FROM agent_action WHERE user_id = ?", USER_ID);
         jdbcTemplate.update("DELETE FROM agent_event WHERE session_id IN (?, ?)", FIRST_SESSION, SECOND_SESSION);
         jdbcTemplate.update("DELETE FROM agent_event_stream_cursor WHERE session_id IN (?, ?)", FIRST_SESSION,
                 SECOND_SESSION);
@@ -375,6 +528,17 @@ class AgentPersistenceMySqlIntegrationTest {
         jdbcTemplate.update("DELETE FROM agent_message WHERE user_id = ?", USER_ID);
         jdbcTemplate.update("DELETE FROM agent_run WHERE user_id = ?", USER_ID);
         jdbcTemplate.update("DELETE FROM agent_session WHERE user_id = ?", USER_ID);
+    }
+
+    private static AgentConfirmationAction action(String actionId) {
+        return action(actionId, "confirm-order");
+    }
+
+    private static AgentConfirmationAction action(String actionId, String nodeId) {
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        return AgentConfirmationAction.pending(9_708_300_001L + Math.abs(actionId.hashCode()), actionId, USER_ID,
+                FIRST_SESSION_ID, 9_708_200_001L, "agent-action-run", "agent-action-plan", 1, nodeId,
+                new ConfirmedOrderCommand("createOrder", "70001", List.of("2", "4")), now.plusMinutes(5), now);
     }
 
     private record Attempt(AgentInitialRunResult result, BusinessException exception) {
@@ -400,6 +564,20 @@ class AgentPersistenceMySqlIntegrationTest {
         @Primary
         MinimalReadOnlyAgentService agentPersistenceMinimalReadOnlyAgentService() {
             return Mockito.mock(MinimalReadOnlyAgentService.class);
+        }
+
+        @Bean
+        @Primary
+        AgentConfirmationFactsProvider agentConfirmationFactsProvider() {
+            return (action, userId) -> new AgentConfirmationValidationContext(
+                    userId, AgentRunStatus.RUNNING, action.planId(), action.planVersion(),
+                    PlanNodeStatus.WAITING_CONFIRMATION, action.parameterHash(), true, LocalDateTime.now());
+        }
+
+        @Bean
+        @Primary
+        CreateOrderToolAdapter agentConfirmationCreateOrderToolAdapter() {
+            return Mockito.mock(CreateOrderToolAdapter.class);
         }
     }
 

@@ -8,6 +8,8 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
 
+import com.miaoyu.ticket.agent.application.confirmation.AgentActionAuthorizationDeniedException;
+import com.miaoyu.ticket.agent.application.confirmation.AgentActionAuthorizationPort;
 import com.miaoyu.ticket.agent.domain.tool.ToolContext;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
@@ -36,9 +38,12 @@ class CreateOrderToolTest {
     @Mock
     private OrderApplicationService orderApplicationService;
 
+    @Mock
+    private AgentActionAuthorizationPort agentActionAuthorizationPort;
+
     @Test
     void givenConfirmedCommand_whenCreateSucceeds_thenReturnTypedOrderAndForwardStableKeys() {
-        CreateOrderTool tool = new CreateOrderTool(orderApplicationService);
+        CreateOrderTool tool = tool();
         CreateOrderForAgentCommand command = command();
         OrderView order = order();
         when(orderApplicationService.createOrder(org.mockito.ArgumentMatchers.any())).thenReturn(order);
@@ -61,7 +66,7 @@ class CreateOrderToolTest {
 
     @Test
     void givenBusinessFailure_whenCreateToolRuns_thenReturnStableFailedResultWithoutRetry() {
-        CreateOrderTool tool = new CreateOrderTool(orderApplicationService);
+        CreateOrderTool tool = tool();
         when(orderApplicationService.createOrder(org.mockito.ArgumentMatchers.any()))
                 .thenThrow(new BusinessException(TicketingErrorCode.SEAT_NOT_LOCKABLE));
 
@@ -75,7 +80,7 @@ class CreateOrderToolTest {
 
     @Test
     void givenUnconfirmedRuntimeOutcome_whenCreateToolRuns_thenReturnProcessingWithoutRetry() {
-        CreateOrderTool tool = new CreateOrderTool(orderApplicationService);
+        CreateOrderTool tool = tool();
         when(orderApplicationService.createOrder(org.mockito.ArgumentMatchers.any()))
                 .thenThrow(new IllegalStateException("database response unavailable"));
 
@@ -89,7 +94,7 @@ class CreateOrderToolTest {
 
     @Test
     void givenOriginalRequest_whenQueryRecoveryRuns_thenReturnSameOrderWithoutCreateCall() {
-        CreateOrderTool tool = new CreateOrderTool(orderApplicationService);
+        CreateOrderTool tool = tool();
         when(orderApplicationService.queryByClientRequestId("client-request-1")).thenReturn(order());
 
         ToolResult<AgentOrderResult> result = tool.queryByClientRequestId(context());
@@ -102,7 +107,7 @@ class CreateOrderToolTest {
 
     @Test
     void givenInvalidCommandOrToolTarget_whenExecuteRuns_thenRejectBeforeOrderService() {
-        CreateOrderTool tool = new CreateOrderTool(orderApplicationService);
+        CreateOrderTool tool = tool();
         assertThatThrownBy(() -> new CreateOrderForAgentCommand(ACTION_ID, "+70001", List.of("80001")))
                 .isInstanceOf(IllegalArgumentException.class);
 
@@ -118,7 +123,7 @@ class CreateOrderToolTest {
 
     @Test
     void givenMissingClientRequestId_whenQueryRecoveryRuns_thenReturnParameterFailure() {
-        CreateOrderTool tool = new CreateOrderTool(orderApplicationService);
+        CreateOrderTool tool = tool();
 
         ToolResult<AgentOrderResult> result = tool.queryByClientRequestId(
                 new ToolContext("run-1", "node-1", CreateOrderTool.TARGET_NAME, List.of(), 1_000L,
@@ -131,7 +136,7 @@ class CreateOrderToolTest {
 
     @Test
     void givenCurrentAvailableSelection_whenValidateRuns_thenReturnExecutableWithoutCreate() {
-        CreateOrderTool tool = new CreateOrderTool(orderApplicationService);
+        CreateOrderTool tool = tool();
 
         OrderPrecheckResult result = tool.validate(
                 new CreateOrderPrecheckCommand("70001", List.of("80001", "80002")));
@@ -144,7 +149,7 @@ class CreateOrderToolTest {
 
     @Test
     void givenStaleSelection_whenValidateRuns_thenReturnSafeErrorWithoutOrderData() {
-        CreateOrderTool tool = new CreateOrderTool(orderApplicationService);
+        CreateOrderTool tool = tool();
         doThrow(new BusinessException(TicketingErrorCode.SEAT_NOT_LOCKABLE))
                 .when(orderApplicationService)
                 .validateOrderSelection(70001L, List.of(80001L));
@@ -159,7 +164,7 @@ class CreateOrderToolTest {
 
     @Test
     void givenInvalidSelection_whenValidateRuns_thenReturnInvalidParameterWithoutServiceCall() {
-        CreateOrderTool tool = new CreateOrderTool(orderApplicationService);
+        CreateOrderTool tool = tool();
 
         OrderPrecheckResult result = tool.validate(
                 new CreateOrderPrecheckCommand("+70001", List.of("80001")));
@@ -171,7 +176,7 @@ class CreateOrderToolTest {
 
     @Test
     void givenQueryDependencyUnavailable_whenValidateRuns_thenReturnStableUnavailableCode() {
-        CreateOrderTool tool = new CreateOrderTool(orderApplicationService);
+        CreateOrderTool tool = tool();
         doThrow(new IllegalStateException("database unavailable"))
                 .when(orderApplicationService)
                 .validateOrderSelection(70001L, List.of(80001L));
@@ -186,7 +191,7 @@ class CreateOrderToolTest {
 
     @Test
     void givenNoOriginalOrder_whenQueryRecoveryRuns_thenReturnOrderNotFoundFailure() {
-        CreateOrderTool tool = new CreateOrderTool(orderApplicationService);
+        CreateOrderTool tool = tool();
         when(orderApplicationService.queryByClientRequestId("client-request-1"))
                 .thenThrow(new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 
@@ -195,6 +200,49 @@ class CreateOrderToolTest {
         assertThat(result.status()).isEqualTo(ToolStatus.FAILED);
         assertThat(result.errorCode()).isEqualTo(205001);
         assertThat(result.retryable()).isFalse();
+    }
+
+    @Test
+    void givenActionBelongsToAnotherUser_whenAuthorizationRejects_thenReturn205004WithoutOrderWrite() {
+        assertAuthorizationRejectedWithoutOrderWrite();
+    }
+
+    @Test
+    void givenActionIsNotExecuting_whenAuthorizationRejects_thenReturn205004WithoutOrderWrite() {
+        assertAuthorizationRejectedWithoutOrderWrite();
+    }
+
+    @Test
+    void givenRunNodeOrToolDoesNotMatch_whenAuthorizationRejects_thenReturn205004WithoutOrderWrite() {
+        assertAuthorizationRejectedWithoutOrderWrite();
+    }
+
+    @Test
+    void givenPlanParametersOrStableKeysDoNotMatch_whenAuthorizationRejects_thenReturn205004WithoutOrderWrite() {
+        assertAuthorizationRejectedWithoutOrderWrite();
+    }
+
+    /** B 负责区分拒绝原因；A 只把公开端口的统一拒绝安全地阻断在订单事务之外。 */
+    private void assertAuthorizationRejectedWithoutOrderWrite() {
+        doThrow(new AgentActionAuthorizationDeniedException())
+                .when(agentActionAuthorizationPort)
+                .authorize(org.mockito.ArgumentMatchers.any());
+
+        ToolResult<AgentOrderResult> result = tool().execute(context(), command());
+
+        assertThat(result.status()).isEqualTo(ToolStatus.FAILED);
+        assertThat(result.errorCode()).isEqualTo(OrderErrorCode.CONFIRMATION_INVALID.code());
+        assertThat(result.retryable()).isFalse();
+        verify(agentActionAuthorizationPort).authorize(org.mockito.ArgumentMatchers.argThat(request ->
+                request.actionId().equals(ACTION_ID)
+                        && request.context().equals(context())
+                        && request.showId().equals("70001")
+                        && request.seatIds().equals(List.of("80001", "80002"))));
+        verify(orderApplicationService, never()).createOrder(org.mockito.ArgumentMatchers.any());
+    }
+
+    private CreateOrderTool tool() {
+        return new CreateOrderTool(orderApplicationService, agentActionAuthorizationPort);
     }
 
     private CreateOrderForAgentCommand command() {
