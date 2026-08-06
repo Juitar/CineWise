@@ -71,4 +71,3 @@
 
 - **WHEN** 扫描公共邮件端口的生产代码依赖
 - **THEN** 只依赖认证公开/内部边界、公共基础和邮件 Provider，不引用 `travel/agent/order` 私有持久化或 Controller
-

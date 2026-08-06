@@ -21,4 +21,3 @@ D 只注入 `com.miaoyu.ticket.auth.application.mail.EmailDeliveryPort`，调用
 - `UNKNOWN`：结果无法确认。禁止生成新 `deliveryKey` 或直接重投，只能用原 key 调用 `query`；仍未知时保留告警和待处理状态。
 
 C 不负责提醒触发时间、通知记录、重试次数、业务文案或 `travel` 表写入。真实 SMTP 不支持稳定查询时，系统不会宣称严格一次投递。
-

@@ -47,4 +47,3 @@ D 后续只能依赖这些公开 Application 类型，不能访问认证 Reposit
 单测覆盖正常用户、用户不存在、未验证、禁用、模板/变量错误、超长或敏感变量、重复 key、明确失败、未知、查询恢复、未配置和日志扫描。ArchUnit/依赖扫描确认不引用 `travel`、`agent`、`order` 的 Repository 或 Controller。
 
 给 D 的说明只描述公开类型、允许变量、结果处理和恢复规则，不要求 D 在本次接入。
-

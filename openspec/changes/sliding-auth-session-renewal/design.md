@@ -61,4 +61,3 @@ POST SSE 不在排除列表；满足条件时在下游建立流之前写 Cookie�
 登出、密码重置、账号停用或其他 `tokenVersion` 变化后，过滤器在续签前的数据库核对失败，因此旧 JWT 不认证也不续签。
 
 使用固定 `Clock` 覆盖 10 分钟边界、8 小时上限、排除路径、GET/POST、OPTIONS、并发、Cookie Max-Age、失败日志和 POST SSE 响应提交前 Cookie。认证集成测试只验证过滤器行为，不修改 Agent 业务。
-
