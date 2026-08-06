@@ -58,6 +58,21 @@ class DistanceContextServiceTest {
         assertThat(service.consume(expiredContext.distanceContextId(), "run-expired")).isNull();
     }
 
+    @Test
+    void discardsOnlyTheMatchingUserRunContext() {
+        CurrentUserAccessor users = Mockito.mock(CurrentUserAccessor.class);
+        when(users.requireCurrentUserId()).thenReturn(7L);
+        DistanceContextService service = new DistanceContextService(users,
+                Clock.fixed(Instant.parse("2026-08-06T10:00:00Z"), ZoneOffset.UTC));
+        var context = service.create("run-1");
+
+        assertThat(service.discard(context.distanceContextId(), "wrong-run"))
+                .isEqualTo(DistanceContextService.CleanupResult.NOT_FOUND);
+        assertThat(service.discard(context.distanceContextId(), "run-1"))
+                .isEqualTo(DistanceContextService.CleanupResult.REMOVED);
+        assertThat(service.consume(context.distanceContextId(), "run-1")).isNull();
+    }
+
     /** 让同一测试同时覆盖创建时刻和过期后的上传，避免依赖真实系统时间。 */
     private static final class MutableClock extends Clock {
         private Instant instant;

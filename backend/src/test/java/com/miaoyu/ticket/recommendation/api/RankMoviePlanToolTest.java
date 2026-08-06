@@ -163,6 +163,21 @@ class RankMoviePlanToolTest {
         assertFixture("recommendation-plan-degraded.json", true, 0);
     }
 
+    @Test
+    void shouldPassOnlyDistanceContextIdAndTrustedRunIdForNearestRecommendation() {
+        PersonalizedRecommendationQueryService personalized = mock(PersonalizedRecommendationQueryService.class);
+        RecommendationPlanResult expected = emptyResult(false);
+        when(personalized.queryWithDistanceContext(any(), org.mockito.ArgumentMatchers.eq("distance-1"),
+                org.mockito.ArgumentMatchers.eq("run-1"))).thenReturn(expected);
+        RankMoviePlanTool tool = new RankMoviePlanTool(mock(FixedRecommendationQueryService.class), personalized);
+
+        var result = tool.executeRecommendationPlan(context(), completeCommand(), "distance-1", "NEAREST");
+
+        assertThat(result.data()).isSameAs(expected);
+        verify(personalized).queryWithDistanceContext(any(), org.mockito.ArgumentMatchers.eq("distance-1"),
+                org.mockito.ArgumentMatchers.eq("run-1"));
+    }
+
     private static RankMoviePlanTool completeTool(RecommendationPlanResult result) {
         PersonalizedRecommendationQueryService personalized = mock(PersonalizedRecommendationQueryService.class);
         when(personalized.query(any())).thenReturn(result);

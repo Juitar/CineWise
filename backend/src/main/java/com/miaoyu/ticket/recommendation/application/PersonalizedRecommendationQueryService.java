@@ -7,6 +7,7 @@ import com.miaoyu.ticket.content.application.ContentQueryService;
 import com.miaoyu.ticket.content.domain.ContentResourceType;
 import com.miaoyu.ticket.content.domain.MovieContent;
 import com.miaoyu.ticket.recommendation.domain.RankedRecommendationCandidate;
+import com.miaoyu.ticket.recommendation.domain.CinemaDistanceSelector;
 import com.miaoyu.ticket.recommendation.domain.RecommendationConstraints;
 import com.miaoyu.ticket.recommendation.domain.RecommendationPlan;
 import com.miaoyu.ticket.recommendation.domain.RecommendationPlanRanker;
@@ -20,6 +21,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /** D 的完整推荐查询用例：合并内容资料和 A 的可售场次后生成确定性方案。 */
@@ -42,7 +44,9 @@ public class PersonalizedRecommendationQueryService {
     private final RecommendationMetricsRecorder metricsRecorder;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final DistanceContextService distanceContextService;
 
+    @Autowired
     public PersonalizedRecommendationQueryService(
             RecommendationContentCandidateQueryService cinemaQueryService,
             ContentQueryService contentQueryService,
@@ -50,12 +54,25 @@ public class PersonalizedRecommendationQueryService {
             RecommendationMetricsRecorder metricsRecorder,
             ObjectMapper objectMapper,
             Clock clock) {
+        this(cinemaQueryService, contentQueryService, showtimeQueryPort, metricsRecorder, objectMapper, clock, null);
+    }
+
+    /** 生产入口额外接入一次性距离上下文；普通推荐仍可使用旧构造器。 */
+    public PersonalizedRecommendationQueryService(
+            RecommendationContentCandidateQueryService cinemaQueryService,
+            ContentQueryService contentQueryService,
+            RecommendationBatchShowtimeQueryPort showtimeQueryPort,
+            RecommendationMetricsRecorder metricsRecorder,
+            ObjectMapper objectMapper,
+            Clock clock,
+            DistanceContextService distanceContextService) {
         this.cinemaQueryService = cinemaQueryService;
         this.contentQueryService = contentQueryService;
         this.showtimeQueryPort = showtimeQueryPort;
         this.metricsRecorder = metricsRecorder;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.distanceContextService = distanceContextService;
     }
 
     /**
@@ -65,6 +82,24 @@ public class PersonalizedRecommendationQueryService {
      * Application API 读取 `movie_show`。</p>
      */
     public RecommendationPlanResult query(RecommendationConstraints constraints) {
+        return queryInternal(constraints, null);
+    }
+
+    /**
+     * B 在可信 ToolContext 中传入本次上下文 ID 和 runId；D 在本方法内消费一次坐标，随后才访问 A。
+     * 上下文不存在、过期、归属不符或已消费时返回普通城市推荐，不把失败伪装成“附近没有影院”。
+     */
+    public RecommendationPlanResult queryWithDistanceContext(
+            RecommendationConstraints constraints, String distanceContextId, String runId) {
+        if (distanceContextService == null || distanceContextId == null || distanceContextId.isBlank()) {
+            return queryInternal(constraints, null);
+        }
+        CinemaDistanceSelector.Coordinate coordinate = distanceContextService.consume(distanceContextId, runId);
+        return queryInternal(constraints, coordinate);
+    }
+
+    private RecommendationPlanResult queryInternal(
+            RecommendationConstraints constraints, CinemaDistanceSelector.Coordinate coordinate) {
         List<RecommendationContentCandidateQueryService.CinemaCandidate> cinemas = cinemaQueryService
                 .listCinemas(constraints.cityCode()).stream()
                 .filter(cinema -> !cinema.expired())
@@ -74,6 +109,24 @@ public class PersonalizedRecommendationQueryService {
         Instant now = clock.instant();
         if (cinemas.isEmpty()) {
             return record(emptyResult("CONTENT", now, now.plusSeconds(60), false, List.of("CONTENT"), null));
+        }
+
+        Map<String, Integer> distanceMeters = Map.of();
+        if (coordinate != null) {
+            List<CinemaDistanceSelector.DistanceCinema> nearest = CinemaDistanceSelector.selectNearest(
+                    coordinate,
+                    cinemas.stream().map(cinema -> new CinemaDistanceSelector.CoordinateCinema(
+                            cinema.cinemaId(), cinema.longitude(), cinema.latitude())).toList(),
+                    constraints.maxDistanceMeters());
+            distanceMeters = nearest.stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
+                    cinema -> Long.toString(cinema.cinemaId()),
+                    CinemaDistanceSelector.DistanceCinema::distanceMeters));
+            if (distanceMeters.isEmpty()) {
+                return queryInternal(constraints, null);
+            }
+            final Map<String, Integer> selectedDistances = distanceMeters;
+            cinemas = cinemas.stream().filter(cinema -> selectedDistances.containsKey(Long.toString(cinema.cinemaId())))
+                    .toList();
         }
 
         RecommendationBatchShowtimeQueryPort.BatchResult batch = showtimeQueryPort.querySaleable(
@@ -103,6 +156,14 @@ public class PersonalizedRecommendationQueryService {
         }
 
         List<RecommendationPlan> plans = RecommendationPlanRanker.rank(candidates, constraints, clock);
+        if (!distanceMeters.isEmpty()) {
+            RecommendationPlan nearest = RecommendationPlanRanker.nearest(candidates, distanceMeters, constraints, clock);
+            if (nearest != null) {
+                plans = java.util.stream.Stream.concat(
+                        java.util.stream.Stream.of(nearest),
+                        plans.stream().filter(plan -> !plan.showId().equals(nearest.showId()))).toList();
+            }
+        }
         Instant dataAt = candidates.stream()
                 .map(RankedRecommendationCandidate::dataAt)
                 .max(Instant::compareTo)

@@ -116,6 +116,15 @@ public class RankMoviePlanTool {
      */
     public ToolResult<RecommendationPlanResult> executeRecommendationPlan(
             ToolContext context, RankMoviePlanCommand command) {
+        return executeRecommendationPlan(context, command, null, null);
+    }
+
+    /**
+     * B 在确认后的可信上下文中调用的附近推荐入口。精确位置不进入 Command；D 只接收一次性上下文 ID，
+     * 并把消费动作交给距离 Application Service。distancePreference 目前只允许 NEAREST。
+     */
+    public ToolResult<RecommendationPlanResult> executeRecommendationPlan(
+            ToolContext context, RankMoviePlanCommand command, String distanceContextId, String distancePreference) {
         // 上下文只提供 B 已验证的运行元数据，用户条件只能来自类型化 Command。
         Objects.requireNonNull(context, "context 不能为空");
         Objects.requireNonNull(command, "command 不能为空");
@@ -134,8 +143,20 @@ public class RankMoviePlanTool {
             return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INTERNAL_ERROR.code(), false, false,
                     "RETRY_LATER", false, null, context.stateVersion(), null, null);
         }
+        if (distancePreference != null && !"NEAREST".equals(distancePreference)) {
+            return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INVALID_PARAMETER.code(), false, false,
+                    "CHECK_DISTANCE_PREFERENCE", false, null, context.stateVersion(), null, null);
+        }
+        if ("NEAREST".equals(distancePreference)
+                && (distanceContextId == null || distanceContextId.isBlank())) {
+            return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INVALID_PARAMETER.code(), false, false,
+                    "CHECK_DISTANCE_CONTEXT", false, null, context.stateVersion(), null, null);
+        }
         // 只把 D 的完整计算结果原样交给 B，卡片、SSE 和 Agent 状态仍由 B 负责。
-        RecommendationPlanResult result = personalizedQueryService.query(command.toConstraints());
+        RecommendationPlanResult result = "NEAREST".equals(distancePreference)
+                ? personalizedQueryService.queryWithDistanceContext(
+                        command.toConstraints(), distanceContextId, context.runId())
+                : personalizedQueryService.query(command.toConstraints());
         // 空方案或放宽建议仍是成功查询；降级标识只描述结果可用性，不能变成自动重试。
         return new ToolResult<>(ToolStatus.SUCCESS, result, null, false, false, "RENDER_RESULT",
                 result.degraded(), result.degraded() ? "RECOMMENDATION_DEGRADED" : null,
