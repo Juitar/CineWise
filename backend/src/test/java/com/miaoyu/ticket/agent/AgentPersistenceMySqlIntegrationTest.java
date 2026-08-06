@@ -9,7 +9,6 @@ import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationFactsPr
 import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationService;
 import com.miaoyu.ticket.agent.application.confirmation.CreateOrderToolAdapter;
 import com.miaoyu.ticket.agent.application.confirmation.CreateOrderToolResult;
-import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
 import com.miaoyu.ticket.agent.application.persistence.AgentInitialRunResult;
 import com.miaoyu.ticket.agent.application.persistence.AgentInitialRunTransaction;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionCommand;
@@ -19,10 +18,8 @@ import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeEventService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunCancellationService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionManagementService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
-import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
-import com.miaoyu.ticket.agent.application.reply.ErrorReplyFacts;
-import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentResult;
-import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentService;
+import com.miaoyu.ticket.agent.application.run.MultiToolSupervisor;
+import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorResult;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEvent;
@@ -140,7 +137,7 @@ class AgentPersistenceMySqlIntegrationTest {
     private CreateOrderTool createOrderTool;
 
     @Autowired
-    private MinimalReadOnlyAgentService minimalReadOnlyAgentService;
+    private MultiToolSupervisor multiToolSupervisor;
 
     private AtomicBoolean toolCalledInsideTransaction;
 
@@ -167,7 +164,7 @@ class AgentPersistenceMySqlIntegrationTest {
                 """, Integer.class)).isEqualTo(1);
         cleanupFixtures();
         toolCalledInsideTransaction = new AtomicBoolean(true);
-        Mockito.reset(minimalReadOnlyAgentService);
+        Mockito.reset(multiToolSupervisor);
     }
 
     @AfterEach
@@ -240,7 +237,7 @@ class AgentPersistenceMySqlIntegrationTest {
     @Test
     void shouldReturnWinnerForConcurrentSameClientRequestId() throws Exception {
         insertSession(FIRST_SESSION_ID, FIRST_SESSION);
-        Mockito.when(minimalReadOnlyAgentService.run(Mockito.any())).thenReturn(invalidResult());
+        Mockito.when(multiToolSupervisor.run(Mockito.any())).thenReturn(invalidResult());
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
@@ -267,7 +264,7 @@ class AgentPersistenceMySqlIntegrationTest {
     @Test
     void shouldCallReadOnlyAgentOutsideDatabaseTransactionAndPersistFailureResult() {
         insertSession(FIRST_SESSION_ID, FIRST_SESSION);
-        Mockito.when(minimalReadOnlyAgentService.run(Mockito.any())).thenAnswer(invocation -> {
+        Mockito.when(multiToolSupervisor.run(Mockito.any())).thenAnswer(invocation -> {
             toolCalledInsideTransaction.set(TransactionSynchronizationManager.isActualTransactionActive());
             return invalidResult();
         });
@@ -494,16 +491,15 @@ class AgentPersistenceMySqlIntegrationTest {
                 sessionId, "推荐电影", requestId, slots, new PlanValidationContext(Map.of(), Map.of(), slots), 3000L);
     }
 
-    private static MinimalReadOnlyAgentResult invalidResult() {
-        return new MinimalReadOnlyAgentResult(
+    private static MultiToolSupervisorResult invalidResult() {
+        return new MultiToolSupervisorResult(
                 new CandidatePlan("candidate-1", 1, List.of()),
                 PlanValidationResult.invalid(List.of(new PlanValidationIssue(
                         PlanValidationIssueCode.TOOL_NOT_FOUND, "rank", "targetName", "ignored"))),
                 null,
                 List.of(),
-                new ReplyGenerationResponse(
-                        "当前请求无法安全执行", AgentReplyMessageType.ERROR,
-                        new ErrorReplyFacts(null, List.of("TOOL_NOT_FOUND"))));
+                false,
+                "PLAN_REJECTED");
     }
 
     private void insertSession(long id, String sessionId) {
@@ -562,8 +558,8 @@ class AgentPersistenceMySqlIntegrationTest {
 
         @Bean
         @Primary
-        MinimalReadOnlyAgentService agentPersistenceMinimalReadOnlyAgentService() {
-            return Mockito.mock(MinimalReadOnlyAgentService.class);
+        MultiToolSupervisor agentPersistenceMultiToolSupervisor() {
+            return Mockito.mock(MultiToolSupervisor.class);
         }
 
         @Bean

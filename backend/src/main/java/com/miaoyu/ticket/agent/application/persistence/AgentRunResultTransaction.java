@@ -1,6 +1,10 @@
 package com.miaoyu.ticket.agent.application.persistence;
 
 import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentResult;
+import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorResult;
+import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
+import com.miaoyu.ticket.agent.application.reply.ErrorReplyFacts;
+import com.miaoyu.ticket.agent.application.reply.ProgressReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
 import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
@@ -17,6 +21,7 @@ import com.miaoyu.ticket.agent.domain.plan.PlanNodeStatus;
 import com.miaoyu.ticket.agent.domain.run.ExecutionNodeState;
 import com.miaoyu.ticket.agent.domain.run.ExecutionRunState;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
+import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import java.time.Clock;
@@ -89,6 +94,43 @@ public class AgentRunResultTransaction {
             sessionRepository.releaseActiveRun(run.sessionId(), run.id());
         }
         return nextRun;
+    }
+
+    /**
+     * 保存生产提交入口的多工具快照。当前唯一可执行工具是 rankMoviePlan，结果类型仍受白名单约束；
+     * 对外只写安全进度或安全错误，不保存模型原文和完整工具响应。
+     */
+    @Transactional
+    public AgentRun record(AgentRun run, MultiToolSupervisorResult result) {
+        return record(run, asMinimalResult(result));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static MinimalReadOnlyAgentResult asMinimalResult(MultiToolSupervisorResult result) {
+        Objects.requireNonNull(result, "运行结果不能为空");
+        List<com.miaoyu.ticket.agent.domain.tool.ToolResult<FixedRecommendationResult>> toolResults =
+                result.toolResults()
+                .stream()
+                .map(item -> (com.miaoyu.ticket.agent.domain.tool.ToolResult<FixedRecommendationResult>) item.result())
+                .toList();
+        ReplyGenerationResponse reply;
+        if (!result.validation().isValid()) {
+            reply = new ReplyGenerationResponse(
+                    "当前请求无法安全执行", AgentReplyMessageType.ERROR,
+                    new ErrorReplyFacts(null, List.of("PLAN_REJECTED")));
+        } else {
+            String nodeId = result.state().plan().nodes().stream()
+                    .filter(node -> result.state().nodeState(node.nodeId()).status()
+                            == PlanNodeStatus.WAITING_CONFIRMATION
+                            || result.state().nodeState(node.nodeId()).status() == PlanNodeStatus.RUNNING)
+                    .map(ExecutionPlanNode::nodeId)
+                    .findFirst()
+                    .orElse("plan");
+            reply = new ReplyGenerationResponse(
+                    "计划已保存，请等待下一步操作。", AgentReplyMessageType.PROGRESS, new ProgressReplyFacts(nodeId));
+        }
+        return new MinimalReadOnlyAgentResult(
+                result.candidatePlan(), result.validation(), result.state(), toolResults, reply);
     }
 
     /** 主控或只读工具异常后，用新的短事务写入安全错误并释放仍指向本运行的会话。 */

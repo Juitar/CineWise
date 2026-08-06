@@ -23,6 +23,11 @@
 
 `MultiToolSupervisor` 依赖 `ModelGateway`、校验器、状态机和按具体类型登记的执行适配器。模型只返回 `CandidatePlan`；校验器将它变为 `ExecutionPlan`，Supervisor 才能选择节点。工具没有 Supervisor 引用，因此不能再调用工具、生成计划或更新会话。
 
+提交入口 `AgentMessageSubmissionService` 在初始短事务提交后调用 `MultiToolSupervisor`，再由
+`AgentRunResultTransaction` 以运行版本 CAS 保存计划、步骤和安全事件。确认节点保存为
+`WAITING_CONFIRMATION` 后，入口才调用 `CreateOrderConfirmationActionOrchestrator`；它只复用 A 的公开
+创建服务，不生成 actionId 或写入幂等键。该顺序确保未落库、旧版本或 CAS 失败的计划不能产生可提交动作。
+
 ### 2. 写节点复用既有确认建单
 
 `rankMoviePlan` 继续由 B 的只读适配器执行。`createOrder` 只作为白名单中的写工具定义和确认门控目标：Supervisor 不能直接调用它，确认动作仍由 `AgentConfirmationActionCreationService` 创建、`AgentConfirmationService` claim 后在事务外调用 A。这样不会为重规划生成新的 actionId 或写键。
