@@ -118,7 +118,7 @@ public class TravelTaskController {
 
     private TravelTaskResponse toResponse(TravelTaskQueryService.TravelTaskDetails task) {
         return new TravelTaskResponse(task.taskId(), task.status().name(), task.triggerAt(), task.version(),
-                new OrderResponse(task.order().orderId(), task.order().orderNo(), task.order().showId(),
+                new TravelOrderResponse(task.order().orderId(), task.order().orderNo(), task.order().showId(),
                         task.order().showStartTime()),
                 new MovieResponse(task.movie().movieId(), task.movie().title(), task.movie().posterUrl(),
                         task.movie().source(), toOffsetDateTime(task.movie().dataTime())),
@@ -177,10 +177,10 @@ public class TravelTaskController {
 
     public record TravelTaskResponse(
             String taskId, String status, OffsetDateTime triggerAt, long version,
-            OrderResponse order, MovieResponse movie, CinemaResponse cinema) {
+            TravelOrderResponse order, MovieResponse movie, CinemaResponse cinema) {
     }
 
-    public record OrderResponse(String orderId, String orderNo, String showId, OffsetDateTime showStartTime) {
+    public record TravelOrderResponse(String orderId, String orderNo, String showId, OffsetDateTime showStartTime) {
     }
 
     public record MovieResponse(String movieId, String title, String posterUrl, String source, OffsetDateTime dataAt) {
