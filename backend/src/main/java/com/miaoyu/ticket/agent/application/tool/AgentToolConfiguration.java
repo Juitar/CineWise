@@ -6,8 +6,6 @@ import com.miaoyu.ticket.agent.domain.plan.PlanSchemaValidator;
 import com.miaoyu.ticket.agent.domain.run.ExecutionPlanStateMachine;
 import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
 import com.miaoyu.ticket.agent.infrastructure.model.MockModelGateway;
-import com.miaoyu.ticket.agent.infrastructure.model.DeepSeekModelGateway;
-import com.miaoyu.ticket.agent.infrastructure.model.DeepSeekProperties;
 import com.miaoyu.ticket.agent.tool.ticketing.QueryAvailableDatesExecutionAdapter;
 import com.miaoyu.ticket.agent.tool.ticketing.QueryShowsExecutionAdapter;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
@@ -15,11 +13,8 @@ import com.miaoyu.ticket.ticketing.api.QueryAvailableDatesTool;
 import com.miaoyu.ticket.ticketing.api.QueryShowsTool;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.client.RestClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * B 的工具装配入口，只登记明确的类型化工具。
@@ -76,25 +71,6 @@ public class AgentToolConfiguration {
     public MockModelGateway mockModelGateway(
             PlanSchemaValidator planSchemaValidator, ToolRegistry agentToolRegistry) {
         return new MockModelGateway(planSchemaValidator, agentToolRegistry);
-    }
-
-    /** 真实模型只在部署明确开启时装配；密钥缺失会在配置绑定阶段失败，不能静默降级为固定业务结果。 */
-    @Configuration(proxyBeanMethods = false)
-    @ConditionalOnProperty(prefix = "cinewise.agent.deepseek", name = "enabled", havingValue = "true")
-    @EnableConfigurationProperties(DeepSeekProperties.class)
-    static class DeepSeekModelConfiguration {
-        @Bean
-        ModelGateway deepSeekModelGateway(
-                DeepSeekProperties properties, ObjectMapper objectMapper, PlanSchemaValidator planSchemaValidator) {
-            properties.requireEnabledConfiguration();
-            org.springframework.http.client.SimpleClientHttpRequestFactory requestFactory =
-                    new org.springframework.http.client.SimpleClientHttpRequestFactory();
-            requestFactory.setConnectTimeout(properties.timeout());
-            requestFactory.setReadTimeout(properties.timeout());
-            RestClient client = RestClient.builder().baseUrl(properties.baseUrl())
-                    .requestFactory(requestFactory).build();
-            return new DeepSeekModelGateway(client, properties, objectMapper, planSchemaValidator);
-        }
     }
 
     /**
