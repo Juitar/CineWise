@@ -65,3 +65,34 @@ done
 PLAYWRIGHT_BASE_URL="http://127.0.0.1:${host_port}" \
   pnpm exec playwright test e2e/production-nginx.spec.ts \
   --config=playwright.production.config.ts
+
+# The one-time distanceContextId is carried in the upload path. Exercise the
+# real production Nginx image, then prove neither the ID nor query string was
+# written to its access log. The upstream response is irrelevant to logging.
+privacy_canary_uuid="11111111-2222-4333-8444-555555555555"
+privacy_canary_query="privacy-canary=distance-context"
+privacy_redacted_path="/api/v1/recommendation/distance-contexts/[redacted]/location"
+
+curl --silent --show-error \
+  --request POST \
+  --header "Content-Type: application/json" \
+  --data '{"longitude":112.9388,"latitude":28.2282}' \
+  "http://127.0.0.1:${host_port}/api/v1/recommendation/distance-contexts/${privacy_canary_uuid}/location?${privacy_canary_query}" \
+  >/dev/null
+
+frontend_logs="$(docker logs "$frontend_container" 2>&1)"
+if grep --fixed-strings --quiet "$privacy_canary_uuid" <<<"$frontend_logs"; then
+  echo "Frontend Nginx access log leaked distanceContextId." >&2
+  exit 1
+fi
+if grep --fixed-strings --quiet "$privacy_canary_query" <<<"$frontend_logs"; then
+  echo "Frontend Nginx access log leaked distance upload query parameters." >&2
+  exit 1
+fi
+if ! grep --fixed-strings --quiet "$privacy_redacted_path" <<<"$frontend_logs"; then
+  echo "Frontend Nginx access log did not contain the expected redacted path." >&2
+  exit 1
+fi
+
+echo "Frontend Nginx privacy log sample:"
+grep --fixed-strings "$privacy_redacted_path" <<<"$frontend_logs" | tail -n 1
