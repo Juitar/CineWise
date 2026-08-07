@@ -6,6 +6,7 @@ import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +26,7 @@ public class WeatherQueryService {
     private final CinemaLocationQueryService cinemaLocationQueryService;
     private final WeatherAdcodeAdapter weatherAdcodeAdapter;
 
+    @Autowired
     public WeatherQueryService(@Qualifier("realWeatherProvider") WeatherProvider realWeatherProvider,
                                @Qualifier("demoWeatherProvider") WeatherProvider demoWeatherProvider,
                                WeatherCache weatherCache, Clock clock,

@@ -8,6 +8,7 @@ import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.Objects;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -33,6 +34,7 @@ public class BasicRouteService {
     private final Clock clock;
 
     /** 创建路线查询服务；服务本身不持有位置或路线历史。 */
+    @Autowired
     public BasicRouteService(
             TravelTaskRepository taskRepository,
             CurrentUserAccessor currentUserAccessor,

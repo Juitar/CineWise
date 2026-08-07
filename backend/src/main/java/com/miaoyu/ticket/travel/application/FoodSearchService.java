@@ -9,6 +9,7 @@ import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /** 用户主动查询影院周边餐饮，不读取画像也不修改出行任务。 */
@@ -24,6 +25,7 @@ public class FoodSearchService {
     private final java.util.function.LongFunction<java.util.Optional<ResolvedGeoPoint>> cinemaLocationQuery;
     private final Clock clock;
 
+    @Autowired
     public FoodSearchService(
             TravelTaskRepository taskRepository,
             CurrentUserAccessor currentUserAccessor,
