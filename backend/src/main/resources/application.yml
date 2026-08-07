@@ -147,6 +147,12 @@ cinewise:
       delay-milliseconds: ${REFUNDED_TRAVEL_RECONCILIATION_DELAY_MILLISECONDS:300000}
       window-hours: ${REFUNDED_TRAVEL_RECONCILIATION_WINDOW_HOURS:24}
       batch-size: ${REFUNDED_TRAVEL_RECONCILIATION_BATCH_SIZE:100}
+  ticketing:
+    sandbox-import:
+      base-price: 39.90
+      row-count: 8
+      seats-per-row: 10
+      language-version: "国语 2D"
   api:
     default-page: 1
     default-page-size: 20
