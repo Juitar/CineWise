@@ -1,5 +1,12 @@
 import { parseOrderDateTime } from '../order/formatters';
-import type { TravelAdvice, TravelTask, TravelTaskStatus, TravelTaskUpdate } from './types';
+import type {
+  TravelAdvice,
+  TravelMode,
+  TravelRoute,
+  TravelTask,
+  TravelTaskStatus,
+  TravelTaskUpdate,
+} from './types';
 
 const BUSINESS_ID = /^[1-9][0-9]*$/;
 const TASK_STATUSES = new Set<TravelTaskStatus>([
@@ -12,6 +19,7 @@ const TASK_STATUSES = new Set<TravelTaskStatus>([
   'FAILED',
 ]);
 const ADVICE_TYPES = new Set(['WEATHER', 'TRANSPORT']);
+const TRAVEL_MODES = new Set<TravelMode>(['DRIVING', 'WALKING']);
 
 export class TravelContractError extends Error {
   constructor() {
@@ -51,6 +59,13 @@ function status(value: unknown): TravelTaskStatus {
 }
 
 function version(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new TravelContractError();
+  }
+  return value;
+}
+
+function nonNegativeInteger(value: unknown): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
     throw new TravelContractError();
   }
@@ -149,5 +164,23 @@ export function parseTravelTaskUpdate(value: unknown): TravelTaskUpdate {
     status: status(update.status),
     triggerAt: dateTime(update.triggerAt, true),
     version: version(update.version),
+  };
+}
+
+export function parseTravelRoute(value: unknown): TravelRoute {
+  const route = record(value);
+  const travelMode = text(route.travelMode) as TravelMode;
+  if (!TRAVEL_MODES.has(travelMode)) throw new TravelContractError();
+  return {
+    provider: text(route.provider),
+    travelMode,
+    durationMinutes: nonNegativeInteger(route.durationMinutes),
+    suggestedDepartureAt: dateTime(route.suggestedDepartureAt) as string,
+    source: text(route.source),
+    dataTime: dateTime(route.dataTime) as string,
+    expiresAt: dateTime(route.expiresAt) as string,
+    isExpired: boolean(route.isExpired),
+    degraded: boolean(route.degraded),
+    fallbackType: optionalText(route.fallbackType),
   };
 }

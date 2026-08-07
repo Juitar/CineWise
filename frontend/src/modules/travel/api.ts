@@ -1,6 +1,18 @@
 import { apiRequest } from '../../shared/api/client';
-import { parseTravelAdvice, parseTravelTask, parseTravelTaskUpdate } from './contract';
-import type { TravelAdvice, TravelTask, TravelTaskUpdate, UpdateReminderRequest } from './types';
+import {
+  parseTravelAdvice,
+  parseTravelRoute,
+  parseTravelTask,
+  parseTravelTaskUpdate,
+} from './contract';
+import type {
+  PlanTravelRouteRequest,
+  TravelAdvice,
+  TravelRoute,
+  TravelTask,
+  TravelTaskUpdate,
+  UpdateReminderRequest,
+} from './types';
 
 export async function getTravelTask(taskId: string, signal?: AbortSignal): Promise<TravelTask> {
   return parseTravelTask(
@@ -44,6 +56,24 @@ export async function updateTravelReminder(
       method: 'PUT',
       headers: { 'If-Match': `"${request.version}"` },
       body: request,
+    }),
+  );
+}
+
+/**
+ * 提交本次浏览器定位并返回不含坐标的路线摘要。
+ * 调用方不得缓存 request，超时或断网后也不得自动重发本 POST。
+ */
+export async function planTravelRoute(
+  taskId: string,
+  request: PlanTravelRouteRequest,
+  signal?: AbortSignal,
+): Promise<TravelRoute> {
+  return parseTravelRoute(
+    await apiRequest<unknown>(`/api/v1/travel/tasks/${encodeURIComponent(taskId)}/route`, {
+      body: request,
+      method: 'POST',
+      signal,
     }),
   );
 }

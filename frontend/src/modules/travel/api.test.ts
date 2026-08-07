@@ -10,6 +10,7 @@ import {
   getTravelAdvice,
   getTravelTask,
   getTravelTaskByOrder,
+  planTravelRoute,
   refreshTravelAdvice,
   updateTravelReminder,
 } from './api';
@@ -58,5 +59,40 @@ describe('出行 API', () => {
       headers: { 'If-Match': '"1"' },
       body: { triggerAt: '2026-08-07T18:00:00+08:00', version: 1 },
     });
+  });
+
+  it('路线规划只向正式路径发送一次性坐标和已确认方式', async () => {
+    const signal = new AbortController().signal;
+    const request = {
+      longitude: 112.9388146,
+      latitude: 28.2282085,
+      travelMode: 'DRIVING' as const,
+      thirdPartySharingConfirmed: true as const,
+    };
+    client.apiRequest.mockResolvedValueOnce({
+      provider: 'AMAP',
+      travelMode: 'DRIVING',
+      durationMinutes: 20,
+      suggestedDepartureAt: '2026-08-08T10:40:00+08:00',
+      source: 'AMAP_ROUTE',
+      dataTime: '2026-08-08T10:00:00+08:00',
+      expiresAt: '2026-08-08T10:15:00+08:00',
+      isExpired: false,
+      degraded: false,
+      fallbackType: null,
+    });
+
+    await expect(planTravelRoute('90001', request, signal)).resolves.toMatchObject({
+      travelMode: 'DRIVING',
+      durationMinutes: 20,
+    });
+    expect(client.apiRequest).toHaveBeenCalledWith('/api/v1/travel/tasks/90001/route', {
+      body: request,
+      method: 'POST',
+      signal,
+    });
+    expect(request).not.toHaveProperty('originValue');
+    expect(request).not.toHaveProperty('cinemaArea');
+    expect(request).not.toHaveProperty('distanceContextId');
   });
 });

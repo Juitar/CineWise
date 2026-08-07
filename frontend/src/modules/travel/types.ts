@@ -57,3 +57,25 @@ export interface TravelTaskUpdate {
   triggerAt: string | null;
   version: number;
 }
+
+export type TravelMode = 'DRIVING' | 'WALKING';
+
+export interface PlanTravelRouteRequest {
+  longitude: number;
+  latitude: number;
+  travelMode: TravelMode;
+  thirdPartySharingConfirmed: true;
+}
+
+export interface TravelRoute {
+  provider: string;
+  travelMode: TravelMode;
+  durationMinutes: number;
+  suggestedDepartureAt: string;
+  source: string;
+  dataTime: string;
+  expiresAt: string;
+  isExpired: boolean;
+  degraded: boolean;
+  fallbackType: string | null;
+}

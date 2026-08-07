@@ -1,14 +1,15 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../shared/api/ApiError';
 import { setupTestEnvironment } from '../../features/test-utils';
 
-const mocks = vi.hoisted(() => ({ historyPush: vi.fn(), travel: vi.fn() }));
+const mocks = vi.hoisted(() => ({ historyPush: vi.fn(), travel: vi.fn(), travelRoute: vi.fn() }));
 vi.mock('umi', () => ({
   history: { push: mocks.historyPush },
   useParams: () => ({ taskId: '90001' }),
 }));
 vi.mock('../../modules/travel/useTravelTask', () => ({ useTravelTask: mocks.travel }));
+vi.mock('../../modules/travel/useTravelRoute', () => ({ useTravelRoute: mocks.travelRoute }));
 
 import TravelPage from './index';
 
@@ -68,8 +69,22 @@ function state(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function routeState(overrides: Record<string, unknown> = {}) {
+  return {
+    route: null,
+    notice: null,
+    phase: 'idle',
+    isPlanning: false,
+    plan: vi.fn(),
+    ...overrides,
+  };
+}
+
 describe('观影出行建议页', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.travelRoute.mockReturnValue(routeState());
+  });
 
   it('加载期间显示加载状态', () => {
     mocks.travel.mockReturnValue(state({ task: null, advice: null, isLoading: true }));
@@ -175,5 +190,73 @@ describe('观影出行建议页', () => {
       triggerAt: '2026-08-07T18:30:00+08:00',
       version: 1,
     });
+  });
+
+  it('只有确认本次位置共享后才能规划驾车或步行路线', async () => {
+    const plan = vi.fn().mockResolvedValue('success');
+    mocks.travel.mockReturnValue(state());
+    mocks.travelRoute.mockReturnValue(routeState({ plan }));
+    render(<TravelPage />);
+
+    const button = screen.getByRole('button', { name: '规划路线' });
+    expect(button).toBeDisabled();
+    expect(screen.queryByText('公交')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: /我确认将本次当前位置/ }));
+    expect(button).toBeEnabled();
+    fireEvent.click(screen.getByText('步行'));
+    fireEvent.click(button);
+
+    await waitFor(() => expect(plan).toHaveBeenCalledWith('WALKING', true));
+    expect(screen.getByRole('checkbox', { name: /我确认将本次当前位置/ })).not.toBeChecked();
+  });
+
+  it('展示后端返回的不含坐标路线摘要', () => {
+    mocks.travel.mockReturnValue(state());
+    mocks.travelRoute.mockReturnValue(
+      routeState({
+        route: {
+          provider: 'AMAP',
+          travelMode: 'DRIVING',
+          durationMinutes: 20,
+          suggestedDepartureAt: '2026-08-08T10:40:00+08:00',
+          source: 'AMAP_ROUTE',
+          dataTime: '2026-08-08T10:00:00+08:00',
+          expiresAt: '2026-08-08T10:15:00+08:00',
+          isExpired: false,
+          degraded: false,
+          fallbackType: null,
+        },
+      }),
+    );
+    render(<TravelPage />);
+    expect(screen.getByText('20 分钟')).toBeInTheDocument();
+    expect(screen.getByText('AMAP_ROUTE')).toBeInTheDocument();
+    expect(screen.queryByText(/112\.938|28\.228/)).not.toBeInTheDocument();
+  });
+
+  it('路线不可用显示固定提示并保留影院信息', () => {
+    mocks.travel.mockReturnValue(state());
+    mocks.travelRoute.mockReturnValue(routeState({ notice: '路线暂不可用' }));
+    render(<TravelPage />);
+    expect(screen.getByText('路线暂不可用')).toBeInTheDocument();
+    expect(screen.getByText(task.cinema.address)).toBeInTheDocument();
+  });
+
+  it('任务只读时禁用位置确认和路线规划', () => {
+    mocks.travel.mockReturnValue(state({ task: { ...task, status: 'CANCELLED' } }));
+    render(<TravelPage />);
+    expect(screen.getByRole('checkbox', { name: /我确认将本次当前位置/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '规划路线' })).toBeDisabled();
+  });
+
+  it('路线接口发现任务不可访问时重新查询原任务', async () => {
+    const reload = vi.fn();
+    const plan = vi.fn().mockResolvedValue('task-unavailable');
+    mocks.travel.mockReturnValue(state({ reload }));
+    mocks.travelRoute.mockReturnValue(routeState({ plan }));
+    render(<TravelPage />);
+    fireEvent.click(screen.getByRole('checkbox', { name: /我确认将本次当前位置/ }));
+    fireEvent.click(screen.getByRole('button', { name: '规划路线' }));
+    await waitFor(() => expect(reload).toHaveBeenCalledOnce());
   });
 });
