@@ -6,7 +6,10 @@ function envelope(data: unknown, code = 0) {
   return { code, data, message: code === 0 ? 'success' : 'error', traceId: 'agent-e2e-trace' };
 }
 
-async function mockAuthenticatedAgent(page: import('@playwright/test').Page) {
+async function mockAuthenticatedAgent(
+  page: import('@playwright/test').Page,
+  showConfirmation = false,
+) {
   await page
     .context()
     .addCookies([
@@ -109,10 +112,50 @@ async function mockAuthenticatedAgent(page: import('@playwright/test').Page) {
       return;
     }
     if (path === `/api/v1/agent/sessions/${sessionId}/messages`) {
+      const records = showConfirmation
+        ? [
+            {
+              messageId: 'message-confirm-1',
+              runId: '52b810c5-4b03-4a41-9c36-07372f1a6f59',
+              role: 'ASSISTANT',
+              type: 'PLAN_CARD',
+              text: '请确认建单',
+              payload: {
+                type: 'PLAN_CARD',
+                actionId: 'action-e2e-1',
+                actionType: 'CREATE_ORDER',
+                status: 'PENDING_CONFIRMATION',
+                title: '确认建单',
+                displayLines: ['影片：示例影片', '座位：已选择'],
+                expiresAt: '2026-08-08T10:05:00+08:00',
+              },
+              status: 'COMPLETED',
+              completedAt: '2026-08-07T10:00:00+08:00',
+              createdAt: '2026-08-07T10:00:00+08:00',
+            },
+          ]
+        : [];
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(envelope({ total: 0, page: 1, size: 100, records: [] })),
+        body: JSON.stringify(envelope({ total: records.length, page: 1, size: 100, records })),
+      });
+      return;
+    }
+    if (path === '/api/v1/agent/actions/action-e2e-1/confirm') {
+      expect(request.postDataJSON()).toEqual({ confirmed: true });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          envelope({
+            actionId: 'action-e2e-1',
+            runId: '52b810c5-4b03-4a41-9c36-07372f1a6f59',
+            planVersion: 2,
+            status: 'SUCCEEDED',
+            updatedAt: '2026-08-07T10:01:00+08:00',
+          }),
+        ),
       });
       return;
     }
@@ -174,4 +217,15 @@ test('登录用户消费 POST SSE 并展示类型化降级卡片', async ({ page
   await expect(page.getByText('已完成', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /购票|确认|支付/ })).toHaveCount(0);
   await expect(page.getByText(/¥|库存|路线|餐饮/)).toHaveCount(0);
+});
+
+test('登录用户从历史消息确认操作且不展示 actionId', async ({ page }) => {
+  await mockAuthenticatedAgent(page, true);
+  await page.goto(`/assistant/${sessionId}`);
+  const confirm = page.getByRole('button', { name: '确认操作' });
+  await expect(confirm).toBeVisible();
+  await expect(page.getByText('action-e2e-1')).toHaveCount(0);
+  await confirm.click();
+  await expect(page.getByText('确认操作已完成')).toBeVisible();
+  await expect(confirm).toBeDisabled();
 });

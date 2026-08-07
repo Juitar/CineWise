@@ -22,6 +22,22 @@ export type AgentEventType = (typeof AGENT_EVENT_TYPES)[number];
 export type AgentWorkspaceStatus =
   'IDLE' | 'CONNECTING' | 'STREAMING' | 'COMPLETED' | 'FAILED' | 'RESULT_UNKNOWN' | 'CANCELLED';
 export type AgentRunStatus = 'CANCELLED' | 'COMPLETED' | 'FAILED' | 'RUNNING';
+export type AgentConfirmationStatus =
+  | 'PENDING_CONFIRMATION'
+  | 'EXECUTING'
+  | 'RESULT_UNKNOWN'
+  | 'SUCCEEDED'
+  | 'FAILED'
+  | 'EXPIRED'
+  | 'REJECTED'
+  | 'INVALIDATED';
+export interface AgentActionConfirmationResult {
+  actionId: string;
+  runId: string;
+  planVersion: number;
+  status: AgentConfirmationStatus;
+  updatedAt: string;
+}
 
 export interface AgentSession {
   sessionId: string;
@@ -36,6 +52,7 @@ export interface AgentMessage {
   role: string;
   type: string;
   text: string;
+  runId: string;
   payload: Readonly<Record<string, unknown>>;
   status: string;
   completedAt: string | null;
