@@ -1,4 +1,4 @@
-import { Alert, Button, Empty, Input, Pagination, Skeleton } from 'antd';
+import { Alert, Input, Pagination } from 'antd';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'umi';
 
@@ -10,6 +10,14 @@ import {
   type NormalizedMovieListQuery,
 } from '../../modules/content/movieListQuery';
 import { useMovieList } from '../../modules/content/useMovieList';
+import {
+  PageEmpty,
+  PageError,
+  PageLoading,
+  PageRefreshErrorNotice,
+  PageRefreshingNotice,
+  PageStaleNotice,
+} from '../../shared/components/page-state';
 import type { MovieSummary } from '../../shared/types/api';
 import './index.css';
 
@@ -17,7 +25,6 @@ const { Search } = Input;
 // 后端目前支持 genre 精确匹配，但没有“可用类型列表”接口；本期只展示产品原型已确认且真实数据中存在的常用类型。
 // 不从当前分页 records 临时汇总类型，否则用户会误以为其他页不存在更多类型。
 const MOVIE_GENRES = ['动作', '喜剧', '爱情', '科幻', '动画', '悬疑', '剧情'] as const;
-const SKELETON_KEYS = Array.from({ length: 10 }, (_, index) => `movie-skeleton-${index + 1}`);
 
 /** 渲染后端影片摘要，并以服务端 movieId 进入可售影院选择页。 */
 function MovieCard({ movie }: { movie: MovieSummary }) {
@@ -83,8 +90,6 @@ export default function MoviesPage() {
   const { query } = parsedQuery;
   const { data, error, isLoading, isOfflineSnapshot, isRefreshing, retry } = useMovieList(query);
   const [keywordDraft, setKeywordDraft] = useState(query.keyword ?? '');
-  // Hook 保留旧结果用于刷新失败恢复；请求进行中先隐藏旧内容，避免新筛选条件配上一次的影片。
-  const showSkeleton = isLoading || isRefreshing;
 
   useEffect(() => {
     setKeywordDraft(query.keyword ?? '');
@@ -97,7 +102,7 @@ export default function MoviesPage() {
   };
 
   // 来源属于整次分页查询，不复制到每张卡片，避免同一页出现互相矛盾的来源提示。
-  const freshnessNotices = data && !showSkeleton ? getFreshnessNotices(data) : [];
+  const freshnessNotices = data ? getFreshnessNotices(data) : [];
 
   return (
     <div className="movies-page-container">
@@ -170,51 +175,46 @@ export default function MoviesPage() {
           ) : null}
 
           {isOfflineSnapshot ? (
-            <Alert
-              className="movies-status-alert"
-              message="当前已离线，正在显示本页面内存中的只读快照"
-              showIcon
-              type="warning"
+            <PageStaleNotice
+              description="当前已离线，正在显示本页面内存中的只读快照。"
+              status="pending-validation"
             />
           ) : null}
 
-          {error ? (
-            <Alert
-              action={
-                <Button size="small" onClick={retry}>
-                  重试
-                </Button>
+          {error && data ? (
+            <PageRefreshErrorNotice
+              description="影片刷新失败，旧数据仍在展示。"
+              onRetry={retry}
+              traceId={error.traceId}
+            />
+          ) : null}
+
+          {error && !data ? (
+            <PageError
+              description="暂时无法加载影片，请稍后重试。"
+              onRetry={retry}
+              traceId={error.traceId}
+            />
+          ) : null}
+
+          {isRefreshing ? (
+            <PageRefreshingNotice description="正在更新影片列表，当前影片仍可查看。" />
+          ) : null}
+
+          {isLoading ? <PageLoading label="影片加载中" /> : null}
+
+          {!isLoading && !error && data?.records.length === 0 ? (
+            <PageEmpty
+              actionLabel={data.total > 0 && query.page > 1 ? '返回第一页' : undefined}
+              description="没有找到符合条件的影片，可以调整搜索词或影片类型。"
+              onAction={
+                data.total > 0 && query.page > 1 ? () => updateQuery({ page: 1 }) : undefined
               }
-              className="movies-status-alert"
-              description={error.traceId ? `问题编号：${error.traceId}` : undefined}
-              message={data ? '刷新失败，已保留上次加载的影片' : '影片加载失败'}
-              showIcon
-              type="error"
+              title="暂无影片"
             />
           ) : null}
 
-          {isRefreshing ? <div className="movies-refreshing">正在更新影片列表…</div> : null}
-
-          {showSkeleton ? (
-            <div className="movies-grid-view" aria-label="影片加载中">
-              {SKELETON_KEYS.map((key) => (
-                <div className="movie-grid-card movie-grid-card--skeleton" key={key}>
-                  <Skeleton.Image active />
-                  <Skeleton active paragraph={{ rows: 2 }} title={{ width: '70%' }} />
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          {!showSkeleton && !error && data?.records.length === 0 ? (
-            <Empty description="没有找到符合条件的影片">
-              {data.total > 0 && query.page > 1 ? (
-                <Button onClick={() => updateQuery({ page: 1 })}>返回第一页</Button>
-              ) : null}
-            </Empty>
-          ) : null}
-
-          {!showSkeleton && data && data.records.length > 0 ? (
+          {!isLoading && data && data.records.length > 0 ? (
             <div className="movies-grid-view" aria-live="polite">
               {data.records.map((movie) => (
                 <MovieCard key={movie.movieId} movie={movie} />
@@ -222,7 +222,7 @@ export default function MoviesPage() {
             </div>
           ) : null}
 
-          {!showSkeleton && data && data.total > 0 ? (
+          {!isLoading && data && data.total > 0 ? (
             <div className="movies-pagination">
               <span>共 {data.total} 部影片</span>
               <Pagination
