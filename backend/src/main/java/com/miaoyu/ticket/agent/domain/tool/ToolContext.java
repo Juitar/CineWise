@@ -28,7 +28,16 @@ public record ToolContext(
         String traceId,
         String clientRequestId,
         String idempotencyKey,
-        Long stateVersion) {
+        Long stateVersion,
+        String distanceContextId,
+        String distancePreference) {
+
+    /** 兼容普通推荐调用方；距离字段只由可信运行上下文的新调用方填写。 */
+    public ToolContext(String runId, String nodeId, String targetName, List<String> inputRefs,
+            long deadlineMs, String traceId, String clientRequestId, String idempotencyKey, Long stateVersion) {
+        this(runId, nodeId, targetName, inputRefs, deadlineMs, traceId, clientRequestId,
+                idempotencyKey, stateVersion, null, null);
+    }
 
     public ToolContext {
         requireText(runId, "runId");

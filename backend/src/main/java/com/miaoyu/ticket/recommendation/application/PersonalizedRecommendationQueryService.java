@@ -157,7 +157,8 @@ public class PersonalizedRecommendationQueryService {
 
         List<RecommendationPlan> plans = RecommendationPlanRanker.rank(candidates, constraints, clock);
         if (!distanceMeters.isEmpty()) {
-            RecommendationPlan nearest = RecommendationPlanRanker.nearest(candidates, distanceMeters, constraints, clock);
+            RecommendationPlan nearest = RecommendationPlanRanker.nearest(
+                    candidates, distanceMeters, constraints, clock);
             if (nearest != null) {
                 plans = java.util.stream.Stream.concat(
                         java.util.stream.Stream.of(nearest),

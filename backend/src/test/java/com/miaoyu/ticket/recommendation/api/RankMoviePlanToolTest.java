@@ -171,7 +171,7 @@ class RankMoviePlanToolTest {
                 org.mockito.ArgumentMatchers.eq("run-1"))).thenReturn(expected);
         RankMoviePlanTool tool = new RankMoviePlanTool(mock(FixedRecommendationQueryService.class), personalized);
 
-        var result = tool.executeRecommendationPlan(context(), completeCommand(), "distance-1", "NEAREST");
+        var result = tool.executeRecommendationPlan(distanceContext(), completeCommand());
 
         assertThat(result.data()).isSameAs(expected);
         verify(personalized).queryWithDistanceContext(any(), org.mockito.ArgumentMatchers.eq("distance-1"),
@@ -187,6 +187,11 @@ class RankMoviePlanToolTest {
     private static ToolContext context() {
         return new ToolContext("run-1", "node-1", RankMoviePlanTool.TARGET_NAME, List.of(), 3_000L,
                 "trace-1", null, null, 2L);
+    }
+
+    private static ToolContext distanceContext() {
+        return new ToolContext("run-1", "node-1", RankMoviePlanTool.TARGET_NAME, List.of(), 3_000L,
+                "trace-1", null, null, 2L, "distance-1", "NEAREST");
     }
 
     private static RankMoviePlanCommand command() {

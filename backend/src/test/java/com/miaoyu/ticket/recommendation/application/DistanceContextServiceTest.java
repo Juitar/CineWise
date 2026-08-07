@@ -20,7 +20,7 @@ class DistanceContextServiceTest {
         when(users.requireCurrentUserId()).thenReturn(7L);
         DistanceContextService service = new DistanceContextService(users,
                 Clock.fixed(Instant.parse("2026-08-06T10:00:00Z"), ZoneOffset.UTC));
-        var context = service.create("run-1");
+        var context = service.createForRun("run-1");
         assertThat(service.upload(context.distanceContextId(), new BigDecimal("112.938814"),
                 new BigDecimal("28.228209"))).isEqualTo(DistanceContextService.UploadResult.SUCCESS);
         assertThat(service.consume(context.distanceContextId(), "run-1")).isNotNull();
@@ -34,7 +34,7 @@ class DistanceContextServiceTest {
         MutableClock clock = new MutableClock(Instant.parse("2026-08-06T10:00:00Z"));
         DistanceContextService service = new DistanceContextService(users, clock);
 
-        var ownerContext = service.create("run-owner");
+        var ownerContext = service.createForRun("run-owner");
         when(users.requireCurrentUserId()).thenReturn(8L);
         assertThat(service.upload(ownerContext.distanceContextId(), new BigDecimal("113.000000"),
                 new BigDecimal("28.000000"))).isEqualTo(DistanceContextService.UploadResult.NOT_FOUND);
@@ -51,7 +51,7 @@ class DistanceContextServiceTest {
         assertThat(coordinate.longitude()).isEqualByComparingTo("112.938814");
         assertThat(coordinate.latitude()).isEqualByComparingTo("28.228209");
 
-        var expiredContext = service.create("run-expired");
+        var expiredContext = service.createForRun("run-expired");
         clock.advance(Duration.ofSeconds(301));
         assertThat(service.upload(expiredContext.distanceContextId(), new BigDecimal("112.938814"),
                 new BigDecimal("28.228209"))).isEqualTo(DistanceContextService.UploadResult.NOT_FOUND);
@@ -64,11 +64,11 @@ class DistanceContextServiceTest {
         when(users.requireCurrentUserId()).thenReturn(7L);
         DistanceContextService service = new DistanceContextService(users,
                 Clock.fixed(Instant.parse("2026-08-06T10:00:00Z"), ZoneOffset.UTC));
-        var context = service.create("run-1");
+        var context = service.createForRun("run-1");
 
-        assertThat(service.discard(context.distanceContextId(), "wrong-run"))
+        assertThat(service.cleanup(context.distanceContextId(), "wrong-run"))
                 .isEqualTo(DistanceContextService.CleanupResult.NOT_FOUND);
-        assertThat(service.discard(context.distanceContextId(), "run-1"))
+        assertThat(service.cleanup(context.distanceContextId(), "run-1"))
                 .isEqualTo(DistanceContextService.CleanupResult.REMOVED);
         assertThat(service.consume(context.distanceContextId(), "run-1")).isNull();
     }

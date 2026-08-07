@@ -24,7 +24,7 @@ public class DistanceContextService {
     }
 
     /** B 使用可信 runId 创建不含位置的关联 ID，随后才允许 C 上传一次坐标。 */
-    public CreatedContext create(String runId) {
+    public CreatedContext createForRun(String runId) {
         long userId = currentUserAccessor.requireCurrentUserId();
         Instant expiresAt = clock.instant().plusSeconds(TTL_SECONDS);
         String id = UUID.randomUUID().toString();
@@ -73,7 +73,7 @@ public class DistanceContextService {
     }
 
     /** B 在拒绝、取消或失败时调用；只有当前用户且 runId 匹配才能清理，避免误删别的运行上下文。 */
-    public CleanupResult discard(String contextId, String runId) {
+    public CleanupResult cleanup(String contextId, String runId) {
         long userId = currentUserAccessor.requireCurrentUserId();
         Context expected = contexts.get(contextId);
         while (expected != null) {

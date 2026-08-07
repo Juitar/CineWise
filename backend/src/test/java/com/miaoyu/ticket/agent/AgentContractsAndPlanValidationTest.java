@@ -56,7 +56,9 @@ class AgentContractsAndPlanValidationTest {
                         "traceId",
                         "clientRequestId",
                         "idempotencyKey",
-                        "stateVersion"),
+                        "stateVersion",
+                        "distanceContextId",
+                        "distancePreference"),
                 contextFields);
         Set<String> resultFields = recordFieldNames(ToolResult.class);
         assertFalse(resultFields.contains("dataTime"));
