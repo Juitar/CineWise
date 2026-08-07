@@ -63,9 +63,9 @@ public class NetStartStartupSyncRunner implements ApplicationRunner {
         // 返回数量只用于测试窗口观察，不改变后续页面查询或票务事实。
         int synchronizedCount = contentSyncService.synchronizeDailyContent();
         if (cityResolutionService != null) {
-            properties.syncCities().forEach(cityName -> cityResolutionService.findProviderCityId(cityName)
-                    .ifPresent(providerCityId -> contentSyncService.synchronizeCityCinemasWithResult(
-                            cityName, providerCityId, () -> true)));
+            properties.syncCities().forEach(cityCode -> cityResolutionService.findCityName(cityCode)
+                    .ifPresent(cityName -> contentSyncService.synchronizeCityCinemasWithResult(
+                            cityName, cityCode, () -> true)));
         }
         LOGGER.info("NetStart 启动同步已执行一次: synchronizedCount={}", synchronizedCount);
     }

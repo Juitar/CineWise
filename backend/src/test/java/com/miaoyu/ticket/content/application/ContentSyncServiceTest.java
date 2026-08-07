@@ -26,6 +26,52 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 class ContentSyncServiceTest {
     @Test
+    void givenProviderInternalCityId_whenSynchronizingCinemas_thenApplicationRejectsBeforeProvider() {
+        AtomicInteger providerCalls = new AtomicInteger();
+        LiveContentSyncPort provider = new LiveContentSyncPort() {
+            @Override public DailySyncBatch fetchForDailySync() { return batch(List.of(), 0,
+                    LiveContentSyncPort.Outcome.SUCCESS, null); }
+            @Override public DailySyncBatch fetchCityCinemas(String cityCode) {
+                providerCalls.incrementAndGet();
+                return batch(List.of(), 0, LiveContentSyncPort.Outcome.SUCCESS, null);
+            }
+        };
+        ContentSyncService service = new ContentSyncService(provider, snapshotPort(new AtomicInteger()),
+                cachePort(new AtomicInteger()), persistence(new AtomicInteger(), new AtomicReference<>()),
+                () -> 99L, Clock.fixed(Instant.parse("2026-08-06T02:00:00Z"), ZoneId.of("Asia/Shanghai")));
+
+        assertThatThrownBy(() -> service.synchronizeCityCinemasWithResult("长沙", "70", () -> true))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(providerCalls).hasValue(0);
+    }
+
+    @Test
+    void givenDailySync_whenCalled_thenItUsesIncrementalMovieProvider() {
+        AtomicInteger incrementalCalls = new AtomicInteger();
+        AtomicInteger legacyCalls = new AtomicInteger();
+        LiveContentSyncPort provider = new LiveContentSyncPort() {
+            @Override
+            public DailySyncBatch fetchForDailySync() {
+                legacyCalls.incrementAndGet();
+                return batch(List.of(), 0, LiveContentSyncPort.Outcome.SUCCESS, null);
+            }
+
+            @Override
+            public DailySyncBatch fetchCurrentHotMovies(Map<String, ContentPersistencePort.MovieState> states) {
+                incrementalCalls.incrementAndGet();
+                return batch(List.of(), 0, LiveContentSyncPort.Outcome.SUCCESS, null);
+            }
+        };
+        ContentSyncService service = new ContentSyncService(provider, snapshotPort(new AtomicInteger()),
+                cachePort(new AtomicInteger()), persistence(new AtomicInteger(), new AtomicReference<>()),
+                () -> 99L, Clock.fixed(Instant.parse("2026-08-04T01:00:00Z"), ZoneId.of("Asia/Shanghai")));
+
+        assertThat(service.synchronizeDailyContent()).isZero();
+        assertThat(incrementalCalls).hasValue(1);
+        assertThat(legacyCalls).hasValue(0);
+    }
+
+    @Test
     void givenQualifiedLiveResult_whenSynchronize_thenItOverwritesBothSnapshotAndCache() {
         ContentQuery query = new ContentQuery(ContentResourceType.MOVIE, 1L, null, null);
         ContentResult<List<? extends ContentItem>> result = new ContentResult<>(List.of(
@@ -246,9 +292,9 @@ class ContentSyncServiceTest {
 
     @Test
     void givenControlledCitySync_whenCinemaIsAccepted_thenItPersistsTheCatalogCityAndProviderId() {
-        ContentQuery cityQuery = new ContentQuery(ContentResourceType.CINEMA, null, "70", "影院");
+        ContentQuery cityQuery = new ContentQuery(ContentResourceType.CINEMA, null, "430100", "影院");
         ContentResult<List<? extends ContentItem>> cinemas = new ContentResult<>(List.of(
-                new CinemaContent("cinema-70", "长沙影院", "70", "岳麓区", "受控地址", null, null)),
+                new CinemaContent("cinema-70", "长沙影院", "430100", "岳麓区", "受控地址", null, null)),
                 new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), LocalDateTime.of(2026, 8, 6, 10, 0),
                 LocalDateTime.of(2026, 8, 6, 16, 0), false, false, null);
         AtomicReference<String> cityName = new AtomicReference<>();
@@ -275,13 +321,13 @@ class ContentSyncServiceTest {
                 cachePort(new AtomicInteger()), persistence, () -> 99L,
                 Clock.fixed(Instant.parse("2026-08-06T02:00:00Z"), ZoneId.of("Asia/Shanghai")));
 
-        var result = service.synchronizeCityCinemasWithResult("长沙", "70", () -> true);
+        var result = service.synchronizeCityCinemasWithResult("长沙", "430100", () -> true);
 
         assertThat(result.successCount()).isEqualTo(1);
         assertThat(cityName).hasValue("长沙");
-        assertThat(providerCityId).hasValue("70");
+        assertThat(providerCityId).hasValue("430100");
         assertThat(audit.get()).extracting(SyncLogRow::resourceType, SyncLogRow::cityName,
-                SyncLogRow::providerCityId).containsExactly("CITY_CINEMAS", "长沙", "70");
+                SyncLogRow::cityCode).containsExactly("CITY_CINEMAS", "长沙", "430100");
     }
     private ContentSnapshotPort snapshotPort(AtomicInteger saved) { return new ContentSnapshotPort() {
         @Override public Optional<ContentResult<List<? extends ContentItem>>> findLatest(ContentQuery query) {

@@ -71,11 +71,11 @@ public class AdminContentSyncService {
             }
             return viewOf(existing);
         }
-        String providerCityId = cityResolutionService.findProviderCityId(cityName)
+        String cityCode = cityResolutionService.findCityCode(cityName)
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.INVALID_PARAMETER, "城市不在本地目录中"));
         LocalDateTime startedAt = now();
         ContentSyncTaskPort.SyncTask pending = new ContentSyncTaskPort.SyncTask(idGenerator.nextId(), clientRequestId,
-                cityName, providerCityId, ContentSyncTaskPort.SyncTaskStatus.PENDING, startedAt, null, 0, 0, null);
+                cityName, cityCode, ContentSyncTaskPort.SyncTaskStatus.PENDING, startedAt, null, 0, 0, null);
         try {
             // PENDING 先成功落库，浏览器断网时仍可用原请求标识查询唯一结果。
             taskPort.createPending(pending);
@@ -92,7 +92,7 @@ public class AdminContentSyncService {
         ScheduledFuture<?> renewal = startLeaseRenewal(pending.syncId(), leaseOwner, leaseActive);
         try {
             ContentSyncService.CurrentHotMovieSyncResult result =
-                    contentSyncService.synchronizeCityCinemasWithResult(cityName, providerCityId,
+                    contentSyncService.synchronizeCityCinemasWithResult(cityName, cityCode,
                             () -> lockAndRenewActiveLease(pending.syncId(), leaseOwner, leaseActive));
             LocalDateTime finishedAt = now();
             ContentSyncTaskPort.SyncTaskStatus status = taskStatus(result);
@@ -213,7 +213,7 @@ public class AdminContentSyncService {
     /**
      * 将内部任务投影为 REST 可见的最小字段。
      *
-     * <p>providerCityId 和 leaseOwner 只能用于 Provider 调用及条件更新；即使以后任务记录增加字段，
+     * <p>行政区码和 leaseOwner 只能用于受控同步及条件更新；即使以后任务记录增加字段，
      * 也必须显式加入本视图后才能对外出现，防止 record 自动序列化泄漏内部信息。</p>
      */
     private SyncTaskView viewOf(ContentSyncTaskPort.SyncTask task) {

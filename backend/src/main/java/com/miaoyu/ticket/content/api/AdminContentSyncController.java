@@ -108,7 +108,7 @@ public class AdminContentSyncController {
                                    String status, OffsetDateTime startedAt, OffsetDateTime finishedAt,
                                    int successCount, int failureCount, String failureCategory) { }
 
-    /** 来源接口不返回 providerCityId、leaseOwner、原始异常或原始响应。 */
+    /** 来源接口不返回行政区码、leaseOwner、原始异常或原始响应。 */
     public record SourceStatusResponse(String provider, String resourceType, String cityName, String status,
                                        OffsetDateTime startedAt, OffsetDateTime finishedAt,
                                        OffsetDateTime lastSuccessAt,

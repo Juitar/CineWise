@@ -322,10 +322,8 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
                 || !java.util.Objects.equals(releaseStatus, savedState.releaseStatus())) {
             return false;
         }
-        // 目录只提供上映状态和日期，无法直接判断海报或简介变化；至少每天重新抽取未在当天复查的详情，
-        // 同时仍受十次请求预算限制。旧夹具没有 dataTime 时维持原有跳过语义。
-        return savedState.dataTime() == null || savedState.dataTime().toLocalDate().equals(
-                LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID).toLocalDate());
+        // 目录只提供上映状态和日期；两者都未变化时，已保存影片直接跳过详情请求，避免定时任务重复写入。
+        return true;
     }
 
     /**

@@ -54,7 +54,7 @@ public class JdbcContentSyncTaskAdapter implements ContentSyncTaskPort {
                 failure_count, started_at, finished_at, error_summary, version, create_time, update_time)
                 VALUES (?, ?, ?, ?, ?, ?, 'PENDING', NULL, NULL, NULL, NULL, 0, 0, 0, ?, NULL, NULL, 0, ?, ?)
                 """, task.syncId(), PROVIDER, RESOURCE_TYPE, task.clientRequestId(), task.cityName(),
-                task.providerCityId(), timestamp(task.startedAt()), timestamp(task.startedAt()),
+                task.cityCode(), timestamp(task.startedAt()), timestamp(task.startedAt()),
                 timestamp(task.startedAt()));
     }
 

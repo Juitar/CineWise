@@ -30,8 +30,8 @@ public class ContentSyncJob {
     public void synchronizeDailyContent() {
         service.synchronizeCurrentHotMovies();
         // 城市名单来自受控配置和本地目录；目录解析失败时跳过该城市，不把未知 ci 发给 Provider。
-        properties.syncCities().forEach(cityName -> cityResolutionService.findProviderCityId(cityName)
-                .ifPresent(providerCityId -> service.synchronizeCityCinemasWithResult(cityName, providerCityId,
+        properties.syncCities().forEach(cityCode -> cityResolutionService.findCityName(cityCode)
+                .ifPresent(cityName -> service.synchronizeCityCinemasWithResult(cityName, cityCode,
                         () -> true)));
     }
 }
