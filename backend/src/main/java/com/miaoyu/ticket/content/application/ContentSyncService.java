@@ -216,7 +216,8 @@ public class ContentSyncService {
         int failureCount = totalItemCount - synchronizedItemCount;
         requireWritePermission(writeGuard);
         String resourceType = cinemaSyncContext == null ? "DAILY_CONTENT" : "CITY_CINEMAS";
-        String requestId = "daily-" + startedAt + (cinemaSyncContext == null ? "" : "-" + cinemaSyncContext.providerCityId());
+        String requestId = "daily-" + startedAt
+                + (cinemaSyncContext == null ? "" : "-" + cinemaSyncContext.providerCityId());
         persistence.insertSyncLog(new ContentPersistencePort.SyncLogRow(idGenerator.nextId(), "NETSTART_MAOYAN",
                 resourceType, requestId, statusOf(totalItemCount, synchronizedItemCount, failureCount, batch.outcome()),
                 batch.errorCode(), totalItemCount, synchronizedItemCount, failureCount, startedAt, finishedAt,
@@ -239,7 +240,8 @@ public class ContentSyncService {
             for (ContentItem item : accepted.data()) {
                 MovieContent movie = (MovieContent) item;
                 // 详情只接受内部 movieId；外部 sourceMovieId 不能成为页面快照键。
-                saveLiveResult(new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
+                saveLiveResult(new ContentQuery(
+                        com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
                         movie.movieId(), null, null), contentResult(List.of(movie), accepted), writeGuard);
                 synchronizedMovies.add(movie);
             }

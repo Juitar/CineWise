@@ -220,7 +220,8 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
             jdbcTemplate.update("""
                     UPDATE cinema SET name = ?, city_code = ?, city_name = COALESCE(?, city_name),
                     provider_city_id = COALESCE(?, provider_city_id), area = COALESCE(?, area),
-                    address = COALESCE(?, address), longitude = COALESCE(?, longitude), latitude = COALESCE(?, latitude),
+                    address = COALESCE(?, address), longitude = COALESCE(?, longitude),
+                    latitude = COALESCE(?, latitude),
                     source_type = ?, data_time = ?, expires_at = ?, version = version + 1, update_time = ?
                     WHERE id = ? AND source = ? AND source_cinema_id = ?
                     """, row.name(), row.cityCode(), cityName, providerCityId, row.area(), row.address(),
@@ -241,9 +242,13 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
 
     private boolean hasV014CinemaColumns() {
         Boolean cached = v014CinemaColumnsAvailable;
-        if (cached != null) return cached;
+        if (cached != null) {
+            return cached;
+        }
         synchronized (this) {
-            if (v014CinemaColumnsAvailable != null) return v014CinemaColumnsAvailable;
+            if (v014CinemaColumnsAvailable != null) {
+                return v014CinemaColumnsAvailable;
+            }
             try {
                 jdbcTemplate.query("SELECT city_name FROM cinema WHERE 1 = 0", (resultSet, rowNumber) -> null);
                 v014CinemaColumnsAvailable = true;
@@ -282,7 +287,8 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
                         ELSE 'INVALID'
                     END,
                     update_time = VALUES(update_time)
-                """, idGenerator == null ? internalId : idGenerator.nextId(), provider, resourceType, externalId, internalId,
+                """, idGenerator == null ? internalId : idGenerator.nextId(), provider, resourceType, externalId,
+                internalId,
                 timestamp(dataTime), timestamp(dataTime));
     }
 
@@ -336,7 +342,8 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
                     version, create_time, update_time)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
                     """, row.id(), row.provider(), row.resourceType(), row.requestId(), row.status().name(),
-                    row.errorCode(), row.totalCount(), row.successCount(), row.failureCount(), timestamp(row.startedAt()),
+                    row.errorCode(), row.totalCount(), row.successCount(), row.failureCount(),
+                    timestamp(row.startedAt()),
                     nullableTimestamp(row.finishedAt()), row.errorSummary(), timestamp(row.startedAt()),
                     timestamp(row.startedAt()));
             return;
@@ -347,7 +354,8 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
                 city_name, provider_city_id, version, create_time, update_time)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
                 """, row.id(), row.provider(), row.resourceType(), row.requestId(), row.status().name(),
-                row.errorCode(), row.totalCount(), row.successCount(), row.failureCount(), timestamp(row.startedAt()),
+                row.errorCode(), row.totalCount(), row.successCount(), row.failureCount(),
+                timestamp(row.startedAt()),
                 nullableTimestamp(row.finishedAt()), row.errorSummary(), row.cityName(), row.providerCityId(),
                 timestamp(row.startedAt()),
                 timestamp(row.startedAt()));
@@ -356,9 +364,13 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
     /** V014 前的 H2 回归库没有城市审计列，不能让兼容测试误报 SQL 错误。 */
     private boolean hasV014SyncLogColumns() {
         Boolean cached = v014SyncLogColumnsAvailable;
-        if (cached != null) return cached;
+        if (cached != null) {
+            return cached;
+        }
         synchronized (this) {
-            if (v014SyncLogColumnsAvailable != null) return v014SyncLogColumnsAvailable;
+            if (v014SyncLogColumnsAvailable != null) {
+                return v014SyncLogColumnsAvailable;
+            }
             try {
                 jdbcTemplate.query("SELECT city_name FROM data_sync_log WHERE 1 = 0",
                         (resultSet, rowNumber) -> null);
