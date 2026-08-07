@@ -40,6 +40,28 @@ export interface AvailableMoviesResponse {
   movies: AvailableMovie[];
 }
 
+/** 影片页按影片查询到的可售影院摘要；不包含价格、库存或座位。 */
+export interface AvailableCinema {
+  cinemaId: string;
+  name: string;
+  address: string;
+  availableShowCount: number;
+  nearestStartTime: string;
+  contentSource: string;
+  contentDataTime: string | null;
+  contentExpiresAt: string | null;
+  contentExpired: boolean;
+  scheduleSource: string;
+  scheduleDataTime: string | null;
+}
+
+export interface AvailableCinemasResponse {
+  total: number;
+  page: number;
+  size: number;
+  records: AvailableCinema[];
+}
+
 /** 列表中单个座位项 */
 export interface SeatItem {
   seatId: string;

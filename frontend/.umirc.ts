@@ -31,6 +31,7 @@ export default defineConfig({
       component: '@/layouts/UserLayout',
       routes: [
         { path: '/', component: '@/pages/home' },
+        { path: '/movies/:movieId', component: '@/pages/movies/available-cinemas' },
         { path: '/movies', component: '@/pages/movies' },
         { path: '/cinemas', component: '@/pages/cinemas' },
         { path: '/cinemas/:cinemaId', component: '@/pages/cinemas/detail' },
