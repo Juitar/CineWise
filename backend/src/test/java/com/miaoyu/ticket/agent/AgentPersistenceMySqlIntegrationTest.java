@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.miaoyu.ticket.agent.application.AgentErrorCode;
+import com.miaoyu.ticket.agent.application.AgentInteractionRuntimeService;
 import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationActionRepository;
 import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationFactsProvider;
 import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationService;
@@ -16,6 +17,7 @@ import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionRes
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeEventService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunCancellationService;
+import com.miaoyu.ticket.agent.application.persistence.AgentRunRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionManagementService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
 import com.miaoyu.ticket.agent.application.model.ModelGateway;
@@ -24,6 +26,7 @@ import com.miaoyu.ticket.agent.application.tool.RankMoviePlanExecutionAdapter;
 import com.miaoyu.ticket.agent.application.tool.ReadOnlyToolExecutionAdapter;
 import com.miaoyu.ticket.agent.application.tool.AgentToolDefinitions;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
+import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
 import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEvent;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
@@ -125,6 +128,12 @@ class AgentPersistenceMySqlIntegrationTest {
 
     @Autowired
     private AgentMessageSubmissionService messageSubmissionService;
+
+    @Autowired
+    private AgentInteractionRuntimeService interactionRuntimeService;
+
+    @Autowired
+    private AgentRunRepository runRepository;
 
     @Autowired
     private AgentRuntimeEventService runtimeEventService;
@@ -294,6 +303,32 @@ class AgentPersistenceMySqlIntegrationTest {
         assertThat(toolCalledInsideTransaction).isFalse();
         assertThat(result.snapshot().run().status()).isEqualTo(AgentRunStatus.FAILED);
         assertThat(result.snapshot().messages()).hasSize(2);
+        assertThat(sessionRepository.findBySessionIdAndUserId(FIRST_SESSION, USER_ID).orElseThrow().activeRunId())
+                .isNull();
+    }
+
+    @Test
+    void shouldRecoverExpiredLocationWaitingRunBeforeOrdinaryStreamSubmission() {
+        insertSession(FIRST_SESSION_ID, FIRST_SESSION);
+        Mockito.when(modelGateway.generatePlan(Mockito.any())).thenReturn(invalidResult());
+        AgentInitialRunResult waiting =
+                initialRunTransaction.submit(USER_ID, command(FIRST_SESSION, "waiting-request"));
+        jdbcTemplate.update("""
+                UPDATE agent_run
+                   SET status = 'WAITING_LOCATION',
+                       update_time = DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 6 MINUTE),
+                       version = version + 1
+                 WHERE id = ?
+                """, waiting.run().id());
+
+        AgentInteractionRuntimeService.StreamView submitted = interactionRuntimeService.submitAndReplay(
+                FIRST_SESSION, "ordinary-request", "推荐电影", "workspace", 0L);
+
+        AgentRun recovered = runRepository.findByRunIdAndUserId(waiting.run().runId(), USER_ID)
+                .orElseThrow();
+        assertThat(recovered.status()).isEqualTo(AgentRunStatus.FAILED);
+        assertThat(submitted.runId()).isNotEqualTo(waiting.run().runId());
+        assertThat(count("SELECT COUNT(*) FROM agent_run WHERE session_id = ?", FIRST_SESSION_ID)).isEqualTo(2);
         assertThat(sessionRepository.findBySessionIdAndUserId(FIRST_SESSION, USER_ID).orElseThrow().activeRunId())
                 .isNull();
     }
