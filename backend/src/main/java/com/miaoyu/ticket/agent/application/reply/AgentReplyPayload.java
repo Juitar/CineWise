@@ -8,7 +8,8 @@ package com.miaoyu.ticket.agent.application.reply;
  */
 public sealed interface AgentReplyPayload
         permits ErrorReplyFacts, ProgressReplyFacts, QuestionReplyFacts,
-        RecommendationReplyFacts, RecommendationPlanCardFacts, SelectSeatsReplyFacts, TravelAdviceCardFacts {
+        RecommendationReplyFacts, RecommendationPlanCardFacts, SelectSeatsReplyFacts, TravelAdviceCardFacts,
+        TextReplyFacts {
 
     /**
      * 判断当前载荷是否允许用于指定回复类型。

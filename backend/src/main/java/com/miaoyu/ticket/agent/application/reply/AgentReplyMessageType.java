@@ -7,6 +7,8 @@ package com.miaoyu.ticket.agent.application.reply;
  * 对应的 {@link AgentReplyPayload} 实现和主控处理分支，不能只给枚举增加常量。
  */
 public enum AgentReplyMessageType {
+    /** 不执行 Tool 的普通、安全文本回复。 */
+    TEXT,
     /** 仅用于要求补齐一个服务端白名单中的必填槽位。 */
     QUESTION,
     /** 已取得至少一个可购买场次时的推荐计划卡。 */

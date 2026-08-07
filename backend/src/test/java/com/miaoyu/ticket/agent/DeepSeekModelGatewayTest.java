@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.agent.application.model.PlanGenerationRequest;
+import com.miaoyu.ticket.agent.application.model.AgentIntent;
+import com.miaoyu.ticket.agent.application.model.IntentClassificationRequest;
 import com.miaoyu.ticket.agent.domain.plan.PlanSchemaValidator;
 import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
 import com.miaoyu.ticket.agent.infrastructure.model.DeepSeekModelGateway;
@@ -88,6 +90,37 @@ class DeepSeekModelGatewayTest {
                     .isInstanceOf(AgentModelGatewayException.class)
                     .hasMessageNotContaining("private-key")
                     .hasMessageNotContaining("not-json");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void shouldDowngradeInvalidOrUnknownIntentToGeneralChat() throws IOException {
+        AtomicReference<String> content = new AtomicReference<>("not-json");
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/chat/completions", exchange -> {
+            byte[] response = ("{\"choices\":[{\"message\":{\"content\":\"" + content.get()
+                    + "\"}}]}").getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            DeepSeekProperties properties = new DeepSeekProperties(
+                    true, "test-key", "deepseek-v4-flash", "http://localhost:" + server.getAddress().getPort(),
+                    Duration.ofSeconds(2));
+            DeepSeekModelGateway gateway = new DeepSeekModelGateway(
+                    RestClient.builder().baseUrl(properties.baseUrl()).build(), properties, new ObjectMapper(),
+                    new PlanSchemaValidator(new ToolRegistry(Set.of())));
+
+            assertThat(gateway.classifyIntent(new IntentClassificationRequest("这啥")))
+                    .isEqualTo(AgentIntent.GENERAL_CHAT);
+            content.set("{\\\"intent\\\":\\\"UNKNOWN\\\"}");
+            assertThat(gateway.classifyIntent(new IntentClassificationRequest("你好")))
+                    .isEqualTo(AgentIntent.GENERAL_CHAT);
         } finally {
             server.stop(0);
         }

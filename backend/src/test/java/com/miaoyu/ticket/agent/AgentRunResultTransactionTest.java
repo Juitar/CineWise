@@ -19,6 +19,7 @@ import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeEventService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.application.reply.ErrorReplyFacts;
+import com.miaoyu.ticket.agent.application.reply.TextReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.ProgressReplyFacts;
 import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorResult;
 import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentResult;
@@ -202,6 +203,28 @@ class AgentRunResultTransactionTest {
         assertEquals(AgentRunStatus.FAILED, recorded.status());
         verify(fixture.stepRepository(), never()).insertAll(any());
         verify(fixture.sessionRepository()).releaseActiveRun(1L, 100L);
+    }
+
+    @Test
+    void shouldPersistGeneralTextWithoutCardOrToolEvents() {
+        Fixture fixture = fixture();
+        ExecutionPlan emptyPlan = new ExecutionPlan("general-plan", 1, List.of());
+        MinimalReadOnlyAgentResult result = new MinimalReadOnlyAgentResult(
+                new CandidatePlan("general-plan", 1, List.of()), PlanValidationResult.valid(emptyPlan),
+                new ExecutionPlanStateMachine(new ToolRegistry(List.of())).initialize(emptyPlan), List.of(),
+                new ReplyGenerationResponse("你好，我可以帮你找电影。", AgentReplyMessageType.TEXT, new TextReplyFacts()));
+        when(fixture.runRepository().updateTerminalWithCas(any(), eq(0L))).thenReturn(true);
+
+        fixture.transaction().record(run(), result);
+
+        ArgumentCaptor<AgentMessage> message = ArgumentCaptor.forClass(AgentMessage.class);
+        verify(fixture.messageRepository()).insert(message.capture());
+        assertEquals(AgentMessageType.TEXT, message.getValue().type());
+        ArgumentCaptor<AgentEventType> eventTypes = ArgumentCaptor.forClass(AgentEventType.class);
+        verify(fixture.runtimeEventService(), Mockito.atLeastOnce()).append(any(), any(), eventTypes.capture(), any());
+        assertEquals(true, eventTypes.getAllValues().contains(AgentEventType.MESSAGE_COMPLETE));
+        assertEquals(false, eventTypes.getAllValues().contains(AgentEventType.CARD));
+        assertEquals(false, eventTypes.getAllValues().contains(AgentEventType.TOOL_START));
     }
 
     @Test

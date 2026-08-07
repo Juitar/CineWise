@@ -1,6 +1,8 @@
 package com.miaoyu.ticket.agent.infrastructure.model;
 
 import com.miaoyu.ticket.agent.application.model.ModelGateway;
+import com.miaoyu.ticket.agent.application.model.AgentIntent;
+import com.miaoyu.ticket.agent.application.model.IntentClassificationRequest;
 import com.miaoyu.ticket.agent.application.model.PlanGenerationRequest;
 import com.miaoyu.ticket.agent.application.model.PlanGenerationResponse;
 import com.miaoyu.ticket.agent.application.model.ReplyGenerationRequest;
@@ -11,6 +13,7 @@ import com.miaoyu.ticket.agent.application.reply.QuestionReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFacts;
 import com.miaoyu.ticket.agent.application.reply.RecommendationReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.TravelAdviceCardFacts;
+import com.miaoyu.ticket.agent.application.reply.TextReplyFacts;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlan;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlanNode;
 import com.miaoyu.ticket.agent.domain.plan.FailurePolicy;
@@ -56,6 +59,18 @@ public final class MockModelGateway implements ModelGateway {
     }
 
     @Override
+    public AgentIntent classifyIntent(IntentClassificationRequest request) {
+        String input = Objects.requireNonNull(request, "request 不能为空").input();
+        if (input.contains("出行") || input.contains("天气")) {
+            return AgentIntent.TRAVEL;
+        }
+        if (input.contains("电影") || input.contains("场次") || input.contains("影院") || input.contains("推荐")) {
+            return AgentIntent.MOVIE;
+        }
+        return AgentIntent.GENERAL_CHAT;
+    }
+
+    @Override
     public PlanGenerationResponse generatePlan(PlanGenerationRequest request) {
         PlanGenerationRequest planRequest = Objects.requireNonNull(request, "request 不能为空");
         // 指纹包含确认槽位和允许工具；它们不同意味着模型可见事实或可执行范围不同，不能复用计划标识。
@@ -79,6 +94,7 @@ public final class MockModelGateway implements ModelGateway {
         ReplyGenerationRequest replyRequest = Objects.requireNonNull(request, "request 不能为空");
         // switch 只接受已由 ReplyGenerationRequest 校验过的类型和事实，Mock 不从自由文本推断业务状态。
         String text = switch (replyRequest.requestedType()) {
+            case TEXT -> "我可以帮你找电影、推荐观影方案或查询场次。你想看什么类型的电影？";
             case QUESTION -> questionText((QuestionReplyFacts) replyRequest.payload());
             case PLAN_CARD -> recommendationPlanText((RecommendationPlanCardFacts) replyRequest.payload());
             case TRAVEL_ADVICE_CARD -> travelAdviceText((TravelAdviceCardFacts) replyRequest.payload());
@@ -102,7 +118,7 @@ public final class MockModelGateway implements ModelGateway {
             return List.of(new CandidatePlanNode(
                     "ask-" + missingInput,
                     PlanNodeType.ASK_USER,
-                    null,
+                    RankMoviePlanTool.TARGET_NAME,
                     List.of(),
                     List.of(),
                     FailurePolicy.FAIL));
