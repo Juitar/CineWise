@@ -127,11 +127,28 @@
   background: #fff2f0;
 }
 
+.agent-message-item--question {
+  border: 1px solid #ded9ff;
+  background: #fbfaff;
+}
+
+.agent-message-item--progress,
+.agent-message-item--completed {
+  border: 1px solid #e2e5ec;
+  background: #f8f9fc;
+  color: #596173;
+}
+
+.agent-message-item--business-intent {
+  border: 1px solid #ccebdc;
+  background: #f4fcf8;
+}
+
 .agent-message-item--card-placeholder,
 .agent-message-item--movie-card,
 .agent-message-item--plan-card {
-  border: 1px dashed #aeb5c3;
-  background: #fafbfc;
+  border: 1px solid #d9deea;
+  background: #fbfcff;
 }
 
 .agent-message-item--card-placeholder strong,
@@ -217,5 +234,14 @@
 
   .agent-message-item {
     max-width: 92%;
+  }
+
+  .agent-card-fields div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .agent-confirmation-actions .ant-btn {
+    min-height: 44px;
   }
 }

@@ -27,6 +27,7 @@ export interface AgentDisplayItem {
   text: string;
   title?: string;
   fields?: readonly { label: string; value: string }[];
+  options?: readonly string[];
   selectSeatsPath?: string;
   confirmation?: {
     actionId: string;
@@ -166,6 +167,7 @@ function candidateFields(event: AgentEvent, collection: 'movies' | 'plans') {
     const prefix = collection === 'movies' ? `影片 ${index + 1}` : `方案 ${index + 1}`;
     const fields: Array<{ label: string; value: string }> = [];
     const entries = [
+      ['片名', candidate.title],
       ['影片 ID', candidate.movieId],
       ['影院 ID', candidate.cinemaId],
       ['场次 ID', candidate.showId],
@@ -206,12 +208,14 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
   }
   if (type === 'QUESTION') {
     const locationState = locationStateText(event);
+    const options = event.payload.options as readonly Record<string, unknown>[];
     return {
       key,
       kind: 'question',
       title: event.payload.message as string,
       text: locationState ?? (event.payload.message as string),
       fields: locationState ? [{ label: '位置授权', value: locationState }] : undefined,
+      options: options.map((option) => option.label as string),
     };
   }
   if (type === 'BUSINESS_INTENT') {
