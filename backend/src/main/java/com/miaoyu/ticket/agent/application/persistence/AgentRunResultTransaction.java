@@ -178,7 +178,8 @@ public class AgentRunResultTransaction {
                 || replyType == AgentReplyMessageType.SELECT_SEATS;
         AgentEventType replyEvent = isCardReply
                 ? AgentEventType.CARD : replyType == AgentReplyMessageType.ERROR
-                        ? AgentEventType.MESSAGE_ERROR : AgentEventType.MESSAGE_COMPLETE;
+                        ? AgentEventType.MESSAGE_ERROR : replyType == AgentReplyMessageType.PROGRESS
+                                ? AgentEventType.MESSAGE_START : AgentEventType.MESSAGE_COMPLETE;
         AgentStoredJson replyEventPayload = replyEvent == AgentEventType.CARD
                 ? jsonFactory.cardPayload(result.reply())
                 : jsonFactory.eventPayload(Map.of("messageType", replyType.name()));
@@ -217,6 +218,9 @@ public class AgentRunResultTransaction {
                 startPayload.put("displayText", displayText(toolName, false));
                 runtimeEventService.append(session, run, AgentEventType.TOOL_START,
                         jsonFactory.eventPayload(startPayload));
+            }
+            if (publicResult.status() == ToolStatus.PROCESSING) {
+                continue;
             }
             Map<String, Object> payload = new java.util.LinkedHashMap<>();
             payload.put("nodeId", nodeId);

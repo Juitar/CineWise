@@ -16,6 +16,7 @@ import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * B 的多工具计划主控。
@@ -34,6 +35,7 @@ public final class MultiToolSupervisor {
     private final PlanSchemaValidator planSchemaValidator;
     private final ExecutionPlanStateMachine stateMachine;
     private final AgentToolExecutorRegistry toolExecutorRegistry;
+    private final ProfileContextPrefetcher profileContextPrefetcher;
 
     public MultiToolSupervisor(
             ModelGateway modelGateway,
@@ -41,11 +43,20 @@ public final class MultiToolSupervisor {
             PlanSchemaValidator planSchemaValidator,
             ExecutionPlanStateMachine stateMachine,
             List<? extends AgentToolExecutor<?, ?>> readOnlyAdapters) {
+        this(modelGateway, toolRegistry, planSchemaValidator, stateMachine, readOnlyAdapters,
+                ProfileContextPrefetcher.disabled());
+    }
+
+    public MultiToolSupervisor(ModelGateway modelGateway, ToolRegistry toolRegistry,
+            PlanSchemaValidator planSchemaValidator,
+            ExecutionPlanStateMachine stateMachine, List<? extends AgentToolExecutor<?, ?>> readOnlyAdapters,
+            ProfileContextPrefetcher profileContextPrefetcher) {
         this.modelGateway = Objects.requireNonNull(modelGateway, "模型网关不能为空");
         this.toolRegistry = Objects.requireNonNull(toolRegistry, "工具白名单不能为空");
         this.planSchemaValidator = Objects.requireNonNull(planSchemaValidator, "计划校验器不能为空");
         this.stateMachine = Objects.requireNonNull(stateMachine, "状态机不能为空");
         this.toolExecutorRegistry = new AgentToolExecutorRegistry(toolRegistry, readOnlyAdapters);
+        this.profileContextPrefetcher = Objects.requireNonNull(profileContextPrefetcher, "画像预取器不能为空");
     }
 
     /** 生成、校验并执行本轮可运行的只读节点；写节点始终保留给既有确认动作服务。 */
@@ -55,18 +66,22 @@ public final class MultiToolSupervisor {
                 supervisorRequest.clientRequestId(),
                 supervisorRequest.input(),
                 supervisorRequest.validationContext().slotSnapshot().values(),
-                toolRegistry.definitions().keySet()));
+                toolRegistry.definitions().keySet(),
+                profileContextPrefetcher.prefetch(supervisorRequest)));
         PlanValidationResult validation = planSchemaValidator.validate(
                 generated.candidatePlan(), supervisorRequest.validationContext());
         if (!validation.isValid()) {
             return new MultiToolSupervisorResult(
                     generated.candidatePlan(), validation, null, List.of(), false, SAFE_PLAN_REJECTED);
         }
+        var serverPlan = withServerPlanId(generated.candidatePlan());
+        PlanValidationResult serverValidation = planSchemaValidator.validate(
+                serverPlan, supervisorRequest.validationContext());
         return execute(
                 supervisorRequest,
-                generated.candidatePlan(),
-                validation,
-                stateMachine.initialize(validation.executionPlan().orElseThrow()),
+                serverPlan,
+                serverValidation,
+                stateMachine.initialize(serverValidation.executionPlan().orElseThrow()),
                 new ArrayList<>());
     }
 
@@ -150,7 +165,8 @@ public final class MultiToolSupervisor {
         }
         var generated = modelGateway.generatePlan(new PlanGenerationRequest(
                 supervisorRequest.clientRequestId(), supervisorRequest.input(),
-                supervisorRequest.validationContext().slotSnapshot().values(), toolRegistry.definitions().keySet()));
+                supervisorRequest.validationContext().slotSnapshot().values(), toolRegistry.definitions().keySet(),
+                profileContextPrefetcher.prefetch(supervisorRequest)));
         PlanValidationResult validation = planSchemaValidator.validate(
                 generated.candidatePlan(), supervisorRequest.validationContext());
         if (!validation.isValid()) {
@@ -158,10 +174,19 @@ public final class MultiToolSupervisor {
                     generated.candidatePlan(), validation, previous.state(), previous.toolResults(),
                     previous.awaitingConfirmation(), SAFE_PLAN_REJECTED);
         }
+        var serverPlan = withServerPlanId(generated.candidatePlan());
+        PlanValidationResult serverValidation = planSchemaValidator.validate(
+                serverPlan, supervisorRequest.validationContext());
         ExecutionRunState replanned = stateMachine.acceptReplan(
-                previous.state(), validation.executionPlan().orElseThrow());
+                previous.state(), serverValidation.executionPlan().orElseThrow());
         return new MultiToolSupervisorResult(
-                generated.candidatePlan(), validation, replanned, previous.toolResults(), false, null);
+                serverPlan, serverValidation, replanned, previous.toolResults(), false, null);
+    }
+
+    private static com.miaoyu.ticket.agent.domain.plan.CandidatePlan withServerPlanId(
+            com.miaoyu.ticket.agent.domain.plan.CandidatePlan plan) {
+        return new com.miaoyu.ticket.agent.domain.plan.CandidatePlan(
+                UUID.randomUUID().toString(), plan.version(), plan.nodes());
     }
 
     private static MultiToolSupervisorResult completed(

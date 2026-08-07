@@ -90,6 +90,7 @@ class ContentSyncServiceTest {
         assertFailureAudit(LiveContentSyncPort.Outcome.CONNECTION_FAILED, null);
         assertFailureAudit(LiveContentSyncPort.Outcome.UPSTREAM_FAILED, 502);
         assertFailureAudit(LiveContentSyncPort.Outcome.FIELD_REJECTED, null);
+        assertFailureAudit(LiveContentSyncPort.Outcome.PROVIDER_DISABLED, null);
     }
 
     @Test
@@ -241,6 +242,46 @@ class ContentSyncServiceTest {
         assertThat(snapshots).hasValue(0);
         assertThat(caches).hasValue(0);
         assertThat(logs).hasValue(0);
+    }
+
+    @Test
+    void givenControlledCitySync_whenCinemaIsAccepted_thenItPersistsTheCatalogCityAndProviderId() {
+        ContentQuery cityQuery = new ContentQuery(ContentResourceType.CINEMA, null, "70", "影院");
+        ContentResult<List<? extends ContentItem>> cinemas = new ContentResult<>(List.of(
+                new CinemaContent("cinema-70", "长沙影院", "70", "岳麓区", "受控地址", null, null)),
+                new ContentSource("NETSTART_MAOYAN", ContentSourceType.LIVE), LocalDateTime.of(2026, 8, 6, 10, 0),
+                LocalDateTime.of(2026, 8, 6, 16, 0), false, false, null);
+        AtomicReference<String> cityName = new AtomicReference<>();
+        AtomicReference<String> providerCityId = new AtomicReference<>();
+        AtomicReference<SyncLogRow> audit = new AtomicReference<>();
+        ContentPersistencePort persistence = new ContentPersistencePort() {
+            @Override public long ensureMovie(MovieRow row) { return row.id(); }
+            @Override public long ensureCinema(CinemaRow row) { return row.id(); }
+            @Override public long ensureCinema(CinemaRow row, String syncedCityName, String syncedProviderCityId) {
+                cityName.set(syncedCityName);
+                providerCityId.set(syncedProviderCityId);
+                return row.id();
+            }
+            @Override public void insertSnapshot(SnapshotRow row) { }
+            @Override public void insertSyncLog(SyncLogRow row) { audit.set(row); }
+        };
+        LiveContentSyncPort provider = new LiveContentSyncPort() {
+            @Override public DailySyncBatch fetchForDailySync() { return batch(List.of(), 0, Outcome.SUCCESS, null); }
+            @Override public DailySyncBatch fetchCityCinemas(String cityCode) {
+                return batch(List.of(new SynchronizedContent(cityQuery, cinemas)), 1, Outcome.SUCCESS, null);
+            }
+        };
+        ContentSyncService service = new ContentSyncService(provider, snapshotPort(new AtomicInteger()),
+                cachePort(new AtomicInteger()), persistence, () -> 99L,
+                Clock.fixed(Instant.parse("2026-08-06T02:00:00Z"), ZoneId.of("Asia/Shanghai")));
+
+        var result = service.synchronizeCityCinemasWithResult("长沙", "70", () -> true);
+
+        assertThat(result.successCount()).isEqualTo(1);
+        assertThat(cityName).hasValue("长沙");
+        assertThat(providerCityId).hasValue("70");
+        assertThat(audit.get()).extracting(SyncLogRow::resourceType, SyncLogRow::cityName,
+                SyncLogRow::providerCityId).containsExactly("CITY_CINEMAS", "长沙", "70");
     }
     private ContentSnapshotPort snapshotPort(AtomicInteger saved) { return new ContentSnapshotPort() {
         @Override public Optional<ContentResult<List<? extends ContentItem>>> findLatest(ContentQuery query) {

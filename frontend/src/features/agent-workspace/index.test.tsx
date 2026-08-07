@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
         text: string;
         title?: string;
         fields?: Array<{ label: string; value: string }>;
+        selectSeatsPath?: string;
       }>,
     },
     refreshSessions: vi.fn(),
@@ -114,6 +115,35 @@ describe('AgentWorkspace 页面', () => {
     expect(screen.getByText('3001')).toBeInTheDocument();
     expect(screen.getByText('已过期')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /购票|确认|拒绝|支付/ })).not.toBeInTheDocument();
+  });
+
+  it('只为已校验的选座意图显示去选座入口', () => {
+    mocks.workspace.projection.items = [
+      {
+        key: 'select-seats-1',
+        kind: 'business-intent',
+        text: '已确认场次，可选座',
+        selectSeatsPath: '/shows/70001/seats?movieId=10001&cinemaId=20001',
+      },
+      {
+        key: 'plan-1',
+        kind: 'plan-card',
+        text: '推荐方案',
+      },
+      {
+        key: 'unsupported-1',
+        kind: 'card-placeholder',
+        text: '暂不支持此类 Agent 内容',
+      },
+    ];
+
+    render(<AgentWorkspace sessionId="session-example-1" />);
+
+    expect(screen.getByRole('link', { name: '去选座' })).toHaveAttribute(
+      'href',
+      '/shows/70001/seats?movieId=10001&cinemaId=20001',
+    );
+    expect(screen.queryByRole('button', { name: /确认|支付|建单|锁座/ })).not.toBeInTheDocument();
   });
 
   it('桌面与移动视图共用当前状态，移动端提供会话抽屉', () => {

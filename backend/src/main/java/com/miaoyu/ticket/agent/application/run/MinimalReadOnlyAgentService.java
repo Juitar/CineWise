@@ -29,7 +29,8 @@ import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
-import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
+import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -60,19 +61,22 @@ public final class MinimalReadOnlyAgentService {
     private final PlanSchemaValidator planSchemaValidator;
     private final ExecutionPlanStateMachine stateMachine;
     private final RankMoviePlanExecutionAdapter rankMoviePlanExecutionAdapter;
+    private final Clock clock;
 
     public MinimalReadOnlyAgentService(
             ModelGateway modelGateway,
             ToolRegistry toolRegistry,
             PlanSchemaValidator planSchemaValidator,
             ExecutionPlanStateMachine stateMachine,
-            RankMoviePlanExecutionAdapter rankMoviePlanExecutionAdapter) {
+            RankMoviePlanExecutionAdapter rankMoviePlanExecutionAdapter,
+            Clock clock) {
         this.modelGateway = Objects.requireNonNull(modelGateway, "modelGateway 不能为空");
         this.toolRegistry = Objects.requireNonNull(toolRegistry, "toolRegistry 不能为空");
         this.planSchemaValidator = Objects.requireNonNull(planSchemaValidator, "planSchemaValidator 不能为空");
         this.stateMachine = Objects.requireNonNull(stateMachine, "stateMachine 不能为空");
         this.rankMoviePlanExecutionAdapter = Objects.requireNonNull(
                 rankMoviePlanExecutionAdapter, "rankMoviePlanExecutionAdapter 不能为空");
+        this.clock = Objects.requireNonNull(clock, "clock 不能为空");
     }
 
     /**
@@ -117,7 +121,7 @@ public final class MinimalReadOnlyAgentService {
 
         // 状态机只负责节点选择和状态推进；真实工具调用始终留在应用层适配器中。
         ExecutionRunState state = stateMachine.initialize(validation.executionPlan().orElseThrow());
-        List<ToolResult<FixedRecommendationResult>> toolResults = new ArrayList<>();
+        List<ToolResult<?>> toolResults = new ArrayList<>();
         ReplyGenerationResponse reply = null;
         // 每个节点理论上至多被选择两次（首次与一次重试），上限同时防御异常依赖图。
         int limit = Math.max(1, state.plan().nodes().size() * 2);
@@ -167,13 +171,13 @@ public final class MinimalReadOnlyAgentService {
             }
             if (node.type() == PlanNodeType.RENDER_RESULT) {
                 // 渲染只能使用本轮最后一个成功且有数据的结果，FAILED 和 PROCESSING 都不能被当成推荐内容。
-                ToolResult<FixedRecommendationResult> result = lastSuccessfulResult(toolResults);
+                ToolResult<RecommendationPlanResult> result = lastSuccessfulResult(toolResults);
                 if (result == null) {
                     return unsupportedNodeResult(
                             agentRequest, candidatePlan, validation, state, toolResults);
                 }
                 state = stateMachine.startNode(state, node.nodeId());
-                RecommendationReplyFacts facts = RecommendationReplyFactsMapper.from(result);
+                RecommendationReplyFacts facts = RecommendationReplyFactsMapper.from(result, clock.instant());
                 // D 的无场次结果仍是成功查询，只是 purchaseEligible=false，应展示影片卡而不是错误卡。
                 AgentReplyMessageType type = facts.purchaseEligible()
                         ? AgentReplyMessageType.PLAN_CARD
@@ -200,13 +204,13 @@ public final class MinimalReadOnlyAgentService {
             CandidatePlan candidatePlan,
             PlanValidationResult validation,
             ExecutionRunState state,
-            List<ToolResult<FixedRecommendationResult>> toolResults,
+            List<ToolResult<?>> toolResults,
             ReplyGenerationResponse reply) {
         if (reply != null) {
             // 已产生 QUESTION 或推荐卡后，状态机没有后续节点是正常结束，不应覆盖用户可见回复。
             return result(candidatePlan, validation, state, toolResults, reply);
         }
-        ToolResult<FixedRecommendationResult> lastResult = lastResult(toolResults);
+        ToolResult<RecommendationPlanResult> lastResult = lastResult(toolResults);
         ErrorReplyFacts facts;
         if (lastResult != null && lastResult.status() == ToolStatus.FAILED) {
             // 工具适配器已经把异常收敛为稳定错误码；这里不拼接 exception message，避免泄露下游细节。
@@ -230,7 +234,7 @@ public final class MinimalReadOnlyAgentService {
             CandidatePlan candidatePlan,
             PlanValidationResult validation,
             ExecutionRunState state,
-            List<ToolResult<FixedRecommendationResult>> toolResults) {
+            List<ToolResult<?>> toolResults) {
         // 未支持节点不调用状态机的成功/失败推进，避免人为修改计划状态掩盖主控能力缺口。
         ErrorReplyFacts facts = new ErrorReplyFacts(null, List.of(UNSUPPORTED_NODE_TYPE));
         return result(
@@ -272,29 +276,36 @@ public final class MinimalReadOnlyAgentService {
                 .orElse(null);
     }
 
-    private static ToolResult<FixedRecommendationResult> lastSuccessfulResult(
-            List<ToolResult<FixedRecommendationResult>> results) {
+    private static ToolResult<RecommendationPlanResult> lastSuccessfulResult(
+            List<ToolResult<?>> results) {
         for (int index = results.size() - 1; index >= 0; index--) {
-            ToolResult<FixedRecommendationResult> result = results.get(index);
-            if (result.status() == ToolStatus.SUCCESS && result.data() != null) {
+            ToolResult<?> result = results.get(index);
+            if (result.status() == ToolStatus.SUCCESS && result.data() instanceof RecommendationPlanResult) {
                 // 重试后优先使用最新成功结果，避免把首次调用的过期结果渲染给用户。
-                return result;
+                @SuppressWarnings("unchecked")
+                ToolResult<RecommendationPlanResult> recommendation = (ToolResult<RecommendationPlanResult>) result;
+                return recommendation;
             }
         }
         return null;
     }
 
-    private static ToolResult<FixedRecommendationResult> lastResult(
-            List<ToolResult<FixedRecommendationResult>> results) {
+    private static ToolResult<RecommendationPlanResult> lastResult(
+            List<ToolResult<?>> results) {
         // 失败映射要看实际最后一次执行，不能因为更早成功就掩盖后续重试失败。
-        return results.isEmpty() ? null : results.getLast();
+        if (results.isEmpty()) {
+            return null;
+        }
+        @SuppressWarnings("unchecked")
+        ToolResult<RecommendationPlanResult> result = (ToolResult<RecommendationPlanResult>) results.getLast();
+        return result;
     }
 
     private static MinimalReadOnlyAgentResult result(
             CandidatePlan candidatePlan,
             PlanValidationResult validation,
             ExecutionRunState state,
-            List<ToolResult<FixedRecommendationResult>> toolResults,
+            List<ToolResult<?>> toolResults,
             ReplyGenerationResponse reply) {
         return new MinimalReadOnlyAgentResult(candidatePlan, validation, state, toolResults, reply);
     }

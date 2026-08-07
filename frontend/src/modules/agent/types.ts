@@ -90,7 +90,7 @@ export interface BusinessIntentCardPayload {
   type: 'BUSINESS_INTENT';
   payload: {
     intent: BusinessIntent;
-    businessRef: { showId: string };
+    businessRef: { showId: string; movieId: string; cinemaId: string };
   };
 }
 

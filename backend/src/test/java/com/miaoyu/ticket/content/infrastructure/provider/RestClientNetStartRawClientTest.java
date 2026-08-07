@@ -13,9 +13,14 @@ class RestClientNetStartRawClientTest {
     }
 
     @Test
+    void givenHangzhouAdministrativeCode_whenBuildingProviderRequest_thenUseNetStartCityId() {
+        assertThat(RestClientNetStartRawClient.providerCityId("330100")).isEqualTo("50");
+    }
+
+    @Test
     void givenUnsupportedAdministrativeCode_whenBuildingProviderRequest_thenRejectInsteadOfGuessing() {
-        assertThatThrownBy(() -> RestClientNetStartRawClient.providerCityId("330100"))
+        assertThatThrownBy(() -> RestClientNetStartRawClient.providerCityId("110100"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("430100");
+                .hasMessageContaining("已核对");
     }
 }

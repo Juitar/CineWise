@@ -43,11 +43,25 @@ public class ContentQueryService implements ContentPurchaseQueryPort {
     private final ContentProvider demoProvider;
     private final ContentProperties properties;
     private final Clock clock;
+    private final ContentLocalMovieCatalogPort localMovieCatalogPort;
 
     /** 端口均在 Application 边界注入，查询服务不接触 Redis、JDBC 或 JSON 实现。 */
     /** 缓存、快照和 Demo 的先后关系只在本服务维护，调用方不能跳过其中任意一层。 */
     /** Clock 是唯一的过期判断来源，测试与生产环境不会因系统默认时区不同而产生不同结果。 */
     /** Properties 只承载时间窗口，不承载任何 Provider 地址或用户输入，避免配置扩大模块职责。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    public ContentQueryService(ContentCachePort cachePort, ContentSnapshotPort snapshotPort,
+                               ContentProvider demoProvider, ContentProperties properties, Clock clock,
+                               ContentLocalMovieCatalogPort localMovieCatalogPort) {
+        this.cachePort = cachePort;
+        this.snapshotPort = snapshotPort;
+        this.demoProvider = demoProvider;
+        this.properties = properties;
+        this.clock = clock;
+        this.localMovieCatalogPort = localMovieCatalogPort;
+    }
+
+    /** 单元测试夹具没有真实数据库目录时仍可使用原有缓存/快照/Demo 查询。 */
     public ContentQueryService(ContentCachePort cachePort, ContentSnapshotPort snapshotPort,
                                ContentProvider demoProvider, ContentProperties properties, Clock clock) {
         this.cachePort = cachePort;
@@ -55,6 +69,15 @@ public class ContentQueryService implements ContentPurchaseQueryPort {
         this.demoProvider = demoProvider;
         this.properties = properties;
         this.clock = clock;
+        this.localMovieCatalogPort = null;
+    }
+
+    /** 影片列表优先读取本地完整目录；本地端口缺失仅用于旧单元测试夹具兼容。 */
+    public Optional<ContentResult<List<? extends ContentItem>>> queryLocalMovies(
+            String keyword, String releaseStatus) {
+        return localMovieCatalogPort == null
+                ? Optional.empty()
+                : localMovieCatalogPort.findMovies(keyword, releaseStatus);
     }
 
     /**

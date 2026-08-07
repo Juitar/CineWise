@@ -137,6 +137,7 @@ export function AgentWorkspace({ sessionId }: { sessionId: string }) {
                   {item.kind === 'card-placeholder' && <strong>卡片暂不可用</strong>}
                   {item.title && <strong>{item.title}</strong>}
                   <p>{item.text}</p>
+                  {item.selectSeatsPath && <Link to={item.selectSeatsPath}>去选座</Link>}
                   {item.fields && item.fields.length > 0 && (
                     <dl className="agent-card-fields">
                       {item.fields.map((field) => (

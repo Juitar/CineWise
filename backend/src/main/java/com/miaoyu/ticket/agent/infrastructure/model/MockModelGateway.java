@@ -107,12 +107,7 @@ public final class MockModelGateway implements ModelGateway {
         List<InputReference> inputReferences = new ArrayList<>();
         // 必填输入全部用 SLOT 引用，Mock 不把用户原话或常量直接写进工具参数。
         definition.requiredInputs().forEach(input -> inputReferences.add(slotReference(input.name())));
-        if (hasText(request.confirmedSlots().get("timeFrom"))
-                && hasText(request.confirmedSlots().get("timeTo"))) {
-            // 时间窗是 D 当前命令的可选约束；只有两个边界都存在时才同时传递，避免半个区间改变查询含义。
-            inputReferences.add(slotReference("timeFrom"));
-            inputReferences.add(slotReference("timeTo"));
-        }
+        addOptionalInputReferences(definition, request.confirmedSlots(), inputReferences);
         // 推荐必须先于渲染节点完成，依赖关系由计划校验器和状态机共同检查。
         return List.of(
                 new CandidatePlanNode(
@@ -173,6 +168,25 @@ public final class MockModelGateway implements ModelGateway {
     private static InputReference slotReference(String name) {
         // source 与 referenceKey 使用同一槽位名，后续适配器据此从已校验快照取值并构造 D 的 Command。
         return new InputReference(name, InputReferenceSource.SLOT, name);
+    }
+
+    private static void addOptionalInputReferences(
+            ToolDefinition definition, Map<String, String> confirmedSlots, List<InputReference> inputReferences) {
+        boolean hasTimeFrom = hasText(confirmedSlots.get("timeFrom"));
+        boolean hasTimeTo = hasText(confirmedSlots.get("timeTo"));
+        for (ToolInputDefinition input : definition.inputs()) {
+            if (input.required() || "timeFrom".equals(input.name()) || "timeTo".equals(input.name())) {
+                continue;
+            }
+            if (hasText(confirmedSlots.get(input.name()))) {
+                inputReferences.add(slotReference(input.name()));
+            }
+        }
+        if (hasTimeFrom && hasTimeTo) {
+            // 时间窗必须成对传递，避免半个区间改变 D 的查询语义。
+            inputReferences.add(slotReference("timeFrom"));
+            inputReferences.add(slotReference("timeTo"));
+        }
     }
 
     private static String questionText(QuestionReplyFacts facts) {

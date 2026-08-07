@@ -14,6 +14,7 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
@@ -126,13 +127,33 @@ public class ContentSyncService {
      * <p>Provider 调用在事务外完成；Provider 返回后的每一次写入和事务提交前必须检查租约。校验失败会回滚本轮资料、快照和审计日志。</p>
      */
     public CurrentHotMovieSyncResult synchronizeCurrentHotMoviesWithResult(BooleanSupplier writeGuard) {
-        Set<String> completedSourceMovieIds = persistence.findExistingMovieSourceIds("NETSTART_MAOYAN");
-        LiveContentSyncPort.DailySyncBatch batch = provider.fetchCurrentHotMovies(completedSourceMovieIds);
+        Map<String, ContentPersistencePort.MovieState> completedMovieStates =
+                persistence.findExistingMovieStates("NETSTART_MAOYAN");
+        LiveContentSyncPort.DailySyncBatch batch = provider.fetchCurrentHotMovies(completedMovieStates);
         // V014 没有专用队列表，所以每轮依据已成功落库的身份过滤目录；本轮未处理的身份保持不在该集合中，
         // 下一次任务会继续请求它们。本轮仍由 ensureMovie 幂等保护重复并发执行。
         LocalDateTime startedAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         int successCount = transactionTemplate == null ? persistBatch(batch, startedAt, writeGuard)
                 : transactionTemplate.execute(status -> persistBatch(batch, startedAt, writeGuard));
+        int totalCount = Math.max(batch.attemptedCount(), successCount);
+        return new CurrentHotMovieSyncResult(totalCount, successCount, totalCount - successCount, batch.outcome(),
+                batch.errorCode());
+    }
+
+    /**
+     * 同步一个已由本地目录确认的城市影院资料。
+     *
+     * <p>这里接收的是管理员服务或定时任务从城市目录取得的标准城市名和内部 ci，不能直接接收页面
+     * 提交的 ci。影院资料只更新 D 的静态内容表，不推断场次、票价、余座或购票状态。</p>
+     */
+    public CurrentHotMovieSyncResult synchronizeCityCinemasWithResult(String cityName, String providerCityId,
+                                                                       BooleanSupplier writeGuard) {
+        LocalDateTime startedAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
+        LiveContentSyncPort.DailySyncBatch batch = provider.fetchCityCinemas(providerCityId);
+        int successCount = transactionTemplate == null
+                ? persistBatch(batch, startedAt, writeGuard, new CinemaSyncContext(cityName, providerCityId))
+                : transactionTemplate.execute(status -> persistBatch(batch, startedAt, writeGuard,
+                        new CinemaSyncContext(cityName, providerCityId)));
         int totalCount = Math.max(batch.attemptedCount(), successCount);
         return new CurrentHotMovieSyncResult(totalCount, successCount, totalCount - successCount, batch.outcome(),
                 batch.errorCode());
@@ -145,6 +166,12 @@ public class ContentSyncService {
     /** 该方法仅被事务模板回调调用，保证业务 ID、快照和审计日志要么一起提交，要么一起回滚。 */
     private int persistBatch(LiveContentSyncPort.DailySyncBatch batch, LocalDateTime startedAt,
                              BooleanSupplier writeGuard) {
+        return persistBatch(batch, startedAt, writeGuard, null);
+    }
+
+    /** 城市上下文只在本次受控写入中存活，防止 Provider 的 ci 进入公开快照或 DTO。 */
+    private int persistBatch(LiveContentSyncPort.DailySyncBatch batch, LocalDateTime startedAt,
+                             BooleanSupplier writeGuard, CinemaSyncContext cinemaSyncContext) {
         requireWritePermission(writeGuard);
         registerCommitGuard(writeGuard);
         List<LiveContentSyncPort.SynchronizedContent> contents = batch.contents();
@@ -166,7 +193,8 @@ public class ContentSyncService {
             for (ContentItem item : content.result().data()) {
                 if (acceptedItems.contains(item)) {
                     requireWritePermission(writeGuard);
-                    acceptedForQuery.add(persistAndAttachBusinessId(item, content.result(), writeGuard));
+                    acceptedForQuery.add(persistAndAttachBusinessId(item, content.result(), writeGuard,
+                            cinemaSyncContext));
                 }
             }
             if (acceptedForQuery.isEmpty()) {
@@ -187,11 +215,15 @@ public class ContentSyncService {
         int totalItemCount = Math.max(batch.attemptedCount(), synchronizedItemCount + identityRejectedCount);
         int failureCount = totalItemCount - synchronizedItemCount;
         requireWritePermission(writeGuard);
+        String resourceType = cinemaSyncContext == null ? "DAILY_CONTENT" : "CITY_CINEMAS";
+        String requestId = "daily-" + startedAt
+                + (cinemaSyncContext == null ? "" : "-" + cinemaSyncContext.providerCityId());
         persistence.insertSyncLog(new ContentPersistencePort.SyncLogRow(idGenerator.nextId(), "NETSTART_MAOYAN",
-                "DAILY_CONTENT", "daily-" + startedAt, statusOf(totalItemCount, synchronizedItemCount, failureCount),
+                resourceType, requestId, statusOf(totalItemCount, synchronizedItemCount, failureCount, batch.outcome()),
                 batch.errorCode(), totalItemCount, synchronizedItemCount, failureCount, startedAt, finishedAt,
                 auditSummary(batch, contents, synchronizedItemCount, failureCount, identityRejectedCount, startedAt,
-                        finishedAt)));
+                        finishedAt), cinemaSyncContext == null ? null : cinemaSyncContext.cityName(),
+                cinemaSyncContext == null ? null : cinemaSyncContext.providerCityId()));
         return synchronizedItemCount;
     }
 
@@ -208,7 +240,8 @@ public class ContentSyncService {
             for (ContentItem item : accepted.data()) {
                 MovieContent movie = (MovieContent) item;
                 // 详情只接受内部 movieId；外部 sourceMovieId 不能成为页面快照键。
-                saveLiveResult(new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
+                saveLiveResult(new ContentQuery(
+                        com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
                         movie.movieId(), null, null), contentResult(List.of(movie), accepted), writeGuard);
                 synchronizedMovies.add(movie);
             }
@@ -278,7 +311,7 @@ public class ContentSyncService {
      * 这保证前端已持有的 movieId/cinemaId 在 Provider 再次同步后仍然有效。</p>
      */
     private ContentItem persistAndAttachBusinessId(ContentItem item, ContentResult<?> result,
-                                                   BooleanSupplier writeGuard) {
+                                                   BooleanSupplier writeGuard, CinemaSyncContext cinemaSyncContext) {
         requireWritePermission(writeGuard);
         if (item instanceof MovieContent movie) {
             long movieId = persistence.ensureMovie(new ContentPersistencePort.MovieRow(idGenerator.nextId(),
@@ -292,10 +325,12 @@ public class ContentSyncService {
                     movie.releaseStatus());
         }
         CinemaContent cinema = (CinemaContent) item;
-        long cinemaId = persistence.ensureCinema(new ContentPersistencePort.CinemaRow(idGenerator.nextId(),
+        ContentPersistencePort.CinemaRow row = new ContentPersistencePort.CinemaRow(idGenerator.nextId(),
                 cinema.sourceCinemaId(), cinema.name(), cinema.cityCode(), cinema.area(), cinema.address(),
                 cinema.longitude(), cinema.latitude(), result.source().type(), result.source().name(),
-                result.dataTime(), result.expiresAt()));
+                result.dataTime(), result.expiresAt());
+        long cinemaId = cinemaSyncContext == null ? persistence.ensureCinema(row)
+                : persistence.ensureCinema(row, cinemaSyncContext.cityName(), cinemaSyncContext.providerCityId());
         return new CinemaContent(cinemaId, cinema.sourceCinemaId(), cinema.name(), cinema.cityCode(), cinema.area(),
                 cinema.address(), cinema.longitude(), cinema.latitude());
     }
@@ -308,6 +343,9 @@ public class ContentSyncService {
     private LocalDate releaseDateOf(String releaseDate) {
         return releaseDate == null ? null : LocalDate.parse(releaseDate);
     }
+
+    /** 影院城市字段只供持久化与审计使用，绝不拼接到页面查询键。 */
+    private record CinemaSyncContext(String cityName, String providerCityId) { }
 
     /**
      * Redis 不是事务事实；只有 MySQL 成功提交后才允许发布新的 LIVE 缓存。
@@ -354,7 +392,12 @@ public class ContentSyncService {
 
     /** 数据库现有四种状态已足够表达本轮结果，无须为了审计摘要新增字段或枚举值。 */
     private ContentPersistencePort.SyncStatus statusOf(int totalItemCount, int synchronizedItemCount,
-                                                        int failureCount) {
+                                                        int failureCount, LiveContentSyncPort.Outcome outcome) {
+        // Provider 被关闭或完全不可用时即使没有候选项也必须记录 FAILED，不能让定时任务显示成成功。
+        if (outcome != LiveContentSyncPort.Outcome.SUCCESS && failureCount == 0
+                && synchronizedItemCount == 0 && totalItemCount == 0) {
+            return ContentPersistencePort.SyncStatus.FAILED;
+        }
         if (totalItemCount == 0) {
             return ContentPersistencePort.SyncStatus.SUCCESS;
         }

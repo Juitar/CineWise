@@ -6,7 +6,7 @@ import com.miaoyu.ticket.agent.domain.tool.DeferredAgentToolCommand;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanCommand;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
-import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
+import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
 import com.miaoyu.ticket.agent.domain.confirmation.ConfirmedOrderCommand;
 import com.miaoyu.ticket.agent.application.confirmation.CreateOrderToolResult;
 import com.miaoyu.ticket.order.api.CreateOrderTool;
@@ -17,6 +17,7 @@ import com.miaoyu.ticket.ticketing.api.QueryShowsTool;
 import com.miaoyu.ticket.ticketing.api.QueryShowsToolCommand;
 import com.miaoyu.ticket.ticketing.api.QueryShowsToolResult;
 import com.miaoyu.ticket.ticketing.application.TicketingErrorCode;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -47,16 +48,23 @@ public final class AgentToolDefinitions {
         return new ToolDefinition(
                 RankMoviePlanTool.TARGET_NAME,
                 RankMoviePlanCommand.class,
-                FixedRecommendationResult.class,
+                RecommendationPlanResult.class,
                 true,
                 RANK_MOVIE_PLAN_TIMEOUT,
                 false,
                 List.of(
-                        new ToolInputDefinition("movieId", String.class, true),
-                        new ToolInputDefinition("cinemaId", String.class, true),
+                        new ToolInputDefinition("cityCode", String.class, true),
                         new ToolInputDefinition("date", LocalDate.class, true),
+                        new ToolInputDefinition("ticketCount", Integer.class, true),
+                        new ToolInputDefinition("movieId", String.class, false),
+                        new ToolInputDefinition("cinemaId", String.class, false),
+                        new ToolInputDefinition("genres", List.class, false),
                         new ToolInputDefinition("timeFrom", LocalTime.class, false),
-                        new ToolInputDefinition("timeTo", LocalTime.class, false)),
+                        new ToolInputDefinition("timeTo", LocalTime.class, false),
+                        new ToolInputDefinition("latestEndTime", LocalTime.class, false),
+                        new ToolInputDefinition("budget", BigDecimal.class, false),
+                        new ToolInputDefinition("excludedGenres", List.class, false),
+                        new ToolInputDefinition("maxDistanceMeters", Integer.class, false)),
                 Set.of(CommonErrorCode.INVALID_PARAMETER.code()));
     }
 

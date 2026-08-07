@@ -9,12 +9,15 @@ import com.miaoyu.ticket.agent.infrastructure.model.MockModelGateway;
 import com.miaoyu.ticket.agent.tool.ticketing.QueryAvailableDatesExecutionAdapter;
 import com.miaoyu.ticket.agent.tool.ticketing.QueryShowsExecutionAdapter;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
+import com.miaoyu.ticket.agent.application.run.ProfileContextPrefetcher;
+import com.miaoyu.ticket.profile.infrastructure.tool.GetProfileSummaryTool;
 import com.miaoyu.ticket.ticketing.api.QueryAvailableDatesTool;
 import com.miaoyu.ticket.ticketing.api.QueryShowsTool;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.ObjectProvider;
 
 /**
  * B 的工具装配入口，只登记明确的类型化工具。
@@ -76,7 +79,7 @@ public class AgentToolConfiguration {
     /**
      * 通过构造器明确绑定 D 的公开推荐工具，不提供字符串路由入口。
      *
-     * <p>适配器只调用 {@code RankMoviePlanTool.execute(context, command)}；它不能调用 D 的 Controller、
+     * <p>适配器只调用 {@code RankMoviePlanTool.executeRecommendationPlan(context, command)}；它不能调用 D 的 Controller、
      * Repository 或持久化对象，也不参与计划生成和状态机推进。
      */
     @Bean
@@ -110,7 +113,8 @@ public class AgentToolConfiguration {
             ExecutionPlanStateMachine executionPlanStateMachine,
             RankMoviePlanExecutionAdapter rankMoviePlanExecutionAdapter,
             QueryAvailableDatesExecutionAdapter queryAvailableDatesExecutionAdapter,
-            QueryShowsExecutionAdapter queryShowsExecutionAdapter) {
+            QueryShowsExecutionAdapter queryShowsExecutionAdapter,
+            ObjectProvider<GetProfileSummaryTool> getProfileSummaryToolProvider) {
         return new MultiToolSupervisor(
                 modelGateway,
                 agentToolRegistry,
@@ -119,7 +123,13 @@ public class AgentToolConfiguration {
                 List.of(
                         rankMoviePlanExecutionAdapter,
                         queryAvailableDatesExecutionAdapter,
-                        queryShowsExecutionAdapter));
+                        queryShowsExecutionAdapter), profileContextPrefetcher(getProfileSummaryToolProvider));
+    }
+
+    private static ProfileContextPrefetcher profileContextPrefetcher(
+            ObjectProvider<GetProfileSummaryTool> getProfileSummaryToolProvider) {
+        GetProfileSummaryTool tool = getProfileSummaryToolProvider.getIfAvailable();
+        return tool == null ? ProfileContextPrefetcher.disabled() : new ProfileContextPrefetcher(tool);
     }
 
 }

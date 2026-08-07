@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.content.application.ContentQuery;
 import com.miaoyu.ticket.content.application.ContentResult;
+import com.miaoyu.ticket.content.application.ContentPersistencePort;
 import com.miaoyu.ticket.content.application.LiveContentSyncPort;
 import com.miaoyu.ticket.content.domain.ContentItem;
 import com.miaoyu.ticket.content.domain.ContentSource;
@@ -222,6 +223,26 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
         return new DailySyncBatch(synchronizedContent, attemptedCount, outcome, failureCode);
     }
 
+    @Override
+    public DailySyncBatch fetchCityCinemas(String cityCode) {
+        if (!properties.enabled() || !isLearningEnvironment()) {
+            return new DailySyncBatch(List.of(), 0, Outcome.PROVIDER_DISABLED, null);
+        }
+        ContentQuery query = new ContentQuery(
+                com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA, null, cityCode, "影院");
+        RawFetchResult fetched = fetchWithPolicy(query);
+        if (fetched.payload() == null) {
+            return new DailySyncBatch(List.of(), 1, fetched.outcome(), fetched.errorCode());
+        }
+        Optional<ContentResult<List<? extends ContentItem>>> normalized = normalizeAll(query, fetched.payload());
+        if (normalized.isEmpty()) {
+            return new DailySyncBatch(List.of(), 1, Outcome.FIELD_REJECTED, null);
+        }
+        int count = normalized.get().data().size();
+        return new DailySyncBatch(List.of(new SynchronizedContent(query, normalized.get())), count,
+                Outcome.SUCCESS, null);
+    }
+
     /**
      * 当前热映目录的可恢复影片批次。
      *
@@ -230,6 +251,22 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
      */
     @Override
     public DailySyncBatch fetchCurrentHotMovies(Set<String> completedSourceMovieIds) {
+        java.util.Map<String, ContentPersistencePort.MovieState> states = new java.util.HashMap<>();
+        completedSourceMovieIds.forEach(id -> states.put(id, null));
+        return fetchCurrentHotMoviesIncremental(states, false);
+    }
+
+    @Override
+    public DailySyncBatch fetchCurrentHotMovies(
+            java.util.Map<String, ContentPersistencePort.MovieState> completedStates) {
+        return fetchCurrentHotMoviesIncremental(completedStates, true);
+    }
+
+    /**
+     * 按已保存的上映资料判断是否跳过详情请求；Provider 没有提供比较字段时不跳过，保证资料变化有机会被更新。
+     */
+    private DailySyncBatch fetchCurrentHotMoviesIncremental(
+            java.util.Map<String, ContentPersistencePort.MovieState> completedStates, boolean compareState) {
         if (!properties.enabled() || !isLearningEnvironment()) {
             return new DailySyncBatch(List.of(), 0, Outcome.PROVIDER_DISABLED, null);
         }
@@ -251,7 +288,9 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
                 continue;
             }
             String externalId = Long.toString(movie.path("id").longValue());
-            if (completedSourceMovieIds.contains(externalId)) {
+            ContentPersistencePort.MovieState savedState = completedStates.get(externalId);
+            if ((!compareState && completedStates.containsKey(externalId))
+                    || (compareState && savedState != null && matchesSavedReleaseState(movie, savedState))) {
                 continue;
             }
             if (requested++ >= detailBudget) {
@@ -280,6 +319,20 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
         Outcome outcome = failureOutcome != null ? failureOutcome
                 : rejected == 0 ? Outcome.SUCCESS : Outcome.FIELD_REJECTED;
         return new DailySyncBatch(accepted, attempted, outcome, failureCode);
+    }
+
+    private boolean matchesSavedReleaseState(JsonNode movie, ContentPersistencePort.MovieState savedState) {
+        String releaseDate = movie.path("rt").asText(null);
+        String releaseStatus = movie.path("globalReleased").asBoolean(false) ? "NOW_SHOWING"
+                : releaseDate == null || releaseDate.isBlank() ? null : "COMING_SOON";
+        if (!java.util.Objects.equals(releaseDate, savedState.releaseDate())
+                || !java.util.Objects.equals(releaseStatus, savedState.releaseStatus())) {
+            return false;
+        }
+        // 目录只提供上映状态和日期，无法直接判断海报或简介变化；至少每天重新抽取未在当天复查的详情，
+        // 同时仍受十次请求预算限制。旧夹具没有 dataTime 时维持原有跳过语义。
+        return savedState.dataTime() == null || savedState.dataTime().toLocalDate().equals(
+                LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID).toLocalDate());
     }
 
     /**

@@ -10,6 +10,8 @@ import com.miaoyu.ticket.content.domain.ContentSource;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
 import com.miaoyu.ticket.content.domain.MovieContent;
 import com.miaoyu.ticket.recommendation.domain.RankedRecommendationCandidate;
+import com.miaoyu.ticket.recommendation.domain.CinemaDistanceSelector;
+import com.miaoyu.ticket.recommendation.domain.RecommendationPlan;
 import com.miaoyu.ticket.recommendation.domain.RecommendationConstraints;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -23,6 +25,53 @@ import org.mockito.Mockito;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 class PersonalizedRecommendationQueryServiceTest {
+
+    @Test
+    void shouldConsumeDistanceContextBeforeQueryingOnlyNearbyCinemas() {
+        RecommendationContentCandidateQueryService cinemas = Mockito.mock(
+                RecommendationContentCandidateQueryService.class);
+        ContentQueryService contents = Mockito.mock(ContentQueryService.class);
+        RecommendationBatchShowtimeQueryPort showtimes = Mockito.mock(RecommendationBatchShowtimeQueryPort.class);
+        DistanceContextService distanceContexts = Mockito.mock(DistanceContextService.class);
+        Instant now = Instant.parse("2026-08-06T10:00:00Z");
+        when(cinemas.listCinemas("430100")).thenReturn(List.of(
+                new RecommendationContentCandidateQueryService.CinemaCandidate(20L, "近影院",
+                        new BigDecimal("112.938814"), new BigDecimal("28.228209"), "MOCK",
+                        LocalDateTime.ofInstant(now, ZoneOffset.UTC),
+                        LocalDateTime.ofInstant(now.plusSeconds(3600), ZoneOffset.UTC), false),
+                new RecommendationContentCandidateQueryService.CinemaCandidate(21L, "远影院",
+                        new BigDecimal("113.000000"), new BigDecimal("28.200000"), "MOCK",
+                        LocalDateTime.ofInstant(now, ZoneOffset.UTC),
+                        LocalDateTime.ofInstant(now.plusSeconds(3600), ZoneOffset.UTC), false)));
+        when(distanceContexts.consume("distance-1", "run-1"))
+                .thenReturn(new CinemaDistanceSelector.Coordinate(new BigDecimal("112.938814"),
+                        new BigDecimal("28.228209")));
+        RankedRecommendationCandidate show = new RankedRecommendationCandidate("10", "20", "30",
+                new BigDecimal("39.90"), now.plusSeconds(3600), now.plusSeconds(10800), List.of(), null,
+                "TICKETING:MOCK", now, now.plusSeconds(60));
+        when(showtimes.querySaleable(any(), any())).thenReturn(
+                new RecommendationBatchShowtimeQueryPort.BatchResult(List.of(show), false));
+        MovieContent movie = new MovieContent(10L, "movie-10", "测试影片", "[\"喜剧\"]", 120,
+                new BigDecimal("8.6"));
+        when(contents.query(any())).thenReturn(new com.miaoyu.ticket.content.application.ContentResult<>(List.of(movie),
+                new ContentSource("demo", ContentSourceType.MOCK), LocalDateTime.ofInstant(now, ZoneOffset.UTC),
+                LocalDateTime.ofInstant(now.plusSeconds(3600), ZoneOffset.UTC), false, false, null));
+        PersonalizedRecommendationQueryService service = new PersonalizedRecommendationQueryService(cinemas, contents,
+                showtimes, new RecommendationMetricsRecorder(new SimpleMeterRegistry()), new ObjectMapper(),
+                Clock.fixed(now, ZoneOffset.UTC), distanceContexts);
+
+        var result = service.queryWithDistanceContext(new RecommendationConstraints("430100",
+                LocalDate.of(2026, 8, 6), 1, null, null, List.of(), null, null, null, null, List.of(), 1_000),
+                "distance-1", "run-1");
+
+        var cinemaIds = org.mockito.ArgumentCaptor.forClass(java.util.Set.class);
+        Mockito.verify(showtimes).querySaleable(any(), cinemaIds.capture());
+        assertThat(cinemaIds.getValue()).containsExactly(20L);
+        assertThat(result.plans()).hasSize(1);
+        assertThat(result.plans()).first().extracting(RecommendationPlan::planType)
+                .isEqualTo(RecommendationPlan.PlanType.NEAREST);
+        assertThat(result.plans().getFirst().distanceMeters()).isZero();
+    }
 
     /*
      * 应用服务测试用 A 的公开批量端口夹具，不访问场次表、Mapper 或 Controller。

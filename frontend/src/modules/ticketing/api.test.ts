@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getShows, getSeatMap } from './api';
+import { getAvailableCinemas, getSeatMap, getShows } from './api';
 import { ApiError } from '../../shared/api/ApiError';
 import showListSuccessPayload from '../../../../backend/src/test/resources/fixtures/ticketing/c/show-list-success.json';
 import seatMapSuccessPayload from '../../../../backend/src/test/resources/fixtures/ticketing/c/seat-map-success.json';
 import seatConflictErrorPayload from '../../../../backend/src/test/resources/fixtures/ticketing/c/seat-conflict-error.json';
+import availableCinemasSuccessPayload from '../../../../backend/src/test/resources/fixtures/ticketing/c/available-cinemas-success.json';
 
 function createApiResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
@@ -32,6 +33,22 @@ describe('票务场次与选座 API 测试 (基于 backend ticketing/c 夹具)',
     expect(shows[0].basePrice).toBe('39.00');
     expect(typeof shows[0].showId).toBe('string');
     expect(typeof shows[0].basePrice).toBe('string');
+  });
+
+  it('getAvailableCinemas 使用正式路径、分页参数和后端夹具字段', async () => {
+    fetchMock.mockResolvedValueOnce(createApiResponse(availableCinemasSuccessPayload));
+
+    const result = await getAvailableCinemas('10001');
+
+    expect(result.records[0]).toMatchObject({
+      cinemaId: '20001',
+      availableShowCount: 3,
+      contentExpired: false,
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/shows/available-cinemas?movieId=10001&page=1&size=20',
+      expect.objectContaining({ method: 'GET' }),
+    );
   });
 
   it('getShows 收到空场次数据时返回空数组', async () => {

@@ -9,7 +9,7 @@ import com.miaoyu.ticket.agent.application.reply.RecommendationReplyFactsMapper;
 import com.miaoyu.ticket.agent.application.reply.SelectSeatsReplyFacts;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
-import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
+import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
 import com.miaoyu.ticket.ticketing.api.QueryShowsTool;
 import com.miaoyu.ticket.ticketing.api.QueryShowsToolResult;
 import java.time.Instant;
@@ -47,9 +47,9 @@ public final class AgentRunReplyFactory {
             return new com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse(
                     "已确认场次，请前往选座。", AgentReplyMessageType.SELECT_SEATS, selectSeats);
         }
-        ToolResult<FixedRecommendationResult> recommendation = lastSuccessfulRecommendation(result);
+        ToolResult<RecommendationPlanResult> recommendation = lastSuccessfulRecommendation(result);
         if (recommendation != null) {
-            RecommendationReplyFacts facts = RecommendationReplyFactsMapper.from(recommendation);
+            RecommendationReplyFacts facts = RecommendationReplyFactsMapper.from(recommendation, now);
             AgentReplyMessageType type = facts.purchaseEligible()
                     ? AgentReplyMessageType.PLAN_CARD : AgentReplyMessageType.MOVIE_CARD;
             String text = facts.purchaseEligible()
@@ -71,8 +71,8 @@ public final class AgentRunReplyFactory {
     /** 将多工具结果组装成持久化层可接收的 B 结果对象；D 类型依赖停留在应用映射边界。 */
     @SuppressWarnings("unchecked")
     public static MinimalReadOnlyAgentResult asMinimalResult(MultiToolSupervisorResult result, Instant now) {
-        List<ToolResult<FixedRecommendationResult>> toolResults = result.toolResults().stream()
-                .map(item -> (ToolResult<FixedRecommendationResult>) item.result())
+        List<ToolResult<?>> toolResults = result.toolResults().stream()
+                .map(MultiToolSupervisorResult.NodeToolResult::result)
                 .toList();
         return new MinimalReadOnlyAgentResult(
                 result.candidatePlan(), result.validation(), result.state(), toolResults, from(result, now));
@@ -94,29 +94,23 @@ public final class AgentRunReplyFactory {
                 continue;
             }
             for (QueryShowsToolResult.ShowItem show : shows.shows()) {
-                if (isPositiveDecimalId(show.showId())) {
-                    return new SelectSeatsReplyFacts(show.showId());
+                if (SelectSeatsReplyFacts.isPositiveLongDecimal(show.showId())
+                        && SelectSeatsReplyFacts.isPositiveLongDecimal(show.movieId())
+                        && SelectSeatsReplyFacts.isPositiveLongDecimal(show.cinemaId())) {
+                    return new SelectSeatsReplyFacts(show.showId(), show.movieId(), show.cinemaId());
                 }
             }
         }
         return null;
     }
 
-    private static boolean isPositiveDecimalId(String value) {
-        try {
-            return value != null && Long.parseLong(value) > 0L;
-        } catch (NumberFormatException exception) {
-            return false;
-        }
-    }
-
     @SuppressWarnings("unchecked")
-    private static ToolResult<FixedRecommendationResult> lastSuccessfulRecommendation(
+    private static ToolResult<RecommendationPlanResult> lastSuccessfulRecommendation(
             MultiToolSupervisorResult result) {
         for (int index = result.toolResults().size() - 1; index >= 0; index--) {
             ToolResult<?> item = result.toolResults().get(index).result();
-            if (item.status() == ToolStatus.SUCCESS && item.data() instanceof FixedRecommendationResult) {
-                return (ToolResult<FixedRecommendationResult>) item;
+            if (item.status() == ToolStatus.SUCCESS && item.data() instanceof RecommendationPlanResult) {
+                return (ToolResult<RecommendationPlanResult>) item;
             }
         }
         return null;

@@ -1,5 +1,8 @@
 package com.miaoyu.ticket.agent.application.tool;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.agent.domain.plan.ExecutionPlanNode;
 import com.miaoyu.ticket.agent.domain.plan.InputReference;
 import com.miaoyu.ticket.agent.domain.plan.InputReferenceSource;
@@ -12,7 +15,8 @@ import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanCommand;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
-import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
+import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
+import java.math.BigDecimal;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -32,23 +36,33 @@ import java.util.Set;
  * 因此模型计划中的字符串不能被解释成 Bean 名、反射类名或其他跨模块调用。
  */
 public final class RankMoviePlanExecutionAdapter
-        implements AgentToolExecutor<RankMoviePlanCommand, FixedRecommendationResult> {
+        implements AgentToolExecutor<RankMoviePlanCommand, RecommendationPlanResult> {
     /**
      * D 当前公开 Command 允许的全部输入名。
      *
      * <p>集合同时限制必填和可选槽位引用。新增 D 字段时必须由 D 确认 Command 变更，并同步修改 B 的
      * 工具定义、计划校验、转换逻辑和测试，不能因为模型生成了字段就透传。
      */
-    private static final Set<String> COMMAND_INPUT_NAMES =
-            Set.of("movieId", "cinemaId", "date", "timeFrom", "timeTo");
+    private static final Set<String> COMMAND_INPUT_NAMES = Set.of(
+            "cityCode", "date", "ticketCount", "movieId", "cinemaId", "genres", "timeFrom", "timeTo",
+            "latestEndTime", "budget", "excludedGenres", "maxDistanceMeters");
 
     private final RankMoviePlanTool rankMoviePlanTool;
     private final ExecutionPlanStateMachine stateMachine;
+    private final ObjectMapper objectMapper;
 
     public RankMoviePlanExecutionAdapter(
             RankMoviePlanTool rankMoviePlanTool, ExecutionPlanStateMachine stateMachine) {
+        this(rankMoviePlanTool, stateMachine, new ObjectMapper());
+    }
+
+    public RankMoviePlanExecutionAdapter(
+            RankMoviePlanTool rankMoviePlanTool,
+            ExecutionPlanStateMachine stateMachine,
+            ObjectMapper objectMapper) {
         this.rankMoviePlanTool = Objects.requireNonNull(rankMoviePlanTool, "推荐工具不能为空");
         this.stateMachine = Objects.requireNonNull(stateMachine, "运行状态机不能为空");
+        this.objectMapper = Objects.requireNonNull(objectMapper, "JSON 工具不能为空");
     }
 
     /**
@@ -74,13 +88,19 @@ public final class RankMoviePlanExecutionAdapter
             command = createCommand(node);
         } catch (DateTimeException | IllegalArgumentException exception) {
             // 槽位文本不能转换为 D 的强类型 Command 时绝不访问 D，避免无效日期/时间触发查询或产生误导结果。
-            ToolResult<FixedRecommendationResult> failureResult = invalidParameterResult(context);
+            ToolResult<RecommendationPlanResult> failureResult = invalidParameterResult(context);
             return new RankMoviePlanExecutionResult(
                     stateMachine.recordToolResult(runningState, node.nodeId(), failureResult), failureResult);
         }
 
-        // 唯一允许的跨模块调用：公开的 RankMoviePlanTool.execute(context, command)。
-        ToolResult<FixedRecommendationResult> toolResult = execute(context, command);
+        // 唯一允许的跨模块调用：D 保留的正式公开兼容入口，不访问其内部查询服务。
+        ToolResult<RecommendationPlanResult> toolResult;
+        try {
+            toolResult = execute(context, command);
+        } catch (RuntimeException exception) {
+            // 下游未预期异常统一转成不可重试结果；异常原文只进入调用方日志，不进入 ToolResult 或回复。
+            toolResult = exceptionResult(context);
+        }
         // 状态机决定 SUCCESS、PROCESSING、FAILED 与一次重试的状态语义；适配器不擅自修改结果状态。
         return new RankMoviePlanExecutionResult(
                 stateMachine.recordToolResult(runningState, node.nodeId(), toolResult), toolResult);
@@ -97,8 +117,8 @@ public final class RankMoviePlanExecutionAdapter
     }
 
     @Override
-    public ToolResult<FixedRecommendationResult> execute(ToolContext context, RankMoviePlanCommand command) {
-        return rankMoviePlanTool.execute(
+    public ToolResult<RecommendationPlanResult> execute(ToolContext context, RankMoviePlanCommand command) {
+        return rankMoviePlanTool.executeRecommendationPlan(
                 Objects.requireNonNull(context, "工具上下文不能为空"),
                 Objects.requireNonNull(command, "工具命令不能为空"));
     }
@@ -148,17 +168,26 @@ public final class RankMoviePlanExecutionAdapter
                 .toList();
     }
 
-    private static RankMoviePlanCommand createCommand(ExecutionPlanNode node) {
+    private RankMoviePlanCommand createCommand(ExecutionPlanNode node) {
         // 所有值先从执行计划固定的槽位快照读取，不从当前会话或模型文本读取，保证计划校验后的输入不漂移。
         Map<String, InputReference> references = indexSlotReferences(node);
         Map<String, String> slotValues = node.slotSnapshot().values();
-        String movieId = requiredSlotValue(references, slotValues, "movieId");
-        String cinemaId = requiredSlotValue(references, slotValues, "cinemaId");
-        // 日期和时间在 B 边界解析为 Java 时间类型；D 不必接收未经校验的字符串并重复猜测格式。
+        String cityCode = requiredSlotValue(references, slotValues, "cityCode");
         LocalDate date = LocalDate.parse(requiredSlotValue(references, slotValues, "date"));
+        int ticketCount = parsePositiveInt(requiredSlotValue(references, slotValues, "ticketCount"), "ticketCount");
+        String movieId = optionalSlotValue(references, slotValues, "movieId");
+        String cinemaId = optionalSlotValue(references, slotValues, "cinemaId");
+        List<String> genres = parseStringList(optionalSlotValue(references, slotValues, "genres"), "genres");
         LocalTime timeFrom = optionalTimeSlotValue(references, slotValues, "timeFrom");
         LocalTime timeTo = optionalTimeSlotValue(references, slotValues, "timeTo");
-        return new RankMoviePlanCommand(movieId, cinemaId, date, timeFrom, timeTo);
+        LocalTime latestEndTime = optionalTimeSlotValue(references, slotValues, "latestEndTime");
+        BigDecimal budget = parseBudget(optionalSlotValue(references, slotValues, "budget"));
+        List<String> excludedGenres = parseStringList(
+                optionalSlotValue(references, slotValues, "excludedGenres"), "excludedGenres");
+        Integer maxDistanceMeters = optionalPositiveIntSlotValue(references, slotValues, "maxDistanceMeters");
+        return new RankMoviePlanCommand(
+                cityCode, date, ticketCount, movieId, cinemaId, genres, timeFrom, timeTo, latestEndTime, budget,
+                excludedGenres, maxDistanceMeters);
     }
 
     private static Map<String, InputReference> indexSlotReferences(ExecutionPlanNode node) {
@@ -201,6 +230,70 @@ public final class RankMoviePlanExecutionAdapter
         return value;
     }
 
+    private static String optionalSlotValue(
+            Map<String, InputReference> references, Map<String, String> slotValues, String inputName) {
+        InputReference reference = references.get(inputName);
+        if (reference == null) {
+            return null;
+        }
+        String value = slotValues.get(reference.sourceId());
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("rankMoviePlan 槽位值不能为空: " + inputName);
+        }
+        return value;
+    }
+
+    private static int parsePositiveInt(String value, String inputName) {
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed <= 0) {
+                throw new IllegalArgumentException(inputName + " 必须大于 0");
+            }
+            return parsed;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(inputName + " 必须是正整数", exception);
+        }
+    }
+
+    private static Integer optionalPositiveIntSlotValue(
+            Map<String, InputReference> references, Map<String, String> slotValues, String inputName) {
+        String value = optionalSlotValue(references, slotValues, inputName);
+        return value == null ? null : parsePositiveInt(value, inputName);
+    }
+
+    private static BigDecimal parseBudget(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return new BigDecimal(value);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("budget 格式不合法", exception);
+        }
+    }
+
+    private List<String> parseStringList(String value, String inputName) {
+        if (value == null) {
+            return List.of();
+        }
+        try {
+            JsonNode root = objectMapper.readTree(value);
+            if (root == null || !root.isArray()) {
+                throw new IllegalArgumentException(inputName + " 必须是 JSON 数组");
+            }
+            List<String> values = new java.util.ArrayList<>();
+            for (JsonNode item : root) {
+                if (!item.isTextual() || item.asText().isBlank()) {
+                    throw new IllegalArgumentException(inputName + " 只能包含非空字符串");
+                }
+                values.add(item.asText());
+            }
+            return List.copyOf(values);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException(inputName + " 必须是有效 JSON 数组", exception);
+        }
+    }
+
     private static LocalTime optionalTimeSlotValue(
             Map<String, InputReference> references, Map<String, String> slotValues, String inputName) {
         InputReference reference = references.get(inputName);
@@ -217,7 +310,7 @@ public final class RankMoviePlanExecutionAdapter
         return LocalTime.parse(value);
     }
 
-    private static ToolResult<FixedRecommendationResult> invalidParameterResult(ToolContext context) {
+    private static ToolResult<RecommendationPlanResult> invalidParameterResult(ToolContext context) {
         // 统一使用稳定通用参数错误码，不暴露具体槽位值或 Java 解析异常给模型和用户。
         return new ToolResult<>(
                 ToolStatus.FAILED,
@@ -231,6 +324,21 @@ public final class RankMoviePlanExecutionAdapter
                 false,
                 null,
                 // 仍记录使用的槽位版本，便于按 traceId 审计到底是哪个确认快照产生了错误。
+                context.stateVersion(),
+                null,
+                null);
+    }
+
+    private static ToolResult<RecommendationPlanResult> exceptionResult(ToolContext context) {
+        return new ToolResult<>(
+                ToolStatus.FAILED,
+                null,
+                CommonErrorCode.INTERNAL_ERROR.code(),
+                false,
+                false,
+                "TOOL_EXCEPTION",
+                false,
+                null,
                 context.stateVersion(),
                 null,
                 null);
