@@ -73,6 +73,14 @@ final class NetStartContentMapper {
                         coordinate(raw, "lat", "latitude", 90))))));
     }
 
+    Optional<CinemaContent> mapCinemaDetail(JsonNode raw, String cityCode) {
+        JsonNode data = raw.path("data").isObject() ? raw.path("data") : raw;
+        return text(data, "cinemaId").flatMap(id -> text(data, "nm").flatMap(name -> text(data, "addr")
+                .flatMap(address -> text(cityCode).map(city -> new CinemaContent(id, name, city,
+                        areaFromAddress(address), address, coordinate(data, "lng", "longitude", 180),
+                        coordinate(data, "lat", "latitude", 90))))));
+    }
+
     private Optional<String> text(JsonNode node, String field) { return text(node.path(field).asText(null)); }
     private Optional<String> text(String value) {
         if (value == null || value.trim().isEmpty()) { return Optional.empty(); }

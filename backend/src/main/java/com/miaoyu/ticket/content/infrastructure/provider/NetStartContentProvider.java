@@ -7,13 +7,16 @@ import com.miaoyu.ticket.content.application.ContentResult;
 import com.miaoyu.ticket.content.application.ContentPersistencePort;
 import com.miaoyu.ticket.content.application.LiveContentSyncPort;
 import com.miaoyu.ticket.content.domain.ContentItem;
+import com.miaoyu.ticket.content.domain.ContentResourceType;
 import com.miaoyu.ticket.content.domain.ContentSource;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
+import com.miaoyu.ticket.content.domain.CinemaContent;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.springframework.core.env.Environment;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
@@ -80,7 +83,11 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
             return Optional.empty();
         }
         RawFetchResult fetched = fetchWithPolicy(query);
-        return fetched.payload() == null ? Optional.empty() : normalizeAll(query, fetched.payload());
+        if (fetched.payload() == null) {
+            return Optional.empty();
+        }
+        return query.resourceType() == ContentResourceType.CINEMA
+                ? normalizeCityCinemas(query, fetched.payload()) : normalizeAll(query, fetched.payload());
     }
 
     /** 将已经受控取得的单条原始响应转换为业务可用的真实来源封套，供同步用例使用。 */
@@ -227,13 +234,65 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
         if (fetched.payload() == null) {
             return new DailySyncBatch(List.of(), 1, fetched.outcome(), fetched.errorCode());
         }
-        Optional<ContentResult<List<? extends ContentItem>>> normalized = normalizeAll(query, fetched.payload());
+        Optional<ContentResult<List<? extends ContentItem>>> normalized = normalizeCityCinemas(
+                query, fetched.payload());
         if (normalized.isEmpty()) {
             return new DailySyncBatch(List.of(), 1, Outcome.FIELD_REJECTED, null);
         }
         int count = normalized.get().data().size();
         return new DailySyncBatch(List.of(new SynchronizedContent(query, normalized.get())), count,
                 Outcome.SUCCESS, null);
+    }
+
+    /** 城市搜索只负责拿影院身份，详情请求负责补齐经纬度并沿用同一限流和重试边界。 */
+    private Optional<ContentResult<List<? extends ContentItem>>> normalizeCityCinemas(
+            ContentQuery query, JsonNode raw) {
+        JsonNode items = raw.isArray() ? raw : raw.path("cinemas");
+        if (!items.isArray()) {
+            return Optional.empty();
+        }
+        List<ContentItem> mapped = new java.util.ArrayList<>();
+        for (JsonNode item : items) {
+            Optional<ContentItem> base = mapper.map(ContentResourceType.CINEMA, item, query.cityCode());
+            if (base.isEmpty()) {
+                continue;
+            }
+            ContentItem enriched = enrichCinema(base.get(), query.cityCode());
+            mapped.add(enriched);
+        }
+        if (mapped.isEmpty()) {
+            return Optional.empty();
+        }
+        LocalDateTime dataTime = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
+        return Optional.of(new ContentResult<>(List.copyOf(mapped), new ContentSource(PROVIDER,
+                ContentSourceType.LIVE), dataTime, dataTime.plusHours(6), false, false, null));
+    }
+
+    /**
+     * 详情接口仅用于补充搜索结果缺失的静态坐标，不能借此覆盖搜索结果中的影院名称和地址。
+     * 详情返回的外部 ID 与搜索结果不一致时同样放弃，避免第三方异常响应写错影院坐标。
+     */
+    private ContentItem enrichCinema(ContentItem base, String cityCode) {
+        CinemaContent cinema = (CinemaContent) base;
+        if (cinema.longitude() != null && cinema.latitude() != null) {
+            return cinema;
+        }
+        long externalId;
+        try {
+            externalId = Long.parseLong(cinema.sourceCinemaId());
+        } catch (NumberFormatException exception) {
+            return cinema;
+        }
+        RawFetchResult detail = fetchCinemaDetailWithPolicy(externalId);
+        if (detail.payload() == null) {
+            return cinema;
+        }
+        return mapper.mapCinemaDetail(detail.payload(), cityCode)
+                .filter(value -> cinema.sourceCinemaId().equals(value.sourceCinemaId()))
+                .filter(value -> value.longitude() != null && value.latitude() != null)
+                .map(value -> new CinemaContent(cinema.sourceCinemaId(), cinema.name(), cinema.cityCode(),
+                        cinema.area(), cinema.address(), value.longitude(), value.latitude()))
+                .orElse(cinema);
     }
 
     /**
@@ -389,18 +448,26 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
      * 需要排查字段质量时，使用脱敏的数量和 dataTime，而不是扩大第三方内容的保存范围。</p>
      */
     private RawFetchResult fetchWithPolicy(ContentQuery query) {
+        return fetchWithPolicy(() -> rawClient.fetch(query));
+    }
+
+    private RawFetchResult fetchCinemaDetailWithPolicy(long cinemaId) {
+        return fetchWithPolicy(() -> rawClient.fetchCinemaDetail(cinemaId));
+    }
+
+    private RawFetchResult fetchWithPolicy(Supplier<JsonNode> request) {
         if (!allowRequest()) {
             return new RawFetchResult(null, Outcome.RATE_LIMITED, 429);
         }
         try {
-            return new RawFetchResult(rawClient.fetch(query), Outcome.SUCCESS, null);
+            return new RawFetchResult(request.get(), Outcome.SUCCESS, null);
         } catch (ResourceAccessException | RestClientResponseException exception) {
             if (!isRetryable(exception) || !allowRequest()) {
                 return failureOf(exception);
             }
             try {
                 Thread.sleep(properties.retryBackoff());
-                return new RawFetchResult(rawClient.fetch(query), Outcome.SUCCESS, null);
+                return new RawFetchResult(request.get(), Outcome.SUCCESS, null);
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 return new RawFetchResult(null, Outcome.CONNECTION_FAILED, null);
