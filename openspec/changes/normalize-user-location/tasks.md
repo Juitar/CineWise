@@ -22,3 +22,4 @@
 - [x] 4.1 D 已运行单元、上下文和全量验证；扫描确认本次代码不把精确坐标写入 DB、Redis、日志、URL、Agent Prompt、轨迹或 SSE。
 - [x] 4.2 D 已完成高德地点文本、路线和天气逆地理 HTTP Mock 验证；NetStart 坐标转城市及按用户位置查影院明确不做，因此不保留 NetStart Adapter 或其测试。
 - [x] 4.3 D 已执行 `backend/mvnw.cmd verify`、`openspec validate normalize-user-location --strict`、`git diff --check` 和 `git status`。
+- [x] 4.4 D 修复 `CinemaLocationQueryService`：仅允许 `LIVE` 影院资料提供路线、天气和附近餐饮位置；Demo 坐标和区域返回不可用，内容目录读取失败仍保留 303004，并以单元测试验证。

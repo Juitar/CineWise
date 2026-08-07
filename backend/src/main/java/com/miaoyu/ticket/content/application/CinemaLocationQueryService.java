@@ -2,6 +2,7 @@ package com.miaoyu.ticket.content.application;
 
 import com.miaoyu.ticket.content.domain.CinemaContent;
 import com.miaoyu.ticket.content.domain.ContentResourceType;
+import com.miaoyu.ticket.content.domain.ContentSourceType;
 import com.miaoyu.ticket.geo.domain.LocationGranularity;
 import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import java.util.Optional;
@@ -12,6 +13,9 @@ import org.springframework.stereotype.Service;
  *
  * <p>影院位置不是用户输入，因而不经过 UserLocationAdapter。该服务只使用内容模块公开查询服务，
  * 不向 travel、recommendation 或 Provider 暴露内容的 Entity、Mapper、Repository。</p>
+ *
+ * <p>路线、天气和附近餐饮会把坐标提交给地图 Provider，因此只能使用已同步的真实影院资料。
+ * Demo 目录仅供离线展示，不能因为有坐标就被当作真实影院位置。</p>
  */
 @Service
 public class CinemaLocationQueryService {
@@ -32,10 +36,7 @@ public class CinemaLocationQueryService {
         if (cinemaId <= 0) {
             return Optional.empty();
         }
-        return contentQueryService.query(new ContentQuery(ContentResourceType.CINEMA, cinemaId, null, null)).data()
-                .stream().map(CinemaContent.class::cast)
-                .filter(cinema -> cinemaId == cinema.cinemaId())
-                .findFirst()
+        return findLiveCinema(cinemaId)
                 .flatMap(cinema -> toPoint(cinema.longitude(), cinema.latitude()));
     }
 
@@ -48,9 +49,22 @@ public class CinemaLocationQueryService {
         if (cinemaId <= 0) {
             return Optional.empty();
         }
-        return contentQueryService.query(new ContentQuery(ContentResourceType.CINEMA, cinemaId, null, null)).data()
-                .stream().map(CinemaContent.class::cast)
-                .filter(cinema -> cinemaId == cinema.cinemaId()).map(CinemaContent::area).findFirst();
+        return findLiveCinema(cinemaId).map(CinemaContent::area);
+    }
+
+    /**
+     * 只从真实内容中找影院，避免通用查询在真实目录缺失时回退 Demo 后，静默把演示坐标交给地图服务。
+     * 真实缓存和真实快照都保留 LIVE 来源类型，因此可继续用于位置查询；内容整体不可用时仍由查询服务
+     * 抛出既有的 303004，不能伪装成“没有该影院”。
+     */
+    private Optional<CinemaContent> findLiveCinema(long cinemaId) {
+        ContentResult<java.util.List<? extends com.miaoyu.ticket.content.domain.ContentItem>> result =
+                contentQueryService.query(new ContentQuery(ContentResourceType.CINEMA, cinemaId, null, null));
+        if (result.source().type() != ContentSourceType.LIVE) {
+            return Optional.empty();
+        }
+        return result.data().stream().map(CinemaContent.class::cast)
+                .filter(cinema -> cinemaId == cinema.cinemaId()).findFirst();
     }
 
     private Optional<ResolvedGeoPoint> toPoint(java.math.BigDecimal longitude, java.math.BigDecimal latitude) {

@@ -68,7 +68,14 @@
 
 系统 MUST 通过 `CinemaLocationQueryService` 按 `cinemaId` 读取已确认的影院坐标。缺失或越界的影院坐标必须导致路线、天气或附近餐饮明确不可用，不能以地址猜测或使用 `0,0`。
 
+影院坐标和逆地理失败时允许使用的 `area`，都只允许来自 `source.type=LIVE` 的真实内容。通用内容查询回退到 Demo 时，即使 Demo 影院含有坐标或区域，系统 MUST 把该影院位置视为不可用；内容目录无法读取时仍必须返回 `303004`，不得伪装成空位置。
+
 #### Scenario: 影院坐标缺失
 
 - **WHEN** 影院详情没有合法经纬度
 - **THEN** 系统返回明确的不可用结果，不调用天气、路线或餐饮 Provider
+
+#### Scenario: 仅有 Demo 影院坐标
+
+- **WHEN** 真实影院目录缺失，内容查询回退到带合法坐标和区域的 Demo 影院
+- **THEN** `CinemaLocationQueryService` 不返回坐标或区域；路线、天气和附近餐饮不调用各自 Provider
