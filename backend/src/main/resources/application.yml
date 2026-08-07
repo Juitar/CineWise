@@ -99,6 +99,13 @@ cinewise:
       retry-backoff: 200ms
       sync-cities: ${CINEWISE_CONTENT_NETSTART_SYNC_CITIES:长沙}
   travel:
+    route:
+      amap:
+        enabled: ${AMAP_ROUTE_ENABLED:false}
+        key: ${AMAP_ROUTE_KEY:}
+        connect-timeout: 2s
+        read-timeout: 5s
+        result-ttl: 15m
     weather:
       amap:
         # 启用且 key 存在时才查询高德；key 仅从环境变量读取，禁止提交到仓库。
@@ -111,6 +118,9 @@ cinewise:
           "[滨江区]": "330108"
           "[拱墅区]": "330105"
           "[上城区]": "330102"
+        # 只有本地登记的城市名称才可作为区域缺失时的备用，不根据模糊地址猜测。
+        city-adcodes:
+          "[杭州市]": "330100"
     food:
       radius-default-meters: ${TRAVEL_FOOD_RADIUS_DEFAULT_METERS:1000}
       radius-min-meters: ${TRAVEL_FOOD_RADIUS_MIN_METERS:300}

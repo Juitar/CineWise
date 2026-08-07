@@ -84,6 +84,7 @@ public class TravelTaskApplicationService {
                 input.userId(),
                 input.orderId(),
                 input.showId(),
+                input.cinemaId(),
                 input.cinemaArea(),
                 input.startAt(),
                 input.startAt().minusHours(REMINDER_ADVANCE_HOURS),
@@ -133,6 +134,7 @@ public class TravelTaskApplicationService {
                 input.userId(),
                 input.orderId(),
                 input.showId(),
+                input.cinemaId(),
                 input.cinemaArea(),
                 input.startAt(),
                 input.startAt().minusHours(REMINDER_ADVANCE_HOURS),
@@ -169,6 +171,7 @@ public class TravelTaskApplicationService {
             long orderId,
             long showId,
             long userId,
+            long cinemaId,
             String cinemaArea,
             LocalDateTime startAt,
             long orderVersion) {
@@ -183,6 +186,7 @@ public class TravelTaskApplicationService {
                     parseBusinessId(event.orderId(), "orderId"),
                     parseBusinessId(event.showId(), "showId"),
                     parseBusinessId(event.userId(), "userId"),
+                    parseBusinessId(event.cinemaId(), "cinemaId"),
                     requiredText(event.cinemaArea(), "cinemaArea"),
                     Objects.requireNonNull(event.startAt(), "startAt 不能为空")
                             .atZoneSameInstant(ClockConfiguration.BUSINESS_ZONE_ID)
@@ -198,12 +202,11 @@ public class TravelTaskApplicationService {
         }
 
         private static long parseBusinessId(String value, String fieldName) {
+            if (value == null || !value.matches("[1-9][0-9]*")) {
+                throw new IllegalArgumentException(fieldName + " 必须是无空白和前导零的正十进制业务ID");
+            }
             try {
-                long parsed = Long.parseLong(requiredText(value, fieldName));
-                if (parsed <= 0) {
-                    throw new IllegalArgumentException(fieldName + " 必须是正整数");
-                }
-                return parsed;
+                return Long.parseLong(value);
             } catch (NumberFormatException exception) {
                 throw new IllegalArgumentException(fieldName + " 必须是十进制业务ID", exception);
             }
@@ -217,6 +220,7 @@ public class TravelTaskApplicationService {
             long orderId,
             long showId,
             long userId,
+            Long cinemaId,
             String cinemaArea,
             LocalDateTime startAt,
             long orderVersion) {
@@ -234,11 +238,23 @@ public class TravelTaskApplicationService {
                     PaymentTaskInput.parseBusinessId(event.orderId(), "orderId"),
                     PaymentTaskInput.parseBusinessId(event.showId(), "showId"),
                     PaymentTaskInput.parseBusinessId(event.userId(), "userId"),
+                    parseOptionalBusinessId(event.cinemaId()),
                     PaymentTaskInput.requiredText(event.cinemaArea(), "cinemaArea"),
                     Objects.requireNonNull(event.startAt(), "startAt 不能为空")
                             .atZoneSameInstant(ClockConfiguration.BUSINESS_ZONE_ID)
                             .toLocalDateTime(),
                     event.orderVersion());
+        }
+
+        private static Long parseOptionalBusinessId(String value) {
+            if (value == null || !value.matches("[1-9][0-9]*")) {
+                return null;
+            }
+            try {
+                return Long.parseLong(value);
+            } catch (NumberFormatException exception) {
+                return null;
+            }
         }
 
     }

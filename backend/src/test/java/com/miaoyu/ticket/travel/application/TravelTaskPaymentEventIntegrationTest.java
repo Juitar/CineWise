@@ -15,6 +15,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
@@ -25,9 +26,20 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 验证 D 只在发布事务提交后创建任务，且补偿与事件共用同一唯一任务。 */
-@ActiveProfiles("test")
-@SpringBootTest
+@EnabledIfEnvironmentVariable(named = "CINEWISE_MYSQL_TRAVEL_IT", matches = "true")
+@ActiveProfiles("dev")
+@SpringBootTest(properties = {
+    "spring.flyway.enabled=true",
+    "cinewise.seed.enabled=true",
+    "cinewise.seed.fixed-value=20260802",
+    "cinewise.transaction.expiry-job-enabled=false",
+    "cinewise.transaction.paid-travel-reconciliation.enabled=false",
+    "cinewise.transaction.refunded-travel-reconciliation.enabled=false",
+    "management.health.redis.enabled=false"
+})
 class TravelTaskPaymentEventIntegrationTest {
+
+    private static final String REQUIRED_DATABASE = "cinewise_ticketing_concurrency_check";
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;
@@ -58,6 +70,9 @@ class TravelTaskPaymentEventIntegrationTest {
 
     @BeforeEach
     void clearTravelTasks() {
+        assertThat(jdbcTemplate.queryForObject("SELECT DATABASE()", String.class))
+                .as("出行事件 MySQL 测试只允许操作隔离库")
+                .isEqualTo(REQUIRED_DATABASE);
         jdbcTemplate.update("DELETE FROM travel_notification_log");
         jdbcTemplate.update("DELETE FROM travel_advice_snapshot");
         jdbcTemplate.update("DELETE FROM travel_task");
@@ -74,6 +89,16 @@ class TravelTaskPaymentEventIntegrationTest {
         assertThat(compensated.status()).hasToString("PENDING");
         assertThat(compensated.orderVersion()).isEqualTo(5L);
         assertThat(triggerAtForOrder(88001L)).isEqualTo("2026-08-05 17:00:00");
+    }
+
+    @Test
+    void givenValidCinemaId_whenPaymentTaskCreated_thenPersistCinemaId() {
+        TravelTaskSummary task = travelTaskApplicationService.ensureTask(
+                paymentEvent("event-cinema-id", "88012", "44001"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT cinema_id FROM travel_task WHERE task_id = ?", Long.class, task.taskId()))
+                .isEqualTo(44001L);
     }
 
     @Test
@@ -122,6 +147,21 @@ class TravelTaskPaymentEventIntegrationTest {
 
         assertThat(paymentResult.status()).hasToString("CANCELLED");
         assertThat(countTasks()).isOne();
+    }
+
+    @Test
+    void givenInvalidCinemaIdOnEarlyRefund_whenCompensatedPaymentArrives_thenKeepNullTombstone() {
+        travelTaskApplicationService.ensureTaskCancelled(
+                invalidatedEvent("refund-invalid-cinema", "88013", 4L, "0"));
+
+        travelTaskApplicationService.ensureTask(paymentEvent(
+                "payment-after-invalid-refund", "88013", "44001"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT cinema_id FROM travel_task WHERE order_id = ?", Long.class, 88013L)).isNull();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM travel_task WHERE order_id = ?", String.class, 88013L))
+                .isEqualTo("CANCELLED");
     }
 
     @Test
@@ -191,7 +231,9 @@ class TravelTaskPaymentEventIntegrationTest {
         LocalDateTime futureStartAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID)
                 .plusDays(1);
         jdbcTemplate.update("UPDATE travel_task SET start_at = ? WHERE id = ?", futureStartAt, internalTaskId);
-        jdbcTemplate.update("UPDATE travel_task SET trigger_at = DATEADD('MINUTE', -1, CURRENT_TIMESTAMP) WHERE id = ?",
+        jdbcTemplate.update(
+                "UPDATE travel_task SET trigger_at = DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 MINUTE) "
+                        + "WHERE id = ?",
                 internalTaskId);
 
         travelReminderSchedulingService.runDueTasks();
@@ -218,7 +260,9 @@ class TravelTaskPaymentEventIntegrationTest {
         long elapsedId = jdbcTemplate.queryForObject(
                 "SELECT id FROM travel_task WHERE task_id = ?", Long.class, elapsed.taskId());
         travelAdviceService.generate(elapsedId);
-        jdbcTemplate.update("UPDATE travel_task SET start_at = DATEADD('HOUR', -3, CURRENT_TIMESTAMP) WHERE id = ?",
+        jdbcTemplate.update(
+                "UPDATE travel_task SET start_at = DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 3 HOUR) "
+                        + "WHERE id = ?",
                 elapsedId);
 
         travelReminderSchedulingService.runDueTasks();
@@ -250,11 +294,15 @@ class TravelTaskPaymentEventIntegrationTest {
     }
 
     private PaymentSucceededEvent paymentEvent(String eventId, String orderId) {
+        return paymentEvent(eventId, orderId, "44001");
+    }
+
+    private PaymentSucceededEvent paymentEvent(String eventId, String orderId, String cinemaId) {
         return new PaymentSucceededEvent(
                 eventId,
                 orderId,
                 "66001",
-                "44001",
+                cinemaId,
                 "55001",
                 "西湖区",
                 OffsetDateTime.parse("2026-08-05T19:00:00+08:00"),
@@ -263,11 +311,16 @@ class TravelTaskPaymentEventIntegrationTest {
     }
 
     private OrderInvalidated invalidatedEvent(String eventId, String orderId, long orderVersion) {
+        return invalidatedEvent(eventId, orderId, orderVersion, "44001");
+    }
+
+    private OrderInvalidated invalidatedEvent(
+            String eventId, String orderId, long orderVersion, String cinemaId) {
         return new OrderInvalidated(
                 eventId,
                 orderId,
                 "66001",
-                "44001",
+                cinemaId,
                 "55001",
                 "西湖区",
                 OffsetDateTime.parse("2026-08-05T19:00:00+08:00"),
@@ -289,7 +342,7 @@ class TravelTaskPaymentEventIntegrationTest {
 
     private String triggerAtForOrder(long orderId) {
         return jdbcTemplate.queryForObject(
-                "SELECT FORMATDATETIME(trigger_at, 'yyyy-MM-dd HH:mm:ss') FROM travel_task WHERE order_id = ?",
+                "SELECT DATE_FORMAT(trigger_at, '%Y-%m-%d %H:%i:%s') FROM travel_task WHERE order_id = ?",
                 String.class,
                 orderId);
     }

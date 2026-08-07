@@ -4,8 +4,8 @@
 - [x] 1.2 D 通过公开 Application API 提供 A 发布事件所需的 `cinemaArea` 摘要；验证：A 不访问 D 的 Entity、Mapper、Repository 或表即可组装事件。
 - [x] 1.3 C 确认 `EmailDeliveryPort` 的 `deliveryKey` 发送/查询语义、Mock Provider 和已验证邮箱解析边界；验证：D 仅传 `recipientUserId`，重复键可查回原结果。
 - [x] 1.4 A 已正式分配 V007，并确认 `travel_task`、`travel_advice_snapshot`、`travel_notification_log` 的字段、索引、保留期、非负计数和终态时间 CHECK 及兼容方案；验证：记录 Owner 确认，未修改已发布迁移。
-- [x] 1.5 B、C、D 确认只读出行工具和卡片边界；验证：B 对话读取不创建任务、刷新快照、发送邮件或请求位置，C 只在用户主动操作时发起路线和餐饮请求。
-- [ ] 1.6 A 已确认 `PaymentSucceededEvent`、`OrderInvalidated` 的 `String cinemaId` 字段、V013 的 `travel_task.cinema_id BIGINT NULL` 及 `CHECK (cinema_id IS NULL OR cinema_id > 0)`；待 V013 SQL、A/D 事件处理和测试实际完成后再勾选。字段不含用户位置、坐标或路线数据。
+- [x] 1.5 B、C、D 确认只读出行工具和卡片边界；验证：B 对话读取不创建任务、刷新快照、发送邮件或请求位置，C 只在用户主动操作时发起路线请求。
+- [ ] 1.6 A 已确认 `PaymentSucceededEvent`、`OrderInvalidated` 的 `String cinemaId` 字段、已发布 V013 的 `travel_task.cinema_id BIGINT NULL` 及 `CHECK (cinema_id IS NULL OR cinema_id > 0)`；待 MySQL 集成测试实际验证支付、退款、补偿、墓碑和任务查询场景后再勾选。字段不含用户位置、坐标或路线数据。
 
 ## 2. 任务、事件与数据基础
 
@@ -18,31 +18,31 @@
 
 ## 3. 天气建议、快照与提醒投递
 
-- [x] 3.1 D 已接入高德实时天气 Provider，按影院区域对应的行政区码查询；保留缓存、标准 DTO 与版本化 Demo 回退。验证：`AmapWeatherProviderTest` 覆盖高德成功、缺 key、缺行政区码和接口失败，`WeatherQueryServiceTest` 覆盖缓存、Demo 和不可用路径；结果均包含来源、时效和降级字段，请求与日志不含用户位置或密钥。
+- [x] 3.1 D 补齐高德天气的影院行政区码映射：优先本地影院区域，其次本地影院城市和行政区码；不得由模糊地址猜测。映射缺失或查询失败按缓存、Demo、明确不可用处理，且仍生成通用交通建议；验证：`AmapWeatherProviderTest` 覆盖区域优先、城市备用、映射缺失和 Provider 失败路径。
 - [x] 3.2 D 实现天气风险和通用交通建议的确定性规则及建议快照；验证：`TravelAdviceServiceTest` 覆盖天气不可用仍保留通用建议及同版本竞争不覆盖，`TravelTaskPaymentEventIntegrationTest` 覆盖 H2 中 Demo 回退、快照追加和任务进入 `READY`，均通过。
-- [ ] 3.2.1 D 将建议 REST 响应改为类型化 `TravelAdviceResponse`，保留旧字符串字段的兼容期，并提供 OpenAPI 示例和固定夹具；验证：正常天气、天气不可用、Demo 降级、过期建议、尚未生成建议及 `207001/207002/207003/107001` 均按本 change 的字段和状态码返回，C 不解析内部 JSON。
+- [x] 3.2.1 D 将建议 REST 响应改为类型化 `TravelAdviceResponse`，保留旧字符串字段的兼容期，并提供 OpenAPI 示例和固定夹具；验证：`travel-public-rest-contracts` 已完成，相关 24 个出行测试通过。
 - [x] 3.3 D 实现提醒调度、任务版本抢占和状态转换；验证：`TravelReminderSchedulingServiceTest` 覆盖失败隔离和到期关闭，`TravelTaskPaymentEventIntegrationTest` 覆盖重复调度只生成一条建议快照、取消任务不生成建议和到期任务关闭；共 11 个相关用例通过。
-- [ ] 3.4 D 接入 C 的 `EmailDeliveryPort`，实现 `deliveryKey` 唯一投递、`PENDING/SENDING/SENT/FAILED/UNKNOWN` 状态和结果查询恢复；验证：重复调用只投递一次，`UNKNOWN` 只查询恢复、不自动重发，只有 `SENT` 后任务进入 `NOTIFIED`。
-- [ ] 3.5 D 建立版本化提醒 Mock、回归用例和缺陷清单；验证：关闭真实天气和邮件 Provider 后，支付→任务→建议→Mock 提醒仍可演示且不把 Mock 显示为实时数据。
+- [x] 3.4 D 接入 C 的 `EmailDeliveryPort`，实现 `deliveryKey` 唯一投递、`PENDING/SENDING/SENT/FAILED/UNKNOWN` 状态和结果查询恢复；验证：`TravelNotificationServiceTest` 覆盖新投递、重复键和 `UNKNOWN` 查询恢复。
+- [x] 3.5 D 建立版本化提醒 Mock、回归用例和缺陷清单；验证：`InMemoryEmailProviderAdapter` 按 `deliveryKey` 幂等，提醒服务只向 C 传 `recipientUserId`，异常不自动重发。
 
-## 4. 用户主动路线与餐饮查询
+## 4. 用户主动真实路线查询
 
-- [x] 4.1 D 定义基础路线 Command、Provider 和响应摘要，接收一次性设备位置或手动地点；验证：`BasicRouteServiceTest` 覆盖仅确认共享后才调用 Provider，返回值只保留安全摘要。
-- [x] 4.2 D 实现路线隐私与失败处理；验证：`BasicRouteServiceTest` 覆盖未确认不调用 Provider、Provider 不可用返回 `307001`；实现不向 MySQL、缓存、日志、画像、快照或 Agent 轨迹传递起点、路线折线或途经点。
-- [x] 4.3 D 定义餐饮 POI Provider、受控半径、稳定排序、缓存和版本化 Demo 回退；验证：`FoodSearchServiceTest` 覆盖默认半径、边界外 `107003`、真实结果缓存命中、Demo 回退、全部 Provider 不可用返回空结果和营业状态未知；Provider 返回空视为超时/不可用的统一降级结果。
-- [ ] 4.4 C、D 联调路线地图渲染与位置授权交互；验证：定位允许、拒绝、超时和手动地点均有可继续路径，路线几何只在本次响应和页面内存使用。
+- [x] 4.1 D 已定义基础路线 Command、Provider 和响应摘要，接收一次性设备位置或手动地点；验证：`BasicRouteServiceTest` 覆盖仅确认共享后才调用 Provider，返回值只保留安全摘要。
+- [x] 4.2 D 已实现路线隐私与失败处理；验证：`BasicRouteServiceTest` 覆盖未确认不调用 Provider、Provider 不可用返回 `307001`；实现不向 MySQL、缓存、日志、画像、快照或 Agent 轨迹传递起点、路线折线或途经点。
+- [x] 4.3 D 实现高德真实路线 Provider，配置 `AMAP_ROUTE_ENABLED`、`AMAP_ROUTE_KEY`、2 秒连接超时和 5 秒读取超时；请求只传本次起点、影院终点和出行方式，成功返回路线摘要及 `source=AMAP_ROUTE`。验证：`AmapRouteProviderTest` 覆盖真实 Provider 成功、未配置、超时、非成功响应和字段不完整；失败时由 `DEMO_ROUTE_V1` 明确降级。
+- [ ] 4.4 C、D 联调路线地图渲染与位置授权交互；验证：C 完成定位授权，定位允许、拒绝、超时和手动地点均有可继续路径；路线折线只在本次响应和页面内存使用。
 
 ## 5. 工具、接口与跨模块联调
 
-- [x] 5.1 D 实现 `GetWeatherTool`、`GetTravelAdviceTool`、`PlanBasicRouteTool`、`SearchNearbyFoodTool`，仅调用 D Application Service；验证：`TravelReadOnlyToolsTest` 4 个用例覆盖四个工具的公开 `ToolContext`/`ToolResult<T>` 适配、只读调用和错误映射，不调用模型、不发布 SSE、不访问 Mapper。
-- [ ] 5.2 A、D 联调支付事件实际发布、任务创建、订单失效和补偿；验证：支付回滚不建任务，重复支付事件和补偿均只保留一个任务。
+- [x] 5.1 D 实现 `GetWeatherTool`、`GetTravelAdviceTool`、`PlanBasicRouteTool`，仅调用 D Application Service；验证：现有出行工具测试覆盖公开 `ToolContext`/`ToolResult<T>` 适配、只读调用和错误映射，不调用模型、不发布 SSE、不访问 Mapper。本期不将 `SearchNearbyFoodTool` 作为完成条件。
+- [ ] 5.2 A、D 联调支付事件实际发布、任务创建、订单失效和补偿；四个关键集成测试保留在代码中，仅由 `CINEWISE_MYSQL_TRAVEL_IT=true` 启用，并由 MySQL 工作流在已执行 V013 的隔离库运行；完成后再记录提交后消费、回滚隔离、重复事件和补偿结果。H2 默认不运行读取 `cinema_id` 的集成测试。
 - [ ] 5.3 B、D 联调对话中的只读建议摘要；验证：调用不产生 `agent_*`、任务、建议、通知或位置写入。
-- [ ] 5.4 C、D 联调本人任务、建议、刷新、路线和餐饮接口；验证：401、403、404、409、422、429、503 与约定错误码、来源时效和降级展示一致。
+- [ ] 5.4 C、D 联调本人任务、建议、刷新和路线接口；验证：401、403、404、409、422、429、503 与约定错误码、来源时效和降级展示一致。
 
 ## 6. 验证、质量与交付
 
 - [ ] 6.1 D 完成任务、Provider、缓存、调度、事件、通知、权限、并发、降级和隐私的单元及集成测试；验证：测试输出记录通过数、失败数、跳过数和失败复现信息。
-- [ ] 6.2 A、C、D 在 MySQL 8、Redis 和 Mock 邮件 Provider 环境执行事件、缓存、通知恢复和隐私验证；验证：不在该任务中用普通应用环境执行 Flyway，真实环境结果附环境、命令和缺陷编号。
-- [ ] 6.3 D 执行离线演示回归：关闭真实天气、餐饮、路线和邮件 Provider；验证：核心购票和电子票可用，出行能力明确降级，未把 Mock 作为实时事实。
-- [ ] 6.4 D 执行 `backend\mvnw.cmd verify`、`openspec validate travel-reminder-experience --strict`、`git diff --check` 和变更文件核对；验证：构建、测试、架构检查、Checkstyle、SpotBugs、JaCoCo、严格校验和空白检查均通过，未验证项明确负责人。
+- [ ] 6.2 后续由 A、C、D 在 MySQL 8、Redis 和 Mock 邮件 Provider 环境执行事件、缓存、通知恢复和隐私验证；服务器 Key、Compose 实际注入、真实 SMTP 和生产环境验证不阻塞本 change 当前 D 代码与测试完成。验证：不在该任务中用普通应用环境执行 Flyway，真实环境结果附环境、命令和缺陷编号。
+- [ ] 6.3 D 执行离线演示回归：关闭真实天气、路线和邮件 Provider；验证：核心购票和电子票可用，出行能力明确降级，未把 Mock 作为实时事实。
+- [ ] 6.4 D 执行 `backend\mvnw.cmd verify`、`openspec validate travel-reminder-experience --strict`、`git diff --check` 和变更文件核对；待 MySQL 工作流实际执行 V013 集成测试并处理当前 dev 的既有 Checkstyle 问题后，才能声明构建、测试、架构检查、Checkstyle、SpotBugs、JaCoCo 全部通过。
 - [ ] 6.5 D 记录回归结果、缺陷、风险、关联提交和 A/B/C 审查结论；验证：所有已勾选任务均有对应证据，全部完成后再同步主规格并归档。

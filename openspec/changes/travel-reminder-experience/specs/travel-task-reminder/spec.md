@@ -171,7 +171,7 @@ A 分配 Flyway 版本后，迁移 MUST 为 `travel_task.order_version`、`trave
 
 #### Scenario: 跨用户查询任务
 - **GIVEN** 当前用户不是任务所有者
-- **WHEN** 用户查询任务、建议、路线或餐饮
+- **WHEN** 用户查询任务、建议或路线
 - **THEN** 系统拒绝访问且不泄露任务是否存在
 
 #### Scenario: 对话读取建议摘要
