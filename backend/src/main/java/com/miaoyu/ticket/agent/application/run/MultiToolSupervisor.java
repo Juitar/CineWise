@@ -77,8 +77,7 @@ public final class MultiToolSupervisor {
         MultiToolSupervisorRequest supervisorRequest = Objects.requireNonNull(request, "请求不能为空");
         AgentIntent intent = modelGateway.classifyIntent(new IntentClassificationRequest(supervisorRequest.input()));
         Set<String> allowedToolNames = allowedToolNames(intent, supervisorRequest.validationContext());
-        // 旧测试替身未实现新增端口时 Mockito 返回 null；生产实现绝不会返回 null。
-        if (intent != null && allowedToolNames.isEmpty()) {
+        if (allowedToolNames.isEmpty()) {
             // 普通会话没有可信 travelTaskId 来源；TRAVEL 也只能走安全文本，不能追问内部任务号。
             var emptyPlan = new com.miaoyu.ticket.agent.domain.plan.CandidatePlan(
                     UUID.randomUUID().toString(), 1, List.of());
@@ -259,10 +258,14 @@ public final class MultiToolSupervisor {
         }
     }
 
+    /** 普通文本不能携带内部标识或服务端路径；命中后必须完全改为固定安全文案。 */
     private static boolean isSafeGeneralText(String text) {
         String normalized = text == null ? "" : text.toLowerCase(Locale.ROOT);
-        return !normalized.contains("traveltaskid") && !normalized.contains("runid")
-                && !normalized.contains("actionid") && !normalized.contains("/api/");
+        return Set.of(
+                "traveltaskid", "userid", "runid", "actionid", "planid", "showid", "movieid",
+                "cinemaid", "taskid", "orderid", "seatid", "ticketid", "refundid", "database id",
+                "数据库id", "/api/", "http://", "https://", "controller", "repository", "mapper")
+                .stream().noneMatch(normalized::contains);
     }
 
     private static com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse safeGeneralChatReply() {
@@ -274,8 +277,8 @@ public final class MultiToolSupervisor {
     private Set<String> allowedToolNames(
             AgentIntent intent, com.miaoyu.ticket.agent.domain.plan.PlanValidationContext context) {
         if (intent == null) {
-            // 仅兼容未覆盖新端口的测试替身；真实网关的异常必须显式返回 GENERAL_CHAT。
-            return toolRegistry.definitions().keySet();
+            // 空结果属于不确定分类，不能因为注册表里存在 Tool 就扩大本轮可见范围。
+            return Set.of();
         }
         if (intent == AgentIntent.MOVIE) {
             return allowedMovieToolNames();
