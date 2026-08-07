@@ -114,10 +114,10 @@ V017 的验收场景包括：首次授权创建唯一同意记录；并发或重
 
 ## Risks / Trade-offs
 
-- B 尚未交付长期偏好确认入口：先实现手工标签和受控内部 Command，B 对接作为独立确认任务。
+- B 已确认长期对话偏好写入不在本期范围；本期只保留画像摘要预取和已确认方案反馈，后续长期写入由 B 单独建 change。
 - C 的画像页面可能仍是静态页面：先以 REST/OpenAPI 和 Mock 夹具交付，页面接入由 C 确认后完成。
 - 用户行为与推荐记录的实际来源尚未全部接通：先通过类型化内部入口和测试夹具验证，不能伪造生产行为。
-- B 已确认稳定 `planId` 和 `ProfileBehaviorRecorder` 调用边界；实际接入仍等待 B 的 `agent-plan-feedback-events` change，D 在此之前不接收 `ACCEPT_PLAN/REJECT_PLAN` 生产写入。
+- B 已通过 PR #130 接入稳定 `planId`、画像摘要预取和已确认方案反馈；D 的 `recordPlanAccepted/recordPlanRejected` 仅作为同一 JVM 内的 Application API 使用，不新增 HTTP、SSE 或工具注册。
 - 总设计与画像设计的标签类型、来源名称不一致：先确认唯一枚举和兼容规则，再写表约束、DTO 与消费者夹具。
 - 总设计要求 Idempotency-Key 重放原响应，但原三表没有保存写请求结果：以 `profile_write_request` 补足；若 A/C 不接受新增表，必须共同给出同等可靠的持久化恢复方案。
 - C 的同意查询和撤回可靠通知尚未实现；D 的生产代码必须在其缺失时按未同意拒绝写入。
@@ -136,7 +136,7 @@ V017 的验收场景包括：首次授权创建唯一同意记录；并发或重
 - C、D 已确认画像页面不新增专门的同意状态 REST。个人数据同意由 C 的认证/隐私设置管理；D 的画像页面仅按画像 REST 的成功结果或 `202004` 渲染，不能把个性化开关当成同意状态。
 - C 已按 A 分配的 `V017` 完成私有 SQL 草案和字段、版本、状态、重试、保留规则记录，详见“7.1 C 的同意记录和撤回事件投递迁移”。下一步仅等待 A 静态审查；未获 MySQL 验证授权前不得执行 SQL。
 - A：已确认四表范围、正式版本 V010、D 创建 SQL 草案/A 静态审查与授权验证的职责、UTC 时间规则、`profile_write_request` 的唯一键/字段/30 天保留期/无 `PROCESSING` 规则，以及 `PaymentSucceededEvent` 的最小使用字段。
-- B：已确认 `GetProfileSummaryTool` 通过 D 的 `CurrentUserAccessor` 取得认证用户，并确认 `ProfileBehaviorRecorder`、服务端 UUID `planId`、重放和不调用边界；实际接入由 B 的 `agent-plan-feedback-events` change 完成。
+- B：已确认 `GetProfileSummaryTool` 通过 D 的 `CurrentUserAccessor` 取得认证用户，并已在 PR #130 接入服务端 UUID `planId`、摘要预取及方案反馈；长期对话偏好写入不在本期范围。
 - C：已确认 `ProfileDataConsentQuery`、`ProfileDataConsentWithdrawnEvent`、未同意 HTTP 403 / `202004 PROFILE_DATA_CONSENT_REQUIRED`、撤回通知重试和关闭个性化后的不采集规则；接口和可靠通知尚未实现。
 - C：当前版本取消账户删除；D 不实现任何账户删除通知或账户删除清理任务。仍请确认 `CurrentUserAccessor` 可用于画像 REST，以及前端对 202001、202002、202003、202004 的展示方式。
 - D：已确认 `DIALOG -> CONVERSATION`、`ORDER -> BEHAVIOR`、`GENRE -> MOVIE_GENRE`，以及六种标签类型、三种来源、四种状态、两种极性、六种行为和三种目标类型；B 已确认稳定 UUID `planId` 的来源和格式。

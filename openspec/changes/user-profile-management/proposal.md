@@ -25,7 +25,7 @@
 
 - D：新增 `profile` 的 api/application/domain/infrastructure 分层、缓存、定时过期处理和测试。
 - A：审核 D 的 V010 草案，并在明确授权后在隔离 MySQL 验证四张画像表迁移。
-- B：确认 `GetProfileSummaryTool` 的注册、`ToolContext` 身份注入，以及“仅用户确认后才写长期对话偏好”的调用边界。
+- B：本期通过 `ToolContext` 预取 `GetProfileSummaryTool`，并在确认动作最终保存后调用方案接受/拒绝反馈；长期对话偏好写入不在本期范围。
 - C：确认 `CurrentUserAccessor` 的接入方式，并在后续单独任务中对接画像页面、版本冲突提示和 API 类型。
 - 推荐：D 将 `ProfileSummary` 作为可选特征接入确定性评分，并记录本次是否使用画像及使用的标签证据；本轮明确要求仍优先。
 

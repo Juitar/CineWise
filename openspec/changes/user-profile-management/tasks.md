@@ -26,7 +26,7 @@
 ## 4. 推荐与前端协作
 
 - [x] 4.1 D 已为推荐模块接入受控 `ProfileSummary`、`profileApplied` 和最小化采用标签证据；当前请求明确影院始终优先，只有画像中同样偏好的影院才记录采用证据。验证：固定推荐回归不因无画像改变，`FixedRecommendationQueryServiceTest` 覆盖匹配影院画像的最小证据返回。
-- [ ] 4.2 B、D 联调确认后的对话标签写入与只读摘要查询；验证：未确认对话不落库，已确认标签可被摘要读取，且没有 Agent 运行或 SSE 写入。
+- [x] 4.2 B、D 联调画像摘要预取与已确认方案反馈；本期不接入长期对话偏好写入。验证：`GetProfileSummaryTool.execute(ToolContext)` 在 Agent 计划前内部预取，不注册为模型工具；`AgentConfirmationService` 仅在确认动作最终保存后调用 `recordPlanAccepted/recordPlanRejected`，不新增 Agent 运行或 SSE。`AgentConfirmationServiceTest`、`MultiToolSupervisorTest`、`AgentToolConfigurationTest` 与 `ProfileBehaviorRecorderTest` 共 28 项通过。
 - [ ] 4.3 C、D 联调画像 REST、开关、标签编辑和版本冲突展示；验证：401、404、409、400 及六位数错误码、刷新最新数据和关闭后的页面状态一致。
 
 ## 5. 验证与交付
