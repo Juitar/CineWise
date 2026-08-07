@@ -24,9 +24,9 @@ import org.springframework.test.context.ActiveProfiles;
  */
 @ActiveProfiles("test")
 @SpringBootTest(properties = {
-    "spring.data.redis.host=${REDIS_HOST:127.0.0.1}",
-    "spring.data.redis.port=${REDIS_PORT:16379}",
-    "spring.data.redis.password=${REDIS_PASSWORD:}"
+    "spring.data.redis.host=${SPRING_DATA_REDIS_HOST:127.0.0.1}",
+    "spring.data.redis.port=${SPRING_DATA_REDIS_PORT:16379}",
+    "spring.data.redis.password=${SPRING_DATA_REDIS_PASSWORD:}"
 })
 @EnabledIfEnvironmentVariable(named = "REDIS_INTEGRATION_ENABLED", matches = "true")
 class RedisProfileSummaryCacheIntegrationTest {
