@@ -7,5 +7,5 @@ import java.time.LocalDateTime;
  *
  * <p>影院名称和区域仍由内容模块提供；本 DTO 只承载 A 权威拥有的场次关联与时间事实。</p>
  */
-public record ShowContextView(long showId, long cinemaId, LocalDateTime startTime) {
+public record ShowContextView(long showId, Long movieId, long cinemaId, LocalDateTime startTime) {
 }

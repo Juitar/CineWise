@@ -325,6 +325,7 @@ class TravelTaskPaymentEventIntegrationTest {
                 eventId,
                 orderId,
                 "66001",
+                "77001",
                 cinemaId,
                 "55001",
                 "西湖区",

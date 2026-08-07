@@ -89,7 +89,7 @@ class ProfileBehaviorMySqlIntegrationTest {
     @Test
     void shouldPersistPaidOrderAsShowEvidenceAndDeduplicatePaymentEvent() {
         PaymentSucceededEvent event = new PaymentSucceededEvent(
-                PAYMENT_EVENT_ID, "9807000001", "9807000002", "9807000003",
+                PAYMENT_EVENT_ID, "9807000001", "9807000002", "9807000004", "9807000003",
                 Long.toString(TEST_USER_ID), "测试区域", OffsetDateTime.parse("2026-08-07T09:00:00+08:00"),
                 1L, OffsetDateTime.parse("2026-08-07T09:00:00+08:00"));
 

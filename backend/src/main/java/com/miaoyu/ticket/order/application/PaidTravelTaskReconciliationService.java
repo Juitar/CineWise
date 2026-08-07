@@ -152,6 +152,7 @@ public class PaidTravelTaskReconciliationService {
                 UUID.randomUUID().toString(),
                 Long.toString(order.orderId()),
                 Long.toString(order.showId()),
+                context.movieId() == null ? null : Long.toString(context.movieId()),
                 Long.toString(context.cinemaId()),
                 Long.toString(order.userId()),
                 context.cinemaArea(),

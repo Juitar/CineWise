@@ -18,7 +18,7 @@ public interface ShowQueryRepository {
     /** 查询座位图头部及场次售卖状态，不存在时返回空。 */
     Optional<ShowSeatHeader> findShowSeatHeader(long showId);
 
-    /** 支付成功事件只读取影院和开场时间，不携带库存或内容模块字段。 */
+    /** 支付成功事件读取A权威的电影、影院关联和开场时间，不携带库存或D内容字段。 */
     Optional<ShowContext> findShowContext(long showId);
 
     /** 按稳定行号、座号顺序查询场次的全部座位。 */
@@ -78,7 +78,7 @@ public interface ShowQueryRepository {
      * 跨订单用例复用的最小权威场次上下文。
      * 影院名称和区域不在该投影中，避免A把D的内容事实复制成第二份权威数据。
      */
-    record ShowContext(long showId, long cinemaId, LocalDateTime startTime) {
+    record ShowContext(long showId, Long movieId, long cinemaId, LocalDateTime startTime) {
     }
 
     record SeatSnapshot(

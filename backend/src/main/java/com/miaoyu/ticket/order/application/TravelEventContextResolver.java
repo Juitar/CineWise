@@ -58,6 +58,7 @@ public class TravelEventContextResolver {
         }
         return Optional.of(new TravelEventContext(
                 show.showId(),
+                show.movieId(),
                 show.cinemaId(),
                 cinema.area().trim(),
                 show.startTime()));
@@ -76,7 +77,12 @@ public class TravelEventContextResolver {
      * showId用于在锁单后再次核对上下文归属；cinemaId保持A权威场次关联，避免预查询结果被错误绑定
      * 到另一场次或由内容模块推测影院ID。
      */
-    public record TravelEventContext(long showId, long cinemaId, String cinemaArea, LocalDateTime startAt) {
+    public record TravelEventContext(
+            long showId,
+            Long movieId,
+            long cinemaId,
+            String cinemaArea,
+            LocalDateTime startAt) {
 
         public TravelEventContext {
             if (showId <= 0 || cinemaId <= 0) {
