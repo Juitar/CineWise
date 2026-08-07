@@ -33,9 +33,11 @@ public interface ExternalShowtimeQueryPort {
      *
      * <p>降级和质量字段放在候选本身，避免 A 只取列表元素时丢失导入判断依据。</p>
      */
-    record QueryResult(List<ExternalShowtimeSnapshot> snapshots, boolean truncated) {
+    record QueryResult(List<ExternalShowtimeSnapshot> snapshots, List<ExternalShowtimeSnapshot> rejectedSnapshots,
+                       boolean truncated) {
         public QueryResult {
             snapshots = List.copyOf(snapshots);
+            rejectedSnapshots = List.copyOf(rejectedSnapshots);
         }
     }
 
@@ -45,8 +47,8 @@ public interface ExternalShowtimeQueryPort {
     /** 外部标价只是参考，A 不能直接把它当成本地票价。 */
     enum PriceSemantic { REFERENCE_ONLY }
 
-    /** A 只能导入 ACCEPTED 候选；其他状态预留给后续逐条隔离结果，不以空字段表达原因。 */
-    enum QualityStatus { ACCEPTED }
+    /** A 只能导入 ACCEPTED 候选；隔离原因必须显式返回，不能静默丢弃。 */
+    enum QualityStatus { ACCEPTED, IDENTITY_REJECTED, END_TIME_REJECTED, TIME_REJECTED }
 
     /**
      * 外部场次幂等身份。
@@ -59,12 +61,13 @@ public interface ExternalShowtimeQueryPort {
     /**
      * 已映射且通过字段质量校验的候选。
      *
-     * <p>时间均为 Asia/Shanghai 带偏移时间；NetStart 没有可靠散场时间时 endTime 为空，A 不得自行推算。</p>
+     * <p>时间均为 Asia/Shanghai 带偏移时间；只有 endTime 非空且晚于 startTime 的 ACCEPTED 候选可供 A 导入。</p>
      */
     record ExternalShowtimeSnapshot(String source, String externalShowId, String externalMovieId,
                                    String externalCinemaId, Long movieId, Long cinemaId,
                                    OffsetDateTime startTime, OffsetDateTime endTime, BigDecimal listedPrice,
                                    PriceSemantic priceSemantic, OffsetDateTime dataAt, OffsetDateTime expiresAt,
                                    boolean isExpired, boolean degraded, FallbackType fallbackType,
-                                   QualityStatus qualityStatus, ExternalShowtimeKey externalShowtimeKey) { }
+                                   QualityStatus qualityStatus, Integer rejectionCode,
+                                   ExternalShowtimeKey externalShowtimeKey) { }
 }

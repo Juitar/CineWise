@@ -8,6 +8,6 @@
 - `openspec validate real-showtime-integration --strict` 和 `git diff --check` 通过。
 - `mvnw -DskipTests checkstyle:check` 仍被 dev 基线既有的 `ContentSyncService.java:219` 长行阻断；排期新增源文件没有 Checkstyle 长行错误。
 - 全量 `mvnw verify` 的既有失败来自 dev 基线 Agent 测试和上述旧 Checkstyle 问题，未发现排期定向测试失败。
-- 按 D 技能的统计口径，新增排期源文件的中文注释比例目前未全部达到 30%；这属于代码收尾项，不能宣称已完成。
+- 按 D 技能的统计口径，新增排期源文件的中文注释比例均达到 30% 以上；已重新统计并完成收尾。
 - 2026-08-07 在独立的 `origin/dev` 工作树运行 `MinimalReadOnlyAgentServiceTest,RankMoviePlanExecutionAdapterTest`，同样得到 3 个失败：两个 `MinimalReadOnlyAgentServiceTest` 和一个 `RankMoviePlanExecutionAdapterTest`。该结果复现了 PR CI 失败，证明不是本 change 引入；本 PR 的排期定向测试保持通过。
 - A 已确认：只导入 `ACCEPTED`、未过期、非降级、无回退且 `endTime > startTime` 的候选；本地价格由 A 配置，外部价格变化不得覆盖本地场次或订单；`QueryResult` 需要 `truncated`，候选按三元幂等键去重并限制 200 条。

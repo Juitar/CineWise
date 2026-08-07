@@ -50,6 +50,20 @@
 
 系统 SHALL 将开场和散场时间转换为 `Asia/Shanghai` 的带偏移 ISO 8601 时间。每条候选必须返回 `source`、`dataAt`、`expiresAt`、`isExpired`、`degraded` 和 `fallbackType`。`endTime` 不晚于 `startTime`、时间无法解析或超过已确认未来窗口的记录必须隔离。
 
+#### Scenario: Provider 没有可靠散场时间
+
+- **GIVEN** Provider 只提供开场时间或散场时间不晚于开场时间
+- **WHEN** D 标准化该排期
+- **THEN** D 将该条返回到 `rejectedSnapshots` 并标记 `qualityStatus=END_TIME_REJECTED`
+- **AND** 不把该条放入 `snapshots`，A 无法将其导入本地场次
+
+#### Scenario: 影片或影院身份无法解析
+
+- **GIVEN** 影片或影院缺少 ACTIVE 映射、映射存在歧义或已经失效
+- **WHEN** D 标准化该排期
+- **THEN** D 将该条返回到 `rejectedSnapshots`，并带 `IDENTITY_REJECTED` 与 `303005`、`303006` 或 `303007`
+- **AND** 其他合格候选仍可继续返回
+
 #### Scenario: Provider 不可用但存在未过期快照
 
 - **GIVEN** Provider 因限流、超时、断网或 5xx 不可用，且存在未过期的已映射快照

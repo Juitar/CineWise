@@ -94,7 +94,7 @@ class ExternalShowtimeSnapshotMySqlIntegrationTest {
                 "NETSTART_MAOYAN", showId, "movie-mysql-it", "cinema-mysql-it", 9_400_101L, 9_400_021L,
                 DATA_AT.plusHours(2), null, new BigDecimal("36.00"),
                 ExternalShowtimeQueryPort.PriceSemantic.REFERENCE_ONLY, DATA_AT, expiresAt, false, false, null,
-                ExternalShowtimeQueryPort.QualityStatus.ACCEPTED,
+                ExternalShowtimeQueryPort.QualityStatus.ACCEPTED, null,
                 new ExternalShowtimeQueryPort.ExternalShowtimeKey("NETSTART_MAOYAN", "cinema-mysql-it", showId))),
                 DATA_AT, expiresAt);
     }

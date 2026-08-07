@@ -25,7 +25,8 @@ class ExternalShowtimeQueryServiceTest {
         MemorySnapshots snapshots = new MemorySnapshots();
         ExternalShowtimeQueryService service = service(new ExternalShowtimeProvider.FetchResult(List.of(
                 new ExternalShowtimeProvider.Candidate("s1", "m1", "c1",
-                        OffsetDateTime.parse("2026-08-07T11:00:00+08:00"), new BigDecimal("36"))), null), snapshots);
+                        OffsetDateTime.parse("2026-08-07T11:00:00+08:00"),
+                        OffsetDateTime.parse("2026-08-07T13:00:00+08:00"), new BigDecimal("36"))), null), snapshots);
 
         ExternalShowtimeQueryPort.QueryResult result = service.query(
                 new ExternalShowtimeQueryPort.Query(DATE, List.of(21L)));
@@ -92,7 +93,8 @@ class ExternalShowtimeQueryServiceTest {
         ExternalShowtimeQueryService service = new ExternalShowtimeQueryService(
                 (date, cinemas) -> new ExternalShowtimeProvider.FetchResult(List.of(
                         new ExternalShowtimeProvider.Candidate(
-                        "s1", "unknown", "c1", OffsetDateTime.parse("2026-08-07T11:00:00+08:00"), null)), null),
+                        "s1", "unknown", "c1", OffsetDateTime.parse("2026-08-07T11:00:00+08:00"),
+                        OffsetDateTime.parse("2026-08-07T13:00:00+08:00"), null)), null),
                 (provider, type, ids) -> List.of(
                         new ContentExternalIdentityLookupPort.ExternalIdentity(21L, "c1", "70")),
                 new ContentIdentityResolutionService((provider, type, ids) ->
@@ -100,7 +102,13 @@ class ExternalShowtimeQueryServiceTest {
                         ids.stream().map(id -> new ContentIdentityResolutionPort.Resolution(id, null,
                         ContentIdentityResolutionPort.ResolutionStatus.NOT_FOUND)).toList())), snapshots, CLOCK);
 
-        assertThat(service.query(new ExternalShowtimeQueryPort.Query(DATE, List.of(21L))).snapshots()).isEmpty();
+        ExternalShowtimeQueryPort.QueryResult result = service.query(
+                new ExternalShowtimeQueryPort.Query(DATE, List.of(21L)));
+        assertThat(result.snapshots()).isEmpty();
+        assertThat(result.rejectedSnapshots()).singleElement().satisfies(snapshot -> {
+            assertThat(snapshot.qualityStatus()).isEqualTo(ExternalShowtimeQueryPort.QualityStatus.IDENTITY_REJECTED);
+            assertThat(snapshot.rejectionCode()).isEqualTo(303005);
+        });
     }
 
     @Test
@@ -132,6 +140,7 @@ class ExternalShowtimeQueryServiceTest {
                 OffsetDateTime.parse("2026-08-07T09:00:00+08:00"),
                 OffsetDateTime.parse("2026-08-07T09:10:00+08:00"), false, false, null,
                 ExternalShowtimeQueryPort.QualityStatus.ACCEPTED,
+                null,
                 new ExternalShowtimeQueryPort.ExternalShowtimeKey("NETSTART_MAOYAN", "c1", "s1"));
     }
 

@@ -116,14 +116,14 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
     public QueryResult query(Query query) {
         validate(query);
         if (query.cinemaIds().isEmpty()) {
-            return new QueryResult(List.of(), false);
+            return new QueryResult(List.of(), List.of(), false);
         }
         List<Long> cinemaIds = distinctCinemaIds(query.cinemaIds());
         Map<String, ContentExternalIdentityLookupPort.ExternalIdentity> localCinemaIds =
                 resolveExternalCinemas(cinemaIds);
         if (localCinemaIds.isEmpty()) {
             // 没有 ACTIVE 外部影院映射是正常的本地资料缺失，不应该访问 Provider 或报成上游故障。
-            return new QueryResult(List.of(), false);
+            return new QueryResult(List.of(), List.of(), false);
         }
         List<ExternalShowtimeProvider.ExternalCinema> externalCinemas = localCinemaIds.values().stream()
                 .filter(identity -> identity.providerCityId() != null && !identity.providerCityId().isBlank())
@@ -131,19 +131,19 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
                         identity.externalId(), identity.providerCityId()))
                 .toList();
         if (externalCinemas.isEmpty()) {
-            return new QueryResult(List.of(), false);
+            return new QueryResult(List.of(), List.of(), false);
         }
         ExternalShowtimeProvider.FetchResult fetched = provider.fetch(query.showDate(), externalCinemas);
         if (!fetched.available()) {
             return fallback(query.showDate(), cinemaIds);
         }
         OffsetDateTime dataAt = OffsetDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
-        List<ExternalShowtimeSnapshot> accepted = mapAccepted(fetched.candidates(), localCinemaIds, dataAt);
-        OffsetDateTime expiresAt = accepted.stream().map(ExternalShowtimeSnapshot::expiresAt)
+        CandidateMapping mapped = mapCandidates(fetched.candidates(), localCinemaIds, dataAt);
+        OffsetDateTime expiresAt = mapped.accepted().stream().map(ExternalShowtimeSnapshot::expiresAt)
                 .min(OffsetDateTime::compareTo).orElse(dataAt.plusMinutes(10));
         snapshotPort.save(query.showDate(), cinemaIds,
-                new ExternalShowtimeSnapshotPort.Snapshot(accepted, dataAt, expiresAt));
-        return limitAndMark(accepted);
+                new ExternalShowtimeSnapshotPort.Snapshot(mapped.accepted(), dataAt, expiresAt));
+        return limitAndMark(mapped);
     }
 
     private QueryResult fallback(LocalDate showDate, List<Long> cinemaIds) {
@@ -152,11 +152,11 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
         return snapshotPort.find(showDate, cinemaIds)
                 .filter(snapshot -> snapshot.expiresAt().isAfter(now))
                 .map(snapshot -> new QueryResult(snapshot.snapshots().stream()
-                        .map(this::asSnapshotFallback).toList(), false))
+                        .map(this::asSnapshotFallback).toList(), List.of(), false))
                 .orElseThrow(() -> new BusinessException(ShowtimeErrorCode.PROVIDER_UNAVAILABLE));
     }
 
-    private List<ExternalShowtimeSnapshot> mapAccepted(List<ExternalShowtimeProvider.Candidate> candidates,
+    private CandidateMapping mapCandidates(List<ExternalShowtimeProvider.Candidate> candidates,
                                                         Map<String, ContentExternalIdentityLookupPort.ExternalIdentity>
                                                                 localCinemaIds,
                                                         OffsetDateTime dataAt) {
@@ -164,44 +164,68 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
         List<String> movieExternalIds = candidates.stream().map(ExternalShowtimeProvider.Candidate::externalMovieId)
                 .filter(Objects::nonNull).distinct().toList();
         if (movieExternalIds.isEmpty()) {
-            return List.of();
+            return new CandidateMapping(List.of(), List.of());
         }
         ContentIdentityResolutionPort.ResolutionBatch resolutions = identityResolutionService.resolve(PROVIDER,
                 ContentResourceType.MOVIE, movieExternalIds);
-        Map<String, Long> movieIds = new LinkedHashMap<>();
+        Map<String, ContentIdentityResolutionPort.Resolution> movieResolutions = new LinkedHashMap<>();
         for (ContentIdentityResolutionPort.Resolution resolution : resolutions.results()) {
-            if (resolution.status() == ContentIdentityResolutionPort.ResolutionStatus.RESOLVED) {
-                movieIds.put(resolution.externalId(), resolution.internalContentId());
-            }
+            movieResolutions.put(resolution.externalId(), resolution);
         }
         Map<ExternalShowtimeKey, ExternalShowtimeSnapshot> accepted = new LinkedHashMap<>();
+        List<ExternalShowtimeSnapshot> rejected = new ArrayList<>();
         for (ExternalShowtimeProvider.Candidate candidate : candidates) {
-            Long movieId = movieIds.get(candidate.externalMovieId());
+            ContentIdentityResolutionPort.Resolution movieResolution =
+                    movieResolutions.get(candidate.externalMovieId());
+            Long movieId = movieResolution != null && movieResolution.status()
+                    == ContentIdentityResolutionPort.ResolutionStatus.RESOLVED
+                    ? movieResolution.internalContentId() : null;
             ContentExternalIdentityLookupPort.ExternalIdentity cinemaIdentity =
                     localCinemaIds.get(candidate.externalCinemaId());
             Long cinemaId = cinemaIdentity == null ? null : cinemaIdentity.contentId();
-            // 不以名称补齐映射，也不允许已经开场或无开始时间的候选进入公开 DTO。
-            if (movieId == null || cinemaId == null || candidate.startTime() == null
-                    || !candidate.startTime().isAfter(dataAt)) {
+            ExternalShowtimeKey key = new ExternalShowtimeKey(PROVIDER, candidate.externalCinemaId(),
+                    candidate.externalShowId());
+            if (movieId == null || cinemaId == null) {
+                int code = movieResolution == null ? 303005 : movieResolution.errorCode();
+                rejected.add(rejected(candidate, movieId, cinemaId, dataAt,
+                        QualityStatus.IDENTITY_REJECTED, code, key));
+                continue;
+            }
+            // NetStart 没有已确认的可靠散场字段；不允许把 null 结束时间交给 A 临时推算。
+            if (candidate.endTime() == null || !candidate.endTime().isAfter(candidate.startTime())) {
+                rejected.add(rejected(candidate, movieId, cinemaId, dataAt,
+                        QualityStatus.END_TIME_REJECTED, null, key));
+                continue;
+            }
+            if (candidate.startTime() == null || !candidate.startTime().isAfter(dataAt)) {
+                rejected.add(rejected(candidate, movieId, cinemaId, dataAt, QualityStatus.TIME_REJECTED, null, key));
                 continue;
             }
             OffsetDateTime expiresAt = min(candidate.startTime(), dataAt.plusMinutes(10));
             ExternalShowtimeSnapshot snapshot = new ExternalShowtimeSnapshot(
                     PROVIDER, candidate.externalShowId(), candidate.externalMovieId(),
-                    candidate.externalCinemaId(), movieId, cinemaId, candidate.startTime(), null,
+                    candidate.externalCinemaId(), movieId, cinemaId, candidate.startTime(), candidate.endTime(),
                     candidate.listedPrice(), PriceSemantic.REFERENCE_ONLY, dataAt, expiresAt, false, false, null,
-                    QualityStatus.ACCEPTED, new ExternalShowtimeKey(PROVIDER, candidate.externalCinemaId(),
-                    candidate.externalShowId()));
+                    QualityStatus.ACCEPTED, null, key);
             // seqNo 没有跨影院唯一保证，三元键是 A 后续导入时唯一可复用的幂等身份。
             accepted.putIfAbsent(snapshot.externalShowtimeKey(), snapshot);
         }
-        return List.copyOf(accepted.values());
+        return new CandidateMapping(List.copyOf(accepted.values()), List.copyOf(rejected));
     }
 
     /** 去重后限制返回规模；截断标记让 A 知道本次结果不是完整候选集。 */
-    private QueryResult limitAndMark(List<ExternalShowtimeSnapshot> snapshots) {
-        boolean truncated = snapshots.size() > MAX_RESULTS;
-        return new QueryResult(snapshots.stream().limit(MAX_RESULTS).toList(), truncated);
+    private QueryResult limitAndMark(CandidateMapping mapped) {
+        boolean truncated = mapped.accepted().size() > MAX_RESULTS;
+        return new QueryResult(mapped.accepted().stream().limit(MAX_RESULTS).toList(), mapped.rejected(), truncated);
+    }
+
+    private ExternalShowtimeSnapshot rejected(ExternalShowtimeProvider.Candidate candidate, Long movieId,
+                                              Long cinemaId, OffsetDateTime dataAt, QualityStatus qualityStatus,
+                                              Integer rejectionCode, ExternalShowtimeKey key) {
+        return new ExternalShowtimeSnapshot(PROVIDER, candidate.externalShowId(), candidate.externalMovieId(),
+                candidate.externalCinemaId(), movieId, cinemaId, candidate.startTime(), candidate.endTime(),
+                candidate.listedPrice(), PriceSemantic.REFERENCE_ONLY, dataAt, dataAt, false, false, null,
+                qualityStatus, rejectionCode, key);
     }
 
     private Map<String, ContentExternalIdentityLookupPort.ExternalIdentity> resolveExternalCinemas(
@@ -225,7 +249,7 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
                 snapshot.externalCinemaId(), snapshot.movieId(), snapshot.cinemaId(), snapshot.startTime(),
                 snapshot.endTime(), snapshot.listedPrice(), snapshot.priceSemantic(), snapshot.dataAt(),
                 snapshot.expiresAt(), snapshot.isExpired(), true, FallbackType.SNAPSHOT, snapshot.qualityStatus(),
-                snapshot.externalShowtimeKey());
+                snapshot.rejectionCode(), snapshot.externalShowtimeKey());
     }
 
     private static List<Long> distinctCinemaIds(List<Long> cinemaIds) {
@@ -263,4 +287,7 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
         @Override public String message() { return message; }
         @Override public HttpStatus httpStatus() { return httpStatus; }
     }
+
+    private record CandidateMapping(List<ExternalShowtimeSnapshot> accepted,
+                                    List<ExternalShowtimeSnapshot> rejected) { }
 }

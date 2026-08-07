@@ -188,7 +188,9 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
             OffsetDateTime startTime = LocalDateTime.parse(date + " " + time, DATE_TIME)
                     .atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime();
             // seqNo 只在 provider + cinemaId 范围内使用；Application 会把三元组公开给 A 作为导入幂等键。
-            return new Candidate(showId, movieId, cinemaId, startTime, price(show.path("vipPrice").asText(null)));
+            // 核验样例没有可靠散场字段，明确保留 null；Application 会把它逐条标记为 END_TIME_REJECTED。
+            return new Candidate(showId, movieId, cinemaId, startTime, null,
+                    price(show.path("vipPrice").asText(null)));
         } catch (DateTimeParseException exception) {
             return null;
         }
