@@ -280,6 +280,14 @@ describe('HomePage', () => {
     expect(pageMocks.navigate).toHaveBeenCalledWith('/assistant');
   });
 
+  it('PC Agent 入口不展示静态影片、影院、路线或价格', () => {
+    pageMocks.isMobile = false;
+    render(<HomePage />);
+    expect(screen.getByText('从真实需求开始规划')).toBeInTheDocument();
+    expect(screen.queryByText('云边有个小卖部')).not.toBeInTheDocument();
+    expect(screen.queryByText(/杭州UME|1.2km|¥96|路线预览|店内餐饮/)).not.toBeInTheDocument();
+  });
+
   it('PC 首页继续使用 Ant Design 的加载、错误和空态组件', () => {
     pageMocks.isMobile = false;
     pageMocks.useMovieList.mockReturnValue(movieState({ data: null, isLoading: true }));

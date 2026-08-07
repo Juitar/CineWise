@@ -28,6 +28,7 @@ export interface OrderDetailProps {
   onPay?: () => void;
   onCancel?: () => void;
   onViewTicket?: () => void;
+  onViewTravel?: () => void;
   onApplyRefund?: () => void;
   onViewOrders?: () => void;
   cancelResultUnknown?: boolean;
@@ -61,6 +62,7 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
   onPay,
   onCancel,
   onViewTicket,
+  onViewTravel,
   onApplyRefund,
   onViewOrders,
   cancelResultUnknown = false,
@@ -207,6 +209,7 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
         return (
           <div className="order-detail-actions">
             {renderPrimaryBtn('查看电子票', onViewTicket)}
+            {renderDefaultBtn('查看出行建议', onViewTravel)}
             {renderDefaultBtn('申请退票', onApplyRefund)}
           </div>
         );

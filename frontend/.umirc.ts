@@ -91,6 +91,11 @@ export default defineConfig({
           component: '@/pages/profile',
           wrappers: ['@/shared/auth/RequireAuth'],
         },
+        {
+          path: '/travel/:taskId',
+          component: '@/pages/travel',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
         { path: '*', component: '@/pages/not-found' },
       ],
     },

@@ -11,6 +11,8 @@ import { formatOrderDateTime } from '../../../modules/order/formatters';
 import { TransactionBreadcrumb } from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import { OrderContentNotice } from '../../../features/order-content-notice/OrderContentNotice';
 import { useOrderContentDetails } from '../../../modules/order/useOrderContentDetails';
+import { useTravelTaskByOrder } from '../../../modules/travel/useTravelTask';
+import { ApiError } from '../../../shared/api/ApiError';
 import './index.css';
 
 /**
@@ -22,6 +24,7 @@ export default function OrderDetailPage() {
   const orderQuery = useOrder(orderNo);
   const cancellation = useCancelOrder(orderNo);
   const paymentQuery = usePaymentQuery(orderNo);
+  const travelTaskQuery = useTravelTaskByOrder();
   const order = orderQuery.data;
   const content = useOrderContentDetails(
     useMemo(() => (order ? [{ movieId: order.movieId, cinemaId: order.cinemaId }] : []), [order]),
@@ -53,6 +56,23 @@ export default function OrderDetailPage() {
     }
     if (!paymentQuery.error) {
       message.error('暂时无法取得电子票信息，请稍后重试');
+    }
+  };
+
+  const handleViewTravel = async () => {
+    if (!order?.orderId) {
+      message.error('当前订单信息不完整，暂时无法查询出行任务');
+      return;
+    }
+    try {
+      const task = await travelTaskQuery.find(order.orderId);
+      if (task) history.push(`/travel/${encodeURIComponent(task.taskId)}`);
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 404 || error.code === 207001)) {
+        message.info('该订单的出行任务尚未建立或不可访问');
+      } else {
+        message.error('出行任务暂时无法查询，请稍后重试');
+      }
     }
   };
 
@@ -96,6 +116,7 @@ export default function OrderDetailPage() {
           }
           onCancel={() => void handleCancel()}
           onViewTicket={() => void handleViewTicket()}
+          onViewTravel={() => void handleViewTravel()}
           onApplyRefund={() => history.push(`/orders/${encodeURIComponent(orderNo)}/refund`)}
           onViewOrders={() => history.push('/orders')}
           cancelResultUnknown={cancellation.resultUnknown}
