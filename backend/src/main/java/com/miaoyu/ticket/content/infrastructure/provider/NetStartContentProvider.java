@@ -11,9 +11,6 @@ import com.miaoyu.ticket.content.domain.ContentSource;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.time.Instant;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -56,14 +53,20 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
     private final Clock clock;
     private final NetStartRawClient rawClient;
     private final NetStartContentMapper mapper = new NetStartContentMapper();
-    private final Deque<Instant> requestTimes = new ArrayDeque<>();
+    private final NetStartRequestLimiter requestLimiter;
 
     public NetStartContentProvider(NetStartProperties properties, Environment environment, Clock clock,
                                    NetStartRawClient rawClient) {
+        this(properties, environment, clock, rawClient, new NetStartRequestLimiter(properties, clock));
+    }
+
+    NetStartContentProvider(NetStartProperties properties, Environment environment, Clock clock,
+                            NetStartRawClient rawClient, NetStartRequestLimiter requestLimiter) {
         this.properties = properties;
         this.environment = environment;
         this.clock = clock;
         this.rawClient = rawClient;
+        this.requestLimiter = requestLimiter;
     }
 
     /**
@@ -119,17 +122,7 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
      * <p>每次尝试（包括可重试请求）都会先消耗额度，避免重试绕开保护值。
      * 到达阈值后返回空结果，由上层记录 RATE_LIMITED 并继续离线回退。</p>
      */
-    private synchronized boolean allowRequest() {
-        Instant now = clock.instant();
-        while (!requestTimes.isEmpty() && !requestTimes.peekFirst().plusSeconds(60).isAfter(now)) {
-            requestTimes.removeFirst();
-        }
-        if (requestTimes.size() >= properties.requestsPerMinute()) {
-            return false;
-        }
-        requestTimes.addLast(now);
-        return true;
-    }
+    private boolean allowRequest() { return requestLimiter.allowRequest(); }
 
     private boolean isRetryable(Exception exception) {
         return exception instanceof ResourceAccessException || exception instanceof RestClientResponseException response
