@@ -87,6 +87,35 @@
   font-size: 14px;
 }
 
+.home-mobile-notice {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff7e6;
+  color: #ad4e00;
+  font-size: 13px;
+}
+
+.home-mobile-error,
+.home-mobile-empty {
+  padding: 16px 0;
+}
+
+.home-card-skeleton-mobile {
+  display: flex;
+  width: 100%;
+  gap: 12px;
+}
+
+.home-poster-skeleton {
+  flex: 0 0 88px;
+  height: 124px;
+  border-radius: 8px;
+}
+
+.home-skeleton-copy {
+  flex: 1;
+}
+
 /* --- 首页主体双栏布局 --- */
 .home-page-main {
   display: flex;

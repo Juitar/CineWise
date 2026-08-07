@@ -50,13 +50,25 @@ vi.mock('antd', () => ({
     </div>
   ),
   Input: () => <input />,
-  Menu: ({ items }: { items: Array<{ label?: React.ReactNode }> }) => (
+  Menu: ({ items }: { items: Array<{ icon?: React.ReactNode; label?: React.ReactNode }> }) => (
     <nav>
       {items.map((item, index) => (
-        <React.Fragment key={index}>{item.label}</React.Fragment>
+        <React.Fragment key={index}>
+          {item.icon}
+          {item.label}
+        </React.Fragment>
       ))}
     </nav>
   ),
+}));
+
+vi.mock('../../shared/components/icons/layout-icons', () => ({
+  FilmIcon: () => <span data-testid="film-icon" />,
+  HomeIcon: () => <span data-testid="home-icon" />,
+  MapPinIcon: () => <span data-testid="map-pin-icon" />,
+  OrderIcon: () => <span data-testid="order-icon" />,
+  SearchIcon: () => <span data-testid="search-icon" />,
+  UserIcon: () => <span data-testid="user-icon" />,
 }));
 
 vi.mock('antd-mobile', () => {
@@ -83,6 +95,13 @@ describe('用户端订单导航', () => {
   });
 
   afterEach(cleanup);
+
+  it('桌面侧边栏的首页和影片入口使用不同图标', () => {
+    render(<DesktopSidebar />);
+
+    expect(screen.getByTestId('home-icon')).toBeInTheDocument();
+    expect(screen.getByTestId('film-icon')).toBeInTheDocument();
+  });
 
   it('桌面侧边栏不显示订单入口，用户菜单仍可进入订单列表', () => {
     const { unmount } = render(<DesktopSidebar />);

@@ -177,9 +177,9 @@
 }
 
 .cinema-list-arrow {
+  display: flex;
+  align-items: center;
   color: #6c5ce7;
-  font-size: 32px;
-  line-height: 1;
 }
 
 .cinema-list-item--skeleton .ant-skeleton {

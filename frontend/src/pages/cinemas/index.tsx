@@ -9,6 +9,7 @@ import {
 } from '../../modules/content/cinemaListQuery';
 import { getFreshnessNotices } from '../../modules/content/freshness';
 import { useCinemaList } from '../../modules/content/useCinemaList';
+import { ChevronRightIcon, MapPinIcon } from '../../shared/components/icons/layout-icons';
 import type { CinemaSummary } from '../../shared/types/api';
 import './index.css';
 
@@ -39,12 +40,12 @@ function CinemaCard({ cinema }: { cinema: CinemaSummary }) {
             <span className="cinema-list-city">城市代码 {cinema.cityCode ?? '待更新'}</span>
           </div>
           <p className="cinema-list-address">
-            <span aria-hidden="true">📍</span>
+            <MapPinIcon size={15} />
             {address}
           </p>
         </div>
         <span className="cinema-list-arrow" aria-hidden="true">
-          ›
+          <ChevronRightIcon size={24} />
         </span>
       </Link>
     </article>
