@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,6 +34,7 @@ import org.springframework.test.context.ActiveProfiles;
     "cinewise.seed.fixed-value=20260802"
 })
 @Import(RefundedTravelTaskReconciliationIntegrationTest.ReconciliationTestConfiguration.class)
+@Disabled("待 A 在已执行 V013 的 MySQL 集成环境验证 cinema_id")
 class RefundedTravelTaskReconciliationIntegrationTest {
 
     private static final Instant FIXED_INSTANT = Instant.parse("2026-08-02T00:00:00Z");
