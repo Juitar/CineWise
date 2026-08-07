@@ -25,6 +25,8 @@
 
 浏览器和 B 的 `placeText` 走 `UserLocationAdapter`；影院只经 `CinemaLocationQueryService(cinemaId)` 返回已确认坐标。不得把影院地址或用户输入互相替代。`CinemaLocationQueryService` 只依赖 D 的内容公开 Application API，不读取 Mapper 或 Entity。
 
+位置查询只接受 `source.type=LIVE` 的影院资料。真实缓存和真实快照仍保留 `LIVE` 类型，可以继续使用；通用内容查询回退到 Demo 时，即使 Demo 资料带有坐标或区域，也必须返回空结果，不能提交给路线、天气或餐饮 Provider。内容目录整体不可用时保留内容模块的 `303004`，不得把故障伪装成空结果。
+
 ### 3. Provider 只接收其所需的私有参数
 
 `WeatherAdcodeAdapter` 从影院坐标取 `adcode`；`AmapRouteAdapter` 从两个统一坐标组装 `lng,lat`。`adcode` 与字符串坐标不跨出 Infrastructure。天气缓存键为 `adcode + 数据类型`，餐饮缓存键为影院坐标的规范化值和半径，不保存用户坐标。
