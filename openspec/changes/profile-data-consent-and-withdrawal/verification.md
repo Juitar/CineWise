@@ -50,4 +50,3 @@
 - 本机定向后端测试使用 `-DforkCount=0` 运行 21 个测试，失败 0、错误 0、跳过 3；默认分叉模式受
   Windows JaCoCo 启动错误 `processing of -javaagent failed` 阻断。
 - `openspec validate profile-data-consent-and-withdrawal --strict` 与 `git diff --check` 通过。
-
