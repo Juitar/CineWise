@@ -5,7 +5,7 @@ import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
 import { useSeatMap } from '../../modules/ticketing/hooks';
 import { SeatMap } from '../../features/seat-map/SeatMap';
 import { SeatSelectionSummary } from '../../features/seat-selection-summary/SeatSelectionSummary';
-import { TransactionBackButton } from '../../features/transaction-back-button/TransactionBackButton';
+import { TransactionBreadcrumb } from '../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 
@@ -53,12 +53,6 @@ export default function SeatsPage() {
     history.push(`/orders/confirm?${query.toString()}`);
   };
 
-  const handleReturnToShows = () => {
-    history.push(
-      `/shows?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`,
-    );
-  };
-
   const selectedSeats = useMemo(
     () =>
       seatMap?.seats
@@ -81,7 +75,17 @@ export default function SeatsPage() {
 
   return (
     <div className="seats-page-container">
-      <TransactionBackButton onBack={handleReturnToShows} label="返回场次" />
+      <TransactionBreadcrumb
+        items={[
+          { label: '影院列表', to: '/cinemas' },
+          { label: '影院详情', to: `/cinemas/${encodeURIComponent(cinemaId)}` },
+          {
+            label: '选择场次',
+            to: `/shows?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`,
+          },
+          { label: '选择座位' },
+        ]}
+      />
       <div className="seats-page-header">
         <div>
           <h1 className="seats-title">{seatMap ? seatMap.auditoriumName : '选择座位'}</h1>

@@ -130,7 +130,14 @@ describe('HomePage', () => {
     expect(screen.getByRole('heading', { level: 3, name: '长沙星河影城' })).toBeInTheDocument();
     expect(screen.getByText(/来源：NETSTART，更新于/)).toBeInTheDocument();
     expect(screen.getByText('演示数据')).toBeInTheDocument();
-    expect(screen.getAllByText('票务信息暂不可用')).toHaveLength(2);
+    expect(screen.getByRole('link', { name: '查看《星河远征》详情并选择影院' })).toHaveAttribute(
+      'href',
+      '/movies/8100001',
+    );
+    expect(screen.getByRole('link', { name: '查看长沙星河影城详情' })).toHaveAttribute(
+      'href',
+      '/cinemas/8200001',
+    );
     expect(pageMocks.useMovieList).toHaveBeenCalledWith({ page: 1, size: 5 });
     expect(pageMocks.useCinemaList).toHaveBeenCalledWith({
       location: '430100',
@@ -243,6 +250,7 @@ describe('HomePage', () => {
     expect(text).not.toContain('库存');
     expect(cardText).not.toMatch(/\b\d{1,2}:\d{2}\b/);
     expect(within(content as HTMLElement).queryByRole('button', { name: '购票' })).toBeNull();
+    expect(within(content as HTMLElement).queryByRole('link', { name: /购票/ })).toBeNull();
   });
 
   it.each([

@@ -8,7 +8,7 @@ import {
   buildOrderDetailPath,
   buildPaymentPath,
 } from '../../../modules/order/routes';
-import { TransactionBackButton } from '../../../features/transaction-back-button/TransactionBackButton';
+import { TransactionBreadcrumb } from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import './index.css';
 
 /**
@@ -28,7 +28,13 @@ export default function PaymentResultPage() {
   return (
     <div className="payment-result-page-wrapper">
       <div className="payment-result-page-content">
-        <TransactionBackButton onBack={() => history.push('/orders')} label="返回订单列表" />
+        <TransactionBreadcrumb
+          items={[
+            { label: '我的订单', to: '/orders' },
+            { label: '订单详情', to: buildOrderDetailPath(orderNo) },
+            { label: '支付结果' },
+          ]}
+        />
         <PaymentResult
           orderNo={orderNo}
           amount={orderQuery.data?.totalAmount ?? '0.00'}
@@ -44,7 +50,6 @@ export default function PaymentResultPage() {
           onViewOrder={() => history.push(buildOrderDetailPath(orderNo))}
           onRetryQuery={() => void paymentAction.query()}
           onRetryPay={() => history.push(buildPaymentPath(orderNo))}
-          onBackToHome={() => history.push('/')}
         />
       </div>
     </div>

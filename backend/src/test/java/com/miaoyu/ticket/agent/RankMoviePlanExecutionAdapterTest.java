@@ -62,7 +62,7 @@ class RankMoviePlanExecutionAdapterTest {
         assertThat(definition.timeout()).isEqualTo(AgentToolDefinitions.RANK_MOVIE_PLAN_TIMEOUT);
         assertThat(definition.inputs()).extracting("name").containsExactly(
                 "cityCode", "date", "ticketCount", "movieId", "cinemaId", "genres",
-                "timeFrom", "timeTo", "latestEndTime", "budget", "excludedGenres");
+                "timeFrom", "timeTo", "latestEndTime", "budget", "excludedGenres", "maxDistanceMeters");
 
         var validation = new PlanSchemaValidator(registry).validate(
                 candidatePlan(FailurePolicy.FAIL, false), validValidationContext());

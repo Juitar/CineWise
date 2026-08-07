@@ -36,6 +36,7 @@ class RankMoviePlanToolTest {
      */
 
     private static final Instant NOW = Instant.parse("2026-08-03T00:00:00Z");
+    private static final String DISTANCE_CONTEXT_ID = "b7c4ab55-3c3a-4a45-9f0f-76d11a1585d3";
 
     @Test
     void shouldReturnReadOnlyToolResultWithoutPlanCardWhenShowtimeIsUnavailable() {
@@ -163,6 +164,21 @@ class RankMoviePlanToolTest {
         assertFixture("recommendation-plan-degraded.json", true, 0);
     }
 
+    @Test
+    void shouldPassOnlyDistanceContextIdAndTrustedRunIdForNearestRecommendation() {
+        PersonalizedRecommendationQueryService personalized = mock(PersonalizedRecommendationQueryService.class);
+        RecommendationPlanResult expected = emptyResult(false);
+        when(personalized.queryWithDistanceContext(any(), org.mockito.ArgumentMatchers.eq(DISTANCE_CONTEXT_ID),
+                org.mockito.ArgumentMatchers.eq("run-1"))).thenReturn(expected);
+        RankMoviePlanTool tool = new RankMoviePlanTool(mock(FixedRecommendationQueryService.class), personalized);
+
+        var result = tool.executeRecommendationPlan(distanceContext(), completeCommand());
+
+        assertThat(result.data()).isSameAs(expected);
+        verify(personalized).queryWithDistanceContext(any(), org.mockito.ArgumentMatchers.eq(DISTANCE_CONTEXT_ID),
+                org.mockito.ArgumentMatchers.eq("run-1"));
+    }
+
     private static RankMoviePlanTool completeTool(RecommendationPlanResult result) {
         PersonalizedRecommendationQueryService personalized = mock(PersonalizedRecommendationQueryService.class);
         when(personalized.query(any())).thenReturn(result);
@@ -172,6 +188,11 @@ class RankMoviePlanToolTest {
     private static ToolContext context() {
         return new ToolContext("run-1", "node-1", RankMoviePlanTool.TARGET_NAME, List.of(), 3_000L,
                 "trace-1", null, null, 2L);
+    }
+
+    private static ToolContext distanceContext() {
+        return new ToolContext("run-1", "node-1", RankMoviePlanTool.TARGET_NAME, List.of(), 3_000L,
+                "trace-1", null, null, 2L, DISTANCE_CONTEXT_ID, "NEAREST");
     }
 
     private static RankMoviePlanCommand command() {

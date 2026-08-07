@@ -24,7 +24,7 @@ public class DistanceContextService {
     }
 
     /** B 使用可信 runId 创建不含位置的关联 ID，随后才允许 C 上传一次坐标。 */
-    public CreatedContext create(String runId) {
+    public CreatedContext createForRun(String runId) {
         long userId = currentUserAccessor.requireCurrentUserId();
         Instant expiresAt = clock.instant().plusSeconds(TTL_SECONDS);
         String id = UUID.randomUUID().toString();
@@ -72,8 +72,26 @@ public class DistanceContextService {
         return null;
     }
 
+    /** B 在拒绝、取消或失败时调用；只有当前用户且 runId 匹配才能清理，避免误删别的运行上下文。 */
+    public CleanupResult cleanup(String contextId, String runId) {
+        long userId = currentUserAccessor.requireCurrentUserId();
+        Context expected = contexts.get(contextId);
+        while (expected != null) {
+            if (expected.userId() != userId || !expected.runId().equals(runId)
+                    || expected.expiresAt().isBefore(clock.instant())) {
+                return CleanupResult.NOT_FOUND;
+            }
+            if (contexts.remove(contextId, expected)) {
+                return CleanupResult.REMOVED;
+            }
+            expected = contexts.get(contextId);
+        }
+        return CleanupResult.NOT_FOUND;
+    }
+
     public record CreatedContext(String distanceContextId, Instant expiresAt) { }
     /** 上传结果只区分前端可以采取不同动作的状态，不泄露归属或过期的具体原因。 */
     public enum UploadResult { SUCCESS, NOT_FOUND, CONFLICT }
+    public enum CleanupResult { REMOVED, NOT_FOUND }
     private record Context(long userId, String runId, Instant expiresAt, Coordinate coordinate, boolean used) { }
 }

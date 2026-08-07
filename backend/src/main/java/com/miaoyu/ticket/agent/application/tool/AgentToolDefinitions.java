@@ -63,7 +63,8 @@ public final class AgentToolDefinitions {
                         new ToolInputDefinition("timeTo", LocalTime.class, false),
                         new ToolInputDefinition("latestEndTime", LocalTime.class, false),
                         new ToolInputDefinition("budget", BigDecimal.class, false),
-                        new ToolInputDefinition("excludedGenres", List.class, false)),
+                        new ToolInputDefinition("excludedGenres", List.class, false),
+                        new ToolInputDefinition("maxDistanceMeters", Integer.class, false)),
                 Set.of(CommonErrorCode.INVALID_PARAMETER.code()));
     }
 
