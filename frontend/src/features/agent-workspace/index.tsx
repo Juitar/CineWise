@@ -2,9 +2,10 @@ import { Alert, Button, Drawer, Empty, Input, Spin, Tag } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'umi';
 
-import { useAgentWorkspace } from '../../modules/agent/useAgentWorkspace';
 import { takePendingAgentDraft } from '../../modules/agent/entryDraft';
+import type { AgentDisplayItem, AgentPlanDisplay } from '../../modules/agent/projection';
 import type { AgentSession } from '../../modules/agent/types';
+import { useAgentWorkspace } from '../../modules/agent/useAgentWorkspace';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import { AgentDisplayItemView } from './cards';
 import './index.css';
@@ -39,25 +40,167 @@ const STATUS_TEXT = {
   IDLE: '等待输入',
   CONNECTING: '正在连接',
   STREAMING: '正在处理',
+  WAITING_LOCATION: '等待位置',
   COMPLETED: '已完成',
   FAILED: '未完成',
   RESULT_UNKNOWN: '结果待确认',
   CANCELLED: '已取消',
 } as const;
 
+const PLAN_TYPE_TEXT: Readonly<Record<string, string>> = {
+  COMPREHENSIVE: '综合推荐',
+  LOW_PRICE: '低价优先',
+  TIME_FIRST: '时间优先',
+};
+
+interface AgentWorkspaceProps {
+  sessionId: string;
+  variant?: 'debug' | 'recommendations';
+}
+
+interface SelectedPlanRef {
+  itemKey: string;
+  index: number;
+}
+
+function planReferenceText(index: number, request: string): string {
+  return `基于当前最新推荐中的第 ${index + 1} 个方案，${request}`;
+}
+
+function RecommendationPlanPane({
+  busy,
+  item,
+  onSelect,
+  selectSeatsPath,
+  selectedIndex,
+}: {
+  busy: boolean;
+  item: AgentDisplayItem | null;
+  onSelect(index: number): void;
+  selectSeatsPath: string | null;
+  selectedIndex: number | null;
+}) {
+  return (
+    <section className="agent-recommendation-pane" aria-labelledby="agent-recommendation-title">
+      <header className="agent-recommendation-header">
+        <div>
+          <span className="agent-recommendation-eyebrow">AI 推荐方案工作区</span>
+          <h1 id="agent-recommendation-title">选择适合你的观影方案</h1>
+        </div>
+        <Tag color="blue">最多 3 个</Tag>
+      </header>
+
+      {!item?.plans?.length ? (
+        <Empty description="告诉右侧 Agent 你的观影需求后，真实推荐方案会显示在这里" />
+      ) : (
+        <div className="agent-recommendation-list" role="list" aria-label="推荐方案">
+          {item.plans.map((plan: AgentPlanDisplay, index: number) => {
+            const expired = plan.expired || Date.parse(plan.expiresAt) <= Date.now();
+            const selected = selectedIndex === index;
+            return (
+              <div key={`${item.key}:${plan.showId}:${index}`} role="listitem">
+                <button
+                  aria-pressed={selected}
+                  className={`agent-recommendation-option${selected ? ' is-selected' : ''}`}
+                  disabled={busy}
+                  onClick={() => onSelect(index)}
+                  type="button"
+                >
+                  <div className="agent-recommendation-option-heading">
+                    <span>{PLAN_TYPE_TEXT[plan.planType] ?? plan.planType}</span>
+                    <strong>
+                      {plan.currency === 'CNY' ? '¥' : `${plan.currency} `}
+                      {plan.price}
+                    </strong>
+                  </div>
+                  <h2>{plan.movieName}</h2>
+                  <p className="agent-recommendation-cinema">{plan.cinemaName}</p>
+                  <dl className="agent-recommendation-details">
+                    <div>
+                      <dt>场次</dt>
+                      <dd>{plan.startTime}</dd>
+                    </div>
+                    {plan.rating !== null && (
+                      <div>
+                        <dt>评分</dt>
+                        <dd>{plan.rating}</dd>
+                      </div>
+                    )}
+                  </dl>
+                  {!!plan.reasons.length && (
+                    <ul className="agent-recommendation-reasons">
+                      {plan.reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="agent-recommendation-meta">
+                    <span>来源：{plan.source}</span>
+                    <span>数据时间：{plan.dataAt}</span>
+                    <span>有效期至：{plan.expiresAt}</span>
+                  </div>
+                  {(expired || !plan.purchaseEligible) && (
+                    <span className="agent-recommendation-unavailable">
+                      {expired ? '方案已过期' : '当前不可购'}
+                    </span>
+                  )}
+                  {selected && <span className="agent-recommendation-selected">当前选择</span>}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {item?.relaxationSuggestion && (
+        <p className="agent-recommendation-relaxation">可调整条件：{item.relaxationSuggestion}</p>
+      )}
+      {selectSeatsPath && (
+        <Link className="agent-recommendation-seat-link" to={selectSeatsPath}>
+          去选座
+        </Link>
+      )}
+      <p className="agent-recommendation-note">
+        方案来自 Agent 实时结果。进入选座前仍以票务服务的最新场次状态为准。
+      </p>
+    </section>
+  );
+}
+
 /** Agent 工作区视图；桌面和移动布局共享同一个 useAgentWorkspace 状态。 */
-export function AgentWorkspace({ sessionId }: { sessionId: string }) {
+export function AgentWorkspace({ sessionId, variant = 'debug' }: AgentWorkspaceProps) {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 1023px)');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [draft, setDraft] = useState('');
+  const [selectedPlanRef, setSelectedPlanRef] = useState<SelectedPlanRef | null>(null);
   const workspace = useAgentWorkspace(sessionId);
-  const busy = ['CONNECTING', 'STREAMING', 'RESULT_UNKNOWN'].includes(workspace.projection.status);
+  const busy = ['CONNECTING', 'STREAMING', 'WAITING_LOCATION', 'RESULT_UNKNOWN'].includes(
+    workspace.projection.status,
+  );
+  const routeBase = variant === 'recommendations' ? '/recommendations' : '/assistant';
+  const latestPlanIndex = workspace.projection.items.reduce(
+    (latestIndex, item, index) =>
+      item.kind === 'plan-card' && !item.confirmation ? index : latestIndex,
+    -1,
+  );
+  const latestPlanItem = latestPlanIndex >= 0 ? workspace.projection.items[latestPlanIndex] : null;
+  const selectedIndex =
+    latestPlanItem && selectedPlanRef?.itemKey === latestPlanItem.key
+      ? selectedPlanRef.index
+      : latestPlanItem
+        ? 0
+        : null;
+  const selectSeatsPath =
+    [...workspace.projection.items.slice(latestPlanIndex + 1)]
+      .reverse()
+      .find((item) => item.kind === 'business-intent' && item.selectSeatsPath)?.selectSeatsPath ??
+    null;
 
   const selectSession = (nextSessionId: string) => {
     workspace.stopActiveStream();
     setDrawerOpen(false);
-    navigate(`/assistant/${encodeURIComponent(nextSessionId)}`);
+    navigate(`${routeBase}/${encodeURIComponent(nextSessionId)}`);
   };
 
   const createSession = async () => {
@@ -66,8 +209,18 @@ export function AgentWorkspace({ sessionId }: { sessionId: string }) {
   };
 
   const send = async () => {
-    const sent = await workspace.submit(draft);
+    const content =
+      variant === 'recommendations' && selectedIndex !== null
+        ? planReferenceText(selectedIndex, draft)
+        : draft;
+    const sent = await workspace.submit(content);
     if (sent) setDraft('');
+  };
+
+  const selectPlan = (index: number) => {
+    if (!latestPlanItem || busy) return;
+    setSelectedPlanRef({ itemKey: latestPlanItem.key, index });
+    void workspace.submit(planReferenceText(index, '请解释这个方案，并说明是否需要继续调整。'));
   };
 
   useEffect(() => {
@@ -93,16 +246,32 @@ export function AgentWorkspace({ sessionId }: { sessionId: string }) {
   );
 
   return (
-    <section className="agent-workspace" aria-label="妙语 Agent 工作区">
-      {!isMobile && <aside className="agent-workspace-sidebar">{sidebar}</aside>}
+    <section
+      className={`agent-workspace agent-workspace--${variant}`}
+      aria-label="妙语 Agent 工作区"
+    >
+      {variant === 'debug' && !isMobile && (
+        <aside className="agent-workspace-sidebar">{sidebar}</aside>
+      )}
+      {variant === 'recommendations' && (
+        <RecommendationPlanPane
+          busy={busy}
+          item={latestPlanItem}
+          onSelect={selectPlan}
+          selectSeatsPath={selectSeatsPath}
+          selectedIndex={selectedIndex}
+        />
+      )}
       <div className="agent-workspace-main">
         <header className="agent-workspace-header">
           <div>
-            <h1>妙语观影助手</h1>
+            {variant === 'recommendations' ? <h2>妙语观影助手</h2> : <h1>妙语观影助手</h1>}
             <Tag>{STATUS_TEXT[workspace.projection.status]}</Tag>
           </div>
           <div className="agent-workspace-actions">
-            {isMobile && <Button onClick={() => setDrawerOpen(true)}>会话列表</Button>}
+            {(isMobile || variant === 'recommendations') && (
+              <Button onClick={() => setDrawerOpen(true)}>会话列表</Button>
+            )}
             {busy && workspace.projection.runId && (
               <Button danger onClick={() => void workspace.cancel()}>
                 取消运行
@@ -129,10 +298,12 @@ export function AgentWorkspace({ sessionId }: { sessionId: string }) {
             <Empty description="说说你想看什么电影" />
           ) : (
             <div className="agent-message-list" role="list">
-              {workspace.projection.items.map((item) => (
+              {workspace.projection.items.map((item, index) => (
                 <AgentDisplayItemView
                   key={item.key}
                   item={item}
+                  planPresentation={variant === 'recommendations' ? 'summary' : 'full'}
+                  selectSeatsEnabled={variant === 'debug' || index > latestPlanIndex}
                   answerDisabled={busy}
                   onAnswer={(_itemKey, answer) => workspace.submit(answer)}
                   onConfirm={(itemKey, confirmed) => void workspace.confirm(itemKey, confirmed)}
@@ -172,7 +343,7 @@ export function AgentWorkspace({ sessionId }: { sessionId: string }) {
         title="会话列表"
         placement="left"
         width="min(88vw, 360px)"
-        open={isMobile && drawerOpen}
+        open={(isMobile || variant === 'recommendations') && drawerOpen}
         onClose={() => setDrawerOpen(false)}
       >
         {sidebar}

@@ -6,6 +6,15 @@ function envelope(data: unknown, code = 0) {
   return { code, data, message: code === 0 ? 'success' : 'error', traceId: 'agent-e2e-trace' };
 }
 
+function sseBody(events: readonly Record<string, unknown>[]) {
+  return events
+    .map(
+      (event) =>
+        `id: ${String(event.eventId)}\nevent: ${String(event.eventType)}\ndata: ${JSON.stringify(event)}\n\n`,
+    )
+    .join('');
+}
+
 async function mockAuthenticatedAgent(
   page: import('@playwright/test').Page,
   showConfirmation = false,
@@ -306,6 +315,217 @@ test('匿名访问 Agent 工作区安全跳转登录', async ({ page }) => {
   });
   await page.goto(`/assistant/${sessionId}`);
   await expect(page).toHaveURL(/\/login\?returnUrl=%2Fassistant%2Fsession-example-1/);
+});
+
+test('匿名访问推荐方案工作区安全跳转登录', async ({ page }) => {
+  await page.route('**/api/v1/auth/me*', async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify(envelope(null, 201006)),
+    });
+  });
+  await page.goto(`/recommendations/${sessionId}`);
+  await expect(page).toHaveURL(/\/login\?returnUrl=%2Frecommendations%2Fsession-example-1/);
+});
+
+test('三栏推荐工作区消费 PLAN_CARD 并在第二轮绑定新运行后进入选座', async ({ page }) => {
+  await mockAuthenticatedAgent(page);
+  let streamCount = 0;
+  const submittedContents: string[] = [];
+  await page.route(`**/api/v1/agent/sessions/${sessionId}/messages/stream`, async (route) => {
+    const request = route.request();
+    streamCount += 1;
+    submittedContents.push(request.postDataJSON().content);
+    expect(request.headers()['x-xsrf-token']).toBe('csrf-agent-e2e');
+    expect(request.headers().cookie).toContain('access_token=');
+
+    if (streamCount === 1) {
+      expect(request.headers()['last-event-id']).toBeUndefined();
+      const common = {
+        sessionId,
+        runId: 'run-plan-first',
+        planId: 'plan-first',
+        planVersion: 2,
+        occurredAt: '2026-08-08T10:00:00+08:00',
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: sseBody([
+          {
+            ...common,
+            eventId: '100',
+            nodeId: 'recommend',
+            eventType: 'step.start',
+            displayText: '正在生成方案',
+            payload: { status: 'RUNNING' },
+          },
+          {
+            ...common,
+            eventId: '101',
+            nodeId: 'render-plan',
+            eventType: 'card',
+            displayText: '推荐方案',
+            payload: {
+              type: 'PLAN_CARD',
+              title: '周末观影方案',
+              schemaVersion: '1.0',
+              algorithmVersion: 'rank-v1',
+              plans: [
+                {
+                  planType: 'COMPREHENSIVE',
+                  movieId: '1001',
+                  movieName: '轻松喜剧一',
+                  cinemaId: '2001',
+                  cinemaName: '示例影院一',
+                  showId: '3001',
+                  price: '46.00',
+                  currency: 'CNY',
+                  startTime: '2099-08-08T19:30:00+08:00',
+                  rating: '8.6',
+                  score: 1,
+                  reasons: ['时间合适'],
+                  source: 'recommendation',
+                  dataAt: '2026-08-08T10:00:00+08:00',
+                  expiresAt: '2099-08-08T20:00:00+08:00',
+                  expired: false,
+                  purchaseEligible: true,
+                  distanceMeters: null,
+                },
+                {
+                  planType: 'LOW_PRICE',
+                  movieId: '1002',
+                  movieName: '轻松喜剧二',
+                  cinemaId: '2002',
+                  cinemaName: '示例影院二',
+                  showId: '3002',
+                  price: '36.00',
+                  currency: 'CNY',
+                  startTime: '2099-08-08T20:00:00+08:00',
+                  rating: '8.2',
+                  score: 0.9,
+                  reasons: ['价格更低'],
+                  source: 'recommendation',
+                  dataAt: '2026-08-08T10:00:00+08:00',
+                  expiresAt: '2099-08-08T20:00:00+08:00',
+                  expired: false,
+                  purchaseEligible: true,
+                  distanceMeters: null,
+                },
+                {
+                  planType: 'TIME_FIRST',
+                  movieId: '1003',
+                  movieName: '轻松喜剧三',
+                  cinemaId: '2003',
+                  cinemaName: '示例影院三',
+                  showId: '3003',
+                  price: '52.00',
+                  currency: 'CNY',
+                  startTime: '2099-08-08T18:50:00+08:00',
+                  rating: null,
+                  score: 0.8,
+                  reasons: ['开场更早'],
+                  source: 'recommendation',
+                  dataAt: '2026-08-08T10:00:00+08:00',
+                  expiresAt: '2099-08-08T20:00:00+08:00',
+                  expired: false,
+                  purchaseEligible: true,
+                  distanceMeters: null,
+                },
+              ],
+              missingFactors: [],
+              relaxationSuggestion: null,
+              usedProfile: false,
+              source: 'recommendation',
+              dataAt: '2026-08-08T10:00:00+08:00',
+              expiresAt: '2099-08-08T20:00:00+08:00',
+              degraded: false,
+              expired: false,
+            },
+          },
+          {
+            ...common,
+            eventId: '102',
+            nodeId: null,
+            eventType: 'run.complete',
+            displayText: '运行完成',
+            payload: { status: 'COMPLETED' },
+          },
+        ]),
+      });
+      return;
+    }
+
+    expect(request.headers()['last-event-id']).toBe('102');
+    const secondRun = {
+      sessionId,
+      runId: 'run-plan-second',
+      planId: 'plan-second',
+      planVersion: 1,
+      occurredAt: '2026-08-08T10:01:00+08:00',
+    };
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: sseBody([
+        {
+          ...secondRun,
+          eventId: '103',
+          nodeId: 'select-plan',
+          eventType: 'step.start',
+          displayText: '正在处理所选方案',
+          payload: { status: 'RUNNING' },
+        },
+        {
+          ...secondRun,
+          eventId: '104',
+          nodeId: 'select-seats',
+          eventType: 'card',
+          displayText: '前往选座',
+          payload: {
+            type: 'BUSINESS_INTENT',
+            payload: {
+              intent: 'SELECT_SEATS',
+              businessRef: { showId: '3002', movieId: '1002', cinemaId: '2002' },
+            },
+          },
+        },
+        {
+          ...secondRun,
+          eventId: '105',
+          nodeId: null,
+          eventType: 'run.complete',
+          displayText: '运行完成',
+          payload: { status: 'COMPLETED' },
+        },
+      ]),
+    });
+  });
+
+  await page.goto(`/recommendations/${sessionId}`);
+  await expect(page.getByRole('heading', { name: '选择适合你的观影方案' })).toBeVisible();
+  await page.getByLabel('观影需求').fill('推荐三个方案');
+  await page.getByRole('button', { name: /发\s*送/ }).click();
+
+  const plans = page.locator('.agent-recommendation-option');
+  await expect(plans).toHaveCount(3);
+  await expect(plans.nth(1)).toContainText('轻松喜剧二');
+  await plans.nth(1).click();
+
+  await expect.poll(() => streamCount).toBe(2);
+  expect(submittedContents).toEqual([
+    '推荐三个方案',
+    '基于当前最新推荐中的第 2 个方案，请解释这个方案，并说明是否需要继续调整。',
+  ]);
+  await expect(page.getByText('已完成', { exact: true })).toBeVisible();
+  const selectSeatsLinks = page.getByRole('link', { name: '去选座' });
+  await expect(selectSeatsLinks).toHaveCount(2);
+  await expect(selectSeatsLinks.first()).toHaveAttribute(
+    'href',
+    '/shows/3002/seats?movieId=1002&cinemaId=2002',
+  );
+  await expect(page.getByText(/actionId|Token|工具参数|完整订单/)).toHaveCount(0);
 });
 
 test('登录用户消费 POST SSE 并展示类型化降级卡片', async ({ page }) => {

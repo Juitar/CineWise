@@ -24,6 +24,43 @@ import {
 } from './projection';
 
 describe('Agent 事件投影', () => {
+  it('恢复 payload 为 null 的用户文本和精简 QUESTION 历史', () => {
+    const projection = buildProjectionFromHistoryAndSnapshots(
+      'session-example-1',
+      [
+        {
+          messageId: 'message-user-1',
+          runId: 'run-1',
+          role: 'USER',
+          type: 'TEXT',
+          text: '推荐电影',
+          payload: null,
+          status: 'COMPLETED',
+          completedAt: null,
+          createdAt: '2026-08-08T10:00:00+08:00',
+        },
+        {
+          messageId: 'message-question-1',
+          runId: 'run-1',
+          role: 'ASSISTANT',
+          type: 'QUESTION',
+          text: '请补充观影偏好',
+          payload: { missingSlot: 'preference' },
+          status: 'COMPLETED',
+          completedAt: '2026-08-08T10:00:01+08:00',
+          createdAt: '2026-08-08T10:00:01+08:00',
+        },
+      ],
+      [],
+    );
+
+    expect(projection.items).toEqual([
+      expect.objectContaining({ kind: 'user-text', text: '推荐电影' }),
+      expect.objectContaining({ kind: 'question', text: '请补充观影偏好' }),
+    ]);
+    expect(projection.items[1].question).toBeUndefined();
+  });
+
   it('按任意长度十进制字符串比较游标', () => {
     expect(compareDecimalStrings('9007199254740993', '9007199254740992')).toBe(1);
     expect(compareDecimalStrings('00043', '43')).toBe(0);

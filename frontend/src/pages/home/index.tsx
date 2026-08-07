@@ -192,7 +192,7 @@ export default function HomePage() {
 
   const openAssistant = (draft: string) => {
     setPendingAgentDraft(draft);
-    navigate('/assistant');
+    navigate('/recommendations');
   };
 
   return (

@@ -8,6 +8,8 @@ import './index.css';
 interface AgentDisplayItemViewProps {
   item: AgentDisplayItem;
   answerDisabled: boolean;
+  planPresentation?: 'full' | 'summary';
+  selectSeatsEnabled?: boolean;
   onAnswer(itemKey: string, answer: string): Promise<boolean>;
   onConfirm(itemKey: string, confirmed: boolean): void;
 }
@@ -112,7 +114,29 @@ const PLAN_TYPE_TEXT: Readonly<Record<string, string>> = {
   TIME_FIRST: '时间优先',
 };
 
-function PlanCard({ item }: { item: AgentDisplayItem }) {
+function PlanCard({
+  item,
+  presentation,
+}: {
+  item: AgentDisplayItem;
+  presentation: 'full' | 'summary';
+}) {
+  if (presentation === 'summary') {
+    return (
+      <>
+        <div className="agent-card-heading">
+          <Tag color="blue">观影方案</Tag>
+          <strong>{item.title}</strong>
+        </div>
+        <p className="agent-card-text">
+          已生成 {item.plans?.length ?? 0} 个真实方案，请在左侧方案区选择后继续交流。
+        </p>
+        {item.relaxationSuggestion && (
+          <p className="agent-card-status">可调整条件：{item.relaxationSuggestion}</p>
+        )}
+      </>
+    );
+  }
   return (
     <>
       <div className="agent-card-heading">
@@ -206,7 +230,13 @@ function RecommendationCard({ item }: { item: AgentDisplayItem }) {
   );
 }
 
-function BusinessIntentCard({ item }: { item: AgentDisplayItem }) {
+function BusinessIntentCard({
+  item,
+  selectSeatsEnabled,
+}: {
+  item: AgentDisplayItem;
+  selectSeatsEnabled: boolean;
+}) {
   return (
     <>
       <div className="agent-card-heading">
@@ -215,7 +245,7 @@ function BusinessIntentCard({ item }: { item: AgentDisplayItem }) {
       </div>
       <p className="agent-card-text">{item.text}</p>
       <CardFields fields={item.fields} />
-      {item.selectSeatsPath && (
+      {selectSeatsEnabled && item.selectSeatsPath && (
         <Link className="agent-card-primary-link" to={item.selectSeatsPath}>
           去选座
         </Link>
@@ -313,6 +343,8 @@ export function AgentDisplayItemView({
   item,
   onAnswer,
   onConfirm,
+  planPresentation = 'full',
+  selectSeatsEnabled = true,
 }: AgentDisplayItemViewProps) {
   let content: React.ReactNode;
   switch (item.kind) {
@@ -327,13 +359,17 @@ export function AgentDisplayItemView({
       content = <RecommendationCard item={item} />;
       break;
     case 'plan-card':
-      content = item.confirmation ? <RecommendationCard item={item} /> : <PlanCard item={item} />;
+      content = item.confirmation ? (
+        <RecommendationCard item={item} />
+      ) : (
+        <PlanCard item={item} presentation={planPresentation} />
+      );
       break;
     case 'travel-advice-card':
       content = <TravelAdviceCard item={item} />;
       break;
     case 'business-intent':
-      content = <BusinessIntentCard item={item} />;
+      content = <BusinessIntentCard item={item} selectSeatsEnabled={selectSeatsEnabled} />;
       break;
     case 'progress':
       content = <ProgressCard item={item} />;

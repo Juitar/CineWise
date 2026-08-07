@@ -64,7 +64,8 @@ function snapshot(status: AgentRunSnapshot['status'], lastEventId = '40'): Agent
     planId: null,
     planVersion: 1,
     startedAt: null,
-    finishedAt: status === 'RUNNING' ? null : '2026-08-05T10:00:01+08:00',
+    finishedAt:
+      status === 'RUNNING' || status === 'WAITING_LOCATION' ? null : '2026-08-05T10:00:01+08:00',
     lastEventId,
     messages: [],
     steps: [],
@@ -112,6 +113,46 @@ describe('useAgentWorkspace 状态与恢复', () => {
     completedAt: '2026-08-05T16:30:00+08:00',
     createdAt: '2026-08-05T16:30:00+08:00',
   };
+  it('刷新时恢复 payload 为 null 的用户文本和只读问题历史', async () => {
+    mocks.listAgentMessages.mockResolvedValue({
+      total: 2,
+      page: 1,
+      size: 100,
+      records: [
+        {
+          messageId: 'message-user-1',
+          runId: 'run-1',
+          role: 'USER',
+          type: 'TEXT',
+          text: '推荐电影',
+          payload: null,
+          status: 'COMPLETED',
+          completedAt: null,
+          createdAt: '2026-08-08T10:00:00+08:00',
+        },
+        {
+          messageId: 'message-question-1',
+          runId: 'run-1',
+          role: 'ASSISTANT',
+          type: 'QUESTION',
+          text: '请补充观影偏好',
+          payload: { missingSlot: 'preference' },
+          status: 'COMPLETED',
+          completedAt: '2026-08-08T10:00:01+08:00',
+          createdAt: '2026-08-08T10:00:01+08:00',
+        },
+      ],
+    });
+
+    const { result } = renderHook(() => useAgentWorkspace('session-example-1'));
+    await waitFor(() => expect(result.current.loadStatus).toBe('ready'));
+    expect(result.current.projection.items).toEqual([
+      expect.objectContaining({ kind: 'user-text', text: '推荐电影' }),
+      expect.objectContaining({ kind: 'question', text: '请补充观影偏好' }),
+    ]);
+    expect(result.current.projection.safeError).toBeNull();
+  });
+
   it.each([
     [401, 201006, '登录状态已失效'],
     [403, undefined, '没有权限'],
@@ -208,6 +249,71 @@ describe('useAgentWorkspace 状态与恢复', () => {
     await act(async () => {
       await first;
     });
+  });
+
+  it('终态后第二轮消息保留会话游标并绑定新的 runId 和 planVersion', async () => {
+    let streamCount = 0;
+    mocks.postAgentStream.mockImplementation(
+      async (_session, _request, cursor, _signal, handlers) => {
+        streamCount += 1;
+        const runId = streamCount === 1 ? 'run-first' : 'run-second';
+        const planVersion = streamCount === 1 ? 2 : 1;
+        const firstEventId = streamCount === 1 ? '100' : '102';
+        const completeEventId = streamCount === 1 ? '101' : '103';
+        expect(cursor).toBe(streamCount === 1 ? '0' : '101');
+        await handlers.onEvent(
+          parseAgentEvent({
+            eventId: firstEventId,
+            sessionId: 'session-example-1',
+            runId,
+            planId: `plan-${streamCount}`,
+            planVersion,
+            nodeId: 'recommend',
+            eventType: 'step.start',
+            displayText: '正在处理',
+            payload: { status: 'RUNNING' },
+            occurredAt: '2026-08-08T10:00:00+08:00',
+          }),
+        );
+        await handlers.onEvent(
+          parseAgentEvent({
+            eventId: completeEventId,
+            sessionId: 'session-example-1',
+            runId,
+            planId: `plan-${streamCount}`,
+            planVersion,
+            nodeId: null,
+            eventType: 'run.complete',
+            displayText: '运行完成',
+            payload: { status: 'COMPLETED' },
+            occurredAt: '2026-08-08T10:00:01+08:00',
+          }),
+        );
+      },
+    );
+    const { result } = renderHook(() => useAgentWorkspace('session-example-1'));
+    await waitFor(() => expect(result.current.loadStatus).toBe('ready'));
+
+    await act(async () => {
+      await result.current.submit('第一次推荐');
+    });
+    expect(result.current.projection).toMatchObject({
+      runId: 'run-first',
+      planVersion: 2,
+      lastEventId: '101',
+      status: 'COMPLETED',
+    });
+
+    await act(async () => {
+      await result.current.submit('换一家影院');
+    });
+    expect(result.current.projection).toMatchObject({
+      runId: 'run-second',
+      planVersion: 1,
+      lastEventId: '103',
+      status: 'COMPLETED',
+    });
+    expect(mocks.postAgentStream).toHaveBeenCalledTimes(2);
   });
 
   it('确认重复点击只发送一次', async () => {
@@ -370,6 +476,31 @@ describe('useAgentWorkspace 状态与恢复', () => {
     });
     expect(mocks.getAgentRun).toHaveBeenCalledWith('run-example-1');
     expect(result.current.projection.status).toBe('COMPLETED');
+  });
+
+  it('断线恢复到等待位置时保留原运行且不重连流', async () => {
+    mocks.postAgentStream.mockImplementation(
+      async (_session, _request, _cursor, _signal, handlers) => {
+        await handlers.onEvent(processingEvent);
+        throw new ApiError('network', { kind: 'NETWORK' });
+      },
+    );
+    mocks.getAgentRun.mockResolvedValue(snapshot('WAITING_LOCATION'));
+    const { result } = renderHook(() => useAgentWorkspace('session-example-1'));
+    await waitFor(() => expect(result.current.loadStatus).toBe('ready'));
+
+    await act(async () => {
+      await result.current.submit('按距离推荐电影');
+    });
+
+    expect(mocks.getAgentRun).toHaveBeenCalledWith('run-example-1');
+    expect(mocks.postAgentStream).toHaveBeenCalledOnce();
+    expect(result.current.projection).toMatchObject({
+      runId: 'run-example-1',
+      status: 'WAITING_LOCATION',
+    });
+    await expect(result.current.submit('再发一条')).resolves.toBe(false);
+    expect(mocks.postAgentStream).toHaveBeenCalledOnce();
   });
 
   it('主动取消使用服务端返回的终态', async () => {
