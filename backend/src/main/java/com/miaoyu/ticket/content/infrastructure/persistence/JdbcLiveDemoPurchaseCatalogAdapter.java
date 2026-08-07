@@ -47,7 +47,7 @@ public class JdbcLiveDemoPurchaseCatalogAdapter implements LiveDemoPurchaseCatal
                     SELECT id, source_cinema_id, data_time, expires_at
                       FROM cinema
                      WHERE city_code = ? AND source_type = ? AND source = ? AND deleted_at IS NULL
-                       AND expires_at IS NOT NULL AND expires_at >= ?
+                       AND expires_at IS NOT NULL AND expires_at > ?
                        AND id > 0 AND source_cinema_id IS NOT NULL AND TRIM(source_cinema_id) <> ''
                      ORDER BY id ASC
                     """, (rs, rowNum) -> new CinemaRow(new ContentPurchaseQueryPort.CinemaRef(
@@ -59,7 +59,7 @@ public class JdbcLiveDemoPurchaseCatalogAdapter implements LiveDemoPurchaseCatal
                     SELECT id, source_movie_id, duration_minutes, data_time, expires_at
                       FROM movie
                      WHERE source_type = ? AND source = ? AND deleted_at IS NULL
-                       AND expires_at IS NOT NULL AND expires_at >= ?
+                       AND expires_at IS NOT NULL AND expires_at > ?
                        AND id > 0 AND source_movie_id IS NOT NULL AND TRIM(source_movie_id) <> ''
                        AND duration_minutes > 0
                      ORDER BY id ASC

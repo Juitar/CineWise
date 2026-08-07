@@ -249,7 +249,7 @@ POST 响应和按请求查询统一返回 `syncId/clientRequestId/cityName/statu
 
 D SHALL 在 `ContentPurchaseQueryPort` 提供 `findLiveDemoPurchaseCatalog(cityCode)`。它返回 `DemoPurchaseCatalog(movies, cinemas, source, dataAt, expiresAt)`，仅供 A 在 dev/demo 为真实影院创建本地 `demo-seed` 排期。A 不得读取 D 的表、Mapper、Repository、缓存、Provider 或 Controller，也不得将目录资料当作真实票价、座位、场次、订单或支付事实。
 
-`cityCode` 必须为六位正行政区划编码，否则返回 `100001`。`movies` 和 `cinemas` 各按本地 ID 升序且去重；每个本地 ID 为正，来源 ID 非空，影片 `durationMinutes` 为正。目录只接受未删除、未过期的 `LIVE/NETSTART_MAOYAN` 资料；本期若出现多个实际来源，D 拒绝构造目录，不以 `MIXED` 掩盖来源差异。影片最多三部，影院返回指定城市全部合格记录。目录无合格影院或影片时正常返回两个空列表；内容存储不可读时返回 `303004`，不得伪装成空目录。`dataAt` 和 `expiresAt` 分别取返回记录中最早的资料时间和最早的到期时间。
+`cityCode` 必须为六位正行政区划编码，否则返回 `100001`。`movies` 和 `cinemas` 两个 List 均不可为 `null`，构造时按本地 ID 升序去重；同一本地 ID 或来源 ID 映射到不同引用时拒绝目录。每个本地 ID 为正，来源 ID 非空，影片 `durationMinutes` 为正。目录只接受未删除且 `expiresAt > now` 的 `LIVE/NETSTART_MAOYAN` 资料；到期时间等于当前时刻也必须排除。本期若出现多个实际来源，D 拒绝构造目录，不以 `MIXED` 掩盖来源差异。影片最多三部，影院返回指定城市全部合格记录。目录无合格影院或影片时正常返回两个空列表；内容存储不可读时返回 `303004`，不得伪装成空目录。`dataAt` 和 `expiresAt` 分别取返回记录中最早的资料时间和最早的到期时间。
 
 #### Scenario: 长沙真实目录可用于本地 Mock 排期
 

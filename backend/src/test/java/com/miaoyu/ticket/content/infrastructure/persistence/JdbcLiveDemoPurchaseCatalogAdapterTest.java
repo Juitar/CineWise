@@ -61,6 +61,19 @@ class JdbcLiveDemoPurchaseCatalogAdapterTest {
     }
 
     @Test
+    void givenExpiryEqualsNow_whenQuerying_thenItExcludesTheBoundaryRecord() {
+        insertMovie(1, "movie-now", 100, "2026-08-07 07:00:00", "2026-08-07 08:00:00");
+        insertCinema(1, "cinema-now", "2026-08-07 07:00:00", "2026-08-07 08:00:00");
+        insertMovie(2, "movie-later", 100, "2026-08-07 07:00:00", "2026-08-07 08:00:01");
+        insertCinema(2, "cinema-later", "2026-08-07 07:00:00", "2026-08-07 08:00:01");
+
+        var result = adapter.findLiveCatalog("430100");
+
+        assertThat(result.movies()).extracting(ref -> ref.movieId()).containsExactly(2L);
+        assertThat(result.cinemas()).extracting(ref -> ref.cinemaId()).containsExactly(2L);
+    }
+
+    @Test
     void givenUnreadableStorage_whenQuerying_thenItKeeps303004() {
         jdbc.execute("DROP TABLE movie");
 
