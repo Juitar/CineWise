@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.travel.application;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -11,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 /** 验证到期建议与观影结束关闭均通过 D 的持久化端口，不依赖单机线程锁。 */
 class TravelReminderSchedulingServiceTest {
@@ -30,7 +32,10 @@ class TravelReminderSchedulingServiceTest {
 
         // 重复调度是否重复写快照由 TravelAdviceService 的版本条件更新裁决。
         verify(adviceService).generate(91L);
-        // 只有已超过开场两小时的 READY/NOTIFIED 候选才进入关闭条件更新。
+        // 关闭检查必须先于建议生成，避免同一轮调度先给已经过期的任务生成快照。
+        InOrder callOrder = inOrder(repository);
+        callOrder.verify(repository).listElapsedTaskIds(now.minusHours(2L), 100);
+        callOrder.verify(repository).listDueForAdvice(now, 100);
         verify(repository).completeIfElapsed(92L, now.minusHours(2L), now);
     }
 }

@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,7 +66,7 @@ public class TravelTaskApplicationService {
      * @param event A 在退款完成后登记的最小失效事件
      * @return 取消后的或原有的最小任务摘要
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.READ_COMMITTED)
     public TravelTaskSummary ensureTaskCancelled(OrderInvalidated event) {
         InvalidationTaskInput input = InvalidationTaskInput.from(event);
 

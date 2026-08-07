@@ -61,20 +61,22 @@ public interface TravelTaskPersistenceMapper {
                    show_id AS show_id, cinema_id AS cinema_id, cinema_area AS cinema_area,
                    start_at AS start_at, trigger_at AS trigger_at, order_version AS order_version,
                    version, status, closed_at AS closed_at, update_time AS updated_at
-              FROM travel_task WHERE status = 'PENDING' AND trigger_at <= #{now}
+              FROM travel_task
+             WHERE status = 'PENDING' AND trigger_at <= #{now} AND start_at > #{now}
              ORDER BY trigger_at ASC, id ASC LIMIT #{limit}
             """)
     List<TravelTaskRow> listDueForAdvice(@Param("now") java.time.LocalDateTime now, @Param("limit") int limit);
 
     @org.apache.ibatis.annotations.Update("""
             UPDATE travel_task SET status = 'COMPLETED', closed_at = #{closedAt}, update_time = #{closedAt}
-             WHERE id = #{id} AND status IN ('READY', 'NOTIFIED') AND start_at <= #{elapsedBefore}
+             WHERE id = #{id} AND status IN ('PENDING', 'READY', 'NOTIFIED') AND start_at <= #{elapsedBefore}
             """)
     int completeIfElapsed(@Param("id") long id, @Param("elapsedBefore") java.time.LocalDateTime elapsedBefore,
                           @Param("closedAt") java.time.LocalDateTime closedAt);
 
     @Select("""
-            SELECT id FROM travel_task WHERE status IN ('READY', 'NOTIFIED') AND start_at <= #{completedAt}
+            SELECT id FROM travel_task
+             WHERE status IN ('PENDING', 'READY', 'NOTIFIED') AND start_at <= #{completedAt}
              ORDER BY start_at ASC, id ASC LIMIT #{limit}
             """)
     List<Long> listElapsedTaskIds(@Param("completedAt") java.time.LocalDateTime completedAt, @Param("limit") int limit);
@@ -93,8 +95,8 @@ public interface TravelTaskPersistenceMapper {
     @org.apache.ibatis.annotations.Update("""
             UPDATE travel_task
                SET invalidation_event_id = #{invalidationEventId}, order_version = #{orderVersion},
-                   version = version + 1, status = 'CANCELLED',
-                   closed_at = CASE WHEN status = 'CANCELLED' THEN closed_at ELSE #{closedAt} END,
+                   version = version + 1, closed_at = COALESCE(closed_at, #{closedAt}),
+                   status = 'CANCELLED',
                    update_time = #{closedAt}
              WHERE id = #{id} AND status NOT IN ('COMPLETED', 'FAILED')
                AND (order_version < #{orderVersion}

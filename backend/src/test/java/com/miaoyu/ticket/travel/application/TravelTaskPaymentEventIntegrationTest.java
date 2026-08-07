@@ -275,6 +275,29 @@ class TravelTaskPaymentEventIntegrationTest {
     }
 
     @Test
+    void givenStartedPendingTask_whenSchedulerRuns_thenDoNotGenerateAdviceBeforeCompletionWindow() {
+        TravelTaskSummary task = travelTaskApplicationService.ensureTask(
+                paymentEvent("scheduled-started", "88014"));
+        long internalTaskId = jdbcTemplate.queryForObject(
+                "SELECT id FROM travel_task WHERE task_id = ?", Long.class, task.taskId());
+        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
+        jdbcTemplate.update(
+                "UPDATE travel_task SET start_at = ?, trigger_at = ? WHERE id = ?",
+                now.minusHours(1),
+                now.minusMinutes(1),
+                internalTaskId);
+
+        travelReminderSchedulingService.runDueTasks();
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM travel_advice_snapshot WHERE travel_task_id = ?", Long.class, internalTaskId))
+                .isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM travel_task WHERE id = ?", String.class, internalTaskId))
+                .isEqualTo("PENDING");
+    }
+
+    @Test
     void givenEarlierRepeatableReadTransaction_whenWinnerCommits_thenFreshReadFindsSnapshot() {
         TravelTaskSummary task = travelTaskApplicationService.ensureTask(paymentEvent("event-multi-instance", "88004"));
         long internalTaskId = jdbcTemplate.queryForObject(
