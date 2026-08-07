@@ -286,7 +286,7 @@ describe('useAgentWorkspace 状态与恢复', () => {
 
   it.each([
     [409, 206006, 'EXECUTING', '确认操作正在处理，请勿重复提交'],
-    [422, 206004, 'INVALIDATED', '确认内容已失效'],
+    [409, 206004, 'INVALIDATED', '确认内容已失效'],
   ] as const)(
     '确认接口返回 %s 时查询运行并恢复为 %s',
     async (status, code, confirmationStatus, expectedFeedback) => {

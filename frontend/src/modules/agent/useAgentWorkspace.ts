@@ -44,8 +44,8 @@ function confirmationErrorMessage(error: unknown): string {
   if (error.status === 401 || error.code === 201006) return '登录状态已失效，请重新登录';
   if (error.status === 403 || error.status === 404 || error.code === 206005)
     return '该确认操作不可用';
-  if (error.status === 409 || error.code === 206006) return '确认操作正在处理，请勿重复提交';
-  if (error.status === 422 || error.code === 206004) return '确认内容已失效';
+  if (error.code === 206004 || error.status === 422) return '确认内容已失效';
+  if (error.code === 206006 || error.status === 409) return '确认操作正在处理，请勿重复提交';
   return '确认请求未完成，请稍后查看实际状态';
 }
 
@@ -391,11 +391,13 @@ export function useAgentWorkspace(sessionId: string) {
           await recoverConfirmation(action.actionId);
         } else {
           const status =
-            error instanceof ApiError && [403, 404, 422].includes(error.status ?? 0)
+            error instanceof ApiError && error.code === 206004
               ? 'INVALIDATED'
-              : error instanceof ApiError && error.status === 409
-                ? 'EXECUTING'
-                : null;
+              : error instanceof ApiError && [403, 404, 422].includes(error.status ?? 0)
+                ? 'INVALIDATED'
+                : error instanceof ApiError && error.status === 409
+                  ? 'EXECUTING'
+                  : null;
           replaceProjection(
             status
               ? updateConfirmationItem(projectionRef.current, itemKey, { status })
