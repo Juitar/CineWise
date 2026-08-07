@@ -60,10 +60,18 @@ public interface ContentPersistencePort {
     }
 
     /** dataTime 用于每日有限预算内轮换复查详情，避免资料永远只按上映状态判断。 */
-    record MovieState(String releaseDate, String releaseStatus, LocalDateTime dataTime) {
+    /**
+     * 目录可观察字段用于决定是否需要再次读取详情；没有目录字段的旧数据保守地保留原有跳过规则。
+     * 不把海报或简介放入这里，因为目录不稳定提供它们，不能用空值误删已确认资料。
+     */
+    record MovieState(String title, String genresJson, BigDecimal rating,
+                      String releaseDate, String releaseStatus, LocalDateTime dataTime) {
+        public MovieState(String releaseDate, String releaseStatus, LocalDateTime dataTime) {
+            this(null, null, null, releaseDate, releaseStatus, dataTime);
+        }
         /** 兼容旧测试夹具；未提供同步时间时保留原有“状态相同则跳过”的语义。 */
         public MovieState(String releaseDate, String releaseStatus) {
-            this(releaseDate, releaseStatus, null);
+            this(null, null, null, releaseDate, releaseStatus, null);
         }
     }
 
