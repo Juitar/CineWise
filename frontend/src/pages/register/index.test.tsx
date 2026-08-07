@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
     status: 'anonymous',
   },
   navigate: vi.fn(),
+  isMobile: false,
   registration: {
     clearFeedback: vi.fn(),
     cooldownSeconds: 0,
@@ -46,7 +47,7 @@ vi.mock('../../modules/auth/useRegistration', () => ({
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: vi.fn().mockImplementation((query) => ({
-    matches: false,
+    matches: mocks.isMobile,
     media: query,
     onchange: null,
     addListener: vi.fn(),
@@ -87,6 +88,7 @@ describe('RegisterPage', () => {
     mocks.auth.currentUser = null;
     mocks.auth.status = 'anonymous';
     mocks.navigate.mockReset();
+    mocks.isMobile = false;
     mocks.registration.clearFeedback.mockReset();
     mocks.registration.cooldownSeconds = 0;
     mocks.registration.isSendCodeDisabled = false;
@@ -118,6 +120,16 @@ describe('RegisterPage', () => {
     expect(screen.getByRole('textbox', { name: '昵称（选填）' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox')).not.toBeChecked();
     expect(screen.queryByText(/暂未开放|静态页面预览/)).not.toBeInTheDocument();
+  });
+
+  it('移动端显示返回首页入口', async () => {
+    mocks.isMobile = true;
+    render(<RegisterPage />);
+
+    await waitFor(() =>
+      expect(document.querySelector('.register-page-container')).toHaveClass('login-page--mobile'),
+    );
+    expect(screen.getByRole('link', { name: '返回首页' })).toHaveAttribute('href', '/');
   });
 
   it('邮箱合法后发送 REGISTER 验证码', async () => {

@@ -162,12 +162,10 @@ export default function RegisterPage() {
           <span className="login-logo-text">妙语购票</span>
         </Link>
 
-        {!isMobile && (
-          <Link to="/" className="login-header-back">
-            <HomeIcon size={16} />
-            <span>返回首页</span>
-          </Link>
-        )}
+        <Link to="/" className="login-header-back">
+          <HomeIcon size={16} />
+          <span>返回首页</span>
+        </Link>
       </header>
 
       <main className="login-main">
