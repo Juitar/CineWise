@@ -84,6 +84,7 @@ public class TravelTaskApplicationService {
                 input.userId(),
                 input.orderId(),
                 input.showId(),
+                input.cinemaId(),
                 input.cinemaArea(),
                 input.startAt(),
                 input.startAt().minusHours(REMINDER_ADVANCE_HOURS),
@@ -133,6 +134,7 @@ public class TravelTaskApplicationService {
                 input.userId(),
                 input.orderId(),
                 input.showId(),
+                input.cinemaId(),
                 input.cinemaArea(),
                 input.startAt(),
                 input.startAt().minusHours(REMINDER_ADVANCE_HOURS),
@@ -169,6 +171,7 @@ public class TravelTaskApplicationService {
             long orderId,
             long showId,
             long userId,
+            long cinemaId,
             String cinemaArea,
             LocalDateTime startAt,
             long orderVersion) {
@@ -183,6 +186,7 @@ public class TravelTaskApplicationService {
                     parseBusinessId(event.orderId(), "orderId"),
                     parseBusinessId(event.showId(), "showId"),
                     parseBusinessId(event.userId(), "userId"),
+                    parseBusinessId(event.cinemaId(), "cinemaId"),
                     requiredText(event.cinemaArea(), "cinemaArea"),
                     Objects.requireNonNull(event.startAt(), "startAt 不能为空")
                             .atZoneSameInstant(ClockConfiguration.BUSINESS_ZONE_ID)
@@ -217,6 +221,7 @@ public class TravelTaskApplicationService {
             long orderId,
             long showId,
             long userId,
+            Long cinemaId,
             String cinemaArea,
             LocalDateTime startAt,
             long orderVersion) {
@@ -234,11 +239,24 @@ public class TravelTaskApplicationService {
                     PaymentTaskInput.parseBusinessId(event.orderId(), "orderId"),
                     PaymentTaskInput.parseBusinessId(event.showId(), "showId"),
                     PaymentTaskInput.parseBusinessId(event.userId(), "userId"),
+                    parseOptionalBusinessId(event.cinemaId()),
                     PaymentTaskInput.requiredText(event.cinemaArea(), "cinemaArea"),
                     Objects.requireNonNull(event.startAt(), "startAt 不能为空")
                             .atZoneSameInstant(ClockConfiguration.BUSINESS_ZONE_ID)
                             .toLocalDateTime(),
                     event.orderVersion());
+        }
+
+        private static Long parseOptionalBusinessId(String value) {
+            if (value == null || value.isBlank()) {
+                return null;
+            }
+            try {
+                long parsed = Long.parseLong(value.trim());
+                return parsed > 0 ? parsed : null;
+            } catch (NumberFormatException exception) {
+                return null;
+            }
         }
 
     }

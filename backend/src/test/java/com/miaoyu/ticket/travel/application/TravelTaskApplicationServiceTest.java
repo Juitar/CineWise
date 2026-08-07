@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.travel.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import com.miaoyu.ticket.order.event.OrderInvalidated;
@@ -93,6 +94,17 @@ class TravelTaskApplicationServiceTest {
         assertThat(newer.orderVersion()).isEqualTo(6L);
     }
 
+    @Test
+    void givenInvalidCinemaId_whenEnsuringPaymentTask_thenRejectEventWithoutCreatingTask() {
+        InMemoryTravelTaskRepository repository = new InMemoryTravelTaskRepository();
+        TravelTaskApplicationService service = service(repository);
+
+        assertThatIllegalArgumentException().isThrownBy(() -> service.ensureTask(
+                paymentEvent("invalid-cinema", "90005", "0")));
+
+        assertThat(repository.count()).isZero();
+    }
+
     private TravelTaskApplicationService service(InMemoryTravelTaskRepository repository) {
         AtomicLong ids = new AtomicLong(9_000_000L);
         BusinessIdGenerator idGenerator = ids::incrementAndGet;
@@ -108,12 +120,16 @@ class TravelTaskApplicationServiceTest {
     }
 
     private PaymentSucceededEvent paymentEvent(String eventId, String orderId) {
+        return paymentEvent(eventId, orderId, "60001");
+    }
+
+    private PaymentSucceededEvent paymentEvent(String eventId, String orderId, String cinemaId) {
         OffsetDateTime startAt = OffsetDateTime.parse("2026-08-05T19:00:00+08:00");
         return new PaymentSucceededEvent(
                 eventId,
                 orderId,
                 "80001",
-                "60001",
+                cinemaId,
                 "70001",
                 "西湖区",
                 startAt,

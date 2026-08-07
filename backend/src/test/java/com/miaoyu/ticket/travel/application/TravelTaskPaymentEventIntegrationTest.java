@@ -77,6 +77,16 @@ class TravelTaskPaymentEventIntegrationTest {
     }
 
     @Test
+    void givenValidCinemaId_whenPaymentTaskCreated_thenPersistCinemaId() {
+        TravelTaskSummary task = travelTaskApplicationService.ensureTask(
+                paymentEvent("event-cinema-id", "88012", "44001"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT cinema_id FROM travel_task WHERE task_id = ?", Long.class, task.taskId()))
+                .isEqualTo(44001L);
+    }
+
+    @Test
     void givenRolledBackPaymentEvent_whenPublished_thenDoNotCreateTask() {
         try {
             transactionTemplate.executeWithoutResult(status -> {
@@ -122,6 +132,21 @@ class TravelTaskPaymentEventIntegrationTest {
 
         assertThat(paymentResult.status()).hasToString("CANCELLED");
         assertThat(countTasks()).isOne();
+    }
+
+    @Test
+    void givenInvalidCinemaIdOnEarlyRefund_whenCompensatedPaymentArrives_thenKeepNullTombstone() {
+        travelTaskApplicationService.ensureTaskCancelled(
+                invalidatedEvent("refund-invalid-cinema", "88013", 4L, "0"));
+
+        travelTaskApplicationService.ensureTask(paymentEvent(
+                "payment-after-invalid-refund", "88013", "44001"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT cinema_id FROM travel_task WHERE order_id = ?", Long.class, 88013L)).isNull();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM travel_task WHERE order_id = ?", String.class, 88013L))
+                .isEqualTo("CANCELLED");
     }
 
     @Test
@@ -250,11 +275,15 @@ class TravelTaskPaymentEventIntegrationTest {
     }
 
     private PaymentSucceededEvent paymentEvent(String eventId, String orderId) {
+        return paymentEvent(eventId, orderId, "44001");
+    }
+
+    private PaymentSucceededEvent paymentEvent(String eventId, String orderId, String cinemaId) {
         return new PaymentSucceededEvent(
                 eventId,
                 orderId,
                 "66001",
-                "44001",
+                cinemaId,
                 "55001",
                 "西湖区",
                 OffsetDateTime.parse("2026-08-05T19:00:00+08:00"),
@@ -263,11 +292,16 @@ class TravelTaskPaymentEventIntegrationTest {
     }
 
     private OrderInvalidated invalidatedEvent(String eventId, String orderId, long orderVersion) {
+        return invalidatedEvent(eventId, orderId, orderVersion, "44001");
+    }
+
+    private OrderInvalidated invalidatedEvent(
+            String eventId, String orderId, long orderVersion, String cinemaId) {
         return new OrderInvalidated(
                 eventId,
                 orderId,
                 "66001",
-                "44001",
+                cinemaId,
                 "55001",
                 "西湖区",
                 OffsetDateTime.parse("2026-08-05T19:00:00+08:00"),
