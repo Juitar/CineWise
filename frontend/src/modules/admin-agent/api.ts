@@ -6,14 +6,17 @@ export function queryAdminAgentRuns(
   query: AdminAgentRunListQuery,
   signal?: AbortSignal,
 ): Promise<AdminAgentRunPage> {
+  const startedFrom = query.startedFrom?.trim();
+  const startedTo = query.startedTo?.trim();
+  const userKeyword = query.userKeyword?.trim();
   return apiRequest<AdminAgentRunPage>('/api/v1/admin/agent-runs', {
     query: {
       page: query.page,
       size: query.size,
-      startedFrom: query.startedFrom,
-      startedTo: query.startedTo,
+      startedFrom: startedFrom || undefined,
+      startedTo: startedTo || undefined,
       status: query.status,
-      userKeyword: query.userKeyword,
+      userKeyword: userKeyword || undefined,
     },
     signal,
   });

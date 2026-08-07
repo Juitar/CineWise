@@ -35,4 +35,26 @@ describe('管理员 Agent 查询条件', () => {
     );
     expect(params.has('runId')).toBe(false);
   });
+
+  it('恢复等待定位状态并丢弃无效时间', () => {
+    const query = parseAdminAgentRunQuery(
+      new URLSearchParams('status=WAITING_LOCATION&startedFrom=2026-08-05&startedTo=not-a-time'),
+    );
+
+    expect(query.status).toBe('WAITING_LOCATION');
+    expect(query.startedFrom).toBeUndefined();
+    expect(query.startedTo).toBeUndefined();
+  });
+
+  it('生成查询参数时忽略空白筛选值', () => {
+    const params = buildAdminAgentRunSearchParams({
+      page: 1,
+      size: 20,
+      userKeyword: '   ',
+      startedFrom: '',
+      startedTo: '  ',
+    });
+
+    expect(params.toString()).toBe('');
+  });
 });

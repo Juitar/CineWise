@@ -14,6 +14,7 @@ vi.mock('./api', () => apiMocks);
 
 const summary = {
   runId: 'run_01J4',
+  sessionId: 'session_01J4',
   userDisplay: 'u***@example.com',
   status: 'FAILED',
   planId: 'plan_01J4',
@@ -52,6 +53,40 @@ describe('管理员 Agent 查询 Hook', () => {
     const { result } = renderHook(() => useAdminAgentRunDetail(detail.runId));
 
     await waitFor(() => expect(result.current.error?.status).toBe(404));
+    expect(result.current.data).toBeNull();
+  });
+
+  it('关闭详情后丢弃迟到响应并清除上一条数据', async () => {
+    let resolveDetail: ((value: AdminAgentRunDetail) => void) | undefined;
+    apiMocks.queryAdminAgentRunDetail.mockReturnValue(
+      new Promise<AdminAgentRunDetail>((resolve) => {
+        resolveDetail = resolve;
+      }),
+    );
+    const { result, rerender } = renderHook(
+      ({ runId }: { runId: string | null }) => useAdminAgentRunDetail(runId),
+      { initialProps: { runId: detail.runId as string | null } },
+    );
+
+    rerender({ runId: null });
+    expect(result.current.data).toBeNull();
+    expect(result.current.isLoading).toBe(false);
+    resolveDetail?.(detail);
+    await waitFor(() => expect(result.current.data).toBeNull());
+  });
+
+  it('列表权限失效时清除已加载的管理数据', async () => {
+    apiMocks.queryAdminAgentRuns
+      .mockResolvedValueOnce(page)
+      .mockRejectedValueOnce(new ApiError('forbidden', { kind: 'HTTP', status: 403 }));
+    const { result, rerender } = renderHook(
+      ({ pageNumber }: { pageNumber: number }) => useAdminAgentRuns({ page: pageNumber, size: 20 }),
+      { initialProps: { pageNumber: 1 } },
+    );
+
+    await waitFor(() => expect(result.current.data?.records).toHaveLength(1));
+    rerender({ pageNumber: 2 });
+    await waitFor(() => expect(result.current.error?.status).toBe(403));
     expect(result.current.data).toBeNull();
   });
 });

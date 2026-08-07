@@ -4,6 +4,7 @@ import { mapAdminAgentRunDetail, mapAdminAgentRunPage } from './mappers';
 
 const summary = {
   runId: 'run_01J4',
+  sessionId: 'session_01J4',
   userDisplay: 'u***@example.com',
   status: 'FAILED',
   planId: 'plan_01J4',
@@ -52,5 +53,59 @@ describe('管理员 Agent DTO 映射', () => {
   it('拒绝缺少分页或节点必填字段的响应', () => {
     expect(() => mapAdminAgentRunPage({ total: 1, page: 1, size: 20, records: [{}] })).toThrow();
     expect(() => mapAdminAgentRunDetail({ ...summary, nodes: [{}] })).toThrow();
+  });
+
+  it('接受等待定位和全部可空审计字段', () => {
+    const detail = mapAdminAgentRunDetail({
+      ...summary,
+      sessionId: null,
+      status: 'WAITING_LOCATION',
+      planId: null,
+      planVersion: null,
+      finishedAt: null,
+      durationMs: null,
+      errorCode: null,
+      errorSummary: null,
+      nodes: [
+        {
+          nodeId: 'node-location',
+          nodeType: 'ASK_USER',
+          targetName: null,
+          status: 'PENDING',
+          attemptCount: 0,
+          startedAt: null,
+          finishedAt: null,
+          durationMs: null,
+          toolStatus: null,
+          errorCode: null,
+          errorSummary: null,
+          recoveryHint: null,
+        },
+      ],
+    });
+
+    expect(detail.status).toBe('WAITING_LOCATION');
+    expect(detail.planId).toBeNull();
+    expect(detail.nodes[0].targetName).toBeNull();
+    expect(detail.nodes[0].startedAt).toBeNull();
+  });
+
+  it('拒绝可空字段中的错误类型和无效时间', () => {
+    expect(() =>
+      mapAdminAgentRunPage({
+        total: 1,
+        page: 1,
+        size: 20,
+        records: [{ ...summary, planId: 123 }],
+      }),
+    ).toThrow('planId');
+    expect(() =>
+      mapAdminAgentRunPage({
+        total: 1,
+        page: 1,
+        size: 20,
+        records: [{ ...summary, startedAt: 'not-a-time' }],
+      }),
+    ).toThrow('startedAt');
   });
 });

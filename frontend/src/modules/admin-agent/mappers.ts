@@ -16,8 +16,14 @@ function requiredString(value: unknown, fieldName: string): string {
   return value;
 }
 
-function nullableString(value: unknown): string | null {
-  return value === null || value === undefined ? null : typeof value === 'string' ? value : null;
+function nullableString(value: unknown, fieldName: string): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value !== 'string') {
+    throw new Error(`Agent 轨迹字段 ${fieldName} 无效`);
+  }
+  return value;
 }
 
 function integer(value: unknown, fieldName: string): number {
@@ -31,6 +37,18 @@ function nullableInteger(value: unknown, fieldName: string): number | null {
   return value === null || value === undefined ? null : integer(value, fieldName);
 }
 
+function isoDateTime(value: unknown, fieldName: string): string {
+  const dateTime = requiredString(value, fieldName);
+  if (Number.isNaN(Date.parse(dateTime)) || !dateTime.includes('T')) {
+    throw new Error(`Agent 轨迹字段 ${fieldName} 无效`);
+  }
+  return dateTime;
+}
+
+function nullableIsoDateTime(value: unknown, fieldName: string): string | null {
+  return value === null || value === undefined ? null : isoDateTime(value, fieldName);
+}
+
 function mapSummary(value: unknown): AdminAgentRunSummary {
   if (!isRecord(value)) {
     throw new Error('Agent 轨迹列表记录格式无效');
@@ -39,14 +57,15 @@ function mapSummary(value: unknown): AdminAgentRunSummary {
     completedNodeCount: integer(value.completedNodeCount, 'completedNodeCount'),
     durationMs: nullableInteger(value.durationMs, 'durationMs'),
     errorCode: nullableInteger(value.errorCode, 'errorCode'),
-    errorSummary: nullableString(value.errorSummary),
+    errorSummary: nullableString(value.errorSummary, 'errorSummary'),
     failedNodeCount: integer(value.failedNodeCount, 'failedNodeCount'),
-    finishedAt: nullableString(value.finishedAt),
+    finishedAt: nullableIsoDateTime(value.finishedAt, 'finishedAt'),
     nodeCount: integer(value.nodeCount, 'nodeCount'),
-    planId: requiredString(value.planId, 'planId'),
-    planVersion: integer(value.planVersion, 'planVersion'),
+    planId: nullableString(value.planId, 'planId'),
+    planVersion: nullableInteger(value.planVersion, 'planVersion'),
     runId: requiredString(value.runId, 'runId'),
-    startedAt: requiredString(value.startedAt, 'startedAt'),
+    sessionId: nullableString(value.sessionId, 'sessionId'),
+    startedAt: isoDateTime(value.startedAt, 'startedAt'),
     status: requiredString(value.status, 'status'),
     userDisplay: requiredString(value.userDisplay, 'userDisplay'),
   };
@@ -60,15 +79,15 @@ function mapNode(value: unknown): AdminAgentRunNode {
     attemptCount: integer(value.attemptCount, 'attemptCount'),
     durationMs: nullableInteger(value.durationMs, 'durationMs'),
     errorCode: nullableInteger(value.errorCode, 'errorCode'),
-    errorSummary: nullableString(value.errorSummary),
-    finishedAt: nullableString(value.finishedAt),
+    errorSummary: nullableString(value.errorSummary, 'errorSummary'),
+    finishedAt: nullableIsoDateTime(value.finishedAt, 'finishedAt'),
     nodeId: requiredString(value.nodeId, 'nodeId'),
     nodeType: requiredString(value.nodeType, 'nodeType'),
-    recoveryHint: nullableString(value.recoveryHint),
-    startedAt: requiredString(value.startedAt, 'startedAt'),
+    recoveryHint: nullableString(value.recoveryHint, 'recoveryHint'),
+    startedAt: nullableIsoDateTime(value.startedAt, 'startedAt'),
     status: requiredString(value.status, 'status'),
-    targetName: requiredString(value.targetName, 'targetName'),
-    toolStatus: nullableString(value.toolStatus),
+    targetName: nullableString(value.targetName, 'targetName'),
+    toolStatus: nullableString(value.toolStatus, 'toolStatus'),
   };
 }
 
