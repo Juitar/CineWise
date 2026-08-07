@@ -4,11 +4,13 @@ import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.config.SeedProperties;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import com.miaoyu.ticket.content.application.ContentSeedCatalog;
+import com.miaoyu.ticket.content.application.ContentPurchaseQueryPort;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -62,6 +64,36 @@ public class TicketingSeedApplicationService {
         if (catalog.movies().isEmpty() || catalog.cinemas().isEmpty()) {
             throw new IllegalArgumentException("Fixed ticketing seed requires movies and cinemas");
         }
+        return ensureSeed(catalog);
+    }
+
+    /**
+     * 为 D 返回的真实内容目录补齐本地 Mock 排期。
+     *
+     * <p>返回的影片和影院 ID 已由 D 标准化，A 只创建自己拥有的影厅、场次、座位和价格。目录到期时
+     * 不再新增任何数据，避免把过时内容继续扩展为可购演示排期。</p>
+     */
+    @Transactional
+    public TicketingSeedReport ensureLiveDemoSeed(ContentPurchaseQueryPort.DemoPurchaseCatalog catalog) {
+        if (catalog == null || catalog.movies().isEmpty() || catalog.cinemas().isEmpty()) {
+            return emptyReport();
+        }
+        OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
+        if (!catalog.expiresAt().isAfter(now)) {
+            return emptyReport();
+        }
+        ContentSeedCatalog references = new ContentSeedCatalog(
+                catalog.movies().stream()
+                        .map(movie -> new ContentSeedCatalog.MovieRef(
+                                movie.movieId(), movie.sourceMovieId(), movie.durationMinutes()))
+                        .toList(),
+                catalog.cinemas().stream()
+                        .map(cinema -> new ContentSeedCatalog.CinemaRef(cinema.cinemaId(), cinema.sourceCinemaId()))
+                        .toList());
+        return ensureSeed(references);
+    }
+
+    private TicketingSeedReport ensureSeed(ContentSeedCatalog catalog) {
 
         LocalDateTime generatedAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         LocalDate runDate = LocalDate.now(clock);
@@ -99,6 +131,10 @@ public class TicketingSeedApplicationService {
             }
         }
         return new TicketingSeedReport(auditoriumCount, showCount, seatCount);
+    }
+
+    private TicketingSeedReport emptyReport() {
+        return new TicketingSeedReport(0, 0, 0);
     }
 
     private long ensureAuditorium(long cinemaId, int hallNumber, LocalDateTime generatedAt) {
