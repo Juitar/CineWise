@@ -7,6 +7,8 @@ import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.auth.application.RoleCode;
 import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.geo.domain.LocationGranularity;
+import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import com.miaoyu.ticket.order.event.OrderInvalidated;
 import java.time.Clock;
 import java.time.OffsetDateTime;
@@ -83,6 +85,9 @@ class BasicRouteServiceMySqlIntegrationTest {
                     providerCalls.incrementAndGet();
                     return Optional.empty();
                 },
+                ignored -> Optional.of(new ResolvedGeoPoint(
+                        new java.math.BigDecimal("120.1"), new java.math.BigDecimal("30.2"),
+                        LocationGranularity.ADDRESS)),
                 clock);
 
         SecurityContextHolder.getContext().setAuthentication(
@@ -91,7 +96,10 @@ class BasicRouteServiceMySqlIntegrationTest {
         try {
             // 历史任务仍可保留和查询，但路线必须先验证影院 ID，不能使用区域名称代替终点。
             assertThatThrownBy(() -> routeService.planMyRoute(task.taskId(),
-                    new BasicRouteCommand(BasicRouteCommand.OriginType.MANUAL, "西湖文化广场", "TRANSIT", true)))
+                    new BasicRouteCommand(new ResolvedGeoPoint(
+                            new java.math.BigDecimal("120.1"), new java.math.BigDecimal("30.2"),
+                            LocationGranularity.POI),
+                            "TRANSIT", true)))
                     .isInstanceOfSatisfying(BusinessException.class,
                             error -> assertThat(error.getErrorCode())
                                     .isEqualTo(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE));

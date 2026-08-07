@@ -7,7 +7,6 @@ import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.travel.application.WeatherObservation;
 import com.miaoyu.ticket.travel.application.WeatherQueryService;
 import java.util.Objects;
-import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,8 +20,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class GetWeatherTool {
     public static final String TARGET_NAME = "getWeather";
-    // 当前 MVP 仅允许内容 Demo 已登记影院的行政区，拒绝地址、坐标和任意 Agent 文本进入缓存键。
-    private static final Set<String> ALLOWED_CINEMA_AREAS = Set.of("西湖区", "滨江区", "拱墅区", "上城区");
     private final WeatherQueryService weatherQueryService;
 
     public GetWeatherTool(WeatherQueryService weatherQueryService) {
@@ -31,7 +28,7 @@ public class GetWeatherTool {
 
     /**
      * 只接受已登记的目标名，防止错误路由把任意 Agent 节点带入 D 的外部数据查询。
-     * 这里不使用 context 中的用户信息；天气查询只按影院区域取得公开的动态数据。
+     * 这里不使用 context 中的用户信息；天气查询只按已登记影院标识取得公开的动态数据。
      */
     public ToolResult<WeatherObservation> execute(ToolContext context, GetWeatherCommand command) {
         Objects.requireNonNull(context, "context 不能为空");
@@ -39,10 +36,7 @@ public class GetWeatherTool {
         if (!TARGET_NAME.equals(context.targetName())) {
             return failed(context);
         }
-        if (!ALLOWED_CINEMA_AREAS.contains(command.cinemaArea())) {
-            return failed(context);
-        }
-        WeatherObservation result = weatherQueryService.query(command.cinemaArea());
+        WeatherObservation result = weatherQueryService.query(command.longCinemaId());
         return new ToolResult<>(ToolStatus.SUCCESS, result, null, false, false, "RENDER_RESULT",
                 result.degraded(), result.fallbackType(), context.stateVersion(), result.dataTime().toInstant(),
                 result.expiresAt().toInstant());
@@ -53,12 +47,14 @@ public class GetWeatherTool {
                 "CHECK_TOOL_TARGET", false, null, context.stateVersion(), null, null);
     }
 
-    /** 影院区域来自已校验的计划参数，不能放入精确地址或用户位置。 */
-    public record GetWeatherCommand(String cinemaArea) {
+    /** 只接受影院业务 ID，禁止地址、区域名、坐标和 userId 进入 Tool Schema。 */
+    public record GetWeatherCommand(String cinemaId) {
         public GetWeatherCommand {
-            if (cinemaArea == null || cinemaArea.isBlank()) {
-                throw new IllegalArgumentException("cinemaArea 不能为空");
+            if (cinemaId == null || !cinemaId.matches("[1-9][0-9]*")) {
+                throw new IllegalArgumentException("cinemaId 必须是正整数");
             }
         }
+
+        public long longCinemaId() { return Long.parseLong(cinemaId); }
     }
 }

@@ -1,0 +1,19 @@
+## Purpose
+
+约束距离推荐只使用可代表个人位置的类型化坐标，并保持现有一次性距离上下文的隐私与并发规则。
+
+## ADDED Requirements
+
+### Requirement: 距离上下文只保存允许用于个人距离的位置
+
+`DistanceContextService` MUST 通过统一位置适配器校验浏览器坐标；仅 DEVICE、POI、ADDRESS 坐标可以创建或更新距离上下文。距离结果必须标注为直线距离。
+
+#### Scenario: 使用设备位置建立距离上下文
+
+- **WHEN** C 上传合法浏览器坐标
+- **THEN** 系统仅在当前进程的 TTL 内保存设备坐标并允许距离排序
+
+#### Scenario: 使用城市代表点建立距离上下文
+
+- **WHEN** 调用方试图以 CITY 或 DISTRICT 粒度的位置创建距离上下文
+- **THEN** 系统拒绝该操作，且不覆盖已有的设备位置

@@ -1,5 +1,6 @@
 package com.miaoyu.ticket.travel.application;
 
+import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 
@@ -13,5 +14,5 @@ import java.util.Optional;
 public interface BasicRouteProvider {
 
     Optional<BasicRouteResult> plan(
-            String originValue, String cinemaArea, String travelMode, OffsetDateTime requestedAt);
+            ResolvedGeoPoint origin, ResolvedGeoPoint destination, String travelMode, OffsetDateTime requestedAt);
 }

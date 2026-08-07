@@ -6,6 +6,8 @@ import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.auth.application.RoleCode;
 import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.geo.domain.LocationGranularity;
+import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import com.miaoyu.ticket.travel.domain.TravelTaskStatus;
 import java.time.Clock;
 import java.time.Instant;
@@ -69,18 +71,23 @@ class BasicRouteServiceTest {
     private BasicRouteService service(BasicRouteProvider provider, Long cinemaId) {
         CurrentUserAccessor user = () -> new CurrentUser(1L, RoleCode.USER, 0L);
         return new BasicRouteService(new StubRepository(cinemaId), user, provider,
+                ignored -> Optional.of(new ResolvedGeoPoint(
+                        new java.math.BigDecimal("120.1"), new java.math.BigDecimal("30.2"),
+                        LocationGranularity.ADDRESS)),
                 Clock.fixed(Instant.parse("2026-08-04T00:00:00Z"), ZoneOffset.UTC));
     }
 
     private BasicRouteCommand command(boolean confirmed) {
-        return new BasicRouteCommand(BasicRouteCommand.OriginType.MANUAL, "西湖文化广场", "TRANSIT", confirmed);
+        return new BasicRouteCommand(new ResolvedGeoPoint(
+                new java.math.BigDecimal("120.1"), new java.math.BigDecimal("30.2"), LocationGranularity.POI),
+                "TRANSIT", confirmed);
     }
 
     private static final class CountingProvider implements BasicRouteProvider {
         private int calls;
         @Override
         public Optional<BasicRouteResult> plan(
-                String origin, String area, String mode, java.time.OffsetDateTime at) {
+                ResolvedGeoPoint origin, ResolvedGeoPoint destination, String mode, java.time.OffsetDateTime at) {
             calls++;
             return Optional.empty();
         }
@@ -89,8 +96,8 @@ class BasicRouteServiceTest {
     private static final class ThrowingProvider implements BasicRouteProvider {
         @Override
         public Optional<BasicRouteResult> plan(
-                String origin, String area, String mode, java.time.OffsetDateTime at) {
-            throw new IllegalStateException("地图服务超时：" + origin);
+                ResolvedGeoPoint origin, ResolvedGeoPoint destination, String mode, java.time.OffsetDateTime at) {
+            throw new IllegalStateException("地图服务超时");
         }
     }
 

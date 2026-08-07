@@ -1,13 +1,18 @@
 package com.miaoyu.ticket.travel.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
+import com.miaoyu.ticket.content.application.CinemaLocationQueryService;
+import com.miaoyu.ticket.geo.domain.LocationGranularity;
+import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 class WeatherQueryServiceTest {
 
@@ -39,6 +44,26 @@ class WeatherQueryServiceTest {
                 new InMemoryCache(), CLOCK);
 
         assertThat(service.query("西湖区").fallbackType()).isEqualTo("DEMO");
+    }
+
+    @Test
+    void givenCinemaCoordinateAndResolvedAdcode_whenQuerying_thenUseAdcodeWithoutExposingItAsArea() {
+        CinemaLocationQueryService cinemas = Mockito.mock(CinemaLocationQueryService.class);
+        WeatherAdcodeAdapter adcodes = Mockito.mock(WeatherAdcodeAdapter.class);
+        ResolvedGeoPoint point = new ResolvedGeoPoint(
+                new java.math.BigDecimal("112.938814"), new java.math.BigDecimal("28.228209"),
+                LocationGranularity.ADDRESS);
+        when(cinemas.findAreaByCinemaId(4L)).thenReturn(Optional.of("岳麓区"));
+        when(cinemas.findByCinemaId(4L)).thenReturn(Optional.of(point));
+        when(adcodes.resolve(point)).thenReturn(Optional.of("430104"));
+        WeatherQueryService service = new WeatherQueryService(
+                (key, time) -> Optional.of(observation("AMAP_WEATHER", false, null)),
+                (key, time) -> Optional.empty(), new InMemoryCache(), CLOCK, cinemas, adcodes);
+
+        WeatherObservation result = service.query(4L);
+
+        assertThat(result.area()).isEqualTo("岳麓区");
+        org.mockito.Mockito.verify(adcodes).resolve(point);
     }
 
     private WeatherObservation observation(String source, boolean degraded, String fallback) {

@@ -1,6 +1,8 @@
 package com.miaoyu.ticket.recommendation.application;
 
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
+import com.miaoyu.ticket.geo.application.BrowserUserLocationAdapter;
+import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import com.miaoyu.ticket.recommendation.domain.CinemaDistanceSelector.Coordinate;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -16,11 +18,21 @@ public class DistanceContextService {
     private static final long TTL_SECONDS = 300L;
     private final CurrentUserAccessor currentUserAccessor;
     private final Clock clock;
+    /** 位置校验只能走 geo 入口，避免推荐模块另行解释范围和精度。 */
+    private final BrowserUserLocationAdapter browserLocationAdapter;
     private final Map<String, Context> contexts = new ConcurrentHashMap<>();
 
-    public DistanceContextService(CurrentUserAccessor currentUserAccessor, Clock clock) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public DistanceContextService(
+            CurrentUserAccessor currentUserAccessor, Clock clock, BrowserUserLocationAdapter browserLocationAdapter) {
         this.currentUserAccessor = currentUserAccessor;
         this.clock = clock;
+        this.browserLocationAdapter = browserLocationAdapter;
+    }
+
+    /** 保留测试构造入口；生产 Bean 一律注入统一的 geo 校验适配器。 */
+    public DistanceContextService(CurrentUserAccessor currentUserAccessor, Clock clock) {
+        this(currentUserAccessor, clock, new BrowserUserLocationAdapter());
     }
 
     /** B 使用可信 runId 创建不含位置的关联 ID，随后才允许 C 上传一次坐标。 */
@@ -35,7 +47,10 @@ public class DistanceContextService {
     /** C 直接上传本次坐标；重复、过期或归属不符均不暴露具体原因。 */
     public UploadResult upload(String contextId, BigDecimal longitude, BigDecimal latitude) {
         long userId = currentUserAccessor.requireCurrentUserId();
-        Coordinate coordinate = new Coordinate(longitude, latitude);
+        // 浏览器坐标只能成为 DEVICE 粒度；统一值对象同时限制范围和六位小数精度。
+        ResolvedGeoPoint point = browserLocationAdapter.fromBrowser(longitude, latitude);
+        point.requirePersonalDistanceCapability();
+        Coordinate coordinate = new Coordinate(point.longitude(), point.latitude());
         Context expected = contexts.get(contextId);
         while (expected != null) {
             // 归属、时效和一次性标记任一不满足都必须失败，并保留原上下文不被覆盖或删除。

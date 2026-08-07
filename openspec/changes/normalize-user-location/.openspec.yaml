@@ -1,0 +1,3 @@
+schema: spec-driven
+created: 2026-08-07
+goal: 统一 D 模块的位置模型，禁止将地址、区域、城市编码、NetStart ci 和高德 adcode 混用。

@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.travel.infrastructure.weather;
 
 import com.miaoyu.ticket.travel.application.WeatherProvider;
+import com.miaoyu.ticket.travel.application.WeatherAdcodeAdapter;
 import com.miaoyu.ticket.travel.application.WeatherQueryService.WeatherCache;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +21,10 @@ public class WeatherProviderConfiguration {
     }
     /** Demo 只用于没有真实结果时的明确降级展示。 */
     @Bean WeatherProvider demoWeatherProvider() { return new DemoWeatherProvider(); }
+    /** 逆地理只处理影院静态坐标；未配置 Key 时 Adapter 返回空并让上层走显式回退。 */
+    @Bean WeatherAdcodeAdapter weatherAdcodeAdapter(AmapWeatherProperties properties, RestClient externalRestClient) {
+        return new AmapWeatherAdcodeAdapter(properties, externalRestClient);
+    }
     /** 缓存键仅为影院行政区，不存用户位置或路线。 */
     @Bean WeatherCache weatherCache() { return new InMemoryWeatherCache(); }
 }

@@ -67,6 +67,10 @@ public record AmapWeatherProperties(boolean enabled, String key, Duration cacheT
             return null;
         }
         String normalizedArea = cinemaArea.trim();
+        // 逆地理 Adapter 已返回合法 adcode 时直接使用，不能再要求它匹配展示区域名称。
+        if (normalizedArea.matches("[1-9][0-9]{5}")) {
+            return normalizedArea;
+        }
         String areaCode = areaAdcodes.get(normalizedArea);
         if (areaCode != null) {
             return areaCode;

@@ -2,6 +2,7 @@ package com.miaoyu.ticket.travel.infrastructure.route;
 
 import com.miaoyu.ticket.travel.application.BasicRouteProvider;
 import com.miaoyu.ticket.travel.application.BasicRouteResult;
+import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 
@@ -11,8 +12,8 @@ final class DemoRouteProvider implements BasicRouteProvider {
 
     @Override
     public Optional<BasicRouteResult> plan(
-            String originValue, String cinemaArea, String travelMode, OffsetDateTime requestedAt) {
-        if (originValue == null || originValue.isBlank() || cinemaArea == null || cinemaArea.isBlank()) {
+            ResolvedGeoPoint origin, ResolvedGeoPoint destination, String travelMode, OffsetDateTime requestedAt) {
+        if (origin == null || destination == null || travelMode == null || travelMode.isBlank()) {
             return Optional.empty();
         }
         return Optional.of(new BasicRouteResult(
