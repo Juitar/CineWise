@@ -245,7 +245,7 @@ describe('MoviesPage', () => {
     );
     render(<MoviesPage />);
 
-    expect(screen.getByText('数据已过期，仅供参考')).toBeInTheDocument();
+    expect(screen.queryByText('数据已过期，仅供参考')).not.toBeInTheDocument();
     expect(screen.getByText('当前为降级数据')).toBeInTheDocument();
     expect(screen.getByText('演示数据')).toBeInTheDocument();
   });

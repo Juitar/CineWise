@@ -30,9 +30,11 @@ export default function OrdersPage() {
   );
   const ordersQuery = useOrders(query);
   const records = ordersQuery.data?.records ?? [];
-  const content = useOrderContentDetails(
-    useMemo(() => records.map(({ movieId, cinemaId }) => ({ movieId, cinemaId })), [records]),
+  const contentReferences = useMemo(
+    () => records.map(({ movieId, cinemaId }) => ({ movieId, cinemaId })),
+    [records],
   );
+  const content = useOrderContentDetails(contentReferences);
   const orders: OrderSummaryItem[] = records.map((order) => ({
     orderId: order.orderId,
     orderNo: order.orderNo,
@@ -48,19 +50,34 @@ export default function OrdersPage() {
     cinemaArea: content.cinemasById.get(order.cinemaId)?.area ?? undefined,
     cinemaAddress: content.cinemasById.get(order.cinemaId)?.address ?? undefined,
   }));
+  const movieReferenceCount = new Set(
+    contentReferences.map(({ movieId }) => movieId).filter(Boolean),
+  ).size;
+  const cinemaReferenceCount = new Set(
+    contentReferences.map(({ cinemaId }) => cinemaId).filter(Boolean),
+  ).size;
+  const isContentLoading =
+    content.isLoading ||
+    (!content.hasUnavailableContent &&
+      (content.moviesById.size < movieReferenceCount ||
+        content.cinemasById.size < cinemaReferenceCount));
+  const isPageLoading = ordersQuery.loading || isContentLoading;
+  const shouldShowContentNotice = !ordersQuery.loading && !isContentLoading;
 
   return (
     <div className="orders-page-wrapper">
       <div className="orders-page-content">
         <TransactionBreadcrumb items={[{ label: '我的订单' }]} />
-        <OrderContentNotice
-          isLoading={content.isLoading}
-          hasUnavailableContent={content.hasUnavailableContent}
-          onRetry={content.refresh}
-        />
+        {shouldShowContentNotice && (
+          <OrderContentNotice
+            isLoading={false}
+            hasUnavailableContent={content.hasUnavailableContent}
+            onRetry={content.refresh}
+          />
+        )}
         <OrderList
           orders={orders}
-          loading={ordersQuery.loading}
+          loading={isPageLoading}
           error={ordersQuery.error?.message}
           selectedStatus={selectedStatus}
           selectedDate={selectedDate}

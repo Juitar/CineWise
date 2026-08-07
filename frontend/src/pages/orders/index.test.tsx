@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupTestEnvironment } from '../../features/test-utils';
 import { useOrders } from '../../modules/order/transaction-hooks';
@@ -25,7 +25,7 @@ describe('个人订单列表场次上下文', () => {
     contentMocks.getCinemaDetail.mockRejectedValue(new Error('内容夹具未提供影院资料'));
   });
 
-  it('展示权威开场时间并保留下单日期筛选语义', () => {
+  it('展示权威开场时间并保留下单日期筛选语义', async () => {
     vi.mocked(useOrders).mockReturnValue({
       data: {
         total: 1,
@@ -57,8 +57,8 @@ describe('个人订单列表场次上下文', () => {
 
     render(<OrdersPage />);
 
-    expect(screen.getByText(/场次：2026-08-10 14:30/)).toBeInTheDocument();
-    expect(screen.getByText('影片信息暂不可用')).toBeInTheDocument();
+    expect(await screen.findByText(/场次：2026-08-10 14:30/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('影片信息暂不可用')).toBeInTheDocument());
     expect(screen.getByText('影院：影院信息暂不可用')).toBeInTheDocument();
     expect(screen.getByText(/场次编号：11/)).toBeInTheDocument();
     expect(screen.getByLabelText('按下单日期筛选订单')).toBeInTheDocument();
