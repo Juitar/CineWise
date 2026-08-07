@@ -61,7 +61,8 @@ public interface ContentPurchaseQueryPort {
     record MovieRef(long movieId, String sourceMovieId, int durationMinutes) {
         public MovieRef {
             if (movieId <= 0 || durationMinutes <= 0 || sourceMovieId == null || sourceMovieId.isBlank()) {
-                throw new IllegalArgumentException("MovieRef must contain positive IDs, positive duration and source ID");
+                throw new IllegalArgumentException(
+                        "MovieRef must contain positive IDs, positive duration and source ID");
             }
             sourceMovieId = sourceMovieId.trim();
         }
