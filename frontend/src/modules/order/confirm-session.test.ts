@@ -54,4 +54,24 @@ describe('订单确认幂等会话', () => {
     rerender({ showId: 'show-2', seatIds: ['seat-2'] });
     expect(result.current.clientRequestId).toBe('request-2');
   });
+
+  it('HTTP 演示地址缺少 randomUUID 时使用 getRandomValues 生成 UUID', () => {
+    let callCount = 0;
+    vi.stubGlobal('crypto', {
+      getRandomValues: vi.fn((bytes: Uint8Array) => {
+        bytes.fill(callCount++);
+        return bytes;
+      }),
+    });
+
+    const session = getConfirmOrderSession('show-http', ['seat-1']);
+
+    expect(session.clientRequestId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(session.idempotencyKey).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(session.clientRequestId).not.toBe(session.idempotencyKey);
+  });
 });
