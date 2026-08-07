@@ -47,6 +47,7 @@ public class ElectronicTicketController {
                 Long.toString(ticket.showId()),
                 ticket.seatIds().stream().map(String::valueOf).toList(),
                 ticket.status().name(),
+                ticket.invalidationReason() == null ? null : ticket.invalidationReason().name(),
                 ticket.qrPayload(),
                 toOffsetDateTime(ticket.issuedAt()),
                 ticket.stateVersion(),

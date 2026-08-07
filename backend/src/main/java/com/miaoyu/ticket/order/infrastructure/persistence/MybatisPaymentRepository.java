@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.order.infrastructure.persistence;
 
 import com.miaoyu.ticket.order.application.PaymentRepository;
+import com.miaoyu.ticket.order.domain.ElectronicTicketInvalidationReason;
 import com.miaoyu.ticket.order.domain.ElectronicTicketStatus;
 import com.miaoyu.ticket.order.domain.PaymentStatus;
 import java.time.LocalDateTime;
@@ -101,7 +102,11 @@ public class MybatisPaymentRepository implements PaymentRepository {
                 row.qrPayload(),
                 row.issuedAt(),
                 row.invalidatedAt(),
+                row.invalidationReason() == null
+                        ? null
+                        : ElectronicTicketInvalidationReason.valueOf(row.invalidationReason()),
                 row.version(),
                 row.updatedAt());
     }
+
 }

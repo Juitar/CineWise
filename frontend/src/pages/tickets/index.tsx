@@ -59,6 +59,7 @@ export default function TicketPage() {
           seatLabels={ticket?.seatIds}
           issuedAt={ticket?.issuedAt ? formatOrderDateTime(ticket.issuedAt) : undefined}
           status={ticket?.status ?? 'INVALIDATED'}
+          invalidationReason={ticket?.invalidationReason}
           loading={loading}
           error={error}
           qrPayload={ticket?.qrPayload}

@@ -52,6 +52,7 @@ public interface PaymentPersistenceMapper {
                    qr_payload,
                    issued_time AS issued_at,
                    invalidated_time AS invalidated_at,
+                   invalidation_reason,
                    version,
                    update_time AS updated_at
               FROM electronic_ticket
@@ -68,6 +69,7 @@ public interface PaymentPersistenceMapper {
                    qr_payload,
                    issued_time AS issued_at,
                    invalidated_time AS invalidated_at,
+                   invalidation_reason,
                    version,
                    update_time AS updated_at
               FROM electronic_ticket

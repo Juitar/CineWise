@@ -12,6 +12,7 @@ public record TicketSnapshotRow(
         String qrPayload,
         LocalDateTime issuedAt,
         LocalDateTime invalidatedAt,
+        String invalidationReason,
         int version,
         LocalDateTime updatedAt) {
 }

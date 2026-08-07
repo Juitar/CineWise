@@ -13,6 +13,7 @@ public record ElectronicTicketResponse(
         @Schema(example = "70001") String showId,
         List<String> seatIds,
         @Schema(example = "VALID") String status,
+        @Schema(example = "SHOW_ENDED", nullable = true) String invalidationReason,
         @Schema(example = "cinewise:ticket:TKT92001") String qrPayload,
         OffsetDateTime issuedAt,
         int stateVersion,

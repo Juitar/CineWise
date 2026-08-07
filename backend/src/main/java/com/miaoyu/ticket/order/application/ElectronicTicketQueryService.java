@@ -46,6 +46,7 @@ public class ElectronicTicketQueryService {
                 order.showId(),
                 orderRepository.findSeatIds(order.orderId()),
                 ticket.status(),
+                ticket.invalidationReason(),
                 ticket.qrPayload(),
                 ticket.issuedAt(),
                 ticket.version(),

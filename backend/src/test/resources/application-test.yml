@@ -12,6 +12,10 @@ spring:
     enabled: true
     # H2 只提供快速反馈；V010 起的 MySQL 专属 DDL 由一次性 MySQL 8.4 CI 验证。
     target: "009"
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:ticketing-v022-h2-test-schema.sql
   main:
     banner-mode: "off"
 
@@ -44,6 +48,7 @@ cinewise:
     login-log-cleanup-delay-milliseconds: 86400000
   transaction:
     expiry-job-enabled: false
+    show-end-invalidation-job-enabled: false
     paid-travel-reconciliation:
       enabled: false
     refunded-travel-reconciliation:

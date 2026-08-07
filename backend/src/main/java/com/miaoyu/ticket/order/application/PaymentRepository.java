@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.order.application;
 
 import com.miaoyu.ticket.order.domain.ElectronicTicketStatus;
+import com.miaoyu.ticket.order.domain.ElectronicTicketInvalidationReason;
 import com.miaoyu.ticket.order.domain.PaymentStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -49,6 +50,7 @@ public interface PaymentRepository {
             String qrPayload,
             LocalDateTime issuedAt,
             LocalDateTime invalidatedAt,
+            ElectronicTicketInvalidationReason invalidationReason,
             int version,
             LocalDateTime updatedAt) {
     }
