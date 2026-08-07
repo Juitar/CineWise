@@ -6,8 +6,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.agent.domain.tool.ToolContext;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
+import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.travel.application.FoodSearchResult;
 import com.miaoyu.ticket.travel.application.FoodSearchService;
 import com.miaoyu.ticket.travel.application.BasicRouteCommand;
@@ -15,8 +17,10 @@ import com.miaoyu.ticket.travel.application.BasicRouteResult;
 import com.miaoyu.ticket.travel.application.BasicRouteService;
 import com.miaoyu.ticket.travel.application.TravelTaskQueryService;
 import com.miaoyu.ticket.travel.domain.TravelTaskStatus;
+import com.miaoyu.ticket.travel.application.TravelErrorCode;
 import com.miaoyu.ticket.travel.application.WeatherObservation;
 import com.miaoyu.ticket.travel.application.WeatherQueryService;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -76,11 +80,58 @@ class TravelReadOnlyToolsTest {
         when(service.getMyAdviceSummary("90001")).thenReturn(summary);
         ToolContext context = context(GetTravelAdviceTool.TARGET_NAME);
 
-        var result = new GetTravelAdviceTool(service).execute(context, "90001");
+        var result = new GetTravelAdviceTool(service, new ObjectMapper()).execute(
+                context, new GetTravelAdviceCommand("90001"));
 
         assertThat(result.status()).isEqualTo(ToolStatus.SUCCESS);
-        assertThat(result.data()).isSameAs(summary);
+        assertThat(result.data().taskId()).isEqualTo("90001");
+        assertThat(result.data().advice()).containsExactly(
+                new TravelAdviceToolResult.Advice("TRANSPORT", "提前出发"));
         verify(service).getMyAdviceSummary("90001");
+    }
+
+    @Test
+    void shouldExposeSnapshotTimeInBusinessOffsetRatherThanTreatingItAsUtc() {
+        TravelTaskQueryService service = mock(TravelTaskQueryService.class);
+        LocalDateTime dataTime = LocalDateTime.of(2026, 8, 7, 18, 30);
+        TravelTaskQueryService.TravelAdviceSummary summary = new TravelTaskQueryService.TravelAdviceSummary(
+                "90001", TravelTaskStatus.READY, false, true, null, "{\"transportAdvice\":\"提前出发\"}",
+                "DEMO_WEATHER_V1", dataTime, dataTime.plusMinutes(30), true, "DEMO");
+        when(service.getMyAdviceSummary("90001")).thenReturn(summary);
+
+        var result = new GetTravelAdviceTool(service, new ObjectMapper()).execute(
+                context(GetTravelAdviceTool.TARGET_NAME), new GetTravelAdviceCommand("90001"));
+
+        // 快照字段是东八区业务本地时间；标成 UTC 会让 Agent 的展示和过期判断整体提前八小时。
+        assertThat(result.data().dataAt()).isEqualTo(OffsetDateTime.parse("2026-08-07T18:30:00+08:00"));
+        assertThat(result.data().expiresAt()).isEqualTo(OffsetDateTime.parse("2026-08-07T19:00:00+08:00"));
+    }
+
+    @Test
+    void shouldHideInvalidOrForeignTravelTaskBehindSameSafeFailure() {
+        TravelTaskQueryService service = mock(TravelTaskQueryService.class);
+        when(service.getMyAdviceSummary("other-user-task"))
+                .thenThrow(new BusinessException(TravelErrorCode.TASK_NOT_FOUND));
+
+        var result = new GetTravelAdviceTool(service, new ObjectMapper()).execute(
+                context(GetTravelAdviceTool.TARGET_NAME), new GetTravelAdviceCommand("other-user-task"));
+
+        assertThat(result.status()).isEqualTo(ToolStatus.FAILED);
+        assertThat(result.errorCode()).isEqualTo(207001);
+        assertThat(result.suggestedNextAction()).isEqualTo("CHECK_TRAVEL_TASK");
+        verify(service).getMyAdviceSummary("other-user-task");
+    }
+
+    @Test
+    void shouldReturnSameSafeFailureForBlankTravelTaskIdWithoutQueryingService() {
+        TravelTaskQueryService service = mock(TravelTaskQueryService.class);
+
+        var result = new GetTravelAdviceTool(service, new ObjectMapper()).execute(
+                context(GetTravelAdviceTool.TARGET_NAME), new GetTravelAdviceCommand(" "));
+
+        assertThat(result.status()).isEqualTo(ToolStatus.FAILED);
+        assertThat(result.errorCode()).isEqualTo(207001);
+        verifyNoInteractions(service);
     }
 
     @Test

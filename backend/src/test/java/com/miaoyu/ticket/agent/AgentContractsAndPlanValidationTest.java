@@ -362,6 +362,23 @@ class AgentContractsAndPlanValidationTest {
                 gateway.generateReply(replyRequest));
     }
 
+    @Test
+    void shouldUseAllPersistedConversationSlotsWithoutCreatingAnotherQuestion() {
+        ToolRegistry registry = new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan()));
+        PlanSchemaValidator validator = new PlanSchemaValidator(registry);
+        MockModelGateway gateway = new MockModelGateway(validator, registry);
+        Map<String, String> persistedSlots = Map.of(
+                "cityCode", "430100", "date", "2026-08-08", "ticketCount", "2");
+
+        var result = gateway.generatePlan(new PlanGenerationRequest(
+                "request-with-persisted-slots", "继续按刚才条件推荐", persistedSlots, Set.of("rankMoviePlan")));
+
+        assertTrue(result.validationResult().isValid());
+        assertEquals(PlanNodeType.CALL_TOOL, result.candidatePlan().nodes().getFirst().type());
+        assertTrue(result.candidatePlan().nodes().stream()
+                .noneMatch(node -> node.type() == PlanNodeType.ASK_USER));
+    }
+
     private static CandidatePlanNode node(
             String nodeId,
             PlanNodeType type,

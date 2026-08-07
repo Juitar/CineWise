@@ -5,6 +5,7 @@ import errorEvent from '../../../../backend/src/test/resources/fixtures/agent/c/
 import errorCard from '../../../../backend/src/test/resources/fixtures/agent/c/error-card.json';
 import locationPermissionQuestion from '../../../../backend/src/test/resources/fixtures/agent/c/location-permission-question.json';
 import orderConfirmCard from '../../../../backend/src/test/resources/fixtures/agent/c/order-confirm-card.json';
+import travelAdviceCard from '../../../../backend/src/test/resources/fixtures/agent/c/travel-advice-card.json';
 import movieCard from '../../../../backend/src/test/resources/fixtures/agent/c/recommendation-card.json';
 import planCard from '../../../../backend/src/test/resources/fixtures/agent/c/plan-card.json';
 import processingEvent from '../../../../backend/src/test/resources/fixtures/agent/c/processing-event.json';
@@ -87,23 +88,30 @@ describe('Agent 事件投影', () => {
     expect(JSON.stringify(failed.projection)).not.toContain('RUN_FAILED');
   });
 
-  it('正常 PLAN_CARD 展示服务端给出的字符串 ID，不补造价格和时间', () => {
+  it('正常 PLAN_CARD 投影正式方案字段且不展示业务 ID', () => {
     const result = consumeAgentEvent(
       createAgentProjection('session-example-1'),
       parseAgentEvent(planCard),
     );
     expect(result.outcome).toBe('applied');
     expect(result.projection.items[0]).toEqual(
-      expect.objectContaining({ kind: 'plan-card', title: '推荐方案' }),
+      expect.objectContaining({ kind: 'plan-card', title: '推荐场次' }),
     );
-    expect(result.projection.items[0].fields).toEqual(
-      expect.arrayContaining([
-        { label: '方案 1 · 影片 ID', value: '1001' },
-        { label: '方案 1 · 影院 ID', value: '2001' },
-        { label: '方案 1 · 场次 ID', value: '3001' },
-      ]),
+    expect(result.projection.items[0].plans).toEqual([
+      expect.objectContaining({
+        showId: '3001',
+        movieName: '示例影片',
+        cinemaName: '示例影院',
+        price: '68.00',
+        reasons: ['匹配条件'],
+      }),
+    ]);
+    expect(result.projection.items[0].fields).not.toContainEqual(
+      expect.objectContaining({ label: expect.stringMatching(/ID/) }),
     );
-    expect(JSON.stringify(result.projection)).not.toMatch(/价格|开场时间/);
+    expect(JSON.stringify(result.projection)).not.toMatch(
+      /score|internalEvidence|rawToolArguments/,
+    );
   });
 
   it('TEXT 使用纯文本投影，过期空方案卡仍明确显示过期且不生成业务按钮', () => {
@@ -147,7 +155,9 @@ describe('Agent 事件投影', () => {
       expect.objectContaining({
         kind: 'question',
         text: '想在哪天观看？',
-        options: ['今天'],
+        question: expect.objectContaining({
+          options: [{ optionId: 'today', label: '今天', value: '2026-08-05' }],
+        }),
       }),
     );
     const progress = consumeAgentEvent(question.projection, parseAgentEvent(progressCard));
@@ -384,6 +394,43 @@ describe('Agent 事件投影', () => {
       text: '卡片数据暂不完整',
     });
     expect(projection.items[2].confirmation?.status).toBe('REJECTED');
+  });
+
+  it('初次加载会从运行快照恢复历史 TEXT 中的出行建议卡片', () => {
+    const history = [
+      {
+        messageId: 'message-travel-advice',
+        runId: 'run-travel',
+        role: 'ASSISTANT',
+        type: 'TEXT',
+        text: '已查询到出行建议',
+        payload: travelAdviceCard.payload,
+        status: 'COMPLETED',
+        completedAt: '2026-08-07T10:00:00Z',
+        createdAt: '2026-08-07T10:00:00Z',
+      },
+    ];
+    const event = parseAgentEvent({ ...travelAdviceCard, runId: 'run-travel' });
+    const projection = buildProjectionFromHistoryAndSnapshots('session-example-1', history, [
+      {
+        runId: 'run-travel',
+        sessionId: 'session-example-1',
+        status: 'COMPLETED',
+        planId: 'plan-example-2',
+        planVersion: 1,
+        startedAt: null,
+        finishedAt: null,
+        lastEventId: event.eventId,
+        messages: [],
+        steps: [],
+        events: [event],
+      },
+    ]);
+    expect(projection.items).toHaveLength(1);
+    expect(projection.items[0]).toMatchObject({
+      kind: 'travel-advice-card',
+      travelTaskId: '90001',
+    });
   });
 
   it.each([

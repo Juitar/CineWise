@@ -120,12 +120,6 @@
   color: #ad4e00;
 }
 
-.movies-refreshing {
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  margin-bottom: 12px;
-}
-
 .movies-grid-view {
   display: grid;
   gap: 20px;
@@ -242,19 +236,6 @@
 .movie-grid-purchase-link:focus-visible {
   outline: 3px solid rgba(22, 119, 255, 35%);
   outline-offset: 3px;
-}
-
-.movie-grid-card--skeleton {
-  padding-bottom: 12px;
-}
-
-.movie-grid-card--skeleton .ant-skeleton-image {
-  height: 220px;
-  width: 100%;
-}
-
-.movie-grid-card--skeleton .ant-skeleton {
-  padding: 12px;
 }
 
 .movies-pagination {

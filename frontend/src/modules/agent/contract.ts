@@ -22,6 +22,7 @@ const CARD_PAYLOAD_TYPES = new Set<AgentCardPayloadType>([
   'QUESTION',
   'MOVIE_CARD',
   'PLAN_CARD',
+  'TRAVEL_ADVICE_CARD',
   'BUSINESS_INTENT',
   'PROGRESS',
   'ERROR',
@@ -223,12 +224,107 @@ function textArray(value: unknown): void {
   array(value).forEach((item) => text(item));
 }
 
-function validateRecommendationItem(value: unknown, type: 'MOVIE_CARD' | 'PLAN_CARD'): void {
+function exactKeys(current: Record<string, unknown>, allowedKeys: readonly string[]): void {
+  const allowed = new Set(allowedKeys);
+  if (Object.keys(current).some((key) => !allowed.has(key))) throw new AgentContractError();
+}
+
+function finiteNumber(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new AgentContractError();
+  return value;
+}
+
+function requiredNullableText(current: Record<string, unknown>, key: string): void {
+  if (!(key in current)) throw new AgentContractError();
+  if (current[key] !== null) text(current[key]);
+}
+
+function requiredNullableNonNegativeInteger(current: Record<string, unknown>, key: string): void {
+  if (!(key in current)) throw new AgentContractError();
+  if (current[key] !== null) nonNegativeInteger(current[key]);
+}
+
+function validatePlanItem(value: unknown): void {
+  const item = record(value);
+  exactKeys(item, [
+    'planType',
+    'movieId',
+    'movieName',
+    'cinemaId',
+    'cinemaName',
+    'showId',
+    'price',
+    'currency',
+    'startTime',
+    'rating',
+    'score',
+    'reasons',
+    'source',
+    'dataAt',
+    'expiresAt',
+    'expired',
+    'purchaseEligible',
+    'distanceMeters',
+  ]);
+  text(item.planType);
+  businessId(item.movieId);
+  text(item.movieName);
+  businessId(item.cinemaId);
+  text(item.cinemaName);
+  businessId(item.showId);
+  text(item.price);
+  text(item.currency);
+  dateText(item.startTime);
+  requiredNullableText(item, 'rating');
+  finiteNumber(item.score);
+  textArray(item.reasons);
+  text(item.source);
+  dateText(item.dataAt);
+  dateText(item.expiresAt);
+  boolean(item.expired);
+  boolean(item.purchaseEligible);
+  requiredNullableNonNegativeInteger(item, 'distanceMeters');
+}
+
+function validatePlanCard(payload: Record<string, unknown>): void {
+  exactKeys(payload, [
+    'type',
+    'title',
+    'schemaVersion',
+    'algorithmVersion',
+    'plans',
+    'missingFactors',
+    'relaxationSuggestion',
+    'usedProfile',
+    'source',
+    'dataAt',
+    'expiresAt',
+    'degraded',
+    'expired',
+  ]);
+  text(payload.title);
+  text(payload.schemaVersion);
+  text(payload.algorithmVersion);
+  array(payload.plans).forEach(validatePlanItem);
+  textArray(payload.missingFactors);
+  if (!('relaxationSuggestion' in payload)) throw new AgentContractError();
+  if (payload.relaxationSuggestion !== null) {
+    const relaxation = record(payload.relaxationSuggestion);
+    exactKeys(relaxation, ['factor', 'message']);
+    text(relaxation.factor);
+    text(relaxation.message);
+  }
+  boolean(payload.usedProfile);
+  text(payload.source);
+  dateText(payload.dataAt);
+  dateText(payload.expiresAt);
+  boolean(payload.degraded);
+  boolean(payload.expired);
+}
+
+function validateMovieRecommendationItem(value: unknown): void {
   const item = record(value);
   businessId(item.movieId);
-  if (type === 'PLAN_CARD') {
-    businessId(item.cinemaId);
-  }
   optionalText(item, 'title');
   optionalBusinessId(item, 'cinemaId');
   optionalBusinessId(item, 'showId');
@@ -277,9 +373,12 @@ function validateRecommendation(
   payload: Record<string, unknown>,
   type: 'MOVIE_CARD' | 'PLAN_CARD',
 ): void {
+  if (type === 'PLAN_CARD') {
+    validatePlanCard(payload);
+    return;
+  }
   text(payload.title);
-  const candidates = array(type === 'MOVIE_CARD' ? payload.movies : payload.plans);
-  candidates.forEach((item) => validateRecommendationItem(item, type));
+  array(payload.movies).forEach(validateMovieRecommendationItem);
   text(payload.source);
   dateText(payload.dataAt);
   dateText(payload.expiresAt);
@@ -317,6 +416,68 @@ function validateBusinessIntent(payload: Record<string, unknown>): void {
       throw new AgentContractError();
     }
   }
+}
+
+function travelPositiveId(value: unknown): void {
+  const id = text(value);
+  if (
+    !POSITIVE_JAVA_LONG_PATTERN.test(id) ||
+    id.length > JAVA_LONG_MAX.length ||
+    (id.length === JAVA_LONG_MAX.length && id > JAVA_LONG_MAX)
+  )
+    throw new AgentContractError();
+}
+
+function validateTravelAdviceCard(payload: Record<string, unknown>): void {
+  exactKeys(payload, [
+    'type',
+    'taskId',
+    'taskStatus',
+    'available',
+    'weather',
+    'advice',
+    'source',
+    'degraded',
+    'fallbackType',
+    'dataAt',
+    'expiresAt',
+    'expired',
+  ]);
+  travelPositiveId(payload.taskId);
+  text(payload.taskStatus);
+  const available = boolean(payload.available);
+  const weather = payload.weather;
+  if (weather !== null) {
+    const current = record(weather);
+    exactKeys(current, ['area', 'condition', 'risk']);
+    nullableText(current.area);
+    nullableText(current.condition);
+    nullableText(current.risk);
+  }
+  array(payload.advice).forEach((item) => {
+    const current = record(item);
+    exactKeys(current, ['type', 'text']);
+    text(current.type);
+    text(current.text);
+  });
+  const source = nullableText(payload.source);
+  const degraded = boolean(payload.degraded);
+  const fallbackType = nullableText(payload.fallbackType);
+  const dataAt = payload.dataAt === null ? null : dateText(payload.dataAt);
+  const expiresAt = payload.expiresAt === null ? null : dateText(payload.expiresAt);
+  boolean(payload.expired);
+  if (available && source === null) throw new AgentContractError();
+  if (
+    !available &&
+    (weather !== null ||
+      array(payload.advice).length > 0 ||
+      degraded ||
+      fallbackType !== null ||
+      dataAt !== null ||
+      expiresAt !== null)
+  )
+    throw new AgentContractError();
+  if (degraded !== (fallbackType !== null)) throw new AgentContractError();
 }
 
 function validateToolPayload(event: AgentEvent): void {
@@ -364,6 +525,8 @@ export function validateAgentCardEvent(event: AgentEvent): AgentCardValidation {
         throw new AgentContractError();
       validateBusinessIntent(event.payload as Record<string, unknown>);
     }
+    if (type === 'TRAVEL_ADVICE_CARD')
+      validateTravelAdviceCard(event.payload as Record<string, unknown>);
     if (type === 'MOVIE_CARD' || type === 'PLAN_CARD') {
       validateRecommendation(event.payload as Record<string, unknown>, type);
     }

@@ -8,6 +8,7 @@ import com.miaoyu.ticket.agent.application.persistence.AgentInitialRunTransactio
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionCommand;
+import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeEventService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionManagementService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
@@ -26,8 +27,12 @@ import com.miaoyu.ticket.auth.application.RoleCode;
 import com.miaoyu.ticket.common.error.BusinessException;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -41,6 +46,7 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 @SpringBootTest
 @Import(AgentSessionPersistenceIntegrationTest.TestCurrentUserConfiguration.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AgentSessionPersistenceIntegrationTest {
     private static final long USER_ID = 9_709_900_001L;
 
@@ -62,10 +68,18 @@ class AgentSessionPersistenceIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @BeforeAll
+    void addAgentSlotSnapshotColumnForH2() {
+        jdbcTemplate.execute("ALTER TABLE agent_session ADD COLUMN IF NOT EXISTS "
+                + "slot_snapshot_json VARCHAR(4096) NOT NULL DEFAULT '{}'");
+    }
+
     @AfterEach
     void cleanup() {
         jdbcTemplate.update("DELETE FROM agent_event WHERE session_id LIKE 'session-control-%'");
+        jdbcTemplate.update("DELETE FROM agent_event WHERE session_id LIKE 'session-slot-%'");
         jdbcTemplate.update("DELETE FROM agent_event_stream_cursor WHERE session_id LIKE 'session-control-%'");
+        jdbcTemplate.update("DELETE FROM agent_event_stream_cursor WHERE session_id LIKE 'session-slot-%'");
         jdbcTemplate.update("DELETE FROM agent_message WHERE user_id = ?", USER_ID);
         jdbcTemplate.update(
                 "DELETE FROM agent_run_step WHERE run_id IN (SELECT id FROM agent_run WHERE user_id = ?)", USER_ID);
@@ -122,6 +136,73 @@ class AgentSessionPersistenceIntegrationTest {
                 session.sessionId())).isZero();
     }
 
+    @Test
+    void shouldReuseTheOriginalRunBeforeCheckingTheActiveRunOrUpdatingSlots() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 5, 12, 0);
+        AgentSession session = session(9_709_900_041L, "session-slot-retry", null, now);
+        sessionRepository.insert(session);
+        messageRepository.insert(question(session, 9_709_900_401L, now));
+
+        var first = initialRunTransaction.submitConversation(
+                USER_ID, session.sessionId(), "2", "slot-retry-request", null);
+        var retry = initialRunTransaction.submitConversation(
+                USER_ID, session.sessionId(), "2", "slot-retry-request", null);
+
+        assertThat(retry.reused()).isTrue();
+        assertThat(retry.run().id()).isEqualTo(first.run().id());
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM agent_run WHERE session_id = ?", Integer.class,
+                session.id())).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT slot_snapshot_json FROM agent_session WHERE id = ?", String.class, session.id()))
+                .contains("\"ticketCount\":\"2\"");
+    }
+
+    @Test
+    void shouldLetOnlyTheWinningConcurrentRequestPersistItsSlotAnswer() throws Exception {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 5, 12, 0);
+        AgentSession session = session(9_709_900_051L, "session-slot-concurrent", null, now);
+        sessionRepository.insert(session);
+        messageRepository.insert(question(session, 9_709_900_501L, now));
+        CountDownLatch start = new CountDownLatch(1);
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var two = executor.submit(() -> submitAfter(start, session.sessionId(), "2", "slot-request-2"));
+            var three = executor.submit(() -> submitAfter(start, session.sessionId(), "3", "slot-request-3"));
+            start.countDown();
+            String twoResult = two.get();
+            String threeResult = three.get();
+
+            assertThat(java.util.List.of(twoResult, threeResult)).containsExactlyInAnyOrder("CREATED", "CONFLICT");
+        }
+        String winner = jdbcTemplate.queryForObject(
+                "SELECT client_request_id FROM agent_run WHERE session_id = ?", String.class, session.id());
+        String expectedTicketCount = "slot-request-2".equals(winner) ? "2" : "3";
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT slot_snapshot_json FROM agent_session WHERE id = ?", String.class, session.id()))
+                .contains("\"ticketCount\":\"" + expectedTicketCount + "\"");
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM agent_run WHERE session_id = ?", Integer.class,
+                session.id())).isEqualTo(1);
+    }
+
+    private String submitAfter(CountDownLatch start, String sessionId, String content, String clientRequestId)
+            throws InterruptedException {
+        start.await();
+        try {
+            initialRunTransaction.submitConversation(USER_ID, sessionId, content, clientRequestId, null);
+            return "CREATED";
+        } catch (BusinessException exception) {
+            assertThat(exception.getErrorCode()).isEqualTo(AgentErrorCode.ACTIVE_RUN_CONFLICT);
+            return "CONFLICT";
+        }
+    }
+
+    private static AgentMessage question(AgentSession session, long messageId, LocalDateTime now) {
+        return new AgentMessage(messageId, "question-" + messageId, session.id(), messageId + 1L, USER_ID,
+                AgentMessageRole.ASSISTANT, AgentMessageType.QUESTION, "请补充票数",
+                new AgentStoredJson("{\"missingSlot\":\"ticketCount\"}"), AgentMessageStatus.COMPLETED,
+                now, now, now.plusDays(30));
+    }
+
     private static AgentMessageSubmissionCommand command(String sessionId) {
         var slotSnapshot = new com.miaoyu.ticket.agent.domain.plan.SlotSnapshot(1L, Map.of());
         return new AgentMessageSubmissionCommand(sessionId, "清空后再次提交", "cleared-request", slotSnapshot,
@@ -145,6 +226,12 @@ class AgentSessionPersistenceIntegrationTest {
         @Primary
         CurrentUserAccessor agentSessionControlCurrentUserAccessor() {
             return () -> new CurrentUser(USER_ID, RoleCode.USER, 0L);
+        }
+
+        @Bean
+        @Primary
+        AgentRuntimeEventService agentSessionControlRuntimeEventService() {
+            return org.mockito.Mockito.mock(AgentRuntimeEventService.class);
         }
     }
 }

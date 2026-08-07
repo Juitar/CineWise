@@ -6,13 +6,19 @@ import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
 import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFacts;
 import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardItem;
 import com.miaoyu.ticket.agent.application.reply.SelectSeatsReplyFacts;
+import com.miaoyu.ticket.agent.application.reply.QuestionReplyFacts;
+import com.miaoyu.ticket.agent.application.reply.TravelAdviceCardFacts;
 import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
+import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.agent.domain.plan.ExecutionPlanNode;
 import com.miaoyu.ticket.agent.domain.plan.InputReferenceSource;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.LinkedHashMap;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 /** 将已经校验并收窄的 Agent 事实转为可存储 JSON，禁止传入工具原始结果。 */
@@ -55,6 +61,29 @@ public class AgentPersistenceJsonFactory {
 
     /** C 的卡片事件只携带已收窄的推荐事实；不写工具原始响应、座位或确认参数。 */
     public AgentStoredJson cardPayload(ReplyGenerationResponse reply) {
+        return cardPayload(reply, null);
+    }
+
+    /** QUESTION 也必须以既有 card SSE 协议输出完整可渲染载荷。 */
+    public AgentStoredJson cardPayload(ReplyGenerationResponse reply, LocalDateTime occurredAt) {
+        if (reply.payload() instanceof QuestionReplyFacts facts) {
+            if (occurredAt == null) {
+                throw new IllegalArgumentException("QUESTION 卡片必须提供发生时间");
+            }
+            OffsetDateTime expiresAt = occurredAt.plusMinutes(10L)
+                    .atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime();
+            Map<String, Object> input = Map.of("name", facts.missingSlot(), "type", "TEXT");
+            return write(Map.of(
+                    "type", "QUESTION",
+                    "questionId", UUID.randomUUID().toString(),
+                    "questionKind", "SLOT_INPUT",
+                    "message", reply.text(),
+                    "options", List.of(),
+                    "allowFreeText", true,
+                    "input", input,
+                    "requiresConfirmation", false,
+                    "expiresAt", expiresAt.toString()));
+        }
         if (reply.payload() instanceof SelectSeatsReplyFacts) {
             SelectSeatsReplyFacts facts = (SelectSeatsReplyFacts) reply.payload();
             return write(Map.of(
@@ -65,6 +94,22 @@ public class AgentPersistenceJsonFactory {
                                     "showId", facts.showId(),
                                     "movieId", facts.movieId(),
                                     "cinemaId", facts.cinemaId()))));
+        }
+        if (reply.payload() instanceof TravelAdviceCardFacts facts) {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("type", "TRAVEL_ADVICE_CARD");
+            payload.put("taskId", facts.taskId());
+            payload.put("taskStatus", facts.taskStatus());
+            payload.put("available", facts.available());
+            payload.put("weather", facts.weather());
+            payload.put("advice", facts.advice());
+            payload.put("source", facts.source());
+            payload.put("degraded", facts.degraded());
+            payload.put("fallbackType", facts.fallbackType());
+            payload.put("dataAt", facts.dataAt() == null ? null : facts.dataAt().toString());
+            payload.put("expiresAt", facts.expiresAt() == null ? null : facts.expiresAt().toString());
+            payload.put("expired", facts.expired());
+            return write(payload);
         }
         if (!(reply.payload() instanceof RecommendationPlanCardFacts facts)) {
             throw new IllegalArgumentException("只有完整推荐或选座回复可以生成卡片事件");

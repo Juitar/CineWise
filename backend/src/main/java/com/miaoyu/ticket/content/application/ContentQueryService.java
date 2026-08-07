@@ -2,6 +2,7 @@ package com.miaoyu.ticket.content.application;
 
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.common.error.ErrorCode;
 import com.miaoyu.ticket.content.domain.ContentItem;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
@@ -44,6 +45,7 @@ public class ContentQueryService implements ContentPurchaseQueryPort {
     private final ContentProperties properties;
     private final Clock clock;
     private final ContentLocalMovieCatalogPort localMovieCatalogPort;
+    private final LiveDemoPurchaseCatalogQueryPort liveDemoPurchaseCatalogQueryPort;
 
     /** 端口均在 Application 边界注入，查询服务不接触 Redis、JDBC 或 JSON 实现。 */
     /** 缓存、快照和 Demo 的先后关系只在本服务维护，调用方不能跳过其中任意一层。 */
@@ -52,13 +54,15 @@ public class ContentQueryService implements ContentPurchaseQueryPort {
     @org.springframework.beans.factory.annotation.Autowired
     public ContentQueryService(ContentCachePort cachePort, ContentSnapshotPort snapshotPort,
                                ContentProvider demoProvider, ContentProperties properties, Clock clock,
-                               ContentLocalMovieCatalogPort localMovieCatalogPort) {
+                               ContentLocalMovieCatalogPort localMovieCatalogPort,
+                               LiveDemoPurchaseCatalogQueryPort liveDemoPurchaseCatalogQueryPort) {
         this.cachePort = cachePort;
         this.snapshotPort = snapshotPort;
         this.demoProvider = demoProvider;
         this.properties = properties;
         this.clock = clock;
         this.localMovieCatalogPort = localMovieCatalogPort;
+        this.liveDemoPurchaseCatalogQueryPort = liveDemoPurchaseCatalogQueryPort;
     }
 
     /** 单元测试夹具没有真实数据库目录时仍可使用原有缓存/快照/Demo 查询。 */
@@ -70,6 +74,7 @@ public class ContentQueryService implements ContentPurchaseQueryPort {
         this.properties = properties;
         this.clock = clock;
         this.localMovieCatalogPort = null;
+        this.liveDemoPurchaseCatalogQueryPort = null;
     }
 
     /** 影片列表优先读取本地完整目录；本地端口缺失仅用于旧单元测试夹具兼容。 */
@@ -86,11 +91,85 @@ public class ContentQueryService implements ContentPurchaseQueryPort {
      * <p>参数校验由 ContentQuery 构造时完成，因此进入此方法后不会对缓存、数据库或 Demo 产生无效访问。</p>
      */
     public ContentResult<List<? extends ContentItem>> query(ContentQuery query) {
-        return cachePort.find(query).filter(this::isVerifiedLiveContent).map(this::asCurrentVersion)
-                .orElseGet(() -> findFromSnapshot(query)
-                // Demo 是离线最后回退层，绝不能写回 Redis 后被下一次查询伪装成真实缓存。
-                .orElseGet(() -> demoProvider.query(query)
-                        .orElseThrow(() -> new BusinessException(ContentErrorCode.DATA_UNAVAILABLE))));
+        ContentQuery storedQuery = cinemaDirectoryQuery(query);
+        ContentResult<List<? extends ContentItem>> result = cachePort.find(storedQuery)
+                .filter(this::isVerifiedLiveContent).map(this::asCurrentVersion)
+                .orElseGet(() -> findFromSnapshot(storedQuery)
+                        // Demo 是离线最后回退层，绝不能写回 Redis 后被下一次查询伪装成真实缓存。
+                        .orElseGet(() -> demoProvider.query(storedQuery)
+                                .orElseThrow(() -> new BusinessException(ContentErrorCode.DATA_UNAVAILABLE))));
+        return filterCinemaDirectory(query, result);
+    }
+
+    /**
+     * 影院同步按城市保存完整目录，关键字仅是页面上的本地筛选条件。
+     * 若把关键字放进快照键，用户每输入一个词都会错过同一城市的真实资料并落回 Demo。
+     *
+     * <p>这里不改变 API 参数：Controller 仍接收 {@code location} 和 {@code keyword}。其中 location 是用户
+     * 选择的城市编码，决定读取哪一份目录；keyword 只影响已经读出的列表。两者不能混为同一个存储条件。</p>
+     *
+     * <p>同步任务每个城市只写入一份无关键字的影院目录。这样万达、天心、岳麓等不同输入都复用同一份
+     * 已校验的本地数据，分页和排序也始终针对同一批影院执行。</p>
+     *
+     * <p>本方法只适用于影院列表：按影院 ID 查询时必须保留 ID；影片查询仍沿用各自已有的查询键，不能被
+     * 这个兼容规则意外改写。</p>
+     *
+     * <p>页面查询路径不会调用真实 Provider。若本地没有该城市目录，才会读取固定 Demo 目录；Provider 的
+     * 网络请求仅能由同步任务发起。</p>
+     */
+    private ContentQuery cinemaDirectoryQuery(ContentQuery query) {
+        return query.resourceType() == com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA
+                && query.contentId() == null && query.cityCode() != null && query.keyword() != null
+                ? new ContentQuery(query.resourceType(), null, query.cityCode(), null)
+                : query;
+    }
+
+    /**
+     * 真实城市目录存在时，即使关键词没有命中也必须保留真实来源的空结果。
+     * 因此筛选放在完成缓存、快照或 Demo 选择之后，绝不能把空筛选结果再次作为回退条件。
+     *
+     * <p>返回空列表表示“这个城市的已同步目录中没有匹配项”，不是“本地资料失效”。此时继续回退 Demo
+     * 会把两个不同来源的城市目录混在一次查询里，也会让用户误以为搜索到了真实影院。</p>
+     *
+     * <p>筛选字段限制为影院名称、行政区和地址，都是影院基础资料。这里不引入场次、价格、座位或距离，
+     * 这些数据分别属于排期和票务模块，不能由内容目录猜测。</p>
+     *
+     * <p>使用 {@link java.util.Locale#ROOT} 做大小写转换，避免服务器默认语言环境影响英文或数字混合名称
+     * 的匹配结果。中文输入不会受此转换影响。</p>
+     *
+     * <p>Controller 在本方法之后执行现有分页。因此页码和总数反映的是筛选后的本地结果，而不是完整目录
+     * 的页码，用户不会因关键词筛选拿到空白的错误页。</p>
+     */
+    private ContentResult<List<? extends ContentItem>> filterCinemaDirectory(
+            ContentQuery requestedQuery, ContentResult<List<? extends ContentItem>> result) {
+        if (requestedQuery.resourceType() != com.miaoyu.ticket.content.domain.ContentResourceType.CINEMA
+                || requestedQuery.keyword() == null) {
+            return result;
+        }
+        String keyword = requestedQuery.keyword().toLowerCase(java.util.Locale.ROOT);
+        List<? extends ContentItem> filtered = result.data().stream().map(CinemaContent.class::cast)
+                .filter(cinema -> matchesCinemaKeyword(cinema, keyword)).toList();
+        return new ContentResult<>(filtered, result.source(), result.dataTime(), result.expiresAt(), result.expired(),
+                result.degraded(), result.fallbackType());
+    }
+
+    /**
+     * 只判断可展示的影院文本字段，确保搜索结果能直接向用户说明命中位置。
+     *
+     * <p>字段在 {@link CinemaContent} 创建时已由 Provider 或快照转换层校验为非空；本处不补造空字符串，
+     * 以免坏数据被静默当作“不匹配”而掩盖同步问题。</p>
+     *
+     * <p>搜索不区分大小写，使用包含匹配而非全词匹配，符合用户输入简称或商圈名称时的预期。</p>
+     *
+     * <p>本方法不修改目录记录，也不把筛选结果写回缓存或快照，避免一次用户搜索污染完整城市目录。</p>
+     *
+     * <p>缓存中始终保存未筛选目录，后续不同关键词才能复用同一份同步结果。</p>
+     * <p>这也避免把一个用户的搜索条件当成全城市的长期数据。</p>
+     */
+    private boolean matchesCinemaKeyword(CinemaContent cinema, String keyword) {
+        return cinema.name().toLowerCase(java.util.Locale.ROOT).contains(keyword)
+                || cinema.area().toLowerCase(java.util.Locale.ROOT).contains(keyword)
+                || cinema.address().toLowerCase(java.util.Locale.ROOT).contains(keyword);
     }
 
     /**
@@ -157,6 +236,17 @@ public class ContentQueryService implements ContentPurchaseQueryPort {
         return cinemas.isEmpty() || movies.isEmpty()
                 ? Optional.empty()
                 : Optional.of(new ContentSeedCatalog(movies, cinemas));
+    }
+
+    @Override
+    public DemoPurchaseCatalog findLiveDemoPurchaseCatalog(String cityCode) {
+        if (cityCode == null || !cityCode.matches("[1-9][0-9]{5}")) {
+            throw new BusinessException(CommonErrorCode.INVALID_PARAMETER);
+        }
+        if (liveDemoPurchaseCatalogQueryPort == null) {
+            throw new BusinessException(ContentErrorCode.DATA_UNAVAILABLE);
+        }
+        return liveDemoPurchaseCatalogQueryPort.findLiveCatalog(cityCode);
     }
 
     private java.util.Optional<ContentResult<List<? extends ContentItem>>> findFromSnapshot(ContentQuery query) {

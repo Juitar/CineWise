@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getMyProfile, updateMyPersonalization } from './api';
+import {
+  getMyProfile,
+  grantProfileDataConsent,
+  updateMyPersonalization,
+  withdrawProfileDataConsent,
+} from './api';
 
 const mocks = vi.hoisted(() => ({ apiRequest: vi.fn() }));
 
@@ -31,6 +36,27 @@ describe('profile api', () => {
       body: { enabled: false },
       headers: { 'Idempotency-Key': 'request-1', 'If-Match': '3' },
       method: 'PUT',
+    });
+  });
+
+  it('开启画像数据使用时提交当前隐私政策版本', async () => {
+    mocks.apiRequest.mockResolvedValue(undefined);
+
+    await grantProfileDataConsent('2026-08-03');
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith('/api/v1/auth/profile-data-consent', {
+      body: { privacyPolicyVersion: '2026-08-03' },
+      method: 'PUT',
+    });
+  });
+
+  it('关闭画像数据使用时调用撤回接口', async () => {
+    mocks.apiRequest.mockResolvedValue(undefined);
+
+    await withdrawProfileDataConsent();
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith('/api/v1/auth/profile-data-consent', {
+      method: 'DELETE',
     });
   });
 });

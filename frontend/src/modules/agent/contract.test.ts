@@ -8,6 +8,10 @@ import sessionCreated from '../../../../backend/src/test/resources/fixtures/agen
 import sessionList from '../../../../backend/src/test/resources/fixtures/agent/c/session-list.json';
 import confirmationFixtures from '../../../../backend/src/test/resources/fixtures/agent/c/confirmation-api-fixtures.json';
 import orderConfirmCard from '../../../../backend/src/test/resources/fixtures/agent/c/order-confirm-card.json';
+import planCard from '../../../../backend/src/test/resources/fixtures/agent/c/plan-card.json';
+import questionCard from '../../../../backend/src/test/resources/fixtures/agent/c/question-card.json';
+import travelAdviceCard from '../../../../backend/src/test/resources/fixtures/agent/c/travel-advice-card.json';
+import unavailableTravelAdviceCard from '../../../../backend/src/test/resources/fixtures/agent/c/travel-advice-unavailable-card.json';
 import {
   AgentContractError,
   parseAgentEvent,
@@ -38,6 +42,103 @@ describe('Agent DTO 和事件校验', () => {
       actionId: 'action-1',
       status: 'SUCCEEDED',
     });
+  });
+
+  it('直接校验 B 正式问题卡和方案卡夹具', () => {
+    expect(validateAgentCardEvent(parseAgentEvent(questionCard)).decision).toBe('render');
+    expect(validateAgentCardEvent(parseAgentEvent(planCard)).decision).toBe('render');
+    expect(validateAgentCardEvent(parseAgentEvent(travelAdviceCard)).decision).toBe('render');
+  });
+
+  it('出行建议天气摘要允许部分字段缺失；来源只在可用建议中必填', () => {
+    const partialWeather = parseAgentEvent({
+      ...travelAdviceCard,
+      payload: {
+        ...travelAdviceCard.payload,
+        weather: { area: null, condition: '小雨', risk: null },
+      },
+    });
+    expect(validateAgentCardEvent(partialWeather).decision).toBe('render');
+    expect(
+      validateAgentCardEvent(
+        parseAgentEvent({
+          ...travelAdviceCard,
+          payload: { ...travelAdviceCard.payload, source: undefined },
+        }),
+      ).decision,
+    ).toBe('reject');
+    expect(validateAgentCardEvent(parseAgentEvent(unavailableTravelAdviceCard)).decision).toBe(
+      'render',
+    );
+  });
+
+  it('固定选项问题不要求 input，自由输入问题仍要求 input', () => {
+    const choiceOnlyPayload: Record<string, unknown> = {
+      ...questionCard.payload,
+      allowFreeText: false,
+    };
+    delete choiceOnlyPayload.input;
+    expect(
+      validateAgentCardEvent(parseAgentEvent({ ...questionCard, payload: choiceOnlyPayload }))
+        .decision,
+    ).toBe('render');
+    expect(
+      validateAgentCardEvent(
+        parseAgentEvent({
+          ...questionCard,
+          payload: { ...choiceOnlyPayload, allowFreeText: true },
+        }),
+      ).decision,
+    ).toBe('reject');
+  });
+
+  it('严格拒绝方案卡缺字段、未知字段和原始工具参数', () => {
+    expect(
+      validateAgentCardEvent(
+        parseAgentEvent({
+          ...planCard,
+          payload: { ...planCard.payload, schemaVersion: undefined },
+        }),
+      ).decision,
+    ).toBe('reject');
+    expect(
+      validateAgentCardEvent(
+        parseAgentEvent({
+          ...planCard,
+          payload: { ...planCard.payload, internalEvidence: 'hidden' },
+        }),
+      ).decision,
+    ).toBe('reject');
+    expect(
+      validateAgentCardEvent(
+        parseAgentEvent({
+          ...planCard,
+          payload: {
+            ...planCard.payload,
+            plans: [{ ...planCard.payload.plans[0], rawToolArguments: '{}' }],
+          },
+        }),
+      ).decision,
+    ).toBe('reject');
+  });
+
+  it('正式方案缺少影片名或问题选项值时拒绝渲染', () => {
+    const invalidPlan = {
+      ...planCard,
+      payload: {
+        ...planCard.payload,
+        plans: [{ ...planCard.payload.plans[0], movieName: undefined }],
+      },
+    };
+    const invalidQuestion = {
+      ...questionCard,
+      payload: {
+        ...questionCard.payload,
+        options: [{ ...questionCard.payload.options[0], value: undefined }],
+      },
+    };
+    expect(validateAgentCardEvent(parseAgentEvent(invalidPlan)).decision).toBe('reject');
+    expect(validateAgentCardEvent(parseAgentEvent(invalidQuestion)).decision).toBe('reject');
   });
 
   it('合法事件忽略未知顶层字段但不把它带入投影', () => {

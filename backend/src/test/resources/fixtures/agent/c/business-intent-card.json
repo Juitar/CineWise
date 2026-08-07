@@ -1,0 +1,1 @@
+{"eventId":"49","eventType":"card","sessionId":"session-example-1","runId":"run-example-1","occurredAt":"2026-08-05T10:00:08+08:00","planId":"plan-example-1","planVersion":1,"nodeId":"select-seats","displayText":"前往选座","payload":{"type":"BUSINESS_INTENT","payload":{"intent":"SELECT_SEATS","businessRef":{"showId":"3001","movieId":"1001","cinemaId":"2001"}}}}

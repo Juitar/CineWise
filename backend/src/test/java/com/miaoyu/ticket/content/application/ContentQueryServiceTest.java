@@ -9,6 +9,7 @@ import com.miaoyu.ticket.content.domain.ContentItem;
 import com.miaoyu.ticket.content.domain.ContentResourceType;
 import com.miaoyu.ticket.content.domain.ContentSource;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
+import com.miaoyu.ticket.content.domain.CinemaContent;
 import com.miaoyu.ticket.content.domain.MovieContent;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -194,12 +195,84 @@ class ContentQueryServiceTest {
     }
 
     @Test
+    void givenInvalidCityCode_whenFindingLiveDemoPurchaseCatalog_thenItReturns100001() {
+        ContentQueryService service = service(Optional.empty(), Optional.empty(), Optional.empty());
+
+        assertThatThrownBy(() -> service.findLiveDemoPurchaseCatalog("长沙"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo(100001);
+    }
+
+    @Test
     void givenMissingOrInvalidLocator_whenCreatingQuery_thenItRejectsBeforeAnyProviderAccess() {
         // 无定位条件和非正业务 ID 都必须在 Application 边界失败，避免生成无意义的缓存或快照键。
         assertThatThrownBy(() -> new ContentQuery(ContentResourceType.CINEMA, null, " ", ""))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ContentQuery(ContentResourceType.CINEMA, 0L, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void givenLiveCityDirectory_whenKeywordQueries_thenItFiltersLocallyWithoutDemoFallback() {
+        AtomicInteger demoCalls = new AtomicInteger();
+        ContentResult<List<? extends ContentItem>> cityDirectory = cinemaDirectory(ContentSourceType.LIVE);
+        ContentCachePort cache = new ContentCachePort() {
+            @Override
+            public Optional<ContentResult<List<? extends ContentItem>>> find(ContentQuery query) {
+                assertThat(query.cityCode()).isEqualTo("430100");
+                assertThat(query.keyword()).isNull();
+                return Optional.of(cityDirectory);
+            }
+            @Override public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) { }
+        };
+        ContentQueryService service = new ContentQueryService(cache, emptySnapshot(), query -> {
+            demoCalls.incrementAndGet();
+            return Optional.empty();
+        }, new ContentProperties(Duration.ofHours(6), Duration.ofHours(6), Duration.ofDays(7)), CLOCK);
+
+        ContentResult<List<? extends ContentItem>> result = service.query(
+                new ContentQuery(ContentResourceType.CINEMA, null, "430100", "万达"));
+
+        assertThat(result.source().type()).isEqualTo(ContentSourceType.LIVE);
+        assertThat(result.data()).extracting(item -> ((CinemaContent) item).name()).containsExactly("万达影城");
+        assertThat(demoCalls).hasValue(0);
+    }
+
+    @Test
+    void givenLiveCityDirectoryWithNoKeywordMatch_whenQuerying_thenItReturnsLiveEmptyResultWithoutDemoFallback() {
+        AtomicInteger demoCalls = new AtomicInteger();
+        ContentQueryService service = new ContentQueryService(cacheOf(cinemaDirectory(ContentSourceType.LIVE)),
+                emptySnapshot(), query -> {
+                    demoCalls.incrementAndGet();
+                    return Optional.empty();
+                }, new ContentProperties(Duration.ofHours(6), Duration.ofHours(6), Duration.ofDays(7)), CLOCK);
+
+        ContentResult<List<? extends ContentItem>> result = service.query(
+                new ContentQuery(ContentResourceType.CINEMA, null, "430100", "不存在的影院"));
+
+        assertThat(result.source().type()).isEqualTo(ContentSourceType.LIVE);
+        assertThat(result.data()).isEmpty();
+        assertThat(demoCalls).hasValue(0);
+    }
+
+    @Test
+    void givenNoRealCityDirectory_whenDemoFallbackUsed_thenItLoadsDirectoryBeforeLocalKeywordFiltering() {
+        AtomicInteger demoCalls = new AtomicInteger();
+        ContentQueryService service = new ContentQueryService(cacheOf(Optional.empty()), emptySnapshot(), query -> {
+            demoCalls.incrementAndGet();
+            // Demo 目录和真实城市目录共用同一查询语义，不能把页面关键词带进目录键。
+            assertThat(query.cityCode()).isEqualTo("430100");
+            assertThat(query.keyword()).isNull();
+            return Optional.of(cinemaDirectory(ContentSourceType.MOCK));
+        }, new ContentProperties(Duration.ofHours(6), Duration.ofHours(6), Duration.ofDays(7)), CLOCK);
+
+        ContentResult<List<? extends ContentItem>> result = service.query(
+                new ContentQuery(ContentResourceType.CINEMA, null, "430100", "万达"));
+
+        assertThat(result.source().type()).isEqualTo(ContentSourceType.MOCK);
+        assertThat(result.data()).extracting(item -> ((CinemaContent) item).name()).containsExactly("万达影城");
+        assertThat(demoCalls).hasValue(1);
     }
 
     private ContentQueryService service(Optional<ContentResult<List<? extends ContentItem>>> cacheResult,
@@ -234,6 +307,28 @@ class ContentQueryServiceTest {
             @Override
             public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) { }
         };
+    }
+
+    private ContentCachePort cacheOf(ContentResult<List<? extends ContentItem>> content) {
+        return cacheOf(Optional.of(content));
+    }
+
+    private ContentCachePort cacheOf(Optional<ContentResult<List<? extends ContentItem>>> content) {
+        return new ContentCachePort() {
+            @Override public Optional<ContentResult<List<? extends ContentItem>>> find(ContentQuery query) {
+                return content;
+            }
+            @Override public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) { }
+        };
+    }
+
+    private ContentResult<List<? extends ContentItem>> cinemaDirectory(ContentSourceType sourceType) {
+        return new ContentResult<>(List.of(
+                new CinemaContent(1L, "cinema-1", "万达影城", "430100", "岳麓区", "长沙市岳麓区", null, null),
+                new CinemaContent(2L, "cinema-2", "星河影城", "430100", "天心区", "长沙市天心区", null, null)),
+                new ContentSource("NETSTART_MAOYAN", sourceType), NOW, NOW.plusHours(1), false,
+                sourceType != ContentSourceType.LIVE,
+                sourceType == ContentSourceType.LIVE ? null : ContentFallbackType.MOCK);
     }
 
     private ContentResult<List<? extends ContentItem>> result(LocalDateTime expiresAt, boolean expired,

@@ -397,15 +397,18 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
 
     @Override
     public Map<String, MovieState> findExistingMovieStates(String source) {
+        // H2 回归基线尚未包含 V014 扩展列；此时返回空集并保守地重新读取详情，而不是让日常同步报 SQL 错误。
         if (!hasV014MovieColumns()) {
             return Map.of();
         }
+        // 只读取目录能比较的字段；详情专属字段继续以 Provider 详情响应为准，避免把缺失列误判为资料删除。
         return jdbcTemplate.query("""
-                SELECT source_movie_id, release_date, release_status, data_time
+                SELECT source_movie_id, title, genres_json, rating, release_date, release_status, data_time
                   FROM movie
                  WHERE source = ? AND source_movie_id IS NOT NULL AND deleted_at IS NULL
                 """, (resultSet, rowNumber) -> Map.entry(resultSet.getString("source_movie_id"),
-                new MovieState(resultSet.getDate("release_date") == null ? null
+                new MovieState(resultSet.getString("title"), resultSet.getString("genres_json"),
+                        resultSet.getBigDecimal("rating"), resultSet.getDate("release_date") == null ? null
                         : resultSet.getDate("release_date").toLocalDate().toString(),
                         resultSet.getString("release_status"),
                         resultSet.getTimestamp("data_time") == null ? null

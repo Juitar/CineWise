@@ -179,15 +179,17 @@ public class AgentRunResultTransaction {
             recordToolEvents(session, run, result, nodeToolResults, null);
         }
         AgentReplyMessageType replyType = result.reply().messageType();
-        boolean isCardReply = replyType == AgentReplyMessageType.MOVIE_CARD
+        boolean isCardReply = replyType == AgentReplyMessageType.QUESTION
+                || replyType == AgentReplyMessageType.MOVIE_CARD
                 || replyType == AgentReplyMessageType.PLAN_CARD
+                || replyType == AgentReplyMessageType.TRAVEL_ADVICE_CARD
                 || replyType == AgentReplyMessageType.SELECT_SEATS;
         AgentEventType replyEvent = isCardReply
                 ? AgentEventType.CARD : replyType == AgentReplyMessageType.ERROR
                         ? AgentEventType.MESSAGE_ERROR : replyType == AgentReplyMessageType.PROGRESS
                                 ? AgentEventType.MESSAGE_START : AgentEventType.MESSAGE_COMPLETE;
         AgentStoredJson replyEventPayload = replyEvent == AgentEventType.CARD
-                ? jsonFactory.cardPayload(result.reply())
+                ? jsonFactory.cardPayload(result.reply(), now)
                 : jsonFactory.eventPayload(Map.of("messageType", replyType.name()));
         runtimeEventService.append(session, run, replyEvent, replyEventPayload);
         if (run.status().isTerminal()) {
@@ -278,6 +280,7 @@ public class AgentRunResultTransaction {
             case "queryAvailableDates" -> "正在查询可用日期";
             case "queryShows" -> "正在查询场次";
             case "querySeats" -> "正在查询座位";
+            case "getTravelAdvice" -> "正在查询出行建议";
             default -> "正在处理请求";
         };
     }
@@ -305,7 +308,7 @@ public class AgentRunResultTransaction {
     private AgentMessage assistantMessage(AgentRun run, MinimalReadOnlyAgentResult result, LocalDateTime now) {
         return new AgentMessage(
                 idGenerator.nextId(), UUID.randomUUID().toString(), run.sessionId(), run.id(), run.userId(),
-                AgentMessageRole.ASSISTANT, AgentMessageType.valueOf(result.reply().messageType().name()),
+                AgentMessageRole.ASSISTANT, messageType(result.reply().messageType()),
                 result.reply().text(), jsonFactory.replyPayload(result.reply()), AgentMessageStatus.COMPLETED,
                 now, now, run.expireAt());
     }
@@ -315,6 +318,12 @@ public class AgentRunResultTransaction {
                         || status == PlanNodeStatus.WAITING_CONFIRMATION
                         || status == PlanNodeStatus.SKIPPED
                 ? null : now;
+    }
+
+    /** V008 的 message_type 不增加枚举值；卡片恢复一律依赖带 eventId 的持久化 CARD 事件。 */
+    private static AgentMessageType messageType(AgentReplyMessageType replyType) {
+        return replyType == AgentReplyMessageType.TRAVEL_ADVICE_CARD
+                ? AgentMessageType.TEXT : AgentMessageType.valueOf(replyType.name());
     }
 
     private static LocalDateTime finishedAt(PlanNodeStatus status, LocalDateTime now) {

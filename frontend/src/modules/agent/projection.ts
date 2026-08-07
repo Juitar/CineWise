@@ -14,6 +14,7 @@ export type AgentDisplayKind =
   | 'card-placeholder'
   | 'movie-card'
   | 'plan-card'
+  | 'travel-advice-card'
   | 'completed'
   | 'error'
   | 'progress'
@@ -27,14 +28,40 @@ export interface AgentDisplayItem {
   text: string;
   title?: string;
   fields?: readonly { label: string; value: string }[];
-  options?: readonly string[];
+  question?: {
+    questionId: string;
+    options: readonly { optionId: string; label: string; value: string }[];
+    allowFreeText: boolean;
+    expiresAt: string;
+  };
+  plans?: readonly AgentPlanDisplay[];
+  relaxationSuggestion?: string;
   selectSeatsPath?: string;
+  travelTaskId?: string;
   confirmation?: {
     actionId: string;
     runId: string;
     status: AgentConfirmationStatus;
     submitting: boolean;
   };
+}
+
+export interface AgentPlanDisplay {
+  showId: string;
+  planType: string;
+  movieName: string;
+  cinemaName: string;
+  price: string;
+  currency: string;
+  startTime: string;
+  rating: string | null;
+  reasons: readonly string[];
+  source: string;
+  dataAt: string;
+  expiresAt: string;
+  expired: boolean;
+  purchaseEligible: boolean;
+  distanceMeters: number | null;
 }
 
 /** 仅使用已校验的场次、影片和影院 ID 构造选座地址，不补齐其他业务参数。 */
@@ -136,6 +163,10 @@ function payloadText(payload: Readonly<Record<string, unknown>>, key: string): s
   return typeof value === 'string' && value ? value : null;
 }
 
+function isTravelAdviceHistory(message: AgentMessage): boolean {
+  return message.payload.type === 'TRAVEL_ADVICE_CARD';
+}
+
 function cardStatusFields(event: AgentEvent): Array<{ label: string; value: string }> {
   const source = payloadText(event.payload, 'source');
   const dataAt = payloadText(event.payload, 'dataAt');
@@ -215,7 +246,16 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
       title: event.payload.message as string,
       text: locationState ?? (event.payload.message as string),
       fields: locationState ? [{ label: '位置授权', value: locationState }] : undefined,
-      options: options.map((option) => option.label as string),
+      question: {
+        questionId: event.payload.questionId as string,
+        options: options.map((option) => ({
+          optionId: option.optionId as string,
+          label: option.label as string,
+          value: option.value as string,
+        })),
+        allowFreeText: event.payload.allowFreeText as boolean,
+        expiresAt: event.payload.expiresAt as string,
+      },
     };
   }
   if (type === 'BUSINESS_INTENT') {
@@ -252,7 +292,67 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
   if (type === 'ERROR') {
     return { key, kind: 'error', text: event.displayText || '本次请求未完成' };
   }
+  if (type === 'TRAVEL_ADVICE_CARD') {
+    const weather = event.payload.weather as Record<string, unknown> | null;
+    const advice = event.payload.advice as readonly Record<string, unknown>[];
+    const fields: Array<{ label: string; value: string }> = [
+      { label: '出行任务', value: event.payload.taskId as string },
+      { label: '任务状态', value: event.payload.taskStatus as string },
+    ];
+    if (weather !== null) {
+      if (typeof weather.area === 'string') fields.push({ label: '天气区域', value: weather.area });
+      if (typeof weather.condition === 'string')
+        fields.push({ label: '天气情况', value: weather.condition });
+      if (typeof weather.risk === 'string') fields.push({ label: '天气提示', value: weather.risk });
+    }
+    advice.forEach((item, index) =>
+      fields.push({
+        label: `建议 ${index + 1} · ${item.type as string}`,
+        value: item.text as string,
+      }),
+    );
+    fields.push({
+      label: '建议状态',
+      value: event.payload.available === true ? '已生成' : '暂未生成',
+    });
+    if (event.payload.fallbackType)
+      fields.push({ label: '降级原因', value: event.payload.fallbackType as string });
+    return {
+      key,
+      kind: 'travel-advice-card',
+      title: '出行建议',
+      text:
+        event.payload.available === true
+          ? event.payload.degraded === true
+            ? '当前为降级建议，请注意有效时间'
+            : '以下为当前出行建议'
+          : '该出行任务暂未生成建议',
+      fields: [...fields, ...cardStatusFields(event)],
+      travelTaskId: event.payload.taskId as string,
+    };
+  }
   const isPlan = type === 'PLAN_CARD';
+  const plans = isPlan
+    ? (event.payload.plans as readonly Record<string, unknown>[]).slice(0, 3).map((plan) => ({
+        showId: plan.showId as string,
+        planType: plan.planType as string,
+        movieName: plan.movieName as string,
+        cinemaName: plan.cinemaName as string,
+        price: plan.price as string,
+        currency: plan.currency as string,
+        startTime: plan.startTime as string,
+        rating: plan.rating as string | null,
+        reasons: plan.reasons as readonly string[],
+        source: plan.source as string,
+        dataAt: plan.dataAt as string,
+        expiresAt: plan.expiresAt as string,
+        expired: plan.expired as boolean,
+        purchaseEligible: plan.purchaseEligible as boolean,
+        distanceMeters: plan.distanceMeters as number | null,
+      }))
+    : undefined;
+  const relaxation = event.payload.relaxationSuggestion as
+    Readonly<Record<string, unknown>> | null | undefined;
   return {
     key,
     kind: isPlan ? 'plan-card' : 'movie-card',
@@ -261,7 +361,12 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
       event.payload.degraded === true
         ? '当前结果为降级数据，请注意来源和有效时间'
         : '以下内容来自服务端卡片数据',
-    fields: [...candidateFields(event, isPlan ? 'plans' : 'movies'), ...cardStatusFields(event)],
+    plans,
+    relaxationSuggestion:
+      relaxation && typeof relaxation.message === 'string' ? relaxation.message : undefined,
+    fields: isPlan
+      ? cardStatusFields(event)
+      : [...candidateFields(event, 'movies'), ...cardStatusFields(event)],
   };
 }
 
@@ -439,6 +544,13 @@ function itemFromHistory(message: AgentMessage): AgentDisplayItem {
       text: confirmationText,
     };
   }
+  if (isTravelAdviceHistory(message)) {
+    return {
+      key: `message:${message.messageId}`,
+      kind: 'card-placeholder',
+      text: '正在恢复出行建议卡片',
+    };
+  }
   if (type === 'MOVIE_CARD' || type === 'PLAN_CARD') {
     return {
       key: `message:${message.messageId}`,
@@ -472,6 +584,32 @@ export function buildProjectionFromHistory(
 
 function confirmationKey(runId: string, payload: Readonly<Record<string, unknown>>): string | null {
   return typeof payload.actionId === 'string' ? `${runId}\u0000${payload.actionId}` : null;
+}
+
+export function travelAdviceRecoveryRunIds(messages: readonly AgentMessage[]): readonly string[] {
+  return Array.from(
+    new Set(messages.filter(isTravelAdviceHistory).map((message) => message.runId)),
+  );
+}
+
+function latestTravelAdviceEvents(snapshots: readonly AgentRunSnapshot[]): Map<string, AgentEvent> {
+  const latest = new Map<string, AgentEvent>();
+  for (const snapshot of snapshots) {
+    for (const event of snapshot.events) {
+      if (
+        event.sessionId !== snapshot.sessionId ||
+        event.runId !== snapshot.runId ||
+        event.eventType !== 'card' ||
+        event.payload.type !== 'TRAVEL_ADVICE_CARD' ||
+        validateAgentCardEvent(event).decision !== 'render'
+      )
+        continue;
+      const previous = latest.get(event.runId);
+      if (previous === undefined || compareDecimalStrings(event.eventId, previous.eventId) > 0)
+        latest.set(event.runId, event);
+    }
+  }
+  return latest;
 }
 
 function latestConfirmationEvents(snapshots: readonly AgentRunSnapshot[]): Map<string, AgentEvent> {
@@ -508,13 +646,19 @@ export function buildProjectionFromHistoryAndSnapshots(
 ): AgentProjection {
   const historyProjection = buildProjectionFromHistory(sessionId, history);
   const latest = latestConfirmationEvents(snapshots);
+  const latestTravelAdvice = latestTravelAdviceEvents(snapshots);
   return {
     ...historyProjection,
     items: historyProjection.items.map((item, index) => {
       const message = history[index];
       const key = message === undefined ? null : confirmationKey(message.runId, message.payload);
       const event = key === null ? undefined : latest.get(key);
-      return event === undefined ? item : confirmationItem(event);
+      if (event !== undefined) return confirmationItem(event);
+      const travelAdviceEvent =
+        message !== undefined && isTravelAdviceHistory(message)
+          ? latestTravelAdvice.get(message.runId)
+          : undefined;
+      return travelAdviceEvent === undefined ? item : typedCard(travelAdviceEvent);
     }),
   };
 }
@@ -526,7 +670,9 @@ function restoredCards(snapshot: AgentRunSnapshot): AgentDisplayItem[] {
       event.runId === snapshot.runId &&
       event.eventType === 'card' &&
       validateAgentCardEvent(event).decision === 'render' &&
-      (event.payload.type === 'MOVIE_CARD' || event.payload.type === 'PLAN_CARD'),
+      (event.payload.type === 'MOVIE_CARD' ||
+        event.payload.type === 'PLAN_CARD' ||
+        event.payload.type === 'TRAVEL_ADVICE_CARD'),
   );
   const latestConfirmations = latestConfirmationEvents([snapshot]);
   return [
@@ -552,7 +698,9 @@ export function buildProjectionFromSnapshot(
     if (
       message === undefined ||
       message.runId !== snapshot.runId ||
-      (message.type !== 'MOVIE_CARD' && message.type !== 'PLAN_CARD')
+      (message.type !== 'MOVIE_CARD' &&
+        message.type !== 'PLAN_CARD' &&
+        message.type !== 'TRAVEL_ADVICE_CARD')
     ) {
       return true;
     }
@@ -565,18 +713,25 @@ export function buildProjectionFromSnapshot(
       : snapshot.messages
           .filter(
             (message) =>
-              cards.length === 0 || (message.type !== 'MOVIE_CARD' && message.type !== 'PLAN_CARD'),
+              cards.length === 0 ||
+              (message.type !== 'MOVIE_CARD' &&
+                message.type !== 'PLAN_CARD' &&
+                message.type !== 'TRAVEL_ADVICE_CARD'),
           )
           .map((message) => ({
             key: `run-message:${message.messageId}`,
             kind:
-              message.type === 'MOVIE_CARD' || message.type === 'PLAN_CARD'
+              message.type === 'MOVIE_CARD' ||
+              message.type === 'PLAN_CARD' ||
+              message.type === 'TRAVEL_ADVICE_CARD'
                 ? 'card-placeholder'
                 : message.role === 'USER'
                   ? 'user-text'
                   : 'assistant-text',
             text:
-              message.type === 'MOVIE_CARD' || message.type === 'PLAN_CARD'
+              message.type === 'MOVIE_CARD' ||
+              message.type === 'PLAN_CARD' ||
+              message.type === 'TRAVEL_ADVICE_CARD'
                 ? '卡片数据暂不完整'
                 : message.text,
           }));

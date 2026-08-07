@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.miaoyu.ticket.agent.application.AgentErrorCode;
 import com.miaoyu.ticket.agent.application.persistence.AgentInitialRunTransaction;
+import com.miaoyu.ticket.agent.application.persistence.AgentConversationSlotService;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionCommand;
 import com.miaoyu.ticket.agent.application.persistence.AgentRequestHashFactory;
@@ -132,6 +133,7 @@ class AgentInitialRunTransactionTest {
         AgentRunRepository runRepository = Mockito.mock(AgentRunRepository.class);
         AgentMessageRepository messageRepository = Mockito.mock(AgentMessageRepository.class);
         AgentRuntimeEventService runtimeEventService = Mockito.mock(AgentRuntimeEventService.class);
+        AgentConversationSlotService conversationSlotService = Mockito.mock(AgentConversationSlotService.class);
         when(sessionRepository.findBySessionIdAndUserId("session-1", 7L)).thenReturn(Optional.of(session()));
         when(runRepository.findByClientRequestId(7L, 1L, "request-1")).thenReturn(Optional.empty());
         when(sessionRepository.claimActiveRun(1L, 7L, 100L, NOW.plusDays(30))).thenReturn(claimResult);
@@ -149,6 +151,7 @@ class AgentInitialRunTransactionTest {
                 messageRepository,
                 new AgentRequestHashFactory(),
                 runtimeEventService,
+                conversationSlotService,
                 idGenerator,
                 Clock.fixed(Instant.parse("2026-08-04T02:00:00Z"), ZoneId.of("Asia/Shanghai")));
         return new Fixture(transaction, sessionRepository, runRepository, messageRepository);

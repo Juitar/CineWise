@@ -9,7 +9,11 @@ function envelope(data: unknown, code = 0) {
 async function mockAuthenticatedAgent(
   page: import('@playwright/test').Page,
   showConfirmation = false,
+  recoverUnknownConfirmation = false,
 ) {
+  let confirmationPostCount = 0;
+  let confirmationRunQueryCount = 0;
+  let messageHistoryQueryCount = 0;
   await page
     .context()
     .addCookies([
@@ -112,6 +116,7 @@ async function mockAuthenticatedAgent(
       return;
     }
     if (path === `/api/v1/agent/sessions/${sessionId}/messages`) {
+      messageHistoryQueryCount += 1;
       const records = showConfirmation
         ? [
             {
@@ -144,6 +149,8 @@ async function mockAuthenticatedAgent(
     }
     if (showConfirmation && path === '/api/v1/agent/runs/52b810c5-4b03-4a41-9c36-07372f1a6f59') {
       expect(request.method()).toBe('GET');
+      confirmationRunQueryCount += 1;
+      const recovered = recoverUnknownConfirmation && confirmationRunQueryCount > 1;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -151,11 +158,11 @@ async function mockAuthenticatedAgent(
           envelope({
             runId: '52b810c5-4b03-4a41-9c36-07372f1a6f59',
             sessionId,
-            status: 'COMPLETED',
+            status: recovered ? 'COMPLETED' : 'RUNNING',
             planId: 'plan-e2e-1',
             planVersion: 2,
             startedAt: '2026-08-07T10:00:00+08:00',
-            finishedAt: '2026-08-07T10:00:00+08:00',
+            finishedAt: recovered ? '2026-08-07T10:01:00+08:00' : null,
             lastEventId: '42',
             messages: [],
             steps: [],
@@ -173,7 +180,7 @@ async function mockAuthenticatedAgent(
                   type: 'PLAN_CARD',
                   actionId: 'action-e2e-1',
                   actionType: 'CREATE_ORDER',
-                  status: 'PENDING_CONFIRMATION',
+                  status: recovered ? 'SUCCEEDED' : 'PENDING_CONFIRMATION',
                   title: '确认建单',
                   displayLines: ['影片：示例影片', '座位：已选择'],
                   expiresAt: '2026-08-08T10:05:00+08:00',
@@ -188,6 +195,15 @@ async function mockAuthenticatedAgent(
     }
     if (path === '/api/v1/agent/actions/action-e2e-1/confirm') {
       expect(request.postDataJSON()).toEqual({ confirmed: true });
+      confirmationPostCount += 1;
+      if (recoverUnknownConfirmation) {
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify(envelope(null, 306001)),
+        });
+        return;
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -272,6 +288,12 @@ async function mockAuthenticatedAgent(
     }
     await route.fallback();
   });
+
+  return {
+    confirmationPostCount: () => confirmationPostCount,
+    confirmationRunQueryCount: () => confirmationRunQueryCount,
+    messageHistoryQueryCount: () => messageHistoryQueryCount,
+  };
 }
 
 test('匿名访问 Agent 工作区安全跳转登录', async ({ page }) => {
@@ -328,7 +350,7 @@ test('移动端使用同一类型化确认卡且操作区不溢出', async ({ pa
 
   const card = page.locator('[data-agent-card-kind="plan-card"]');
   await expect(card).toBeVisible();
-  await expect(card.getByText('观影方案')).toBeVisible();
+  await expect(card.getByText('操作确认')).toBeVisible();
   await expect(card.getByRole('button', { name: '确认操作' })).toBeVisible();
   await expect(card.getByRole('button', { name: '拒绝操作' })).toBeVisible();
   await expect(page.getByText('action-e2e-1')).toHaveCount(0);
@@ -337,4 +359,19 @@ test('移动端使用同一类型化确认卡且操作区不溢出', async ({ pa
   expect(box).not.toBeNull();
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+});
+
+test('确认结果未知后按历史消息 runId 恢复且不重发 POST', async ({ page }) => {
+  const requests = await mockAuthenticatedAgent(page, true, true);
+  await page.goto(`/assistant/${sessionId}`);
+
+  const confirm = page.getByRole('button', { name: '确认操作' });
+  await expect(confirm).toBeVisible();
+  await confirm.click();
+
+  await expect(page.getByText('确认操作已完成')).toBeVisible();
+  await expect(confirm).toBeDisabled();
+  await expect.poll(requests.confirmationPostCount).toBe(1);
+  await expect.poll(requests.messageHistoryQueryCount).toBeGreaterThanOrEqual(2);
+  await expect.poll(requests.confirmationRunQueryCount).toBeGreaterThanOrEqual(2);
 });

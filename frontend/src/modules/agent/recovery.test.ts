@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import messageHistory from '../../../../backend/src/test/resources/fixtures/agent/c/session-message-history.json';
+import planCard from '../../../../backend/src/test/resources/fixtures/agent/c/plan-card.json';
 import runCompleted from '../../../../backend/src/test/resources/fixtures/agent/c/run-completed.json';
 import streamReset from '../../../../backend/src/test/resources/fixtures/agent/c/stream-reset.json';
 import { parseAgentEvent, parseAgentMessagePage, parseAgentRunSnapshot } from './contract';
@@ -51,24 +52,11 @@ describe('stream.reset 恢复', () => {
       ...runCompleted.data,
       events: [
         {
+          ...planCard,
           eventId: '42',
-          eventType: 'card',
           sessionId: 'session-example-1',
           runId: 'run-example-1',
           occurredAt: '2026-08-05T10:00:02+08:00',
-          planId: 'plan-example-1',
-          planVersion: 1,
-          nodeId: 'render-plan',
-          displayText: '推荐方案',
-          payload: {
-            type: 'PLAN_CARD',
-            title: '推荐方案',
-            plans: [{ planKey: 'p1', movieId: '1001', cinemaId: '2001', showId: '3001' }],
-            source: 'recommendation',
-            dataAt: '2026-08-05T10:00:00+08:00',
-            expiresAt: '2026-08-05T10:05:00+08:00',
-            degraded: false,
-          },
         },
       ],
     });
@@ -78,7 +66,7 @@ describe('stream.reset 恢复', () => {
     });
     expect(result.lastEventId).toBe('43');
     expect(result.items).toContainEqual(
-      expect.objectContaining({ kind: 'plan-card', title: '推荐方案' }),
+      expect.objectContaining({ kind: 'plan-card', title: '推荐场次' }),
     );
   });
 });

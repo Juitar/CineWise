@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.miaoyu.ticket.agent.api.AgentCardEventValidator;
 import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationService;
 import com.miaoyu.ticket.agent.application.persistence.AgentEventReplayService;
-import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionCommand;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeQueryService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunCancellationService;
@@ -17,14 +16,11 @@ import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
 import com.miaoyu.ticket.common.api.PageResult;
-import com.miaoyu.ticket.agent.domain.plan.PlanValidationContext;
-import com.miaoyu.ticket.agent.domain.plan.SlotSnapshot;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.observability.TraceIdHolder;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -93,9 +89,7 @@ public class AgentInteractionRuntimeService {
 
     public StreamView submitAndReplay(
             String sessionId, String clientRequestId, String content, String entry, long cursor) {
-        SlotSnapshot slots = new SlotSnapshot(1L, Map.of("context.entry", entry));
-        var submitted = submissionService.submit(new AgentMessageSubmissionCommand(sessionId, content, clientRequestId,
-                slots, new PlanValidationContext(Map.of(), Map.of(), slots), 30_000L));
+        var submitted = submissionService.submitConversation(sessionId, content, clientRequestId, entry, 30_000L);
         var replay = replayService.replay(sessionId, cursor);
         return new StreamView(sessionId, submitted.snapshot().run().runId(), replay.reset(), replay.watermark(),
                 replay.events().stream().map(this::event).toList());

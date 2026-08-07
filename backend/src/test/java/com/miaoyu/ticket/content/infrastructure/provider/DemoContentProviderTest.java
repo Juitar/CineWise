@@ -86,6 +86,27 @@ class DemoContentProviderTest {
     }
 
     @Test
+    void givenDemoMovieWithDisplayMetadata_whenBindingDatabaseId_thenItKeepsAllDisplayFields() {
+        MovieContent catalogMovie = new MovieContent(null, "demo-metadata", "演示资料片", "[\"剧情\"]", 100,
+                new java.math.BigDecimal("8.8"), "https://example.test/poster.jpg", "固定演示简介",
+                "2026-08-01", "NOW_SHOWING");
+        DemoContentCatalogProvider metadataCatalog = () -> new DemoContentCatalog("demo-content-v1",
+                "2026-08-01T00:00:00", "DEMO_CONTENT", ContentSourceType.MOCK, List.of(catalogMovie), List.of());
+        ContentIdentityLookupPort lookup = (resourceType, contentId) -> java.util.Optional.of("demo-metadata");
+        DemoContentProvider metadataProvider = new DemoContentProvider(metadataCatalog,
+                new ContentProperties(Duration.ofHours(6), Duration.ofHours(6), Duration.ofDays(7)), lookup);
+
+        MovieContent result = (MovieContent) metadataProvider.query(
+                new ContentQuery(ContentResourceType.MOVIE, 8_100_009L, null, null)).orElseThrow().data().getFirst();
+
+        assertThat(result.movieId()).isEqualTo(8_100_009L);
+        assertThat(result.posterUrl()).isEqualTo("https://example.test/poster.jpg");
+        assertThat(result.summary()).isEqualTo("固定演示简介");
+        assertThat(result.releaseDate()).isEqualTo("2026-08-01");
+        assertThat(result.releaseStatus()).isEqualTo("NOW_SHOWING");
+    }
+
+    @Test
     void givenUnknownDatabaseMovieId_whenQueryDemoContent_thenItDoesNotReturnTheCatalogList() {
         ContentQuery query = new ContentQuery(ContentResourceType.MOVIE, 8_199_999L, null, null);
 

@@ -56,8 +56,10 @@ public final class AmapWeatherProvider implements WeatherProvider {
 
     private Optional<WeatherObservation> toObservation(
             String cinemaArea, OffsetDateTime requestedAt, JsonNode response) {
-        // status 非成功或没有实况数组，都不能视为可展示的真实天气。
-        if (!"1".equals(response.path("status").asText()) || !response.path("lives").isArray()
+        // 高德 status 与 infocode 都成功且有实况数组，才允许进入真实天气转换。
+        if (!"1".equals(response.path("status").asText())
+                || !"10000".equals(response.path("infocode").asText())
+                || !response.path("lives").isArray()
                 || response.path("lives").isEmpty()) {
             return Optional.empty();
         }

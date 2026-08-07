@@ -16,15 +16,41 @@ class AgentCardEventValidatorTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void shouldRenderAllSixTypedPayloadsIncludingLocationPermissionQuestion() throws Exception {
+    void shouldRenderAllTypedPayloadsIncludingLocationPermissionAndTravelAdvice() throws Exception {
         for (String fixture : List.of("text-card.json", "question-card.json", "location-permission-question.json",
-                "recommendation-card.json", "plan-card.json", "progress-card.json", "error-card.json")) {
+                "recommendation-card.json", "plan-card.json", "progress-card.json", "error-card.json",
+                "travel-advice-card.json", "travel-advice-unavailable-card.json",
+                "travel-advice-degraded-expired-card.json")) {
             assertThat(validate(fixture).decision()).isEqualTo(AgentCardEventValidator.Decision.RENDER);
         }
         JsonNode location = fixture("location-permission-question.json").path("payload");
         assertThat(location.path("questionKind").asText()).isEqualTo("LOCATION_PERMISSION");
         assertThat(location.path("locationAuthorization").path("authorizationState").asText())
                 .isEqualTo("NOT_REQUESTED");
+    }
+
+    @Test
+    void shouldRejectTravelAdviceWithSensitiveOrInconsistentPayload() throws Exception {
+        ObjectNode sensitive = (ObjectNode) fixture("travel-advice-card.json").deepCopy();
+        ((ObjectNode) sensitive.path("payload")).put("latitude", "28.1");
+        assertThat(AgentCardEventValidator.validate(sensitive).decision())
+                .isEqualTo(AgentCardEventValidator.Decision.REJECT);
+
+        ObjectNode unavailable = (ObjectNode) fixture("travel-advice-unavailable-card.json").deepCopy();
+        ((ObjectNode) unavailable.path("payload")).put("degraded", true);
+        assertThat(AgentCardEventValidator.validate(unavailable).decision())
+                .isEqualTo(AgentCardEventValidator.Decision.REJECT);
+    }
+
+    @Test
+    void shouldRenderTravelAdviceWhenOnlySomeWeatherSummaryFieldsAreAvailable() throws Exception {
+        ObjectNode event = (ObjectNode) fixture("travel-advice-card.json").deepCopy();
+        ObjectNode weather = (ObjectNode) event.path("payload").path("weather");
+        weather.putNull("area");
+        weather.putNull("risk");
+
+        assertThat(AgentCardEventValidator.validate(event).decision())
+                .isEqualTo(AgentCardEventValidator.Decision.RENDER);
     }
 
     @Test
