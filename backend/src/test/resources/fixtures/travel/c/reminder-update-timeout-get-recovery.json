@@ -1,0 +1,17 @@
+{
+  "writeOutcome": "UNKNOWN_TO_CLIENT",
+  "clientRule": "PUT 超时或断网后不自动重发；只调用 GET /api/v1/travel/tasks/90001 确认结果。",
+  "getRequest": { "method": "GET", "path": "/api/v1/travel/tasks/90001" },
+  "getResponse": {
+    "httpStatus": 200,
+    "code": 0,
+    "message": "success",
+    "traceId": "dddddddddddddddddddddddddddddddd",
+    "data": {
+      "taskId": "90001",
+      "status": "READY",
+      "triggerAt": "2026-08-05T17:00:00+08:00",
+      "version": 2
+    }
+  }
+}

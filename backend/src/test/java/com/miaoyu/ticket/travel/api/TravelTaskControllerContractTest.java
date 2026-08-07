@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miaoyu.ticket.common.error.CommonErrorCode;
+import com.miaoyu.ticket.travel.application.TravelErrorCode;
 import com.miaoyu.ticket.travel.application.TravelTaskQueryService;
 import com.miaoyu.ticket.travel.domain.TravelTaskStatus;
 import java.io.InputStream;
@@ -97,6 +99,34 @@ class TravelTaskControllerContractTest {
         verify(queryService, never()).getMyTaskDetails("90001");
     }
 
+    @Test
+    void givenReminderBrowserFixtures_whenCheckingContract_thenKeepKnownSuccessAndErrorCodes() throws Exception {
+        JsonNode manifest = fixtureJson("reminder-update-fixtures.json");
+        JsonNode request = manifest.required("updateRequest");
+        assertThat(request.required("method").asText()).isEqualTo("PUT");
+        assertThat(request.required("headers").required("If-Match").asText()).isEqualTo("\"1\"");
+        assertThat(request.required("body").required("version").asLong()).isEqualTo(1L);
+
+        JsonNode success = fixtureJson("reminder-update-success.json");
+        assertSuccessEnvelope(success, 200);
+        assertThat(success.required("data").required("version").asLong()).isEqualTo(2L);
+
+        assertFixtureError("reminder-update-header-body-version-conflict.json", 409, CommonErrorCode.CONFLICT.code());
+        assertFixtureError("reminder-update-version-conflict.json", 409, TravelErrorCode.TASK_VERSION_CONFLICT.code());
+        assertFixtureError("reminder-update-not-found.json", 404, TravelErrorCode.TASK_NOT_FOUND.code());
+        assertFixtureError("reminder-update-cancelled.json", 409, TravelErrorCode.TASK_CANCELLED.code());
+        JsonNode recovery = fixtureJson("reminder-update-timeout-get-recovery.json");
+        assertSuccessEnvelope(recovery.required("getResponse"), 200);
+        assertThat(recovery.required("getResponse").required("data").required("version").asLong()).isEqualTo(2L);
+        assertSuccessEnvelope(fixtureJson("task-detail-success.json"), null);
+        assertSuccessEnvelope(fixtureJson("task-detail-cancelled.json"), null);
+        for (String adviceFixture : new String[] {
+                "advice-weather-normal.json", "advice-weather-unavailable.json", "advice-weather-demo.json",
+                "advice-expired.json", "advice-not-generated.json"}) {
+            assertSuccessEnvelope(fixtureJson(adviceFixture), null);
+        }
+    }
+
     private void assertAdviceFixture(String fixtureName, TravelTaskQueryService.TravelAdviceSummary summary)
             throws Exception {
         when(queryService.getMyAdviceSummary(summary.taskId())).thenReturn(summary);
@@ -117,9 +147,29 @@ class TravelTaskControllerContractTest {
     }
 
     private JsonNode fixtureData(String fixtureName) throws Exception {
+        return fixtureJson(fixtureName).required("data");
+    }
+
+    private JsonNode fixtureJson(String fixtureName) throws Exception {
         try (InputStream input = new ClassPathResource("fixtures/travel/c/" + fixtureName).getInputStream()) {
-            return objectMapper.readTree(input).required("data");
+            return objectMapper.readTree(input);
         }
+    }
+
+    private void assertFixtureError(String fixtureName, int statusCode, int errorCode) throws Exception {
+        JsonNode error = fixtureJson(fixtureName);
+        assertThat(error.required("httpStatus").asInt()).isEqualTo(statusCode);
+        assertThat(error.required("code").asInt()).isEqualTo(errorCode);
+    }
+
+    private void assertSuccessEnvelope(JsonNode response, Integer expectedHttpStatus) {
+        if (expectedHttpStatus != null) {
+            assertThat(response.required("httpStatus").asInt()).isEqualTo(expectedHttpStatus);
+        }
+        assertThat(response.required("code").asInt()).isZero();
+        assertThat(response.required("message").asText()).isEqualTo("success");
+        assertThat(response.required("traceId").asText()).hasSize(32);
+        assertThat(response.required("data").isObject()).isTrue();
     }
 
     private TravelTaskQueryService.TravelAdviceSummary summary(
