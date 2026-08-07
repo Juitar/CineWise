@@ -104,6 +104,12 @@ export function useProfile(privacyPolicyVersion: string) {
       } catch (error) {
         if (error instanceof ApiError && error.code === CONSENT_REQUIRED_CODE) {
           clearForConsent();
+        } else if (error instanceof ApiError && error.status === 401) {
+          setNotice('登录状态已失效，请重新登录');
+        } else if (error instanceof ApiError && error.status === 403 && error.code === 201009) {
+          setNotice('安全校验已刷新，请再次手动修改个性化设置');
+        } else if (error instanceof ApiError && error.status === 403) {
+          setNotice('当前账号无权修改个性化设置');
         } else if (
           error instanceof ApiError &&
           (error.code === VERSION_CONFLICT_CODE || error.status === 409)
@@ -114,6 +120,8 @@ export function useProfile(privacyPolicyVersion: string) {
           setNotice('画像设置参数不正确');
         } else if (error instanceof ApiError && (error.status ?? 0) >= 500) {
           setNotice('画像设置暂时无法保存');
+        } else if (error instanceof ApiError && error.isResultUnknown) {
+          setNotice('请求结果暂时无法确认，请刷新页面后查看当前设置');
         } else {
           setNotice('画像设置未保存，请稍后重试');
         }

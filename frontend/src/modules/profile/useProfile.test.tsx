@@ -101,6 +101,42 @@ describe('useProfile', () => {
   });
 
   it.each([
+    [401, undefined, '登录状态已失效，请重新登录'],
+    [403, 201009, '安全校验已刷新，请再次手动修改个性化设置'],
+    [403, 201007, '当前账号无权修改个性化设置'],
+  ])('个性化写入返回 HTTP %s 时显示可处理提示', async (status, code, message) => {
+    mocks.getMyProfile.mockResolvedValue(profile);
+    mocks.updateMyPersonalization.mockRejectedValue(
+      new ApiError('设置失败', { code, kind: 'HTTP', status }),
+    );
+    const { result } = renderHook(() => useProfile('2026-08-03'));
+    await waitFor(() => expect(result.current.state).toBe('ready'));
+
+    await act(async () => {
+      await result.current.setEnabled(false);
+    });
+
+    expect(mocks.updateMyPersonalization).toHaveBeenCalledOnce();
+    expect(result.current.notice).toBe(message);
+  });
+
+  it('个性化写入结果未知时不自动重发', async () => {
+    mocks.getMyProfile.mockResolvedValue(profile);
+    mocks.updateMyPersonalization.mockRejectedValue(
+      new ApiError('请求超时', { isResultUnknown: true, kind: 'TIMEOUT' }),
+    );
+    const { result } = renderHook(() => useProfile('2026-08-03'));
+    await waitFor(() => expect(result.current.state).toBe('ready'));
+
+    await act(async () => {
+      await result.current.setEnabled(false);
+    });
+
+    expect(mocks.updateMyPersonalization).toHaveBeenCalledOnce();
+    expect(result.current.notice).toBe('请求结果暂时无法确认，请刷新页面后查看当前设置');
+  });
+
+  it.each([
     [401, '登录状态已失效，请重新登录'],
     [403, '当前账号无权读取画像数据'],
     [422, '画像查询参数不正确'],

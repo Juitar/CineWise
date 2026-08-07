@@ -86,7 +86,7 @@ describe('getFreshnessNotices', () => {
     expect(notices.some((notice) => notice.id === 'source')).toBe(false);
   });
 
-  it('过期、降级和来源未验证可以同时显示', () => {
+  it('过期标记不在页面单独提示，降级和来源异常仍要提示', () => {
     const notices = getFreshnessNotices({
       source: '',
       sourceType: 'UNKNOWN' as 'LIVE',
@@ -98,12 +98,8 @@ describe('getFreshnessNotices', () => {
     });
 
     expect(notices.map((notice) => notice.text)).toEqual(
-      expect.arrayContaining([
-        '数据已过期，仅供参考',
-        '当前为降级数据',
-        '演示数据',
-        '来源尚未验证',
-      ]),
+      expect.arrayContaining(['当前为降级数据', '演示数据', '来源尚未验证']),
     );
+    expect(notices.some((notice) => notice.text.includes('过期'))).toBe(false);
   });
 });

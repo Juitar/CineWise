@@ -11,7 +11,7 @@ export type FreshnessNoticeTone = 'info' | 'warning';
 
 /** 页面可直接渲染的来源提示；id 保证组合提示使用稳定 key。 */
 export interface FreshnessNotice {
-  id: 'degraded' | 'expired' | 'fallback' | 'source' | 'unverified';
+  id: 'degraded' | 'fallback' | 'source' | 'unverified';
   text: string;
   tone: FreshnessNoticeTone;
 }
@@ -96,7 +96,7 @@ function displayedFallbackType(
 /**
  * 将后端内容来源转换为页面提示。
  *
- * 过期、降级和来源未验证互不排斥，避免只显示其中一个风险而让用户误以为数据是实时的。
+ * 降级和来源未验证互不排斥，避免只显示其中一个风险而让用户误以为数据是实时的。
  */
 export function getFreshnessNotices(
   freshness: Partial<ContentFreshness> | null | undefined,
@@ -140,10 +140,6 @@ export function getFreshnessNotices(
       text: sourceText,
       tone: 'info',
     });
-  }
-
-  if (freshness.isExpired === true) {
-    notices.push({ id: 'expired', text: '数据已过期，仅供参考', tone: 'warning' });
   }
 
   if (freshness.degraded === true) {
