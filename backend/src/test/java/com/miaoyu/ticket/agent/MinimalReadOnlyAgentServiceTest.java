@@ -18,6 +18,7 @@ import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.application.reply.ErrorReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.ProgressReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.QuestionReplyFacts;
+import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFacts;
 import com.miaoyu.ticket.agent.application.reply.RecommendationReplyCandidate;
 import com.miaoyu.ticket.agent.application.reply.RecommendationReplyFacts;
 import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentRequest;
@@ -200,28 +201,27 @@ class MinimalReadOnlyAgentServiceTest {
                     .isNotEmpty();
         });
         assertThat(result.reply().messageType()).isEqualTo(AgentReplyMessageType.PLAN_CARD);
-        assertThat(result.reply().payload()).isInstanceOf(RecommendationReplyFacts.class);
-        RecommendationReplyFacts facts = (RecommendationReplyFacts) result.reply().payload();
-        assertThat(facts.candidates()).singleElement().satisfies(replyCandidate -> {
-            assertThat(replyCandidate.showId()).isEqualTo("301");
-            assertThat(replyCandidate.price()).isEqualTo("45.00");
-            assertThat(replyCandidate.startTime()).isEqualTo(NOW.plusSeconds(300));
+        assertThat(result.reply().payload()).isInstanceOf(RecommendationPlanCardFacts.class);
+        RecommendationPlanCardFacts facts = (RecommendationPlanCardFacts) result.reply().payload();
+        assertThat(facts.plans()).singleElement().satisfies(plan -> {
+            assertThat(plan.showId()).isEqualTo("301");
+            assertThat(plan.price()).isEqualTo("45.00");
+            assertThat(plan.startTime()).isEqualTo(NOW.plusSeconds(300));
         });
         assertThat(result.state().nodeState("rank-movie-plan").status()).isEqualTo(PlanNodeStatus.SUCCESS);
         assertThat(result.state().nodeState("render-result").status()).isEqualTo(PlanNodeStatus.SUCCESS);
     }
 
     @Test
-    void shouldKeepNoShowtimeAsSuccessfulMovieCardWithoutInventedPurchaseFacts() {
+    void shouldKeepNoShowtimeAsSuccessfulEmptyPlanCardWithoutInventedPurchaseFacts() {
         MinimalReadOnlyAgentResult result = service(recommendationTool(
                 recommendationResult(List.of(), List.of("SHOWTIME"), true))).run(request(completeSlots()));
 
-        assertThat(result.reply().messageType()).isEqualTo(AgentReplyMessageType.MOVIE_CARD);
-        RecommendationReplyFacts facts = (RecommendationReplyFacts) result.reply().payload();
-        assertThat(facts.purchaseEligible()).isFalse();
+        assertThat(result.reply().messageType()).isEqualTo(AgentReplyMessageType.PLAN_CARD);
+        RecommendationPlanCardFacts facts = (RecommendationPlanCardFacts) result.reply().payload();
         assertThat(facts.missingFactors()).containsExactly("SHOWTIME");
         assertThat(facts.degraded()).isTrue();
-        assertThat(facts.candidates()).isEmpty();
+        assertThat(facts.plans()).isEmpty();
         assertThat(result.state().nodeState("rank-movie-plan").status()).isEqualTo(PlanNodeStatus.SUCCESS);
     }
 

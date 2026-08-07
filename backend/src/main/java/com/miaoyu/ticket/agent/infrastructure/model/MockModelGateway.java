@@ -8,6 +8,7 @@ import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
 import com.miaoyu.ticket.agent.application.reply.ErrorReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.ProgressReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.QuestionReplyFacts;
+import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFacts;
 import com.miaoyu.ticket.agent.application.reply.RecommendationReplyFacts;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlan;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlanNode;
@@ -78,7 +79,7 @@ public final class MockModelGateway implements ModelGateway {
         // switch 只接受已由 ReplyGenerationRequest 校验过的类型和事实，Mock 不从自由文本推断业务状态。
         String text = switch (replyRequest.requestedType()) {
             case QUESTION -> questionText((QuestionReplyFacts) replyRequest.payload());
-            case PLAN_CARD -> recommendationText((RecommendationReplyFacts) replyRequest.payload(), true);
+            case PLAN_CARD -> recommendationPlanText((RecommendationPlanCardFacts) replyRequest.payload());
             case MOVIE_CARD -> recommendationText((RecommendationReplyFacts) replyRequest.payload(), false);
             case SELECT_SEATS -> "请在选座页面选择座位。";
             case PROGRESS -> progressText((ProgressReplyFacts) replyRequest.payload());
@@ -201,6 +202,12 @@ public final class MockModelGateway implements ModelGateway {
         }
         // 无场次是 D 返回的成功降级，不要变成“工具失败”或虚构 showId、价格、开场时间。
         return "已找到影片候选，但当前条件下暂无可购场次。";
+    }
+
+    private static String recommendationPlanText(RecommendationPlanCardFacts facts) {
+        return facts.plans().isEmpty()
+                ? "当前条件下暂无可购方案。"
+                : "已找到 " + facts.plans().size() + " 个可购方案。";
     }
 
     private static String progressText(ProgressReplyFacts facts) {

@@ -7,8 +7,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
 import com.miaoyu.ticket.agent.application.persistence.AgentPersistenceJsonFactory;
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
-import com.miaoyu.ticket.agent.application.reply.RecommendationReplyCandidate;
-import com.miaoyu.ticket.agent.application.reply.RecommendationReplyFacts;
+import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFacts;
+import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardItem;
 import com.miaoyu.ticket.agent.application.reply.SelectSeatsReplyFacts;
 import java.time.Instant;
 import java.util.List;
@@ -20,10 +20,11 @@ class AgentPersistenceJsonFactoryTest {
         ObjectMapper mapper = new ObjectMapper();
         AgentPersistenceJsonFactory factory = new AgentPersistenceJsonFactory(mapper);
         Instant dataAt = Instant.parse("2026-08-06T07:00:00Z");
-        RecommendationReplyFacts facts = new RecommendationReplyFacts(
-                "rank-v1", List.of(new RecommendationReplyCandidate(
-                        "movie-1", "cinema-1", "show-1", "68.00", dataAt.plusSeconds(3600),
-                        "recommendation", false, true)), true, List.of(), "recommendation", dataAt,
+        RecommendationPlanCardFacts facts = new RecommendationPlanCardFacts(
+                "1.0", "rank-v1", List.of(new RecommendationPlanCardItem(
+                        "COMPREHENSIVE", "10001", "影片", "20001", "影院", "30001", "68.00", "CNY",
+                        dataAt.plusSeconds(3600), "8.5", 1.0D, List.of("匹配条件"), "recommendation", dataAt,
+                        dataAt.plusSeconds(300), false, true, null)), List.of(), null, true, "recommendation", dataAt,
                 dataAt.plusSeconds(300), false, false);
 
         JsonNode payload = mapper.readTree(factory.cardPayload(new ReplyGenerationResponse(
@@ -32,7 +33,8 @@ class AgentPersistenceJsonFactoryTest {
         assertThat(payload.path("type").asText()).isEqualTo("PLAN_CARD");
         assertThat(payload.path("title").asText()).isEqualTo("推荐场次");
         assertThat(payload.path("plans")).hasSize(1);
-        assertThat(payload.toString()).doesNotContain("seat", "actionId", "parameterHash", "token");
+        assertThat(payload.toString()).doesNotContain("seat", "actionId", "parameterHash", "token", "evidence",
+                "latitude", "longitude", "address", "estimatedTravelMinutes");
     }
 
     @Test

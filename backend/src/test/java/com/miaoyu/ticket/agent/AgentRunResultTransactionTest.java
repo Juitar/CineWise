@@ -248,7 +248,7 @@ class AgentRunResultTransactionTest {
         assertEquals(expectedErrorPayload, errorPayload.getValue().value());
         ArgumentCaptor<AgentMessage> messages = ArgumentCaptor.forClass(AgentMessage.class);
         verify(fixture.messageRepository(), Mockito.times(2)).insert(messages.capture());
-        assertEquals(AgentMessageType.MOVIE_CARD, messages.getAllValues().getFirst().type());
+        assertEquals(AgentMessageType.PLAN_CARD, messages.getAllValues().getFirst().type());
         assertEquals(AgentMessageType.ERROR, messages.getAllValues().getLast().type());
     }
 
