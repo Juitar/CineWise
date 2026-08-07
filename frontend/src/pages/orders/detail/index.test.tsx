@@ -57,7 +57,7 @@ describe('订单详情交易时间展示', () => {
         showId: '11',
         movieId: '22',
         cinemaId: '33',
-        showStartTime: '2026-08-10T14:30:00+08:00',
+        showStartTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         seatIds: ['101'],
         ticketCount: 1,
         unitPrice: '39.00',
@@ -89,6 +89,47 @@ describe('订单详情交易时间展示', () => {
     fireEvent.click(screen.getByRole('button', { name: '查看出行建议' }));
     await waitFor(() => expect(travelMocks.find).toHaveBeenCalledWith('1'));
     expect(routeMocks.historyPush).toHaveBeenCalledWith('/travel/90001');
+  });
+
+  it('开场前超过两小时的已支付订单不展示出行建议入口', () => {
+    vi.mocked(useOrder).mockReturnValue({
+      data: {
+        orderId: '1',
+        orderNo: 'CW1',
+        showId: '11',
+        movieId: '22',
+        cinemaId: '33',
+        showStartTime: '2099-08-10T14:30:00+08:00',
+        seatIds: ['101'],
+        ticketCount: 1,
+        unitPrice: '39.00',
+        totalAmount: '39.00',
+        status: 'PAID',
+        expireTime: '',
+        stateVersion: 1,
+        updatedAt: '2026-08-05T04:00:00Z',
+      },
+      loading: false,
+      error: null,
+      refresh: vi.fn(),
+    });
+    vi.mocked(useCancelOrder).mockReturnValue({
+      submitting: false,
+      resultUnknown: false,
+      error: null,
+      submit: vi.fn(),
+      recover: vi.fn(),
+    });
+    vi.mocked(usePaymentQuery).mockReturnValue({
+      payment: null,
+      querying: false,
+      error: null,
+      query: vi.fn(),
+    });
+
+    render(<OrderDetailPage />);
+
+    expect(screen.queryByRole('button', { name: '查看出行建议' })).not.toBeInTheDocument();
   });
 
   it('按固定业务时区展示支付截止和更新时间', () => {

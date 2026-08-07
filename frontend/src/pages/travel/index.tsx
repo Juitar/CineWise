@@ -4,6 +4,7 @@ import { history, useParams } from 'umi';
 import { formatOrderDateTime, parseOrderDateTime } from '../../modules/order/formatters';
 import type { TravelTaskStatus } from '../../modules/travel/types';
 import { useTravelTask } from '../../modules/travel/useTravelTask';
+import { isTravelAdviceAvailable } from '../../modules/travel/advice-availability';
 import './index.css';
 
 const STATUS_LABELS: Record<TravelTaskStatus, string> = {
@@ -78,7 +79,7 @@ export default function TravelPage() {
     );
   }
 
-  if (!travel.task || !travel.advice) {
+  if (!travel.task) {
     return (
       <main className="travel-page">
         <Empty description="暂无可查看的出行任务" />
@@ -87,6 +88,35 @@ export default function TravelPage() {
   }
 
   const { task, advice } = travel;
+  const isAdviceGenerationPending = !isTravelAdviceAvailable(task.order.showStartTime);
+
+  if (!advice && isAdviceGenerationPending) {
+    return (
+      <main className="travel-page">
+        <header className="travel-header">
+          <div>
+            <h1>观影出行建议</h1>
+            <p>
+              {task.movie.title} · {task.cinema.name}
+            </p>
+          </div>
+          <Tag color={statusColor(task.status)}>{STATUS_LABELS[task.status]}</Tag>
+        </header>
+        <Card title="出行建议">
+          <Empty description="出行建议将在开场前 2 小时生成，请稍后查看" />
+        </Card>
+      </main>
+    );
+  }
+
+  if (!advice) {
+    return (
+      <main className="travel-page">
+        <Empty description="出行建议暂不可用，请稍后重试" />
+      </main>
+    );
+  }
+
   const isTerminal = ['CANCELLED', 'COMPLETED', 'FAILED'].includes(task.status);
   const isReadOnly = isTerminal || advice.isExpired;
 
@@ -183,7 +213,7 @@ export default function TravelPage() {
         title="天气与通用交通建议"
         extra={
           <Button
-            disabled={isReadOnly || travel.isRefreshing}
+            disabled={isReadOnly || isAdviceGenerationPending || travel.isRefreshing}
             loading={travel.isRefreshing}
             onClick={() => void travel.refresh()}
           >
@@ -192,7 +222,7 @@ export default function TravelPage() {
         }
       >
         {!advice.available ? (
-          <Empty description="建议尚未生成，可稍后主动刷新" />
+          <Empty description="出行建议将在开场前 2 小时生成，请稍后查看" />
         ) : (
           <div className="travel-advice-content">
             {advice.weather ? (

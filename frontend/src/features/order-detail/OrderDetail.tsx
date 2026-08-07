@@ -209,7 +209,7 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
         return (
           <div className="order-detail-actions">
             {renderPrimaryBtn('查看电子票', onViewTicket)}
-            {renderDefaultBtn('查看出行建议', onViewTravel)}
+            {onViewTravel ? renderDefaultBtn('查看出行建议', onViewTravel) : null}
             {renderDefaultBtn('申请退票', onApplyRefund)}
           </div>
         );

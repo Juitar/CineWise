@@ -100,12 +100,28 @@ describe('观影出行建议页', () => {
   it('建议未生成时显示空态并允许主动刷新', () => {
     const refresh = vi.fn();
     mocks.travel.mockReturnValue(
-      state({ advice: { ...advice, available: false, weather: null, advice: [] }, refresh }),
+      state({
+        task: { ...task, order: { ...task.order, showStartTime: '2099-08-07T20:00:00+08:00' } },
+        advice: { ...advice, available: false, weather: null, advice: [] },
+        refresh,
+      }),
     );
     render(<TravelPage />);
-    expect(screen.getByText('建议尚未生成，可稍后主动刷新')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '刷新建议' }));
-    expect(refresh).toHaveBeenCalledOnce();
+    expect(screen.getByText('出行建议将在开场前 2 小时生成，请稍后查看')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '刷新建议' })).toBeDisabled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('建议接口尚未返回完整 DTO 时仍展示两小时前的等待说明', () => {
+    mocks.travel.mockReturnValue(
+      state({
+        task: { ...task, order: { ...task.order, showStartTime: '2099-08-07T20:00:00+08:00' } },
+        advice: null,
+      }),
+    );
+    render(<TravelPage />);
+    expect(screen.getByText('出行建议将在开场前 2 小时生成，请稍后查看')).toBeInTheDocument();
+    expect(screen.queryByText('出行建议加载失败')).not.toBeInTheDocument();
   });
 
   it('天气降级时说明原因并继续展示通用建议', () => {

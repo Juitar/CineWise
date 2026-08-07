@@ -8,6 +8,7 @@ import {
   updateTravelReminder,
 } from './api';
 import { TravelContractError } from './contract';
+import { isTravelAdviceAvailable } from './advice-availability';
 import type { TravelAdvice, TravelTask, UpdateReminderRequest } from './types';
 
 function safeError(error: unknown, fallback: string): ApiError {
@@ -47,14 +48,22 @@ export function useTravelTask(taskId: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const [nextTask, nextAdvice] = await Promise.all([
-        getTravelTask(taskId, controller.signal),
-        getTravelAdvice(taskId, controller.signal),
-      ]);
+      const nextTask = await getTravelTask(taskId, controller.signal);
+      let nextAdvice: TravelAdvice | null;
+      try {
+        nextAdvice = await getTravelAdvice(taskId, controller.signal);
+      } catch (adviceError) {
+        if (!isTravelAdviceAvailable(nextTask.order.showStartTime)) {
+          nextAdvice = null;
+          setNotice('出行建议将在开场前 2 小时生成，请稍后查看');
+        } else {
+          throw adviceError;
+        }
+      }
       if (controller.signal.aborted) return false;
       setTask(nextTask);
       setAdvice(nextAdvice);
-      setNotice(null);
+      if (nextAdvice) setNotice(null);
       setIsReminderResultUnknown(false);
       return true;
     } catch (requestError) {

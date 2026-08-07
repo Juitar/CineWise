@@ -12,6 +12,7 @@ import { TransactionBreadcrumb } from '../../../features/transaction-breadcrumb/
 import { OrderContentNotice } from '../../../features/order-content-notice/OrderContentNotice';
 import { useOrderContentDetails } from '../../../modules/order/useOrderContentDetails';
 import { useTravelTaskByOrder } from '../../../modules/travel/useTravelTask';
+import { isTravelAdviceAvailable } from '../../../modules/travel/advice-availability';
 import { ApiError } from '../../../shared/api/ApiError';
 import './index.css';
 
@@ -31,6 +32,9 @@ export default function OrderDetailPage() {
   );
   const movie = order ? content.moviesById.get(order.movieId) : undefined;
   const cinema = order ? content.cinemasById.get(order.cinemaId) : undefined;
+  const canViewTravelAdvice = Boolean(
+    order?.showStartTime && isTravelAdviceAvailable(order.showStartTime),
+  );
 
   const handleCancel = async () => {
     const cancelled = await cancellation.submit();
@@ -116,7 +120,7 @@ export default function OrderDetailPage() {
           }
           onCancel={() => void handleCancel()}
           onViewTicket={() => void handleViewTicket()}
-          onViewTravel={() => void handleViewTravel()}
+          onViewTravel={canViewTravelAdvice ? () => void handleViewTravel() : undefined}
           onApplyRefund={() => history.push(`/orders/${encodeURIComponent(orderNo)}/refund`)}
           onViewOrders={() => history.push('/orders')}
           cancelResultUnknown={cancellation.resultUnknown}
