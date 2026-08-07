@@ -1,0 +1,79 @@
+.page-state {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 280px;
+  padding: 32px 24px;
+  width: 100%;
+}
+
+.page-state-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 520px;
+  text-align: center;
+  width: 100%;
+}
+
+.page-state-title {
+  color: var(--color-text);
+  display: block;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.page-state-description,
+.page-state-trace-id {
+  color: var(--color-text-secondary);
+  display: block;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.page-state-trace-id {
+  font-size: 13px;
+}
+
+.page-state-action {
+  align-self: center;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.page-state--loading .ant-skeleton {
+  margin-top: 8px;
+  text-align: left;
+}
+
+.page-state--empty .ant-empty {
+  margin: 0;
+}
+
+.page-state--empty .ant-empty-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.page-state-notice {
+  margin-bottom: 16px;
+}
+
+.page-state-notice-description {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@media (max-width: 1023px) {
+  .page-state {
+    min-height: 220px;
+    padding: 24px 16px;
+  }
+
+  .page-state-title {
+    font-size: 18px;
+  }
+}
