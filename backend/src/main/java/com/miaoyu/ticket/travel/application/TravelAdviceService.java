@@ -74,7 +74,11 @@ public class TravelAdviceService {
             return adviceRepository.findCommittedByTaskIdAndVersion(task.id(), task.version() + 1)
                     .orElseThrow(() -> new IllegalStateException("建议版本抢占失败后未找到已生成快照"));
         }
-        WeatherObservation weather = weatherQueryService.query(task.cinemaArea());
+        // 新任务必须按影院 ID 查静态坐标，再由天气服务逆地理取得 adcode。
+        // V013 前的历史任务允许没有 cinemaId，只能保留已登记区域映射的明确回退，不能猜测坐标。
+        WeatherObservation weather = task.cinemaId() == null
+                ? weatherQueryService.query(task.cinemaArea())
+                : weatherQueryService.query(task.cinemaId());
 
         TravelAdviceSnapshot snapshot = new TravelAdviceSnapshot(
                 idGenerator.nextId(), task.id(), task.version() + 1, weatherJson(weather), adviceJson(weather),

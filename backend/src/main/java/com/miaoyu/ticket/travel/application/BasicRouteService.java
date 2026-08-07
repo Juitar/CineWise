@@ -3,9 +3,12 @@ package com.miaoyu.ticket.travel.application;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.content.application.CinemaLocationQueryService;
+import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.Objects;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -23,20 +26,35 @@ public class BasicRouteService {
     private final TravelTaskRepository taskRepository;
     /** 由认证上下文提供当前用户，不能使用请求体或 Agent 参数中的 userId。 */
     private final CurrentUserAccessor currentUserAccessor;
-    /** Provider 只接收本次请求的起点、影院区域和出行方式。 */
+    /** Provider 只接收本次请求的两个数值坐标和出行方式。 */
     private final BasicRouteProvider routeProvider;
+    /** 影院终点必须由内容模块按 cinemaId 查询，不能用区域文本猜测。 */
+    private final java.util.function.LongFunction<java.util.Optional<ResolvedGeoPoint>> cinemaLocationQuery;
     /** 统一产生本次路线结果的数据时间，便于测试和过期判断。 */
     private final Clock clock;
 
     /** 创建路线查询服务；服务本身不持有位置或路线历史。 */
+    @Autowired
     public BasicRouteService(
             TravelTaskRepository taskRepository,
             CurrentUserAccessor currentUserAccessor,
             BasicRouteProvider routeProvider,
+            CinemaLocationQueryService cinemaLocationQueryService,
+            Clock clock) {
+        this(taskRepository, currentUserAccessor, routeProvider, cinemaLocationQueryService::findByCinemaId, clock);
+    }
+
+    /** 测试可传入只读位置查询函数；生产环境只使用内容模块提供的公开查询服务。 */
+    public BasicRouteService(
+            TravelTaskRepository taskRepository,
+            CurrentUserAccessor currentUserAccessor,
+            BasicRouteProvider routeProvider,
+            java.util.function.LongFunction<java.util.Optional<ResolvedGeoPoint>> cinemaLocationQuery,
             Clock clock) {
         this.taskRepository = taskRepository;
         this.currentUserAccessor = currentUserAccessor;
         this.routeProvider = routeProvider;
+        this.cinemaLocationQuery = cinemaLocationQuery;
         this.clock = clock;
     }
 
@@ -45,7 +63,7 @@ public class BasicRouteService {
      *
      * <p>校验顺序不可交换：先确认任务属于当前用户和影院标识存在，再校验用户的第三方共享确认，
      * 最后才读取起点并调用 Provider。这样历史任务缺少影院终点时，即使请求体包含精确位置也不会
-     * 被发送出去；originValue 始终是方法局部变量，不进入持久化端口、异常信息或日志。</p>
+     * 被发送出去；起点始终是方法局部变量，不进入持久化端口、异常信息或日志。</p>
      */
     public BasicRouteResult planMyRoute(String taskId, BasicRouteCommand command) {
         TravelTaskRepository.TravelTaskSnapshot task = requireMyTask(taskId);
@@ -56,11 +74,18 @@ public class BasicRouteService {
         if (!command.thirdPartySharingConfirmed()) {
             throw new BusinessException(TravelErrorCode.ROUTE_SHARING_NOT_CONFIRMED);
         }
-        String origin = requireText(command.originValue(), "起点不能为空");
+        ResolvedGeoPoint destination = cinemaLocationQuery.apply(task.cinemaId())
+                .orElseThrow(() -> new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE));
+        ResolvedGeoPoint origin = java.util.Objects.requireNonNull(command.origin(), "起点不能为空");
+        try {
+            origin.requirePersonalDistanceCapability();
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE);
+        }
         String mode = requireText(command.travelMode(), "出行方式不能为空");
         OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         try {
-            return routeProvider.plan(origin, task.cinemaArea(), mode, now)
+            return routeProvider.plan(origin, destination, mode, now)
                     .orElseThrow(() -> new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE));
         } catch (RuntimeException exception) {
             // Provider 异常与空结果对用户都表示路线暂不可用；异常中不得拼接 origin，防止位置泄漏。

@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miaoyu.ticket.geo.domain.LocationGranularity;
+import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import org.junit.jupiter.api.Test;
@@ -18,12 +21,12 @@ class AmapRouteProviderTest {
     void givenValidAmapResponse_whenPlanning_thenReturnRealRouteSummary() {
         AmapRouteProvider provider = provider((origin, destination, key) -> {
             assertThat(origin).isEqualTo("120.1,30.2");
-            assertThat(destination).isEqualTo("西湖区");
+            assertThat(destination).isEqualTo("120.2,30.3");
             assertThat(key).isEqualTo("test-key");
             return json("{\"status\":\"1\",\"route\":{\"paths\":[{\"duration\":\"1250\"}]}}");
         });
 
-        var result = provider.plan("120.1,30.2", "西湖区", "DRIVING", REQUESTED_AT);
+        var result = provider.plan(point("120.1", "30.2"), point("120.2", "30.3"), "DRIVING", REQUESTED_AT);
 
         assertThat(result).isPresent();
         assertThat(result.orElseThrow().source()).isEqualTo("AMAP_ROUTE");
@@ -42,8 +45,8 @@ class AmapRouteProviderTest {
                         Duration.ofMinutes(15)),
                 (origin, destination, key) -> { throw new AssertionError("不应请求高德"); });
 
-        assertThat(disabled.plan("120.1,30.2", "西湖区", "DRIVING", REQUESTED_AT)).isEmpty();
-        assertThat(missingKey.plan("120.1,30.2", "西湖区", "DRIVING", REQUESTED_AT)).isEmpty();
+        assertThat(disabled.plan(point("120.1", "30.2"), point("120.2", "30.3"), "DRIVING", REQUESTED_AT)).isEmpty();
+        assertThat(missingKey.plan(point("120.1", "30.2"), point("120.2", "30.3"), "DRIVING", REQUESTED_AT)).isEmpty();
     }
 
     @Test
@@ -55,9 +58,9 @@ class AmapRouteProviderTest {
         AmapRouteProvider incomplete = provider((origin, destination, key) ->
                 json("{\"status\":\"1\",\"route\":{\"paths\":[{}]}}"));
 
-        assertThat(timeout.plan("120.1,30.2", "西湖区", "DRIVING", REQUESTED_AT)).isEmpty();
-        assertThat(rejected.plan("120.1,30.2", "西湖区", "DRIVING", REQUESTED_AT)).isEmpty();
-        assertThat(incomplete.plan("120.1,30.2", "西湖区", "DRIVING", REQUESTED_AT)).isEmpty();
+        assertThat(timeout.plan(point("120.1", "30.2"), point("120.2", "30.3"), "DRIVING", REQUESTED_AT)).isEmpty();
+        assertThat(rejected.plan(point("120.1", "30.2"), point("120.2", "30.3"), "DRIVING", REQUESTED_AT)).isEmpty();
+        assertThat(incomplete.plan(point("120.1", "30.2"), point("120.2", "30.3"), "DRIVING", REQUESTED_AT)).isEmpty();
     }
 
     private AmapRouteProvider provider(AmapRouteClient client) {
@@ -72,5 +75,10 @@ class AmapRouteProviderTest {
         } catch (Exception exception) {
             throw new AssertionError(exception);
         }
+    }
+
+    /** 用数值坐标驱动 Provider；字符串只允许在适配器内部出现。 */
+    private ResolvedGeoPoint point(String longitude, String latitude) {
+        return new ResolvedGeoPoint(new BigDecimal(longitude), new BigDecimal(latitude), LocationGranularity.ADDRESS);
     }
 }

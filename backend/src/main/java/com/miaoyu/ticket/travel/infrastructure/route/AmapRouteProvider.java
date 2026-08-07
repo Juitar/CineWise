@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.travel.infrastructure.route;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import com.miaoyu.ticket.travel.application.BasicRouteProvider;
 import com.miaoyu.ticket.travel.application.BasicRouteResult;
 import java.time.OffsetDateTime;
@@ -19,12 +20,15 @@ final class AmapRouteProvider implements BasicRouteProvider {
 
     @Override
     public Optional<BasicRouteResult> plan(
-            String originValue, String cinemaArea, String travelMode, OffsetDateTime requestedAt) {
-        if (!properties.enabled() || properties.key().isBlank() || blank(originValue) || blank(cinemaArea)) {
+            ResolvedGeoPoint origin, ResolvedGeoPoint destination, String travelMode, OffsetDateTime requestedAt) {
+        if (!properties.enabled() || properties.key().isBlank() || origin == null || destination == null
+                || blank(travelMode)) {
             return Optional.empty();
         }
         try {
-            JsonNode response = client.queryDrivingRoute(originValue, cinemaArea, properties.key());
+            // 字符串坐标只在 HTTP Provider 边界短暂存在，不能返回到 Application 或写入任何缓存、日志。
+            JsonNode response = client.queryDrivingRoute(toAmapLocation(origin), toAmapLocation(destination),
+                    properties.key());
             if (!"1".equals(response.path("status").asText())) {
                 return Optional.empty();
             }
@@ -45,5 +49,10 @@ final class AmapRouteProvider implements BasicRouteProvider {
 
     private boolean blank(String value) {
         return value == null || value.isBlank();
+    }
+
+    /** 高德 HTTP 参数要求经度在前、纬度在后；此方法不承担坐标系转换。 */
+    private String toAmapLocation(ResolvedGeoPoint point) {
+        return point.longitude().toPlainString() + "," + point.latitude().toPlainString();
     }
 }

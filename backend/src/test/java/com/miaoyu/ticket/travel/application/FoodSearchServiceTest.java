@@ -7,6 +7,8 @@ import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.auth.application.RoleCode;
 import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.geo.domain.LocationGranularity;
+import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import com.miaoyu.ticket.travel.domain.TravelTaskStatus;
 import java.time.Clock;
 import java.time.Instant;
@@ -92,15 +94,19 @@ class FoodSearchServiceTest {
         CurrentUserAccessor user = () -> new CurrentUser(1L, RoleCode.USER, 0L);
         return new FoodSearchService(new StubRepository(), user, real, demo, cache,
                 new FoodQueryProperties(1000, 300, 3000),
+                ignored -> Optional.of(new ResolvedGeoPoint(
+                        new java.math.BigDecimal("120.1"), new java.math.BigDecimal("30.2"),
+                        LocationGranularity.ADDRESS)),
                 Clock.fixed(Instant.parse("2026-08-04T00:00:00Z"), ZoneOffset.UTC));
     }
 
     private static final class InMemoryCache implements FoodSearchService.FoodCache {
         private FoodSearchResult value;
-        @Override public Optional<FoodSearchResult> findValid(String area, int radius, OffsetDateTime now) {
+        @Override public Optional<FoodSearchResult> findValid(
+                ResolvedGeoPoint location, int radius, OffsetDateTime now) {
             return Optional.ofNullable(value).filter(item -> item.expiresAt().isAfter(now));
         }
-        @Override public FoodSearchResult save(String area, int radius, FoodSearchResult result) {
+        @Override public FoodSearchResult save(ResolvedGeoPoint location, int radius, FoodSearchResult result) {
             value = result;
             return result;
         }
@@ -110,20 +116,20 @@ class FoodSearchServiceTest {
         private Optional<FoodSearchResult> result;
         private int calls;
         private CountingProvider(Optional<FoodSearchResult> result) { this.result = result; }
-        @Override public Optional<FoodSearchResult> search(String area, int radius, OffsetDateTime at) {
+        @Override public Optional<FoodSearchResult> search(ResolvedGeoPoint location, int radius, OffsetDateTime at) {
             calls++;
             return result;
         }
     }
 
     private static final class ThrowingProvider implements FoodPoiProvider {
-        @Override public Optional<FoodSearchResult> search(String area, int radius, OffsetDateTime at) {
+        @Override public Optional<FoodSearchResult> search(ResolvedGeoPoint location, int radius, OffsetDateTime at) {
             throw new IllegalStateException("餐饮网络超时");
         }
     }
 
     private static final class StubRepository implements TravelTaskRepository {
-        private final TravelTaskSnapshot task = new TravelTaskSnapshot(1L, "90001", 1L, 2L, 3L, "西湖区",
+        private final TravelTaskSnapshot task = new TravelTaskSnapshot(1L, "90001", 1L, 2L, 3L, 4L, "西湖区",
                 LocalDateTime.of(2026, 8, 5, 19, 0), LocalDateTime.of(2026, 8, 5, 17, 0), 0L, 0L,
                 TravelTaskStatus.READY, null, LocalDateTime.of(2026, 8, 4, 0, 0));
         @Override public Optional<TravelTaskSnapshot> findByPaymentEventId(String eventId) {

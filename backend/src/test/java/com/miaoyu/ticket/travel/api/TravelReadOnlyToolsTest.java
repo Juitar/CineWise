@@ -10,6 +10,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.agent.domain.tool.ToolContext;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.geo.domain.LocationGranularity;
+import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import com.miaoyu.ticket.travel.application.FoodSearchResult;
 import com.miaoyu.ticket.travel.application.FoodSearchService;
 import com.miaoyu.ticket.travel.application.BasicRouteCommand;
@@ -36,15 +38,15 @@ class TravelReadOnlyToolsTest {
         OffsetDateTime now = OffsetDateTime.parse("2026-08-05T10:00:00+08:00");
         WeatherObservation weather = new WeatherObservation("西湖区", "多云", "提前出发", "DEMO_WEATHER_V1", now,
                 now.plusMinutes(30), false, true, "DEMO");
-        when(service.query("西湖区")).thenReturn(weather);
+        when(service.query(4L)).thenReturn(weather);
 
-        var result = new GetWeatherTool(service).execute(WEATHER_CONTEXT, new GetWeatherTool.GetWeatherCommand("西湖区"));
+        var result = new GetWeatherTool(service).execute(WEATHER_CONTEXT, new GetWeatherTool.GetWeatherCommand("4"));
 
         // Demo 结果必须原样带出降级和有效期，B 才能避免把它显示成实时天气。
         assertThat(result.status()).isEqualTo(ToolStatus.SUCCESS);
         assertThat(result.degraded()).isTrue();
         assertThat(result.expiresAt()).isEqualTo(now.plusMinutes(30).toInstant());
-        verify(service).query("西湖区");
+        verify(service).query(4L);
     }
 
     @Test
@@ -61,14 +63,22 @@ class TravelReadOnlyToolsTest {
     }
 
     @Test
-    void shouldRejectExactAddressBeforeCallingWeatherService() {
+    void shouldRejectNonCinemaIdBeforeCallingWeatherService() {
         WeatherQueryService service = mock(WeatherQueryService.class);
 
-        var result = new GetWeatherTool(service).execute(
-                WEATHER_CONTEXT, new GetWeatherTool.GetWeatherCommand("文三路168号"));
-
-        assertThat(result.status()).isEqualTo(ToolStatus.FAILED);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> new GetWeatherTool.GetWeatherCommand("文三路168号"));
         verifyNoInteractions(service);
+    }
+
+    @Test
+    void shouldRejectInvalidCinemaIdFormatsAndValuesBeforeExecution() {
+        List<String> invalidCinemaIds = List.of("0", "01", "-1", "movie-1", "9223372036854775808");
+
+        for (String cinemaId : invalidCinemaIds) {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                    () -> new GetWeatherTool.GetWeatherCommand(cinemaId));
+        }
     }
 
     @Test
@@ -140,7 +150,8 @@ class TravelReadOnlyToolsTest {
         FoodSearchService foodService = mock(FoodSearchService.class);
         OffsetDateTime now = OffsetDateTime.parse("2026-08-05T10:00:00+08:00");
         BasicRouteCommand command = new BasicRouteCommand(
-                BasicRouteCommand.OriginType.MANUAL, "西湖文化广场", "TRANSIT", true);
+                new ResolvedGeoPoint(new java.math.BigDecimal("120.1"), new java.math.BigDecimal("30.2"),
+                        LocationGranularity.POI), "TRANSIT", true);
         BasicRouteResult route = new BasicRouteResult(
                 "AMAP", "TRANSIT", 20, now.plusMinutes(40), "DEMO_ROUTE", now, now.plusMinutes(15), false,
                 true, "DEMO");

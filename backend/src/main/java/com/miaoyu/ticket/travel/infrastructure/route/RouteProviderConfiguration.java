@@ -21,8 +21,8 @@ public class RouteProviderConfiguration {
                 properties, new RestClientAmapRouteClient(RestClient.builder()
                         .baseUrl("https://restapi.amap.com").requestFactory(requestFactory).build()));
         DemoRouteProvider demoProvider = new DemoRouteProvider();
-        return (origin, cinemaArea, travelMode, requestedAt) -> realProvider
-                .plan(origin, cinemaArea, travelMode, requestedAt)
-                .or(() -> demoProvider.plan(origin, cinemaArea, travelMode, requestedAt));
+        return (origin, destination, travelMode, requestedAt) -> realProvider
+                .plan(origin, destination, travelMode, requestedAt)
+                .or(() -> demoProvider.plan(origin, destination, travelMode, requestedAt));
     }
 }
