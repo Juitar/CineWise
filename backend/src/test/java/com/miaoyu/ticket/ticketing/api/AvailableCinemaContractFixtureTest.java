@@ -24,6 +24,9 @@ class AvailableCinemaContractFixtureTest {
         assertThat(record.required("cinemaId").asText()).matches("[1-9][0-9]*");
         assertThat(record.required("availableShowCount").asInt()).isPositive();
         assertThat(record.required("nearestStartTime").asText()).endsWith("+08:00");
+        JsonNode expired = read("available-cinemas-expired.json").required("data").required("records").get(0);
+        assertThat(expired.required("contentExpired").asBoolean()).isTrue();
+        assertThat(expired.required("contentExpiresAt").asText()).endsWith("+08:00");
         assertThat(read("available-cinemas-empty.json").required("data").required("records")).isEmpty();
         assertThat(read("available-cinemas-invalid-parameter.json").required("code").asInt()).isEqualTo(100001);
         assertThat(read("available-cinemas-query-unavailable.json").required("code").asInt()).isEqualTo(306003);

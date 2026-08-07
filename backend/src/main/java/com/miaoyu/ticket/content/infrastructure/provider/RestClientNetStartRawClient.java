@@ -14,6 +14,8 @@ import org.springframework.web.client.RestClient;
 final class RestClientNetStartRawClient implements NetStartRawClient {
     private static final String CHANGSHA_CITY_CODE = "430100";
     private static final String CHANGSHA_PROVIDER_CITY_ID = "70";
+    private static final String HANGZHOU_CITY_CODE = "330100";
+    private static final String HANGZHOU_PROVIDER_CITY_ID = "50";
     private final RestClient restClient;
 
     RestClientNetStartRawClient(RestClient restClient) { this.restClient = restClient; }
@@ -38,6 +40,9 @@ final class RestClientNetStartRawClient implements NetStartRawClient {
         if (CHANGSHA_CITY_CODE.equals(cityCode)) {
             return CHANGSHA_PROVIDER_CITY_ID;
         }
-        throw new IllegalArgumentException("NetStart 当前只支持长沙行政代码 430100");
+        if (HANGZHOU_CITY_CODE.equals(cityCode)) {
+            return HANGZHOU_PROVIDER_CITY_ID;
+        }
+        throw new IllegalArgumentException("NetStart 当前只支持已核对的长沙或杭州行政代码");
     }
 }

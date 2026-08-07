@@ -89,7 +89,7 @@ describe('AvailableCinemasPage', () => {
     expect(screen.getByLabelText('可售影院加载中')).toBeInTheDocument();
   });
 
-  it('失败可重试，404 提供返回入口', () => {
+  it('失败、404 均可重试', () => {
     const retry = vi.fn();
     mocks.useAvailableCinemas.mockReturnValue(
       state({
@@ -108,12 +108,18 @@ describe('AvailableCinemasPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /重\s*试/ }));
     expect(retry).toHaveBeenCalledOnce();
 
+    const retry404 = vi.fn();
     mocks.useAvailableCinemas.mockReturnValue(
-      state({ data: null, error: new ApiError('missing', { kind: 'HTTP', status: 404 }) }),
+      state({
+        data: null,
+        error: new ApiError('missing', { kind: 'HTTP', status: 404 }),
+        retry: retry404,
+      }),
     );
     rerender(<AvailableCinemasPage />);
-    expect(screen.getByText('影片不存在或已下线')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '返回影片列表' })).toHaveAttribute('href', '/movies');
+    expect(screen.getByText('可售影院加载失败')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /重\s*试/ }));
+    expect(retry404).toHaveBeenCalledOnce();
   });
 
   it('明确提示过期、非实时来源、离线快照，并保持键盘可访问的链接', () => {

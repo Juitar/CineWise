@@ -74,20 +74,26 @@ public class ContentController {
     public Result<ContentPageResponse<MovieResponse>> listMovies(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String genre,
+            @RequestParam(required = false) String releaseStatus,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         validatePage(page, size);
         String normalizedKeyword = normalizeFilter(keyword, "keyword");
         String normalizedGenre = normalizeFilter(genre, "genre");
+        String normalizedReleaseStatus = normalizeReleaseStatus(releaseStatus);
 
-        ContentResult<List<? extends ContentItem>> result = contentQueryService.query(
-                new ContentQuery(ContentResourceType.MOVIE, null, null, normalizedKeyword));
+        ContentResult<List<? extends ContentItem>> result = contentQueryService
+                .queryLocalMovies(normalizedKeyword, normalizedReleaseStatus)
+                .orElseGet(() -> contentQueryService.query(
+                        new ContentQuery(ContentResourceType.MOVIE, null, null, normalizedKeyword)));
         List<MovieResponse> records = result.data().stream()
                 .map(MovieContent.class::cast)
                 .map(this::toMovieResponse)
                 .filter(movie -> titleContains(movie.title(), normalizedKeyword))
                 .filter(movie -> normalizedGenre == null || movie.genres().contains(normalizedGenre))
-                .sorted(Comparator.comparingLong(movie -> Long.parseLong(movie.movieId())))
+                .sorted(Comparator.comparing(MovieResponse::releaseDate,
+                        Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparingLong(movie -> Long.parseLong(movie.movieId())))
                 .toList();
         return Result.success(toPage(records, page, size, result));
     }
@@ -212,6 +218,14 @@ public class ContentController {
         }
         // 空白筛选与未传筛选语义一致，不能把空字符串作为不同的缓存或分页条件。
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    private String normalizeReleaseStatus(String value) {
+        String normalized = normalizeFilter(value, "releaseStatus");
+        if (normalized != null && !"NOW_SHOWING".equals(normalized) && !"COMING_SOON".equals(normalized)) {
+            throw invalidParameter("releaseStatus 只允许 NOW_SHOWING 或 COMING_SOON");
+        }
+        return normalized;
     }
 
     private MovieResponse toMovieResponse(MovieContent movie) {

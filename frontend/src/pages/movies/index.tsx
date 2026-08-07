@@ -62,7 +62,7 @@ function MovieCard({ movie }: { movie: MovieSummary }) {
         <Link
           aria-label={`为《${movie.title}》选择影院`}
           className="movie-grid-purchase-link"
-          to={`/movies/${encodeURIComponent(movie.movieId)}/cinemas`}
+          to={`/movies/${encodeURIComponent(movie.movieId)}`}
         >
           选影院购票
         </Link>

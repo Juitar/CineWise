@@ -4,8 +4,8 @@
 
 - [x] 创建 proposal、design、两个 capability spec 和实施任务清单。
 - [x] 产品范围已确认：排片、影厅、票价和座位允许使用 `demo-seed`，验收目标是从影院详情完成现有购票流程，不要求第三方真实排片。
-- [ ] D 提供或扩展公开 Application API，解析至少一家长沙 LIVE 影院和可用影片的内部 ID；A 不得按名称、地址或直接读表关联。
-- [ ] A、C、D 核对 `available-movies` DTO、时间窗口、来源字段、错误码和演示标识，并在实现前记录确认结果。
+- [x] D 通过公开 `ContentPurchaseQueryPort` 提供影院摘要和可用影片内部 ID；PR #85 的共享 MySQL HTTP 验收确认至少一家长沙 LIVE 影院可用，A 未按名称、地址或直接读表关联。
+- [x] A、C、D 已在 PR #85 和相关 OpenSpec 记录中核对 `available-movies` DTO、时间窗口、来源字段、错误码和演示标识。
 
 ## A：按影院查询和演示排期
 

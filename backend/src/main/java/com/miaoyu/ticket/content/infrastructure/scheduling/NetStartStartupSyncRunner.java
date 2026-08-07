@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.content.infrastructure.scheduling;
 
 import com.miaoyu.ticket.content.application.ContentSyncService;
+import com.miaoyu.ticket.content.application.CityResolutionService;
 import com.miaoyu.ticket.content.infrastructure.provider.NetStartProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,10 +27,21 @@ public class NetStartStartupSyncRunner implements ApplicationRunner {
     private final NetStartProperties properties;
     /** 应用服务负责事务、身份隔离和缓存提交顺序，Runner 不直接访问数据库或 Redis。 */
     private final ContentSyncService contentSyncService;
+    private final CityResolutionService cityResolutionService;
 
-    public NetStartStartupSyncRunner(NetStartProperties properties, ContentSyncService contentSyncService) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public NetStartStartupSyncRunner(NetStartProperties properties, ContentSyncService contentSyncService,
+                                     CityResolutionService cityResolutionService) {
         this.properties = properties;
         this.contentSyncService = contentSyncService;
+        this.cityResolutionService = cityResolutionService;
+    }
+
+    /** 兼容旧单元测试；正式 Spring 构造器同时注入城市目录。 */
+    NetStartStartupSyncRunner(NetStartProperties properties, ContentSyncService contentSyncService) {
+        this.properties = properties;
+        this.contentSyncService = contentSyncService;
+        this.cityResolutionService = null;
     }
 
     @Override
@@ -50,6 +62,11 @@ public class NetStartStartupSyncRunner implements ApplicationRunner {
         }
         // 返回数量只用于测试窗口观察，不改变后续页面查询或票务事实。
         int synchronizedCount = contentSyncService.synchronizeDailyContent();
+        if (cityResolutionService != null) {
+            properties.syncCities().forEach(cityName -> cityResolutionService.findProviderCityId(cityName)
+                    .ifPresent(providerCityId -> contentSyncService.synchronizeCityCinemasWithResult(
+                            cityName, providerCityId, () -> true)));
+        }
         LOGGER.info("NetStart 启动同步已执行一次: synchronizedCount={}", synchronizedCount);
     }
 }

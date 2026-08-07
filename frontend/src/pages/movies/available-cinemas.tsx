@@ -21,7 +21,6 @@ function isNonRealtimeSource(source: string): boolean {
 }
 
 function errorMessage(status: number | undefined, code: number | undefined): string {
-  if (status === 404) return '影片不存在或已下线';
   if (code === 303004) return '影片资料暂时不可用';
   if (code === 306003) return '可售场次暂时不可查询';
   return '可售影院加载失败';
@@ -70,7 +69,6 @@ export default function AvailableCinemasPage() {
   }
 
   const unavailable = state.error?.code === 303004 || state.error?.code === 306003;
-  const notFound = state.error?.status === 404;
 
   return (
     <main className="available-cinemas-page">
@@ -100,18 +98,13 @@ export default function AvailableCinemasPage() {
       ) : null}
       {state.error ? (
         <Alert
-          action={notFound ? undefined : <Button onClick={state.retry}>重试</Button>}
+          action={<Button onClick={state.retry}>重试</Button>}
           className="available-cinemas-status"
           description={state.error.traceId ? `问题编号：${state.error.traceId}` : undefined}
           message={errorMessage(state.error.status, state.error.code)}
           showIcon
-          type={notFound || unavailable ? 'warning' : 'error'}
+          type={unavailable ? 'warning' : 'error'}
         />
-      ) : null}
-      {notFound ? (
-        <Link className="available-cinemas-back" to="/movies">
-          返回影片列表
-        </Link>
       ) : null}
       {!state.isLoading && !state.error && state.data?.records.length === 0 ? (
         <Empty description="当前没有可售影院" />

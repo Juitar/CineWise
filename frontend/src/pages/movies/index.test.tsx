@@ -97,7 +97,7 @@ describe('MoviesPage', () => {
     expect(screen.queryByText('云边有个小卖部')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '为《星河远征》选择影院' })).toHaveAttribute(
       'href',
-      '/movies/8100001/cinemas',
+      '/movies/8100001',
     );
   });
 
