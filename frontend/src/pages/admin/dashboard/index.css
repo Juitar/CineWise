@@ -27,6 +27,18 @@
   margin: var(--spacing-page) 0 0;
 }
 
+.content-sync-action {
+  display: flex;
+  gap: 12px;
+  max-width: 440px;
+  margin: 0 0 16px;
+}
+
+.content-sync-loading {
+  padding: 32px;
+  text-align: center;
+}
+
 .admin-readiness-list > div {
   display: grid;
   grid-template-columns: minmax(120px, 160px) 1fr;
@@ -53,5 +65,9 @@
   .admin-readiness-list > div {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+
+  .content-sync-action {
+    flex-direction: column;
   }
 }
