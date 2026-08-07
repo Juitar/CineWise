@@ -39,29 +39,35 @@ function HomeMovieCard({ movie }: { movie: MovieSummary }) {
 
   return (
     <article className="movie-card" data-testid={`home-movie-${movie.movieId}`}>
-      {posterUrl && !posterFailed ? (
-        <img
-          alt={`${movie.title}海报`}
-          className="movie-poster-large"
-          loading="lazy"
-          onError={() => setPosterFailed(true)}
-          src={posterUrl}
-        />
-      ) : (
-        <div
-          className="movie-poster-large movie-poster-placeholder"
-          aria-label={`${movie.title}暂无海报`}
-        >
-          暂无海报
+      <Link
+        aria-label={`查看《${movie.title}》详情并选择影院`}
+        className="home-card-link"
+        to={`/movies/${encodeURIComponent(movie.movieId)}`}
+      >
+        {posterUrl && !posterFailed ? (
+          <img
+            alt={`${movie.title}海报`}
+            className="movie-poster-large"
+            loading="lazy"
+            onError={() => setPosterFailed(true)}
+            src={posterUrl}
+          />
+        ) : (
+          <div
+            className="movie-poster-large movie-poster-placeholder"
+            aria-label={`${movie.title}暂无海报`}
+          >
+            暂无海报
+          </div>
+        )}
+        <div className="movie-card-info">
+          <h3 className="movie-card-name">{movie.title}</h3>
+          <div className="movie-card-meta">
+            {movie.genres.length > 0 ? movie.genres.join(' / ') : '类型待更新'}
+          </div>
+          <div className="home-card-action">选择影院</div>
         </div>
-      )}
-      <div className="movie-card-info">
-        <h3 className="movie-card-name">{movie.title}</h3>
-        <div className="movie-card-meta">
-          {movie.genres.length > 0 ? movie.genres.join(' / ') : '类型待更新'}
-        </div>
-        <div className="home-sale-unavailable">票务信息暂不可用</div>
-      </div>
+      </Link>
     </article>
   );
 }
@@ -69,13 +75,18 @@ function HomeMovieCard({ movie }: { movie: MovieSummary }) {
 function HomeCinemaCard({ cinema }: { cinema: CinemaSummary }) {
   return (
     <article className="cinema-card" data-testid={`home-cinema-${cinema.cinemaId}`}>
-      <div className="cinema-title-wrap">
-        <div className="cinema-icon-placeholder" aria-hidden="true" />
-        <h3 className="cinema-name">{cinema.name}</h3>
-      </div>
-      <div className="cinema-address">{cinema.address?.trim() || '地址待更新'}</div>
-      <div className="cinema-area">{cinema.area?.trim() || '区域待更新'}</div>
-      <div className="home-sale-unavailable">票务信息暂不可用</div>
+      <Link
+        aria-label={`查看${cinema.name}详情`}
+        className="home-card-link"
+        to={`/cinemas/${encodeURIComponent(cinema.cinemaId)}`}
+      >
+        <div className="cinema-title-wrap">
+          <div className="cinema-icon-placeholder" aria-hidden="true" />
+          <h3 className="cinema-name">{cinema.name}</h3>
+        </div>
+        <div className="cinema-address">{cinema.address?.trim() || '地址待更新'}</div>
+        <div className="cinema-area">{cinema.area?.trim() || '区域待更新'}</div>
+      </Link>
     </article>
   );
 }
