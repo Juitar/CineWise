@@ -26,7 +26,7 @@
 
 ### Requirement: 外部排期不是本地票务事实
 
-系统 SHALL 将外部 `listedPrice` 标记为 `REFERENCE_ONLY`，仅作为候选参考；A 必须在自己的 Application Service 决定本地价格、影厅、座位和余座。D MUST NOT 写入 `movie_show`、影厅、座位、订单、支付或退款数据。
+系统 SHALL 将外部 `listedPrice` 标记为 `REFERENCE_ONLY`，仅作为候选参考；A 必须在自己的 Application Service 决定本地价格、影厅、座位和余座。`durationMinutes` 只能用于 A 计算本地预计结束时间，`auditoriumText` 只能作为本地沙箱影厅展示/命名参考，二者都不能被描述为外部交易事实。D MUST NOT 写入 `movie_show`、影厅、座位、订单、支付或退款数据。
 
 #### Scenario: Provider 返回外部票价或余座
 
@@ -48,9 +48,17 @@
 
 ### Requirement: 候选必须具有统一时区、时效和降级标记
 
-系统 SHALL 将开场和散场时间转换为 `Asia/Shanghai` 的带偏移 ISO 8601 时间。每条候选必须返回 `source`、`dataAt`、`expiresAt`、`isExpired`、`degraded` 和 `fallbackType`。`endTime` 不晚于 `startTime`、时间无法解析或超过已确认未来窗口的记录必须隔离。`rejectedSnapshots` 最多返回 200 条，超出时必须返回 `rejectedTruncated=true`。
+系统 SHALL 将开场和散场时间转换为 `Asia/Shanghai` 的带偏移 ISO 8601 时间。每条候选必须返回 `source`、`dataAt`、`expiresAt`、`isExpired`、`degraded` 和 `fallbackType`。`durationMinutes` 必须是正整数，`auditoriumText` 可为空。具有可靠 `endTime` 且 `endTime > startTime` 的候选标记为 `ACCEPTED`；只有开场时间、正 `durationMinutes` 且身份有效的候选标记为 `SANDBOX_REFERENCE`；两者都不满足的记录必须隔离。`rejectedSnapshots` 最多返回 200 条，超出时必须返回 `rejectedTruncated=true`。
 
-#### Scenario: Provider 没有可靠散场时间
+#### Scenario: Provider 没有可靠散场时间但有正片长
+
+- **GIVEN** Provider 只提供开场时间、正 `dur` 和可选 `th`
+- **WHEN** D 标准化该排期
+- **THEN** D 将 `dur` 标准化为 `durationMinutes`，将 `th` 标准化为 `auditoriumText`
+- **AND** D 将该条放入 `snapshots` 并标记 `qualityStatus=SANDBOX_REFERENCE`
+- **AND** A 只能据此计算本地预计结束时间并创建本地沙箱事实，不能当作外部真实散场或影厅
+
+#### Scenario: Provider 没有可靠散场时间且没有正片长
 
 - **GIVEN** Provider 只提供开场时间或散场时间不晚于开场时间
 - **WHEN** D 标准化该排期

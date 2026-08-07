@@ -53,8 +53,8 @@ public interface ExternalShowtimeQueryPort {
     /** 外部标价只是参考，A 不能直接把它当成本地票价。 */
     enum PriceSemantic { REFERENCE_ONLY }
 
-    /** A 只能导入 ACCEPTED 候选；隔离原因必须显式返回，不能静默丢弃。 */
-    enum QualityStatus { ACCEPTED, IDENTITY_REJECTED, END_TIME_REJECTED, TIME_REJECTED }
+    /** A 只导入 ACCEPTED；SANDBOX_REFERENCE 只用于创建本地沙箱参考，其他状态必须显式隔离。 */
+    enum QualityStatus { ACCEPTED, SANDBOX_REFERENCE, IDENTITY_REJECTED, END_TIME_REJECTED, TIME_REJECTED }
 
     /**
      * 外部场次幂等身份。
@@ -67,13 +67,28 @@ public interface ExternalShowtimeQueryPort {
     /**
      * 已映射且通过字段质量校验的候选。
      *
-     * <p>时间均为 Asia/Shanghai 带偏移时间；只有 endTime 非空且晚于 startTime 的 ACCEPTED 候选可供 A 导入。</p>
+     * <p>时间均为 Asia/Shanghai 带偏移时间；只有 endTime 非空且晚于 startTime 的 ACCEPTED 候选可供 A 导入，
+     * SANDBOX_REFERENCE 只携带片长和影厅文本供本地沙箱使用。</p>
      */
     record ExternalShowtimeSnapshot(String source, String externalShowId, String externalMovieId,
                                    String externalCinemaId, Long movieId, Long cinemaId,
                                    OffsetDateTime startTime, OffsetDateTime endTime, BigDecimal listedPrice,
+                                   Integer durationMinutes, String auditoriumText,
                                    PriceSemantic priceSemantic, OffsetDateTime dataAt, OffsetDateTime expiresAt,
                                    boolean isExpired, boolean degraded, FallbackType fallbackType,
                                    QualityStatus qualityStatus, Integer rejectionCode,
-                                   ExternalShowtimeKey externalShowtimeKey) { }
+                                   ExternalShowtimeKey externalShowtimeKey) {
+        /** 兼容已有快照夹具；新增沙箱参考字段缺省为空。 */
+        public ExternalShowtimeSnapshot(String source, String externalShowId, String externalMovieId,
+                                        String externalCinemaId, Long movieId, Long cinemaId,
+                                        OffsetDateTime startTime, OffsetDateTime endTime, BigDecimal listedPrice,
+                                        PriceSemantic priceSemantic, OffsetDateTime dataAt, OffsetDateTime expiresAt,
+                                        boolean isExpired, boolean degraded, FallbackType fallbackType,
+                                        QualityStatus qualityStatus, Integer rejectionCode,
+                                        ExternalShowtimeKey externalShowtimeKey) {
+            this(source, externalShowId, externalMovieId, externalCinemaId, movieId, cinemaId, startTime, endTime,
+                    listedPrice, null, null, priceSemantic, dataAt, expiresAt, isExpired, degraded, fallbackType,
+                    qualityStatus, rejectionCode, externalShowtimeKey);
+        }
+    }
 }

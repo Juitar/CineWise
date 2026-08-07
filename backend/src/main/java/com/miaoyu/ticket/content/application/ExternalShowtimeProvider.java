@@ -31,7 +31,14 @@ public interface ExternalShowtimeProvider {
     /** Provider Mapper 已丢弃余座、座位、订单和支付字段，只保留标准化的候选资料。 */
     /** 候选不包含余座、座位图、订单或支付字段，listedPrice 永远只是参考价。 */
     record Candidate(String externalShowId, String externalMovieId, String externalCinemaId,
-                     OffsetDateTime startTime, OffsetDateTime endTime, BigDecimal listedPrice) { }
+                     OffsetDateTime startTime, OffsetDateTime endTime, BigDecimal listedPrice,
+                     Integer durationMinutes, String auditoriumText) {
+        /** 兼容没有沙箱参考字段的 Provider 测试夹具。 */
+        public Candidate(String externalShowId, String externalMovieId, String externalCinemaId,
+                         OffsetDateTime startTime, OffsetDateTime endTime, BigDecimal listedPrice) {
+            this(externalShowId, externalMovieId, externalCinemaId, startTime, endTime, listedPrice, null, null);
+        }
+    }
 
     /** Provider 城市 ID 只在 D 的 HTTP 适配器使用，A 的公开 Port 不会得到该字段。 */
     record ExternalCinema(String externalCinemaId, String providerCityId) { }

@@ -30,7 +30,7 @@ class NetStartShowtimeProviderTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         server.expect(requestTo("https://netstart.test/cinema/shows?ci=70&cinemaId=c1"))
                 .andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body("""
-                        {"success":true,"data":{"movies":[{"id":101,"shows":[{"showDate":"2026-08-07",
+                        {"code":0,"data":{"movies":[{"id":101,"dur":135,"shows":[{"showDate":"2026-08-07",
                         "plist":[{"seqNo":"s1","tm":"11:30","vipPrice":"36","th":"1号厅","lang":"国语"}]}]}]}}"""));
         NetStartShowtimeProvider provider = provider(builder.build());
 
@@ -44,6 +44,8 @@ class NetStartShowtimeProviderTest {
             assertThat(candidate.externalCinemaId()).isEqualTo("c1");
             assertThat(candidate.startTime().toString()).isEqualTo("2026-08-07T11:30+08:00");
             assertThat(candidate.listedPrice()).hasToString("36");
+            assertThat(candidate.durationMinutes()).isEqualTo(135);
+            assertThat(candidate.auditoriumText()).isEqualTo("1号厅");
         });
         server.verify();
     }
@@ -105,7 +107,7 @@ class NetStartShowtimeProviderTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         server.expect(requestTo("https://netstart.test/cinema/shows?ci=70&cinemaId=c1"))
                 .andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body("""
-                        {"success":true,"data":{"movies":[{"id":101,"shows":[{"showDate":"2026-08-07",
+                        {"code":0,"data":{"movies":[{"id":101,"shows":[{"showDate":"2026-08-07",
                         "plist":[{"tm":"11:30","vipPrice":"36"}]}]}]}}"""));
         NetStartShowtimeProvider provider = provider(builder.build());
 

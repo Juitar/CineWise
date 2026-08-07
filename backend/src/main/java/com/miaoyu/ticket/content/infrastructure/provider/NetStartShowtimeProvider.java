@@ -27,12 +27,12 @@ import org.springframework.web.client.RestClientResponseException;
  * <p>每个影院请求受共享滑动窗口保护，重试也消耗同一预算。</p>
  * <p>网络失败和 5xx 最多重试一次，429 和其他 4xx 不重试。</p>
  * <p>ResourceAccessException 会继续检查原因链，区分读超时和普通断网。</p>
- * <p>响应 success 或 data 结构不符合预期时归类为 INVALID_DATA。</p>
+ * <p>响应 code=0 且 data 结构存在时才视为成功，否则归类为 INVALID_DATA。</p>
  * <p>上游返回多天资料时只接受调用方要求的业务日期。</p>
  * <p>缺少影片、影院、场次 ID 的记录直接隔离，不拼接名称和时间生成 ID。</p>
  * <p>showDate 与 tm 按 Asia/Shanghai 解析为 OffsetDateTime。</p>
  * <p>vipPrice 只保留非负数字作为参考价，缺失时返回 null。</p>
- * <p>影厅名称、语言和其他展示字段不进入候选模型。</p>
+ * <p>dur 规范化为正整数片长，th 作为可选影厅展示文本；二者都不代表外部交易事实。</p>
  * <p>Provider 返回的余座和座位字段即使存在也会被丢弃。</p>
  * <p>一次影院请求失败会让整个批次进入故障结果，避免实时和旧快照混合。</p>
  * <p>关闭 Provider 时不发起任何外部 HTTP 请求。</p>
@@ -56,7 +56,7 @@ import org.springframework.web.client.RestClientResponseException;
  * <p>价格只作为参考价。</p>
  * <p>负价格被隔离。</p>
  * <p>余座和座位图字段不会进入 DTO。</p>
- * <p>影厅和语言文本不会进入 DTO。</p>
+ * <p>影厅文本进入 DTO 只作沙箱命名参考，语言文本不会进入 DTO。</p>
  * <p>原始响应只在适配器内存中短暂存在。</p>
  * <p>原始响应不会写日志或快照。</p>
  * <p>Key、Cookie、ci 和 URL 不进入公开模型。</p>
@@ -156,7 +156,7 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
     }
 
     private FetchOneResult parse(LocalDate expectedDate, String externalCinemaId, JsonNode response) {
-        if (response == null || !response.path("success").asBoolean(false) || response.path("data").isMissingNode()) {
+        if (response == null || response.path("code").asInt(-1) != 0 || response.path("data").isMissingNode()) {
             return new FetchOneResult(List.of(), FailureCategory.INVALID_DATA);
         }
         List<Candidate> candidates = new ArrayList<>();
@@ -168,7 +168,7 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
                     continue;
                 }
                 for (JsonNode show : shows.path("plist")) {
-                    Candidate candidate = candidate(movieId, externalCinemaId, expectedDate, show);
+                    Candidate candidate = candidate(movieId, movie.path("dur"), externalCinemaId, expectedDate, show);
                     if (candidate != null) {
                         candidates.add(candidate);
                     }
@@ -178,7 +178,7 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
         return new FetchOneResult(candidates, null);
     }
 
-    private Candidate candidate(String movieId, String cinemaId, LocalDate date, JsonNode show) {
+    private Candidate candidate(String movieId, JsonNode durationNode, String cinemaId, LocalDate date, JsonNode show) {
         String showId = text(show, "seqNo");
         String time = text(show, "tm");
         if (blank(movieId) || blank(cinemaId) || blank(showId) || blank(time)) {
@@ -188,12 +188,20 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
             OffsetDateTime startTime = LocalDateTime.parse(date + " " + time, DATE_TIME)
                     .atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime();
             // seqNo 只在 provider + cinemaId 范围内使用；Application 会把三元组公开给 A 作为导入幂等键。
-            // 核验样例没有可靠散场字段，明确保留 null；Application 会把它逐条标记为 END_TIME_REJECTED。
+            // 核验样例没有可靠散场字段，明确保留 null；正片时长仅供 A 计算本地预计结束时间。
             return new Candidate(showId, movieId, cinemaId, startTime, null,
-                    price(show.path("vipPrice").asText(null)));
+                    price(show.path("vipPrice").asText(null)), duration(durationNode), text(show, "th"));
         } catch (DateTimeParseException exception) {
             return null;
         }
+    }
+
+    private static Integer duration(JsonNode value) {
+        if (value == null || !value.canConvertToInt()) {
+            return null;
+        }
+        int minutes = value.asInt();
+        return minutes > 0 ? minutes : null;
     }
 
     private static BigDecimal price(String value) {
