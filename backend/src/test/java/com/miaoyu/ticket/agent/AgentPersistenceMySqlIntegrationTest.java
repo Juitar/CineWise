@@ -316,6 +316,7 @@ class AgentPersistenceMySqlIntegrationTest {
         jdbcTemplate.update("""
                 UPDATE agent_run
                    SET status = 'WAITING_LOCATION',
+                       create_time = DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 6 MINUTE),
                        update_time = DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 6 MINUTE),
                        version = version + 1
                  WHERE id = ?
