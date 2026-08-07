@@ -2,6 +2,7 @@ package com.miaoyu.ticket.agent.infrastructure.persistence;
 
 import com.miaoyu.ticket.agent.application.persistence.AgentRunRepository;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
+import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -44,8 +45,20 @@ public class MybatisAgentRunRepository implements AgentRunRepository {
     }
 
     @Override
+    public List<AgentRun> findExpiredWaitingLocationByUser(long userId, int limit) {
+        return mapper.findExpiredWaitingLocationByUser(userId, limit).stream()
+                .map(AgentPersistenceMappings::toDomain)
+                .toList();
+    }
+
+    @Override
     public void insert(AgentRun run) {
         mapper.insertRun(AgentPersistenceMappings.toEntity(run));
+    }
+
+    @Override
+    public void insertWaitingLocation(AgentRun run) {
+        mapper.insertWaitingLocation(AgentPersistenceMappings.toEntity(run));
     }
 
     @Override
@@ -56,6 +69,18 @@ public class MybatisAgentRunRepository implements AgentRunRepository {
     @Override
     public boolean updateTerminalWithCas(AgentRun run, long expectedVersion) {
         return mapper.updateRunTerminalWithCas(AgentPersistenceMappings.toEntity(run), expectedVersion) == 1;
+    }
+
+    @Override
+    public boolean updateWithCas(AgentRun run, long expectedVersion, AgentRunStatus expectedStatus) {
+        return mapper.updateRunWithCas(
+                AgentPersistenceMappings.toEntity(run), expectedVersion, expectedStatus.name()) == 1;
+    }
+
+    @Override
+    public boolean recoverExpiredWaitingLocationWithCas(AgentRun run, long expectedVersion) {
+        return mapper.recoverExpiredWaitingLocationWithCas(
+                AgentPersistenceMappings.toEntity(run), expectedVersion) == 1;
     }
 
     @Override

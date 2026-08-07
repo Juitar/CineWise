@@ -48,6 +48,19 @@ public class AgentRuntimeQueryService {
                 stepRepository.findByRunId(run.id()), events, lastEventId);
     }
 
+    /** 初始化 POST 结果未知时按同一会话和请求键只读恢复，不允许客户端重发写请求。 */
+    @Transactional(readOnly = true)
+    public RuntimeView queryMyRunByClientRequest(String sessionId, String clientRequestId) {
+        long userId = currentUserAccessor.requireCurrentUserId();
+        AgentSession session = sessionRepository.findBySessionIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new BusinessException(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND));
+        AgentRun run = runRepository.findByClientRequestId(userId, session.id(), clientRequestId)
+                .orElseThrow(() -> new BusinessException(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND));
+        List<AgentRuntimeEvent> events = eventRepository.findByRunId(run.runId(), 0L, EVENT_LIMIT);
+        return new RuntimeView(run, session, messageRepository.findByRunIdAndUserId(run.id(), userId),
+                stepRepository.findByRunId(run.id()), events, eventRepository.findLastEventIdByRunId(run.runId()));
+    }
+
     public record RuntimeView(AgentRun run, AgentSession session, List<AgentMessage> messages, List<AgentRunStep> steps,
             List<AgentRuntimeEvent> events, long lastEventId) {
     }

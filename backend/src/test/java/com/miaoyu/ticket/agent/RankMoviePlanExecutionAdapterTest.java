@@ -111,6 +111,27 @@ class RankMoviePlanExecutionAdapterTest {
     }
 
     @Test
+    void shouldPassTrustedNearestContextWithoutPuttingItInCommand() {
+        RankMoviePlanTool tool = unavailableRecommendationTool();
+        ToolRegistry registry = registry();
+        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry);
+        RankMoviePlanExecutionAdapter adapter = new RankMoviePlanExecutionAdapter(tool, stateMachine);
+        ExecutionPlan plan = validatedPlan(registry, FailurePolicy.FAIL, false);
+
+        adapter.execute(new RankMoviePlanExecutionRequest(
+                stateMachine.initialize(plan), "rank", "run-1", "trace-1", 9_000L,
+                "550e8400-e29b-41d4-a716-446655440000", "NEAREST"));
+
+        ArgumentCaptor<ToolContext> contextCaptor = ArgumentCaptor.forClass(ToolContext.class);
+        ArgumentCaptor<RankMoviePlanCommand> commandCaptor = ArgumentCaptor.forClass(RankMoviePlanCommand.class);
+        verify(tool).executeRecommendationPlan(contextCaptor.capture(), commandCaptor.capture());
+        assertThat(contextCaptor.getValue().distanceContextId())
+                .isEqualTo("550e8400-e29b-41d4-a716-446655440000");
+        assertThat(contextCaptor.getValue().distancePreference()).isEqualTo("NEAREST");
+        assertThat(commandCaptor.getValue().maxDistanceMeters()).isNull();
+    }
+
+    @Test
     void shouldNotCallDWhenSlotsCannotBuildCommandAndSkipDownstream() {
         assertInvalidParameter(
                 false, Map.of("cityCode", "430100", "ticketCount", "1", "date", "not-a-date"));

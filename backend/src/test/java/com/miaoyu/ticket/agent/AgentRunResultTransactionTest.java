@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
+import com.miaoyu.ticket.agent.application.AgentDistanceContextApplicationService;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentPersistenceJsonFactory;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunRepository;
@@ -348,7 +349,8 @@ class AgentRunResultTransactionTest {
                 new AgentPersistenceJsonFactory(new ObjectMapper().findAndRegisterModules()),
                 runtimeEventService,
                 idGenerator,
-                Clock.fixed(Instant.parse("2026-08-04T02:00:00Z"), ZoneId.of("Asia/Shanghai")));
+                Clock.fixed(Instant.parse("2026-08-04T02:00:00Z"), ZoneId.of("Asia/Shanghai")),
+                Mockito.mock(AgentDistanceContextApplicationService.class));
         return new Fixture(transaction, runRepository, stepRepository, messageRepository, sessionRepository,
                 runtimeEventService);
     }

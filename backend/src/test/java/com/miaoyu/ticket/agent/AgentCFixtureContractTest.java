@@ -88,6 +88,16 @@ class AgentCFixtureContractTest {
         assertThat(terminal.path("data").path("status").asText()).isEqualTo("COMPLETED");
     }
 
+    @Test
+    void shouldKeepDistanceRunRecoveryFixtureFreeOfLocationContext() throws Exception {
+        JsonNode waiting = fixture("distance-run-waiting.json");
+        assertThat(waiting.path("code").asInt()).isZero();
+        assertThat(waiting.path("data").path("runId").isTextual()).isTrue();
+        assertThat(waiting.path("data").path("status").asText()).isEqualTo("WAITING_LOCATION");
+        assertThat(waiting.path("data").path("lastEventId").isTextual()).isTrue();
+        assertThat(waiting.toString()).doesNotContain("distanceContextId", "latitude", "longitude", "address");
+    }
+
     private JsonNode fixture(String fixtureName) throws Exception {
         try (InputStream input = getClass().getResourceAsStream("/fixtures/agent/c/" + fixtureName)) {
             assertThat(input).as("夹具必须存在: %s", fixtureName).isNotNull();
