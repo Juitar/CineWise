@@ -177,7 +177,7 @@ class MinimalReadOnlyAgentServiceTest {
     }
 
     @Test
-    void shouldCallRealDToolAndReturnPurchasePlanCard() {
+    void shouldMapMockedRecommendationToolResultToPurchasePlanCard() {
         PurchaseCandidate candidate = new PurchaseCandidate(
                 "301",
                 "101",

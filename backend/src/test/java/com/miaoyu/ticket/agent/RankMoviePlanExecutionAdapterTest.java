@@ -80,7 +80,7 @@ class RankMoviePlanExecutionAdapterTest {
     }
 
     @Test
-    void shouldCallRealDToolAndKeepShowtimeUnavailableAsSuccessfulDegradation() {
+    void shouldMapMockedRecommendationToolDegradationAsSuccessfulResult() {
         RankMoviePlanTool tool = unavailableRecommendationTool();
         ToolRegistry registry = registry();
         ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry);
