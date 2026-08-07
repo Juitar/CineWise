@@ -3,8 +3,8 @@ package com.miaoyu.ticket.agent.application.persistence;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
-import com.miaoyu.ticket.agent.application.reply.RecommendationReplyFacts;
-import com.miaoyu.ticket.agent.application.reply.RecommendationReplyCandidate;
+import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFacts;
+import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardItem;
 import com.miaoyu.ticket.agent.application.reply.SelectSeatsReplyFacts;
 import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
 import com.miaoyu.ticket.agent.domain.plan.ExecutionPlanNode;
@@ -66,34 +66,48 @@ public class AgentPersistenceJsonFactory {
                                     "movieId", facts.movieId(),
                                     "cinemaId", facts.cinemaId()))));
         }
-        if (!(reply.payload() instanceof RecommendationReplyFacts facts)) {
-            throw new IllegalArgumentException("只有推荐或选座回复可以生成卡片事件");
+        if (!(reply.payload() instanceof RecommendationPlanCardFacts facts)) {
+            throw new IllegalArgumentException("只有完整推荐或选座回复可以生成卡片事件");
         }
         Map<String, Object> payload = new LinkedHashMap<>();
-        boolean planCard = reply.messageType()
-                == com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType.PLAN_CARD;
-        payload.put("type", reply.messageType().name());
-        payload.put("title", planCard ? "推荐场次" : "影片推荐");
-        payload.put(planCard ? "plans" : "movies", facts.candidates().stream()
-                .map(AgentPersistenceJsonFactory::cardCandidate)
+        payload.put("type", "PLAN_CARD");
+        payload.put("title", "推荐场次");
+        payload.put("schemaVersion", facts.schemaVersion());
+        payload.put("algorithmVersion", facts.algorithmVersion());
+        payload.put("plans", facts.plans().stream()
+                .map(AgentPersistenceJsonFactory::cardPlan)
                 .toList());
+        payload.put("missingFactors", facts.missingFactors());
+        payload.put("relaxationSuggestion", facts.relaxationSuggestion());
+        payload.put("usedProfile", facts.usedProfile());
         payload.put("source", facts.source());
         payload.put("dataAt", facts.dataAt().toString());
         payload.put("expiresAt", facts.expiresAt().toString());
         payload.put("degraded", facts.degraded());
+        payload.put("expired", facts.expired());
         return write(payload);
     }
 
-    private static Map<String, Object> cardCandidate(RecommendationReplyCandidate candidate) {
+    private static Map<String, Object> cardPlan(RecommendationPlanCardItem plan) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("movieId", candidate.movieId());
-        payload.put("cinemaId", candidate.cinemaId());
-        payload.put("showId", candidate.showId());
-        payload.put("price", candidate.price());
-        payload.put("startTime", candidate.startTime() == null ? null : candidate.startTime().toString());
-        payload.put("source", candidate.source());
-        payload.put("expired", candidate.expired());
-        payload.put("purchaseEligible", candidate.purchaseEligible());
+        payload.put("planType", plan.planType());
+        payload.put("movieId", plan.movieId());
+        payload.put("movieName", plan.movieName());
+        payload.put("cinemaId", plan.cinemaId());
+        payload.put("cinemaName", plan.cinemaName());
+        payload.put("showId", plan.showId());
+        payload.put("price", plan.price());
+        payload.put("currency", plan.currency());
+        payload.put("startTime", plan.startTime().toString());
+        payload.put("rating", plan.rating());
+        payload.put("score", plan.score());
+        payload.put("reasons", plan.reasons());
+        payload.put("source", plan.source());
+        payload.put("dataAt", plan.dataAt().toString());
+        payload.put("expiresAt", plan.expiresAt().toString());
+        payload.put("expired", plan.expired());
+        payload.put("purchaseEligible", plan.purchaseEligible());
+        payload.put("distanceMeters", plan.distanceMeters());
         return payload;
     }
 
