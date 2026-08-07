@@ -84,9 +84,9 @@ describe('用户端订单导航', () => {
 
   afterEach(cleanup);
 
-  it('已登录用户可以从桌面侧栏和用户菜单进入订单列表', () => {
+  it('桌面侧边栏不显示订单入口，用户菜单仍可进入订单列表', () => {
     const { unmount } = render(<DesktopSidebar />);
-    expect(screen.getByRole('link', { name: '我的订单' })).toHaveAttribute('href', '/orders');
+    expect(screen.queryByRole('link', { name: '我的订单' })).not.toBeInTheDocument();
     unmount();
 
     render(<DesktopTopBar />);

@@ -1,12 +1,13 @@
 ## 1. OpenSpec 和范围
 
 - [x] 1.1 C 确认订单页的“内容资料来源与时效”来自 `OrderContentNotice`，本次不修改。（验证：订单页和组件代码核对）
-- [x] 1.2 C 完成本 change 的严格校验。（验证：`openspec validate remove-profile-order-link --strict`）
+- [x] 1.2 C 更新本 change 并完成严格校验。（验证：`openspec validate remove-profile-order-link --strict`）
 
-## 2. 个人中心入口
+## 2. 个人中心和侧边栏入口
 
-- [x] 2.1 C 删除 `/profile` 中重复的“我的订单”链接和仅服务该链接的样式。（验证：组件测试和代码核对）
-- [x] 2.2 C 更新个人中心组件测试，确认订单链接不再显示，隐私说明和退出登录仍可用。（验证：`pnpm test -- src/pages/profile/index.test.tsx`）
+- [x] 2.1 C 在 `/profile` 恢复“我的订单”链接，跳转现有 `/orders` 页面。（验证：组件测试）
+- [x] 2.2 C 删除桌面侧边栏的“我的订单”菜单项及仅服务该入口的逻辑。（验证：组件测试）
+- [x] 2.3 C 更新组件测试，覆盖个人中心进入 `/orders` 和桌面侧边栏不显示订单入口。（验证：`pnpm test`）
 
 ## 3. 交付检查
 
