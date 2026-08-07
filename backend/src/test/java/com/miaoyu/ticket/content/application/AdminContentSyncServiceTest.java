@@ -59,7 +59,7 @@ class AdminContentSyncServiceTest {
         service(hangzhouTasks, provider).requestSync("request-hangzhou", "杭州");
 
         // 城市编号只留在 Provider 边界；管理员返回值和任务安全视图均不公开它。
-        assertThat(provider.cityCodes).containsExactly("70", "50");
+        assertThat(provider.cityCodes).containsExactly("430100", "330100");
     }
 
     @Test
@@ -71,7 +71,7 @@ class AdminContentSyncServiceTest {
         service.requestSync("request-idempotent", "长沙");
         service.requestSync("request-idempotent", "长沙");
 
-        assertThat(provider.cityCodes).containsExactly("70");
+        assertThat(provider.cityCodes).containsExactly("430100");
     }
 
     @Test
@@ -109,7 +109,7 @@ class AdminContentSyncServiceTest {
     @Test
     void givenExpiredRunningTask_whenQueried_thenItIsRecoveredAsInternalFailureWithoutProviderRetry() {
         InMemoryTasks tasks = new InMemoryTasks();
-        tasks.task = new ContentSyncTaskPort.SyncTask(701L, "expired-request", "长沙", "70",
+        tasks.task = new ContentSyncTaskPort.SyncTask(701L, "expired-request", "长沙", "430100",
                 ContentSyncTaskPort.SyncTaskStatus.RUNNING, LocalDateTime.of(2026, 8, 6, 9, 0), null, 0, 0, null);
         AdminContentSyncService service = service(tasks, LiveContentSyncPort.Outcome.SUCCESS, 1);
 
@@ -209,7 +209,7 @@ class AdminContentSyncServiceTest {
         }
         @Override
         public boolean claimPending(long syncId, String leaseOwner, LocalDateTime leaseUntil, LocalDateTime now) {
-            task = new SyncTask(task.syncId(), task.clientRequestId(), task.cityName(), task.providerCityId(),
+            task = new SyncTask(task.syncId(), task.clientRequestId(), task.cityName(), task.cityCode(),
                     SyncTaskStatus.RUNNING, task.startedAt(), null, 0, 0, null);
             return true;
         }
@@ -225,7 +225,7 @@ class AdminContentSyncServiceTest {
         @Override public boolean finish(long syncId, String leaseOwner, SyncTaskStatus status, int totalCount,
                                         int successCount, int failureCount, Integer errorCode,
                                         FailureCategory failureCategory, LocalDateTime finishedAt) {
-            task = new SyncTask(task.syncId(), task.clientRequestId(), task.cityName(), task.providerCityId(), status,
+            task = new SyncTask(task.syncId(), task.clientRequestId(), task.cityName(), task.cityCode(), status,
                     task.startedAt(), finishedAt, successCount, failureCount, failureCategory);
             return true;
         }
@@ -235,7 +235,7 @@ class AdminContentSyncServiceTest {
             if (task == null || task.status() != SyncTaskStatus.RUNNING) {
                 return 0;
             }
-            task = new SyncTask(task.syncId(), task.clientRequestId(), task.cityName(), task.providerCityId(),
+            task = new SyncTask(task.syncId(), task.clientRequestId(), task.cityName(), task.cityCode(),
                     SyncTaskStatus.FAILED, task.startedAt(), now, 0, 0, failureCategory);
             recovered.incrementAndGet();
             return 1;

@@ -25,6 +25,8 @@ import org.springframework.stereotype.Repository;
 public class JdbcContentLocalMovieCatalogAdapter implements ContentLocalMovieCatalogPort {
 
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Shanghai");
+    private static final String LIVE_SOURCE_TYPE = ContentSourceType.LIVE.name();
+    private static final String NETSTART_SOURCE = "NETSTART_MAOYAN";
     /** 字段探测只做一次，避免每个影片列表请求额外访问数据库元数据。 */
     private final JdbcTemplate jdbcTemplate;
     private final Clock clock;
@@ -55,13 +57,17 @@ public class JdbcContentLocalMovieCatalogAdapter implements ContentLocalMovieCat
                 SELECT id, source_movie_id, title, genres_json, duration_minutes, rating,
                        source_type, source, data_time, expires_at%s
                   FROM movie
-                 WHERE source_movie_id IS NOT NULL AND deleted_at IS NULL
+                 WHERE source_type = ? AND source = ?
+                   AND source_movie_id IS NOT NULL AND deleted_at IS NULL
                    AND duration_minutes > 0 AND rating IS NOT NULL%s%s
                  ORDER BY %s
                 """.formatted(optional, statusClause, keywordClause,
                 "release_date DESC, id ASC");
         // 参数添加顺序与 SQL 中状态、关键字占位符的顺序一致。
         List<Object> args = new ArrayList<>();
+        // 列表只代表完整的真实影片目录；Demo 必须由上层整体回退，不能与 LIVE 行混在同一响应中。
+        args.add(LIVE_SOURCE_TYPE);
+        args.add(NETSTART_SOURCE);
         if (releaseStatus != null) {
             // 上层已限制枚举值，此处仍坚持参数绑定。
             args.add(releaseStatus);
@@ -85,6 +91,9 @@ public class JdbcContentLocalMovieCatalogAdapter implements ContentLocalMovieCat
                     resultSet.getTimestamp("expires_at") == null ? null
                             : resultSet.getTimestamp("expires_at").toLocalDateTime());
         }, args.toArray());
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
         LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), BUSINESS_ZONE);
         // 时区固定为中国业务日期，和凌晨同步调度使用同一标准。
         // 列表的资料时间取本批最新值，只描述内容资料的新旧，不承诺票务实时性。

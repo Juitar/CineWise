@@ -42,8 +42,8 @@ public interface ContentSyncTaskPort {
     /** 管理页面只读取已经脱敏的审计视图。 */
     List<SourceStatus> findLatestSourceStatuses();
 
-    /** 同步任务内部视图保留 providerCityId，只供 Provider 边界使用，不进入 REST DTO。 */
-    record SyncTask(long syncId, String clientRequestId, String cityName, String providerCityId,
+    /** 同步任务内部只保存受控行政区码，不保存 NetStart 内部城市 ID。 */
+    record SyncTask(long syncId, String clientRequestId, String cityName, String cityCode,
                     SyncTaskStatus status, LocalDateTime startedAt, LocalDateTime finishedAt,
                     int successCount, int failureCount, FailureCategory failureCategory) { }
 

@@ -32,7 +32,7 @@ public record NetStartProperties(boolean enabled, boolean syncOnStartup, String 
                               Duration connectTimeout, Duration readTimeout, int requestsPerMinute, int retryCount,
                               Duration retryBackoff) {
         this(enabled, syncOnStartup, baseUrl, dailySyncCron, connectTimeout, readTimeout, requestsPerMinute,
-                retryCount, retryBackoff, List.of("长沙"));
+                retryCount, retryBackoff, List.of("430100"));
     }
 
     /**
@@ -47,7 +47,7 @@ public record NetStartProperties(boolean enabled, boolean syncOnStartup, String 
         connectTimeout = requirePositive(connectTimeout, "connectTimeout");
         readTimeout = requirePositive(readTimeout, "readTimeout");
         retryBackoff = requirePositive(retryBackoff, "retryBackoff");
-        syncCities = syncCities == null ? List.of("长沙") : syncCities.stream()
+        syncCities = syncCities == null ? List.of("430100") : syncCities.stream()
                 .filter(value -> value != null && !value.isBlank()).distinct().toList();
         if (requestsPerMinute != 10 || retryCount != 1) {
             throw new IllegalArgumentException("NetStart only permits 10 req/min and one retry");

@@ -38,6 +38,11 @@ class JdbcContentLocalMovieCatalogAdapterTest {
                     TIMESTAMP '2026-08-06 11:00:00', TIMESTAMP '2026-08-07 11:00:00', NULL)
                 """);
 
+        jdbc.update("""
+                INSERT INTO movie VALUES (4, 'demo-m4', 'Demo movie', '["剧情"]', 100, 8.0, NULL, NULL,
+                    'NOW_SHOWING', DATE '2026-08-10', 'MOCK', 'demo-seed',
+                    TIMESTAMP '2026-08-06 12:00:00', TIMESTAMP '2026-08-07 12:00:00', NULL)
+                """);
         JdbcContentLocalMovieCatalogAdapter adapter = new JdbcContentLocalMovieCatalogAdapter(jdbc,
                 Clock.fixed(Instant.parse("2026-08-06T12:00:00Z"), ZoneOffset.UTC));
 
@@ -46,6 +51,11 @@ class JdbcContentLocalMovieCatalogAdapterTest {
         assertThat(result.data()).extracting(item -> ((com.miaoyu.ticket.content.domain.MovieContent) item).movieId())
                 .containsExactly(2L, 1L);
         assertThat(result.source().name()).isEqualTo("NETSTART_MAOYAN");
+        assertThat(result.data()).extracting(item ->
+                ((com.miaoyu.ticket.content.domain.MovieContent) item).sourceMovieId())
+                .doesNotContain("demo-m4");
+        jdbc.update("DELETE FROM movie WHERE source_type = 'LIVE'");
+        assertThat(adapter.findMovies(null, null)).isEmpty();
     }
 
     private DataSource dataSource() {
