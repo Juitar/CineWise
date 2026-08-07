@@ -302,12 +302,12 @@ test('移动端画像开关返回 202004 后清除旧标签且不重试', async 
   });
 
   await page.goto('/profile');
-  // 画像标签与筛选下拉框共享文本，限定到标签语义元素避免 Playwright 严格模式歧义。
-  await expect(page.getByRole('strong', { name: '科幻', exact: true })).toBeVisible();
+  // 画像标签与筛选下拉框共享文本，限定到标签业务容器避免定位歧义。
+  await expect(page.locator('.profile-tag-item')).toContainText('科幻');
   await page.getByRole('checkbox', { name: '开启个性化' }).click();
 
   await expect(page.getByRole('status')).toHaveText('未开启画像数据使用');
-  await expect(page.getByRole('strong', { name: '科幻', exact: true })).toHaveCount(0);
+  await expect(page.locator('.profile-tag-item')).toHaveCount(0);
   await expect(page.getByRole('checkbox', { name: '开启个性化' })).toHaveCount(0);
   expect(updateAttempts).toBe(1);
 });
