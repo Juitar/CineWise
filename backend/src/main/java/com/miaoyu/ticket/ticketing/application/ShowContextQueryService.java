@@ -28,6 +28,7 @@ public class ShowContextQueryService {
         return repository.findShowContext(showId)
                 .map(context -> new ShowContextView(
                         context.showId(),
+                        context.movieId(),
                         context.cinemaId(),
                         context.startTime()));
     }

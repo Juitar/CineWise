@@ -196,6 +196,7 @@ public interface TicketingQueryMapper {
     /** 支付事件仅查询A拥有的场次事实，影院区域仍由D的公开端口提供。 */
     @Select("""
             SELECT id AS show_id,
+                   movie_id,
                    cinema_id,
                    start_time
               FROM movie_show

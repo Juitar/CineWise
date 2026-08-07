@@ -60,7 +60,7 @@ class ProfileBehaviorRecorderTest {
     EventRepository events = new EventRepository();
     TagRepository tags = new TagRepository();
     ProfileBehaviorRecorder recorder = recorder(events, tags);
-    PaymentSucceededEvent event = new PaymentSucceededEvent("payment-1", "10", "20", "30", "7", "长沙", null,
+    PaymentSucceededEvent event = new PaymentSucceededEvent("payment-1", "10", "20", "30", "40", "7", "长沙", null,
         1L, OffsetDateTime.ofInstant(CLOCK.instant(), ZoneOffset.UTC));
 
     assertThat(recorder.recordPayment(event)).isEqualTo(new ProfileBehaviorRecorder.RecordResult(true, false));

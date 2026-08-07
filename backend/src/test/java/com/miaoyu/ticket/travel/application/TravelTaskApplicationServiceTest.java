@@ -144,6 +144,7 @@ class TravelTaskApplicationServiceTest {
                 eventId,
                 orderId,
                 "80001",
+                "90001",
                 cinemaId,
                 "70001",
                 "西湖区",

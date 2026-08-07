@@ -189,6 +189,7 @@ class RefundedTravelTaskReconciliationServiceTest {
     private TravelEventContextResolver.TravelEventContext context(long showId) {
         return new TravelEventContextResolver.TravelEventContext(
                 showId,
+                showId + 5_000L,
                 showId + 10_000L,
                 "西湖区",
                 WINDOW_END.plusHours(6));

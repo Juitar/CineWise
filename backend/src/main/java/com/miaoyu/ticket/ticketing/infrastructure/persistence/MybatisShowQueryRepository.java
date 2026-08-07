@@ -54,7 +54,7 @@ public class MybatisShowQueryRepository implements ShowQueryRepository {
         if (row == null) {
             return Optional.empty();
         }
-        return Optional.of(new ShowContext(row.showId(), row.cinemaId(), row.startTime()));
+        return Optional.of(new ShowContext(row.showId(), row.movieId(), row.cinemaId(), row.startTime()));
     }
 
     @Override

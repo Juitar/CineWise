@@ -104,7 +104,7 @@ class TravelTaskControllerIntegrationTest {
 
     private TravelTaskSummary createTaskWithAdvice() {
         TravelTaskSummary task = travelTaskApplicationService.ensureTask(new PaymentSucceededEvent(
-                "travel-api-event", "77001", "55001", "44001", Long.toString(OWNER_ID), "西湖区",
+                "travel-api-event", "77001", "55001", "66001", "44001", Long.toString(OWNER_ID), "西湖区",
                 OffsetDateTime.parse("2026-08-05T19:00:00+08:00"), 1L,
                 OffsetDateTime.parse("2026-08-04T08:00:00+08:00")));
         Long internalTaskId = jdbcTemplate.queryForObject(

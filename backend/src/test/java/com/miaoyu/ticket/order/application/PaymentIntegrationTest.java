@@ -123,6 +123,7 @@ class PaymentIntegrationTest {
             assertThat(event.eventId()).matches("[0-9a-f-]{36}");
             assertThat(event.orderId()).isEqualTo(Long.toString(order.orderId()));
             assertThat(event.showId()).isEqualTo(Long.toString(order.showId()));
+            assertThat(event.movieId()).isEqualTo(Long.toString(findMovieId(order.showId())));
             assertThat(event.cinemaId()).isEqualTo(Long.toString(findCinemaId(order.showId())));
             assertThat(event.cinemaId()).matches("[1-9][0-9]*");
             assertThat(event.userId()).isEqualTo(Long.toString(USER_A));
@@ -442,6 +443,13 @@ class PaymentIntegrationTest {
                 "SELECT status FROM ticket_order WHERE id = ?",
                 String.class,
                 orderId);
+    }
+
+    private long findMovieId(long showId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT movie_id FROM movie_show WHERE id = ?",
+                Long.class,
+                showId);
     }
 
     private String seatStatus(long seatId) {

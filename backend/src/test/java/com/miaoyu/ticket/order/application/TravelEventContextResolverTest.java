@@ -28,11 +28,30 @@ class TravelEventContextResolverTest {
         OrderRepository.OrderSnapshot order = order(70001L);
 
         when(showRepository.findShowContext(order.showId())).thenReturn(Optional.of(
-                new ShowQueryRepository.ShowContext(70002L, 0L, FIXED_TIME)));
+                new ShowQueryRepository.ShowContext(70002L, 71002L, 0L, FIXED_TIME)));
 
         assertThat(resolver.resolve(order)).isEmpty();
         // 无效的A场次关联不能向D摘要端口查询，更不能用默认影院ID拼接事件。
         verifyNoInteractions(contentSummaryQueryPort);
+    }
+
+    @Test
+    void givenMissingMovieContext_whenResolve_thenKeepNullableMovieId() {
+        ShowQueryRepository showRepository = mock(ShowQueryRepository.class);
+        ContentSummaryQueryPort contentSummaryQueryPort = mock(ContentSummaryQueryPort.class);
+        TravelEventContextResolver resolver = new TravelEventContextResolver(
+                new ShowContextQueryService(showRepository), contentSummaryQueryPort);
+        OrderRepository.OrderSnapshot order = order(70001L);
+        when(showRepository.findShowContext(order.showId())).thenReturn(Optional.of(
+                new ShowQueryRepository.ShowContext(70001L, null, 71002L, FIXED_TIME)));
+        when(contentSummaryQueryPort.findCinemaSummaries(java.util.Set.of(71002L))).thenReturn(
+                new ContentSummaryQueryPort.CinemaSummaryBatch(
+                        java.util.List.of(new ContentSummaryQueryPort.CinemaSummary(
+                                71002L, "示例影院", "西湖区", "地址", "DEMO", FIXED_TIME,
+                                FIXED_TIME.plusDays(1), false)),
+                        java.util.Set.of()));
+
+        assertThat(resolver.resolve(order)).hasValueSatisfying(context -> assertThat(context.movieId()).isNull());
     }
 
     private OrderRepository.OrderSnapshot order(long showId) {
