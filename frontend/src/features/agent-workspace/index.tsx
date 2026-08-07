@@ -133,6 +133,8 @@ export function AgentWorkspace({ sessionId }: { sessionId: string }) {
                 <AgentDisplayItemView
                   key={item.key}
                   item={item}
+                  answerDisabled={busy}
+                  onAnswer={(_itemKey, answer) => workspace.submit(answer)}
                   onConfirm={(itemKey, confirmed) => void workspace.confirm(itemKey, confirmed)}
                 />
               ))}

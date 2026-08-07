@@ -223,11 +223,38 @@ function textArray(value: unknown): void {
   array(value).forEach((item) => text(item));
 }
 
+function nullableNumber(value: unknown): void {
+  if (value !== null && (typeof value !== 'number' || !Number.isFinite(value))) {
+    throw new AgentContractError();
+  }
+}
+
+function nullableNonNegativeInteger(value: unknown): void {
+  if (value !== null) nonNegativeInteger(value);
+}
+
 function validateRecommendationItem(value: unknown, type: 'MOVIE_CARD' | 'PLAN_CARD'): void {
   const item = record(value);
   businessId(item.movieId);
   if (type === 'PLAN_CARD') {
+    text(item.planType);
+    text(item.movieName);
     businessId(item.cinemaId);
+    text(item.cinemaName);
+    businessId(item.showId);
+    text(item.price);
+    text(item.currency);
+    dateText(item.startTime);
+    if (item.rating !== null) text(item.rating);
+    nullableNumber(item.score);
+    textArray(item.reasons);
+    text(item.source);
+    dateText(item.dataAt);
+    dateText(item.expiresAt);
+    boolean(item.expired);
+    boolean(item.purchaseEligible);
+    nullableNonNegativeInteger(item.distanceMeters);
+    return;
   }
   optionalText(item, 'title');
   optionalBusinessId(item, 'cinemaId');
@@ -249,14 +276,12 @@ function validateQuestion(payload: Record<string, unknown>): void {
     text(current.label);
     text(current.value);
   });
-  const allowFreeText = boolean(payload.allowFreeText);
+  boolean(payload.allowFreeText);
   boolean(payload.requiresConfirmation);
   dateText(payload.expiresAt);
-  if (allowFreeText) {
-    const input = record(payload.input);
-    text(input.name);
-    text(input.type);
-  }
+  const input = record(payload.input);
+  text(input.name);
+  text(input.type);
   if (payload.questionKind === 'LOCATION_PERMISSION') {
     const authorization = record(payload.locationAuthorization);
     if (authorization.permission !== 'DEVICE_LOCATION') throw new AgentContractError();
@@ -284,6 +309,18 @@ function validateRecommendation(
   dateText(payload.dataAt);
   dateText(payload.expiresAt);
   boolean(payload.degraded);
+  if (type === 'PLAN_CARD') {
+    text(payload.schemaVersion);
+    text(payload.algorithmVersion);
+    textArray(payload.missingFactors);
+    boolean(payload.usedProfile);
+    boolean(payload.expired);
+    if (payload.relaxationSuggestion !== null) {
+      const suggestion = record(payload.relaxationSuggestion);
+      text(suggestion.factor);
+      text(suggestion.message);
+    }
+  }
   optionalBoolean(payload, 'expired');
   optionalBoolean(payload, 'purchaseEligible');
   if ('missingFactors' in payload) textArray(payload.missingFactors);
