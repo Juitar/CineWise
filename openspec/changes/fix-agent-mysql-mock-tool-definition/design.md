@@ -12,7 +12,7 @@
 
 **Non-Goals:**
 
-- 不修改生产工具注册表、MySQL、Flyway、配置或业务逻辑。
+- 不修改生产工具注册表、MySQL 配置、已执行 Flyway 或业务逻辑。
 - 不调整 Agent 工具协议。
 
 ## Decisions
@@ -20,8 +20,10 @@
 - 在 mock Bean 创建和 `@BeforeEach` 的 reset 后，显式 stub `targetName()` 与 `definition()`。这是 Mockito reset 的必要恢复步骤，且直接复用生产白名单定义，避免测试复制字段。
 - 测试计划直接引用当前白名单必填字段，成功结果使用当前时刻生成、尚未过期的最小 `RecommendationPlanResult`。测试只验证 B 的监督器持久化，不依赖 D 已废弃的固定推荐服务。
 - 仅检查同一个测试配置中的其他 `AgentToolExecutor` mock；不扩大到无关测试重构。
+- V009 已执行且数据库检查只允许 `tool.result`，不能直接修改历史迁移。新写入的 `TOOL_COMPLETE/TOOL_ERROR` 在数据库行中保存为 `tool.result`；受控成功载荷固定包含 `degraded`，失败载荷固定包含 `errorCode`，读取时据此还原当前公开事件类型。没有这两个字段的历史 `tool.result` 继续按旧类型重放。
 
 ## Risks / Trade-offs
 
 - [未来新增 mock 执行器仍可能漏配 definition] → 复核本测试类中全部 `AgentToolExecutor` mock，并在本次测试中保留上下文启动覆盖。
 - [本地未提供 CI MySQL] → 运行定向编译/单元测试并如实保留 MySQL CI 未验证状态。
+- [数据库存储值与公开事件名不同] → 由映射单元测试和 MySQL 提交测试同时覆盖写入及读取；V009 保持不可变。

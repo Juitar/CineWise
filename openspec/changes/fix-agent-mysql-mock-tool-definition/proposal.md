@@ -1,6 +1,6 @@
 ## Why
 
-`AgentPersistenceMySqlIntegrationTest` 在 GitHub Actions 的 MySQL 8.4 环境完成数据库初始化后，因测试替身缺少工具定义而无法创建 Spring ApplicationContext。该问题阻断 `dev` 的 MySQL 集成测试，需以最小测试修复恢复验证。
+`AgentPersistenceMySqlIntegrationTest` 在 GitHub Actions 的 MySQL 8.4 环境先因测试替身缺少工具定义而无法创建 Spring ApplicationContext；修复后又暴露 V009 只允许 `tool.result`、而当前公开 SSE 使用 `tool.complete/tool.error` 的存储不兼容。两处问题都会阻断 `dev` 的 MySQL 集成测试。
 
 ## What Changes
 
@@ -9,6 +9,7 @@
 - 将监督器测试计划夹具更新为当前完整 `rankMoviePlan` 的必填输入和结果类型。
 - 将仍依赖旧固定推荐服务的 B Agent 测试替换为完整推荐结果替身。
 - 检查同一测试配置中的其他 `AgentToolExecutor` mock，防止出现同类空工具定义。
+- 终态工具事件在数据库中兼容写为 V009 已允许的 `tool.result`，读取时按受控载荷还原为公开的 `tool.complete` 或 `tool.error`；旧 `tool.result` 保持不变。
 
 ## Capabilities
 
@@ -18,9 +19,9 @@
 
 ### Modified Capabilities
 
-- 无。
+- `agent-post-sse-interaction`: 不修改已执行的 V009，通过持久化映射保证当前工具终态事件可写入 MySQL 且重放后的公开事件类型不变。
 
 ## Impact
 
-- 仅影响 `AgentPersistenceMySqlIntegrationTest` 及其 OpenSpec 验收记录。
-- 不修改生产代码、MySQL 配置、Flyway、接口或业务规则。
+- 影响 Agent MySQL 测试和 Agent 事件持久化映射。
+- 不修改 MySQL 配置、已执行 Flyway、公开 SSE 字段或业务规则。

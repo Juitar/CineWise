@@ -17,3 +17,18 @@
 #### Scenario: 监督器持久化完整推荐计划
 - **WHEN** 测试提交有效的完整推荐计划
 - **THEN** 计划通过校验、调用 mock 执行器并持久化计划标识和版本
+
+### Requirement: 当前工具终态事件兼容 V009 存储白名单
+系统 SHALL 将公开的 `tool.complete` 和 `tool.error` 以 V009 已允许的 `tool.result` 写入数据库，并在读取及重放时还原原公开事件类型；没有当前终态字段的历史 `tool.result` SHALL 保持原类型。
+
+#### Scenario: 成功工具事件写入并重放
+- **WHEN** Agent 保存包含 `degraded` 的 `tool.complete`
+- **THEN** 数据库事件类型为 `tool.result`，读取后的事件类型为 `tool.complete`
+
+#### Scenario: 失败工具事件写入并重放
+- **WHEN** Agent 保存包含 `errorCode` 的 `tool.error`
+- **THEN** 数据库事件类型为 `tool.result`，读取后的事件类型为 `tool.error`
+
+#### Scenario: 读取历史工具结果
+- **WHEN** 历史 `tool.result` 载荷不含 `degraded` 或 `errorCode`
+- **THEN** 读取后的事件类型仍为 `tool.result`
