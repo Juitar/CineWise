@@ -22,8 +22,7 @@ class AmapWeatherProviderTest {
             calls.incrementAndGet();
             assertThat(adcode).isEqualTo("330106");
             assertThat(key).isEqualTo("test-key");
-            return responseUnchecked("{\"status\":\"1\",\"lives\":[{\"weather\":\"小雨\",\"temperature\":\"18\","
-                    + "\"reporttime\":\"2026-08-06 14:00:00\"}]}");
+            return responseUnchecked(liveResponse("330106", "小雨", "18", "2026-08-06 14:00:00"));
         });
 
         var result = provider.query("西湖区", REQUESTED_AT);
@@ -67,14 +66,25 @@ class AmapWeatherProviderTest {
     }
 
     @Test
+    void givenSuccessStatusWithErrorInfoCode_whenQuerying_thenReturnEmptyForFallback() {
+        AmapWeatherProvider provider = provider((adcode, key) -> responseUnchecked(
+                "{\"status\":\"1\",\"count\":\"1\",\"info\":\"INVALID_USER_KEY\","
+                        + "\"infocode\":\"10001\",\"lives\":[]}"));
+
+        assertThat(provider.query("西湖区", REQUESTED_AT)).isEmpty();
+    }
+
+    @Test
     void givenAmapLiveWeatherMissingRequiredFields_whenQuerying_thenReturnEmptyForFallback() {
         AmapWeatherProvider missingTemperature = provider((adcode, key) -> responseUnchecked(
-                "{\"status\":\"1\",\"lives\":[{\"weather\":\"小雨\",\"reporttime\":\"2026-08-06 14:00:00\"}]}"));
+                "{\"status\":\"1\",\"infocode\":\"10000\",\"lives\":[{\"weather\":\"小雨\","
+                        + "\"reporttime\":\"2026-08-06 14:00:00\"}]}"));
         AmapWeatherProvider missingReportTime = provider((adcode, key) -> responseUnchecked(
-                "{\"status\":\"1\",\"lives\":[{\"weather\":\"小雨\",\"temperature\":\"18\"}]}"));
+                "{\"status\":\"1\",\"infocode\":\"10000\",\"lives\":[{\"weather\":\"小雨\","
+                        + "\"temperature\":\"18\"}]}"));
         AmapWeatherProvider invalidReportTime = provider((adcode, key) -> responseUnchecked(
-                "{\"status\":\"1\",\"lives\":[{\"weather\":\"小雨\",\"temperature\":\"18\","
-                        + "\"reporttime\":\"invalid\"}]}"));
+                "{\"status\":\"1\",\"infocode\":\"10000\",\"lives\":[{\"weather\":\"小雨\","
+                        + "\"temperature\":\"18\",\"reporttime\":\"invalid\"}]}"));
 
         assertThat(missingTemperature.query("西湖区", REQUESTED_AT)).isEmpty();
         assertThat(missingReportTime.query("西湖区", REQUESTED_AT)).isEmpty();
@@ -87,8 +97,7 @@ class AmapWeatherProviderTest {
                 true, "test-key", Duration.ofMinutes(15), Map.of(), Map.of("杭州市", "330100"));
         AmapWeatherProvider provider = new AmapWeatherProvider(properties, (adcode, key) -> {
             assertThat(adcode).isEqualTo("330100");
-            return responseUnchecked("{\"status\":\"1\",\"lives\":[{\"weather\":\"晴\","
-                    + "\"temperature\":\"25\",\"reporttime\":\"2026-08-06 14:00:00\"}]}");
+            return responseUnchecked(liveResponse("330100", "晴", "25", "2026-08-06 14:00:00"));
         });
 
         assertThat(provider.query("杭州市", REQUESTED_AT)).isPresent();
@@ -100,8 +109,7 @@ class AmapWeatherProviderTest {
                 true, "test-key", Duration.ofMinutes(15), Map.of("西湖区", "330106"), Map.of("西湖区", "330100"));
         AmapWeatherProvider provider = new AmapWeatherProvider(properties, (adcode, key) -> {
             assertThat(adcode).isEqualTo("330106");
-            return responseUnchecked("{\"status\":\"1\",\"lives\":[{\"weather\":\"晴\","
-                    + "\"temperature\":\"25\",\"reporttime\":\"2026-08-06 14:00:00\"}]}");
+            return responseUnchecked(liveResponse("330106", "晴", "25", "2026-08-06 14:00:00"));
         });
 
         assertThat(provider.query("西湖区", REQUESTED_AT)).isPresent();
@@ -123,5 +131,14 @@ class AmapWeatherProviderTest {
         } catch (Exception exception) {
             throw new AssertionError(exception);
         }
+    }
+
+    /** 使用官方 Web Service 实况字段，避免简化 JSON 掩盖字段名或类型错误。 */
+    private String liveResponse(String adcode, String weather, String temperature, String reportTime) {
+        return "{\"status\":\"1\",\"count\":\"1\",\"info\":\"OK\",\"infocode\":\"10000\","
+                + "\"lives\":[{\"province\":\"浙江\",\"city\":\"杭州市\",\"adcode\":\""
+                + adcode + "\",\"weather\":\"" + weather + "\",\"temperature\":\""
+                + temperature + "\",\"winddirection\":\"东风\",\"windpower\":\"≤3\","
+                + "\"humidity\":\"85\",\"reporttime\":\"" + reportTime + "\"}]}";
     }
 }

@@ -12,6 +12,7 @@ import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
 import com.miaoyu.ticket.ticketing.api.QueryAvailableDatesTool;
 import com.miaoyu.ticket.ticketing.api.QueryShowsTool;
+import com.miaoyu.ticket.travel.api.GetTravelAdviceTool;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
@@ -24,6 +25,7 @@ class AgentToolConfigurationTest {
             context.registerBean(RankMoviePlanTool.class, () -> mock(RankMoviePlanTool.class));
             context.registerBean(QueryAvailableDatesTool.class, () -> mock(QueryAvailableDatesTool.class));
             context.registerBean(QueryShowsTool.class, () -> mock(QueryShowsTool.class));
+            context.registerBean(GetTravelAdviceTool.class, () -> mock(GetTravelAdviceTool.class));
             context.register(AgentToolConfiguration.class);
             context.refresh();
 
@@ -34,6 +36,7 @@ class AgentToolConfigurationTest {
             ToolRegistry registry = context.getBean(ToolRegistry.class);
             assertThat(registry.find(AgentToolDefinitions.QUERY_AVAILABLE_DATES)).isPresent();
             assertThat(registry.find(AgentToolDefinitions.QUERY_SHOWS)).isPresent();
+            assertThat(registry.find(GetTravelAdviceTool.TARGET_NAME)).isPresent();
             assertThat(registry.find(AgentToolDefinitions.QUERY_SEATS)).isEmpty();
         }
     }

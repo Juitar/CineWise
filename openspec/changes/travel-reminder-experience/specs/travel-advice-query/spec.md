@@ -97,6 +97,24 @@ D SHALL 提供固定夹具和 OpenAPI 示例，覆盖正常天气、天气不可
 - **THEN** 页面只读取类型化 `weather`、`advice` 和来源时效字段
 - **AND** 页面不解析 `weatherJson`、`adviceJson`，也不读取 D 的数据库或内部类
 
+### Requirement: Agent 只读查询使用受控任务槽位和结构化建议结果
+
+`getTravelAdvice` SHALL 只接受 B 已校验并写入当前会话的 `travelTaskId` 槽位。Tool 执行适配器不得接受模型常量、模型自由生成的 `taskId` 或 `ToolContext.userId`；D 继续从当前认证上下文校验任务归属。Tool 返回结构化的 `available`、`taskId`、`taskStatus`、`weather`、`advice`、`source`、`dataAt`、`expiresAt`、`expired`、`degraded` 和 `fallbackType`，不得输出 `weatherJson` 或 `adviceJson`。
+
+#### Scenario: Agent 读取用户已选择任务的建议
+
+- **GIVEN** C 已通过卡片动作提交任务号，B 已校验后将其写入 `travelTaskId` 槽位
+- **WHEN** Agent 执行 `getTravelAdvice`
+- **THEN** 适配器只从该槽位读取任务号并调用 D 的只读 Tool
+- **AND** 返回结构化建议，不创建任务、快照、通知或位置数据
+
+#### Scenario: Agent 读取不存在或非本人任务
+
+- **GIVEN** `travelTaskId` 非法、不存在或不属于当前认证用户
+- **WHEN** Agent 执行 `getTravelAdvice`
+- **THEN** Tool 返回安全失败 `207001`
+- **AND** 不泄露其他任务是否存在、任务内容或归属信息
+
 ### Requirement: 高德真实路线只能由用户主动发起且不保存精确位置
 
 系统 SHALL 仅在用户主动请求并确认第三方位置共享说明后，使用一次性设备位置或手动地点调用高德真实路线 Provider。设备位置必须已经由 C 完成授权；用户拒绝定位、定位超时或定位不可用时，只能由用户主动提交手动地点。请求使用一次性起点、影院终点和 `travelMode`；连接超时为 2 秒、读取超时为 5 秒。成功响应必须返回 `travelMode`、`durationMinutes`、`suggestedDepartureAt`、`source=AMAP_ROUTE`、`dataTime`、`expiresAt`、`degraded=false`。精确起点、路线折线和途经点 MUST 不写入 MySQL、Redis、日志、画像、建议快照、URL 或 Agent 轨迹，且不持续定位。

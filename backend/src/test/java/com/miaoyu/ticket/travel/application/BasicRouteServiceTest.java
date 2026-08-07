@@ -38,6 +38,19 @@ class BasicRouteServiceTest {
     }
 
     @Test
+    void givenHistoricalTaskWithoutCinemaId_whenPlanning_thenRejectBeforeReadingOrSendingOrigin() {
+        CountingProvider provider = new CountingProvider();
+        BasicRouteService service = service(provider, null);
+
+        // V013 之前的任务允许 cinema_id 为 NULL；它不能退化为按 cinemaArea 猜测导航终点。
+        assertThatThrownBy(() -> service.planMyRoute("90001", command(true)))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> org.assertj.core.api.Assertions.assertThat(error.getErrorCode())
+                                .isEqualTo(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE));
+        org.assertj.core.api.Assertions.assertThat(provider.calls).isZero();
+    }
+
+    @Test
     void givenProviderThrows_whenPlanning_thenReturnStableCodeWithoutOrigin() {
         BasicRouteService service = service(new ThrowingProvider());
 
@@ -50,8 +63,12 @@ class BasicRouteServiceTest {
     }
 
     private BasicRouteService service(BasicRouteProvider provider) {
+        return service(provider, 4L);
+    }
+
+    private BasicRouteService service(BasicRouteProvider provider, Long cinemaId) {
         CurrentUserAccessor user = () -> new CurrentUser(1L, RoleCode.USER, 0L);
-        return new BasicRouteService(new StubRepository(), user, provider,
+        return new BasicRouteService(new StubRepository(cinemaId), user, provider,
                 Clock.fixed(Instant.parse("2026-08-04T00:00:00Z"), ZoneOffset.UTC));
     }
 
@@ -78,9 +95,13 @@ class BasicRouteServiceTest {
     }
 
     private static final class StubRepository implements TravelTaskRepository {
-        private final TravelTaskSnapshot task = new TravelTaskSnapshot(1L, "90001", 1L, 2L, 3L, "西湖区",
-                LocalDateTime.of(2026, 8, 5, 19, 0), LocalDateTime.of(2026, 8, 5, 17, 0), 0L, 0L,
-                TravelTaskStatus.READY, null, LocalDateTime.of(2026, 8, 4, 0, 0));
+        private final TravelTaskSnapshot task;
+
+        private StubRepository(Long cinemaId) {
+            this.task = new TravelTaskSnapshot(1L, "90001", 1L, 2L, 3L, cinemaId, "西湖区",
+                    LocalDateTime.of(2026, 8, 5, 19, 0), LocalDateTime.of(2026, 8, 5, 17, 0), 0L, 0L,
+                    TravelTaskStatus.READY, null, LocalDateTime.of(2026, 8, 4, 0, 0));
+        }
         @Override public Optional<TravelTaskSnapshot> findByPaymentEventId(String eventId) {
             return Optional.empty();
         }

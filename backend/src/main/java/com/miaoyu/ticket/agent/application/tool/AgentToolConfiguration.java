@@ -13,6 +13,7 @@ import com.miaoyu.ticket.agent.application.run.ProfileContextPrefetcher;
 import com.miaoyu.ticket.profile.infrastructure.tool.GetProfileSummaryTool;
 import com.miaoyu.ticket.ticketing.api.QueryAvailableDatesTool;
 import com.miaoyu.ticket.ticketing.api.QueryShowsTool;
+import com.miaoyu.ticket.travel.api.GetTravelAdviceTool;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -38,6 +39,7 @@ public class AgentToolConfiguration {
     public ToolRegistry agentToolRegistry() {
         return new ToolRegistry(List.of(
                 AgentToolDefinitions.rankMoviePlan(),
+                AgentToolDefinitions.getTravelAdvice(),
                 AgentToolDefinitions.queryAvailableDates(),
                 AgentToolDefinitions.queryShows(),
                 AgentToolDefinitions.createOrder()));
@@ -88,6 +90,13 @@ public class AgentToolConfiguration {
         return new RankMoviePlanExecutionAdapter(rankMoviePlanTool, executionPlanStateMachine);
     }
 
+    /** D 的建议 Tool 只读取 B 已确认的 travelTaskId 槽位，不参与 SSE 或会话写入。 */
+    @Bean
+    public GetTravelAdviceExecutionAdapter getTravelAdviceExecutionAdapter(
+            GetTravelAdviceTool getTravelAdviceTool, ExecutionPlanStateMachine executionPlanStateMachine) {
+        return new GetTravelAdviceExecutionAdapter(getTravelAdviceTool, executionPlanStateMachine);
+    }
+
     /** A 的日期 Tool 只接通明确的公开 API；它不注入票务持久化实现。 */
     @Bean
     public QueryAvailableDatesExecutionAdapter queryAvailableDatesExecutionAdapter(
@@ -112,6 +121,7 @@ public class AgentToolConfiguration {
             PlanSchemaValidator planSchemaValidator,
             ExecutionPlanStateMachine executionPlanStateMachine,
             RankMoviePlanExecutionAdapter rankMoviePlanExecutionAdapter,
+            GetTravelAdviceExecutionAdapter getTravelAdviceExecutionAdapter,
             QueryAvailableDatesExecutionAdapter queryAvailableDatesExecutionAdapter,
             QueryShowsExecutionAdapter queryShowsExecutionAdapter,
             ObjectProvider<GetProfileSummaryTool> getProfileSummaryToolProvider) {
@@ -122,6 +132,7 @@ public class AgentToolConfiguration {
                 executionPlanStateMachine,
                 List.of(
                         rankMoviePlanExecutionAdapter,
+                        getTravelAdviceExecutionAdapter,
                         queryAvailableDatesExecutionAdapter,
                         queryShowsExecutionAdapter), profileContextPrefetcher(getProfileSummaryToolProvider));
     }

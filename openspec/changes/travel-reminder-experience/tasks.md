@@ -14,11 +14,11 @@
 - [x] 2.3 D 实现 `PaymentSucceededEvent` 的 AFTER_COMMIT 消费、`eventId` 去重、`orderId` 唯一任务创建及 A 补偿共用的 `ensureTask`；验证：`TravelTaskApplicationServiceTest`、`TravelTaskPaymentEventIntegrationTest` 覆盖重复事件、首次消费失败后的补偿、并发创建、提交后消费和回滚不创建，均通过。
 - [x] 2.4 D 实现 `OrderInvalidated` 的版本比较、任务取消和建议过期处理；验证：`TravelTaskApplicationServiceTest`、`TravelTaskPaymentEventIntegrationTest` 覆盖退款提交后取消、退款先到的 CANCELLED 墓碑、支付事件随后到达不重开任务、低版本退款后较高版本退款推进墓碑审计字段及两版本并发到达时保留较高版本，均通过。
 - [x] 2.5 D 提供本人任务查询、提醒时间更新与只读建议摘要 Application/API 边界；验证：`TravelTaskQueryServiceTest` 覆盖跨用户隐藏、取消任务返回 `207002`、五分钟内刷新返回 `107001`，均通过。
-- [ ] 2.6 A、D 在 A 的事件代码合入后实现并验证 `cinemaId` 处理；已验证：合法支付任务、非法支付后的 PAID 补偿、退款先到合法/非法影院 ID、已有任务退款保留原值、迟到支付不重开，以及 V013 对 `0`/负数的 CHECK。待 D 在路线查询实现并以 MySQL 测试验证历史 `cinema_id=NULL` 路线不可用后再勾选。
+- [ ] 2.6 A、D 在 A 的事件代码合入后实现并验证 `cinemaId` 处理；已验证：合法支付任务、非法支付后的 PAID 补偿、退款先到合法/非法影院 ID、已有任务退款保留原值、迟到支付不重开，以及 V013 对 `0`/负数的 CHECK。D 已在 `BasicRouteService` 中拒绝历史 `cinemaId=NULL` 任务，并补充单元测试和隔离 MySQL 集成测试；待隔离 MySQL 实际执行该路线用例后再勾选。
 
 ## 3. 天气建议、快照与提醒投递
 
-- [x] 3.1 D 补齐高德天气的影院行政区码映射：优先本地影院区域，其次本地影院城市和行政区码；不得由模糊地址猜测。映射缺失或查询失败按缓存、Demo、明确不可用处理，且仍生成通用交通建议；验证：`AmapWeatherProviderTest` 覆盖区域优先、城市备用、映射缺失和 Provider 失败路径。
+- [x] 3.1 D 补齐高德天气的影院行政区码映射：优先本地影院区域，其次本地影院城市和行政区码；不得由模糊地址猜测。映射缺失或查询失败按缓存、Demo、明确不可用处理，且仍生成通用交通建议；验证：`AmapWeatherProviderTest` 覆盖官方完整实况响应、`status=1` 且 `infocode=10000` 成功校验、错误码降级、区域优先、城市备用、映射缺失和 Provider 失败路径。
 - [x] 3.2 D 实现天气风险和通用交通建议的确定性规则及建议快照；验证：`TravelAdviceServiceTest` 覆盖天气不可用仍保留通用建议及同版本竞争不覆盖，`TravelTaskPaymentEventIntegrationTest` 覆盖 H2 中 Demo 回退、快照追加和任务进入 `READY`，均通过。
 - [x] 3.2.1 D 将建议 REST 响应改为类型化 `TravelAdviceResponse`，保留旧字符串字段的兼容期，并提供 OpenAPI 示例和固定夹具；验证：`travel-public-rest-contracts` 已完成，相关 24 个出行测试通过。
 - [x] 3.3 D 实现提醒调度、任务版本抢占和状态转换；验证：`TravelReminderSchedulingServiceTest` 覆盖失败隔离和到期关闭，`TravelTaskPaymentEventIntegrationTest` 覆盖重复调度只生成一条建议快照、取消任务不生成建议和到期任务关闭；共 11 个相关用例通过。
@@ -36,7 +36,7 @@
 
 - [x] 5.1 D 实现 `GetWeatherTool`、`GetTravelAdviceTool`、`PlanBasicRouteTool`，仅调用 D Application Service；验证：现有出行工具测试覆盖公开 `ToolContext`/`ToolResult<T>` 适配、只读调用和错误映射，不调用模型、不发布 SSE、不访问 Mapper。本期不将 `SearchNearbyFoodTool` 作为完成条件。
 - [x] 5.2 A、D 联调支付事件实际发布、任务创建、订单失效和补偿；验证：`TravelTaskPaymentEventIntegrationTest` 13/13、PAID 补偿 2/2、REFUNDED 补偿 3/3、任务查询 2/2 均在 MySQL 8.4 隔离库通过，覆盖提交后消费、回滚隔离、重复事件、退款取消和补偿结果。H2 默认不运行读取 `cinema_id` 的集成测试。
-- [ ] 5.3 B、D 联调对话中的只读建议摘要；验证：调用不产生 `agent_*`、任务、建议、通知或位置写入。
+- [ ] 5.3 B、D 联调对话中的只读建议摘要；D 提供仅接受 `travelTaskId` 受控槽位的结构化 `getTravelAdvice` Tool、定义和执行适配器，B 复核会话槽位和卡片映射；验证：调用不产生 `agent_*`、任务、建议、通知或位置写入，且不存在、无权或非法任务号统一返回 `207001`。
 - [ ] 5.4 C、D 联调本人任务、建议、刷新和路线接口；验证：401、403、404、409、422、429、503 与约定错误码、来源时效和降级展示一致。
 - [x] 5.4.1 D 提供 C 的提醒时间浏览器联调固定夹具；范围仅为正常更新、`100409` 请求版本不一致、`207003` 条件更新冲突、`207001` 不存在或无权、`207002` 已取消及写结果未知后的 GET 查询恢复。验证：`fixtures/travel/c/reminder-update-fixtures.json` 引用任务详情、建议、PUT 请求和六类固定结果；本期不提供提醒关闭/重新开启字段、接口、夹具或迁移。
 
