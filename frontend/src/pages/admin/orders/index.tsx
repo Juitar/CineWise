@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { ExternalShowtimeImportPanel } from '../../../features/external-showtime-import/ExternalShowtimeImportPanel';
 import { AdminOrderDetailDrawer } from '../../../features/admin-order-detail/AdminOrderDetailDrawer';
 import {
   AdminOrderFilters,
@@ -76,6 +77,8 @@ export default function AdminOrdersPage() {
         onSearch={handleSearch}
         onReset={handleReset}
       />
+
+      <ExternalShowtimeImportPanel />
 
       {listErrorState && ordersQuery.error ? (
         <AdminOrderError

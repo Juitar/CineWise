@@ -83,7 +83,7 @@ jobs:
         working-directory: backend
         run: >-
           bash ./mvnw --batch-mode --no-transfer-progress
-          -Dtest=ShowQueryMySqlIntegrationTest,OrderCreationMySqlConcurrencyIntegrationTest,OrderLifecycleMySqlIntegrationTest,PaymentMySqlIntegrationTest,RefundMySqlIntegrationTest,PaidTravelTaskReconciliationMySqlIntegrationTest,RefundedTravelTaskReconciliationMySqlIntegrationTest,PaidTravelTaskReconciliationIntegrationTest,RefundedTravelTaskReconciliationIntegrationTest,TravelTaskPaymentEventIntegrationTest,TravelTaskControllerIntegrationTest,AdminOrderQueryMySqlIntegrationTest
+          -Dtest=ShowQueryMySqlIntegrationTest,ExternalShowtimeSandboxImportMySqlIntegrationTest,OrderCreationMySqlConcurrencyIntegrationTest,OrderLifecycleMySqlIntegrationTest,PaymentMySqlIntegrationTest,RefundMySqlIntegrationTest,PaidTravelTaskReconciliationMySqlIntegrationTest,RefundedTravelTaskReconciliationMySqlIntegrationTest,PaidTravelTaskReconciliationIntegrationTest,RefundedTravelTaskReconciliationIntegrationTest,TravelTaskPaymentEventIntegrationTest,TravelTaskControllerIntegrationTest,AdminOrderQueryMySqlIntegrationTest
           test
       - name: Run Agent MySQL persistence integration tests
         working-directory: backend
