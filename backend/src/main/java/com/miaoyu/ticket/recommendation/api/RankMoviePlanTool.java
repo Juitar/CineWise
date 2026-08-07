@@ -6,9 +6,13 @@ import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationQueryService;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
+import com.miaoyu.ticket.recommendation.application.RecommendationCandidate;
 import com.miaoyu.ticket.recommendation.application.PersonalizedRecommendationQueryService;
+import com.miaoyu.ticket.recommendation.domain.RecommendationPlan;
 import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
+import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.List;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -130,9 +134,11 @@ public class RankMoviePlanTool {
                     "COMPLETE_CONSTRAINTS_REQUIRED", false, null, context.stateVersion(), null, null);
         }
         if (personalizedQueryService == null) {
-            // 这是错误的测试装配或 Bean 装配，不把内部异常或固定推荐结果泄露给调用方。
-            return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INTERNAL_ERROR.code(), false, false,
-                    "RETRY_LATER", false, null, context.stateVersion(), null, null);
+            // 旧构造器仍被已发布的 Agent 适配器和回归测试使用；只读转换保持兼容，绝不补造场次或写票务事实。
+            RecommendationPlanResult legacyResult = toLegacyPlanResult(queryService.query(command.toQuery()));
+            return new ToolResult<>(ToolStatus.SUCCESS, legacyResult, null, false, false, "RENDER_RESULT",
+                    legacyResult.degraded(), legacyResult.degraded() ? "RECOMMENDATION_DEGRADED" : null,
+                    context.stateVersion(), legacyResult.dataAt(), legacyResult.expiresAt());
         }
         // 只把 D 的完整计算结果原样交给 B，卡片、SSE 和 Agent 状态仍由 B 负责。
         RecommendationPlanResult result = personalizedQueryService.query(command.toConstraints());
@@ -140,6 +146,20 @@ public class RankMoviePlanTool {
         return new ToolResult<>(ToolStatus.SUCCESS, result, null, false, false, "RENDER_RESULT",
                 result.degraded(), result.degraded() ? "RECOMMENDATION_DEGRADED" : null,
                 context.stateVersion(), result.dataAt(), result.expiresAt());
+    }
+
+    /** 旧固定推荐只转换已有可购候选；无场次保持空方案和 SHOWTIME 缺失，不生成任何虚构票务数据。 */
+    private RecommendationPlanResult toLegacyPlanResult(FixedRecommendationResult result) {
+        List<RecommendationPlan> plans = result.candidates().stream()
+                .filter(RecommendationCandidate::purchaseEligible)
+                .map(candidate -> new RecommendationPlan(RecommendationPlan.PlanType.COMPREHENSIVE,
+                        candidate.movieId(), candidate.cinemaId(), candidate.showId(),
+                        new BigDecimal(candidate.price()), candidate.startTime(), 0D, List.of(), List.of(),
+                        candidate.source(), result.dataAt(), result.expiresAt(), true))
+                .limit(3)
+                .toList();
+        return new RecommendationPlanResult(result.algorithmVersion(), plans, result.missingFactors(), null,
+                result.source(), result.dataAt(), result.expiresAt(), !result.purchaseEligible());
     }
 
 }
