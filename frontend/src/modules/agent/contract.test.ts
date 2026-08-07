@@ -15,6 +15,7 @@ import unavailableTravelAdviceCard from '../../../../backend/src/test/resources/
 import {
   AgentContractError,
   parseAgentEvent,
+  parseAgentMessage,
   parseAgentMessagePage,
   parseAgentRunSnapshot,
   parseAgentSession,
@@ -34,6 +35,41 @@ describe('Agent DTO 和事件校验', () => {
       '52b810c5-4b03-4a41-9c36-07372f1a6f59',
     );
     expect(parseAgentRunSnapshot(runCompleted.data).lastEventId).toBe('42');
+  });
+
+  it('历史普通文本允许 payload 为 null，其他非对象值仍拒绝', () => {
+    const message = {
+      messageId: 'message-user-1',
+      role: 'USER',
+      type: 'TEXT',
+      text: '推荐电影',
+      runId: 'run-1',
+      payload: null,
+      status: 'COMPLETED',
+      completedAt: null,
+      createdAt: '2026-08-08T10:00:00+08:00',
+    };
+
+    expect(parseAgentMessage(message).payload).toBeNull();
+    expect(() => parseAgentMessage({ ...message, payload: 'raw' })).toThrow(AgentContractError);
+    expect(() => parseAgentMessage({ ...message, payload: [] })).toThrow(AgentContractError);
+  });
+
+  it('接受尚未生成计划的等待位置运行', () => {
+    expect(
+      parseAgentRunSnapshot({
+        ...runCompleted.data,
+        status: 'WAITING_LOCATION',
+        planId: null,
+        planVersion: null,
+        finishedAt: null,
+      }),
+    ).toMatchObject({
+      status: 'WAITING_LOCATION',
+      planId: null,
+      planVersion: null,
+      finishedAt: null,
+    });
   });
 
   it('校验确认卡并解析确认结果', () => {

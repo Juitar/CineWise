@@ -16,7 +16,13 @@ import type {
   AgentSessionPage,
 } from './types';
 
-const RUN_STATUSES = new Set<AgentRunStatus>(['RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED']);
+const RUN_STATUSES = new Set<AgentRunStatus>([
+  'RUNNING',
+  'WAITING_LOCATION',
+  'COMPLETED',
+  'FAILED',
+  'CANCELLED',
+]);
 const CARD_PAYLOAD_TYPES = new Set<AgentCardPayloadType>([
   'TEXT',
   'QUESTION',
@@ -158,7 +164,7 @@ export function parseAgentMessage(value: unknown): AgentMessage {
     type: text(current.type),
     text: text(current.text, true),
     runId: businessId(current.runId),
-    payload: record(current.payload),
+    payload: current.payload === null ? null : record(current.payload),
     status: text(current.status),
     completedAt: optionalNullableDate(current, 'completedAt'),
     createdAt: dateText(current.createdAt),

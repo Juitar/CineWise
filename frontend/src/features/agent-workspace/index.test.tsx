@@ -1,12 +1,16 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { AgentDisplayItem } from '../../modules/agent/projection';
+import type { AgentWorkspaceStatus } from '../../modules/agent/types';
 
 const mocks = vi.hoisted(() => ({
   isMobile: false,
   navigate: vi.fn(),
   workspace: {
     cancel: vi.fn(),
+    confirm: vi.fn(),
     clearAll: vi.fn(),
     clearCurrent: vi.fn(),
     createNewSession: vi.fn(),
@@ -17,16 +21,9 @@ const mocks = vi.hoisted(() => ({
       runId: null as string | null,
       planVersion: null,
       lastEventId: '0',
-      status: 'IDLE' as const,
+      status: 'IDLE' as AgentWorkspaceStatus,
       safeError: null as string | null,
-      items: [] as Array<{
-        key: string;
-        kind: string;
-        text: string;
-        title?: string;
-        fields?: Array<{ label: string; value: string }>;
-        selectSeatsPath?: string;
-      }>,
+      items: [] as AgentDisplayItem[],
     },
     refreshSessions: vi.fn(),
     sessions: [] as Array<{
@@ -68,6 +65,11 @@ beforeEach(() => {
     items: [],
   };
   vi.clearAllMocks();
+  mocks.workspace.submit.mockResolvedValue(true);
+});
+
+afterEach(() => {
+  cleanup();
 });
 
 describe('AgentWorkspace 页面', () => {
@@ -176,5 +178,99 @@ describe('AgentWorkspace 页面', () => {
       expect(mocks.workspace.submit).toHaveBeenCalledOnce();
     });
     expect(mocks.workspace.submit).toHaveBeenCalledWith('推荐一部电影');
+  });
+
+  it('等待位置时禁用新消息并保留取消原运行入口', () => {
+    mocks.workspace.projection = {
+      ...mocks.workspace.projection,
+      runId: 'run-waiting-location',
+      status: 'WAITING_LOCATION',
+    };
+
+    render(<AgentWorkspace sessionId="session-example-1" />);
+
+    expect(screen.getByText('等待位置')).toBeInTheDocument();
+    expect(screen.getByLabelText('观影需求')).toBeDisabled();
+    expect(screen.getByRole('button', { name: '取消运行' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '处理中' })).toBeDisabled();
+  });
+
+  it('推荐工作区展示真实方案并把当前方案序号交给右侧会话', async () => {
+    mocks.workspace.projection.items = [
+      {
+        key: 'plan-latest',
+        kind: 'plan-card',
+        title: '周末观影方案',
+        text: '以下内容来自服务端卡片数据',
+        plans: [
+          {
+            showId: '70001',
+            planType: 'COMPREHENSIVE',
+            movieName: '真实影片',
+            cinemaName: '真实影院',
+            price: '46.00',
+            currency: 'CNY',
+            startTime: '2026-08-09T19:30:00+08:00',
+            rating: '8.6',
+            reasons: ['时间合适', '评分较高'],
+            source: 'recommendation-service',
+            dataAt: '2026-08-08T10:00:00+08:00',
+            expiresAt: '2099-08-08T10:30:00+08:00',
+            expired: false,
+            purchaseEligible: true,
+            distanceMeters: 1200,
+          },
+        ],
+      },
+    ];
+
+    render(<AgentWorkspace sessionId="session-example-1" variant="recommendations" />);
+
+    expect(screen.getByText('真实影片')).toBeInTheDocument();
+    expect(screen.getByText('真实影院')).toBeInTheDocument();
+    expect(screen.getByText('¥46.00')).toBeInTheDocument();
+    expect(screen.queryByText(/1200|距离|路线|餐饮/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText('已生成 1 个真实方案，请在左侧方案区选择后继续交流。'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /综合推荐/ }));
+    await vi.waitFor(() => {
+      expect(mocks.workspace.submit).toHaveBeenCalledWith(
+        '基于当前最新推荐中的第 1 个方案，请解释这个方案，并说明是否需要继续调整。',
+      );
+    });
+
+    fireEvent.change(screen.getByLabelText('观影需求'), {
+      target: { value: '换一家影院' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /发.*送/ }));
+    await vi.waitFor(() => {
+      expect(mocks.workspace.submit).toHaveBeenLastCalledWith(
+        '基于当前最新推荐中的第 1 个方案，换一家影院',
+      );
+    });
+  });
+
+  it('推荐工作区不从 PLAN_CARD 自行生成选座入口', () => {
+    mocks.workspace.projection.items = [
+      {
+        key: 'old-select-seats',
+        kind: 'business-intent',
+        text: '旧方案选座入口',
+        selectSeatsPath: '/shows/old/seats?movieId=old&cinemaId=old',
+      },
+      {
+        key: 'plan-only',
+        kind: 'plan-card',
+        title: '推荐方案',
+        text: '方案快照',
+        plans: [],
+      },
+    ];
+
+    render(<AgentWorkspace sessionId="session-example-1" variant="recommendations" />);
+
+    expect(screen.queryByRole('link', { name: '去选座' })).not.toBeInTheDocument();
   });
 });

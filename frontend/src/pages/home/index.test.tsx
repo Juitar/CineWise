@@ -277,7 +277,7 @@ describe('HomePage', () => {
       target: { value: '推荐一部电影' },
     });
     fireEvent.click(screen.getByRole('button', { name: '发送' }));
-    expect(pageMocks.navigate).toHaveBeenCalledWith('/assistant');
+    expect(pageMocks.navigate).toHaveBeenCalledWith('/recommendations');
   });
 
   it('PC Agent 入口不展示静态影片、影院、路线或价格', () => {

@@ -104,7 +104,7 @@ function cardRecoveryRunIds(messages: readonly AgentMessage[]): readonly string[
   return Array.from(
     new Set([
       ...messages
-        .filter((message) => typeof message.payload.actionId === 'string')
+        .filter((message) => typeof message.payload?.actionId === 'string')
         .map((message) => message.runId),
       ...travelAdviceRecoveryRunIds(messages),
     ]),
@@ -226,7 +226,7 @@ export function useAgentWorkspace(sessionId: string) {
     async (actionId: string) => {
       try {
         const history = await listAgentMessages(projectionRef.current.sessionId);
-        const message = history.records.find((record) => record.payload.actionId === actionId);
+        const message = history.records.find((record) => record.payload?.actionId === actionId);
         if (!message) throw new AgentContractError('确认操作不在当前会话历史中');
         const snapshot = await getAgentRun(message.runId);
         replaceProjection(buildProjectionFromSnapshot(snapshot, history.records));
@@ -335,7 +335,9 @@ export function useAgentWorkspace(sessionId: string) {
         !normalized ||
         normalized.length > 2000 ||
         controllerRef.current ||
-        ['CONNECTING', 'STREAMING', 'RESULT_UNKNOWN'].includes(projectionRef.current.status)
+        ['CONNECTING', 'STREAMING', 'WAITING_LOCATION', 'RESULT_UNKNOWN'].includes(
+          projectionRef.current.status,
+        )
       ) {
         return false;
       }
@@ -349,12 +351,18 @@ export function useAgentWorkspace(sessionId: string) {
         kind: 'user-text',
         text: normalized,
       };
+      const previous = projectionRef.current;
+      const cursor = previous.lastEventId;
+      // eventId 是会话级递增游标，而 runId/planVersion 只属于一次运行。
+      // 终态后发送新消息必须解除旧运行绑定，否则新运行的全部事件都会被 reducer 忽略。
       replaceProjection({
-        ...projectionRef.current,
-        items: [...projectionRef.current.items, localItem],
+        ...previous,
+        runId: null,
+        planVersion: null,
+        items: [...previous.items, localItem],
         safeError: null,
       });
-      await startStream(request, projectionRef.current.lastEventId);
+      await startStream(request, cursor);
       return true;
     },
     [replaceProjection, startStream],

@@ -20,8 +20,15 @@ export const AGENT_EVENT_TYPES = [
 
 export type AgentEventType = (typeof AGENT_EVENT_TYPES)[number];
 export type AgentWorkspaceStatus =
-  'IDLE' | 'CONNECTING' | 'STREAMING' | 'COMPLETED' | 'FAILED' | 'RESULT_UNKNOWN' | 'CANCELLED';
-export type AgentRunStatus = 'CANCELLED' | 'COMPLETED' | 'FAILED' | 'RUNNING';
+  | 'IDLE'
+  | 'CONNECTING'
+  | 'STREAMING'
+  | 'WAITING_LOCATION'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'RESULT_UNKNOWN'
+  | 'CANCELLED';
+export type AgentRunStatus = 'CANCELLED' | 'COMPLETED' | 'FAILED' | 'RUNNING' | 'WAITING_LOCATION';
 export type AgentConfirmationStatus =
   | 'PENDING_CONFIRMATION'
   | 'EXECUTING'
@@ -53,7 +60,7 @@ export interface AgentMessage {
   type: string;
   text: string;
   runId: string;
-  payload: Readonly<Record<string, unknown>>;
+  payload: Readonly<Record<string, unknown>> | null;
   status: string;
   completedAt: string | null;
   createdAt: string;

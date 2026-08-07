@@ -164,7 +164,7 @@ function payloadText(payload: Readonly<Record<string, unknown>>, key: string): s
 }
 
 function isTravelAdviceHistory(message: AgentMessage): boolean {
-  return message.payload.type === 'TRAVEL_ADVICE_CARD';
+  return message.payload?.type === 'TRAVEL_ADVICE_CARD';
 }
 
 function cardStatusFields(event: AgentEvent): Array<{ label: string; value: string }> {
@@ -523,9 +523,10 @@ export function consumeAgentEvent(
 
 function itemFromHistory(message: AgentMessage): AgentDisplayItem {
   const type = message.type.toUpperCase();
-  const confirmationText = safeConfirmationStatusText(message.payload.status);
+  const payload = message.payload ?? {};
+  const confirmationText = safeConfirmationStatusText(payload.status);
   if (confirmationText) {
-    if ('actionId' in message.payload)
+    if ('actionId' in payload)
       return confirmationItem({
         eventId: message.messageId,
         sessionId: '',
@@ -535,7 +536,7 @@ function itemFromHistory(message: AgentMessage): AgentDisplayItem {
         nodeId: null,
         eventType: 'card',
         displayText: message.text,
-        payload: message.payload,
+        payload,
         occurredAt: null,
       });
     return {
@@ -582,8 +583,11 @@ export function buildProjectionFromHistory(
   return { ...createAgentProjection(sessionId), items: messages.map(itemFromHistory) };
 }
 
-function confirmationKey(runId: string, payload: Readonly<Record<string, unknown>>): string | null {
-  return typeof payload.actionId === 'string' ? `${runId}\u0000${payload.actionId}` : null;
+function confirmationKey(
+  runId: string,
+  payload: Readonly<Record<string, unknown>> | null,
+): string | null {
+  return typeof payload?.actionId === 'string' ? `${runId}\u0000${payload.actionId}` : null;
 }
 
 export function travelAdviceRecoveryRunIds(messages: readonly AgentMessage[]): readonly string[] {

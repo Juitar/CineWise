@@ -47,6 +47,16 @@ export default defineConfig({
           wrappers: ['@/shared/auth/RequireAuth'],
         },
         {
+          path: '/recommendations',
+          component: '@/pages/recommendations',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
+          path: '/recommendations/:sessionId',
+          component: '@/pages/recommendations',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
           path: '/shows/:showId/seats',
           component: '@/pages/seats',
           wrappers: ['@/shared/auth/RequireAuth'],

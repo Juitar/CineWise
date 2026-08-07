@@ -61,6 +61,191 @@
   padding: 20px;
 }
 
+.agent-workspace--recommendations {
+  gap: 0;
+  background: #f4f6fb;
+}
+
+.agent-workspace--recommendations .agent-workspace-main {
+  width: min(42%, 620px);
+  flex: 0 0 min(42%, 620px);
+  border-left: 1px solid #e5e8ef;
+  background: #f8f9fc;
+}
+
+.agent-workspace--recommendations .agent-message-area {
+  min-height: 0;
+}
+
+.agent-recommendation-pane {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 18px;
+  padding: 28px;
+  overflow-y: auto;
+}
+
+.agent-recommendation-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.agent-recommendation-header h1 {
+  margin: 6px 0 0;
+  color: #202634;
+  font-size: 28px;
+}
+
+.agent-recommendation-eyebrow {
+  color: #635bff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.agent-recommendation-list {
+  display: grid;
+  gap: 14px;
+}
+
+.agent-recommendation-option {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 20px;
+  border: 1px solid #e1e4ec;
+  border-radius: 18px;
+  background: #fff;
+  color: #252b37;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.agent-recommendation-option:hover:not(:disabled) {
+  border-color: #8b84ff;
+  box-shadow: 0 10px 28px rgba(65, 58, 164, 12%);
+  transform: translateY(-1px);
+}
+
+.agent-recommendation-option.is-selected {
+  border-color: #635bff;
+  box-shadow: 0 0 0 3px rgba(99, 91, 255, 10%);
+}
+
+.agent-recommendation-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.agent-recommendation-option-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #635bff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.agent-recommendation-option-heading strong {
+  color: #f05a47;
+  font-size: 20px;
+}
+
+.agent-recommendation-option h2 {
+  margin: 12px 0 4px;
+  font-size: 21px;
+}
+
+.agent-recommendation-cinema {
+  margin: 0;
+  color: #596173;
+}
+
+.agent-recommendation-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 16px 0 0;
+}
+
+.agent-recommendation-details div {
+  display: flex;
+  gap: 8px;
+}
+
+.agent-recommendation-details dt,
+.agent-recommendation-meta {
+  color: #7b8291;
+}
+
+.agent-recommendation-details dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.agent-recommendation-reasons {
+  margin: 14px 0 0;
+  padding-left: 20px;
+  color: #454c5c;
+}
+
+.agent-recommendation-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 14px;
+  font-size: 12px;
+}
+
+.agent-recommendation-unavailable,
+.agent-recommendation-selected {
+  display: inline-flex;
+  margin-top: 12px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.agent-recommendation-unavailable {
+  background: #fff1f0;
+  color: #cf4436;
+}
+
+.agent-recommendation-selected {
+  margin-left: 8px;
+  background: #eeecff;
+  color: #574ee6;
+}
+
+.agent-recommendation-relaxation,
+.agent-recommendation-note {
+  margin: 0;
+  color: #666f80;
+}
+
+.agent-recommendation-seat-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  padding: 0 24px;
+  border-radius: 10px;
+  background: #635bff;
+  color: #fff;
+  font-weight: 700;
+}
+
 .agent-workspace-header,
 .agent-workspace-actions,
 .agent-composer {
@@ -73,7 +258,8 @@
   justify-content: space-between;
 }
 
-.agent-workspace-header h1 {
+.agent-workspace-header h1,
+.agent-workspace-header h2 {
   margin: 0 0 6px;
   font-size: 24px;
 }
@@ -211,6 +397,30 @@
 
   .agent-workspace-main {
     padding: 12px;
+  }
+
+  .agent-workspace--recommendations {
+    display: block;
+  }
+
+  .agent-workspace--recommendations .agent-workspace-main {
+    width: auto;
+    border-top: 1px solid #e5e8ef;
+    border-left: 0;
+  }
+
+  .agent-recommendation-pane {
+    padding: 18px 14px;
+    overflow: visible;
+  }
+
+  .agent-recommendation-header h1 {
+    font-size: 23px;
+  }
+
+  .agent-recommendation-option {
+    min-height: 44px;
+    padding: 16px;
   }
 
   .agent-workspace-header {
