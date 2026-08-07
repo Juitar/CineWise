@@ -14,9 +14,6 @@ public interface AgentSessionRepository {
 
     Optional<AgentSession> findByIdAndUserId(long id, long userId);
 
-    /** 管理员已在应用层复核后按内部 ID 读取会话，仅用于转换公开 sessionId。 */
-    Optional<AgentSession> findById(long id);
-
     List<AgentSession> findActiveByUserId(long userId, int offset, int limit);
 
     long countActiveByUserId(long userId);
