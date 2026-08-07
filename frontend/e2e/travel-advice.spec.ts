@@ -51,6 +51,7 @@ test.beforeEach(async ({ page }) => {
 
 test('桌面和移动端展示真实建议并按版本更新提醒', async ({ page }) => {
   let reminderWrites = 0;
+  let routeWrites = 0;
   await page.route('**/api/v1/travel/tasks/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -67,6 +68,34 @@ test('桌面和移动端展示真实建议并按版本更新提醒', async ({ pa
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(adviceFixture),
+      });
+      return;
+    }
+    if (path === '/api/v1/travel/tasks/90001/route' && request.method() === 'POST') {
+      routeWrites += 1;
+      expect(request.postDataJSON()).toEqual({
+        longitude: 112.9388146,
+        latitude: 28.2282085,
+        travelMode: 'WALKING',
+        thirdPartySharingConfirmed: true,
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          envelope({
+            provider: 'AMAP',
+            travelMode: 'WALKING',
+            durationMinutes: 18,
+            suggestedDepartureAt: '2026-08-07T19:12:00+08:00',
+            source: 'AMAP_ROUTE',
+            dataTime: '2026-08-07T18:00:00+08:00',
+            expiresAt: '2026-08-07T18:15:00+08:00',
+            isExpired: false,
+            degraded: false,
+            fallbackType: null,
+          }),
+        ),
       });
       return;
     }
@@ -91,16 +120,66 @@ test('桌面和移动端展示真实建议并按版本更新提醒', async ({ pa
     await route.fallback();
   });
 
+  await page.context().grantPermissions(['geolocation']);
+  await page.context().setGeolocation({ longitude: 112.9388146, latitude: 28.2282085 });
   await page.goto('/travel/90001');
   await expect(page.getByRole('heading', { name: '观影出行建议' })).toBeVisible();
   await expect(page.getByRole('listitem').filter({ hasText: '关注短时降雨' })).toBeVisible();
   await expect(page.getByText(/AMAP_WEATHER/)).toBeVisible();
   await expect(page.getByText(/杭州UME|1.2km|店内餐饮|路线预览/)).toHaveCount(0);
 
+  await page.getByText('步行').click();
+  await page.getByRole('checkbox', { name: /我确认将本次当前位置/ }).check();
+  await page.getByRole('button', { name: '规划路线' }).click();
+  await expect(page.getByText('18 分钟')).toBeVisible();
+  await expect(page.getByText('AMAP_ROUTE')).toBeVisible();
+  expect(routeWrites).toBe(1);
+  expect(page.url()).not.toContain('112.9388146');
+  expect(page.url()).not.toContain('28.2282085');
+  expect(
+    await page.evaluate(() =>
+      [...Object.values(localStorage), ...Object.values(sessionStorage)].join('|'),
+    ),
+  ).not.toMatch(/112\.9388146|28\.2282085/);
+
   await page.getByLabel('修改提醒时间').fill('2026-08-07T18:30');
   await page.getByRole('button', { name: '更新提醒时间' }).click();
   await expect(page.getByText('提醒时间已更新')).toBeVisible();
   expect(reminderWrites).toBe(1);
+});
+
+test('拒绝浏览器定位时不请求路线并显示固定提示', async ({ page }) => {
+  let routeWrites = 0;
+  await page.context().clearPermissions();
+  await page.route('**/api/v1/travel/tasks/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === '/api/v1/travel/tasks/90001' && request.method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(taskFixture),
+      });
+      return;
+    }
+    if (path === '/api/v1/travel/tasks/90001/advice' && request.method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(adviceFixture),
+      });
+      return;
+    }
+    if (path === '/api/v1/travel/tasks/90001/route') routeWrites += 1;
+    await route.fallback();
+  });
+
+  await page.goto('/travel/90001');
+  await page.getByRole('checkbox', { name: /我确认将本次当前位置/ }).check();
+  await page.getByRole('button', { name: '规划路线' }).click();
+  await expect(page.getByText('路线暂不可用')).toBeVisible();
+  expect(routeWrites).toBe(0);
+  await expect(page.getByText(taskFixture.data.cinema.address)).toBeVisible();
 });
 
 test('任务不存在时只返回订单列表', async ({ page }) => {

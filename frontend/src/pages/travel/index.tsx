@@ -1,9 +1,10 @@
-import { Alert, Button, Card, Descriptions, Empty, Spin, Tag } from 'antd';
+import { Alert, Button, Card, Checkbox, Descriptions, Empty, Radio, Spin, Tag } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { history, useParams } from 'umi';
 import { formatOrderDateTime, parseOrderDateTime } from '../../modules/order/formatters';
-import type { TravelTaskStatus } from '../../modules/travel/types';
+import type { TravelMode, TravelTaskStatus } from '../../modules/travel/types';
 import { useTravelTask } from '../../modules/travel/useTravelTask';
+import { useTravelRoute } from '../../modules/travel/useTravelRoute';
 import { isTravelAdviceAvailable } from '../../modules/travel/advice-availability';
 import './index.css';
 
@@ -40,12 +41,20 @@ function statusColor(status: TravelTaskStatus): string {
 export default function TravelPage() {
   const { taskId = '' } = useParams<{ taskId: string }>();
   const travel = useTravelTask(taskId);
+  const travelRoute = useTravelRoute(taskId);
   const [triggerAt, setTriggerAt] = useState('');
   const [inputNotice, setInputNotice] = useState<string | null>(null);
+  const [travelMode, setTravelMode] = useState<TravelMode>('DRIVING');
+  const [sharingConfirmed, setSharingConfirmed] = useState(false);
 
   useEffect(() => {
     setTriggerAt(inputDateTime(travel.task?.triggerAt ?? null));
   }, [travel.task?.triggerAt]);
+
+  useEffect(() => {
+    setTravelMode('DRIVING');
+    setSharingConfirmed(false);
+  }, [taskId]);
 
   if (travel.isLoading) {
     return (
@@ -130,6 +139,12 @@ export default function TravelPage() {
     await travel.updateReminder({ triggerAt: nextTriggerAt, version: task.version });
   };
 
+  const handlePlanRoute = async () => {
+    const outcome = await travelRoute.plan(travelMode, sharingConfirmed);
+    setSharingConfirmed(false);
+    if (outcome === 'task-unavailable') await travel.reload();
+  };
+
   return (
     <main className="travel-page">
       <header className="travel-header">
@@ -208,6 +223,74 @@ export default function TravelPage() {
           <p className="travel-channel-note">提醒渠道为认证邮箱，本期不申请浏览器通知权限。</p>
         </Card>
       </section>
+
+      <Card title="按当前位置规划路线">
+        <p className="travel-route-disclosure">
+          规划时会把本次浏览器定位的经纬度发送给高德路线服务，仅用于本次请求；页面不会保存当前位置。
+        </p>
+        <div className="travel-route-controls">
+          <Radio.Group
+            aria-label="出行方式"
+            value={travelMode}
+            disabled={isReadOnly || travelRoute.isPlanning}
+            onChange={(event) => setTravelMode(event.target.value as TravelMode)}
+            options={[
+              { label: '驾车', value: 'DRIVING' },
+              { label: '步行', value: 'WALKING' },
+            ]}
+          />
+          <Checkbox
+            checked={sharingConfirmed}
+            disabled={isReadOnly || travelRoute.isPlanning}
+            onChange={(event) => setSharingConfirmed(event.target.checked)}
+          >
+            我确认将本次当前位置发送给路线服务
+          </Checkbox>
+          <Button
+            type="primary"
+            loading={travelRoute.isPlanning}
+            disabled={isReadOnly || !sharingConfirmed || travelRoute.isPlanning}
+            onClick={() => void handlePlanRoute()}
+          >
+            规划路线
+          </Button>
+        </div>
+        {travelRoute.notice && (
+          <Alert
+            className="travel-route-notice"
+            showIcon
+            type="warning"
+            message={travelRoute.notice}
+          />
+        )}
+        {travelRoute.route && (
+          <div className="travel-route-result" aria-live="polite">
+            <Descriptions column={1} size="small">
+              <Descriptions.Item label="出行方式">
+                {travelRoute.route.travelMode === 'DRIVING' ? '驾车' : '步行'}
+              </Descriptions.Item>
+              <Descriptions.Item label="预计耗时">
+                {travelRoute.route.durationMinutes} 分钟
+              </Descriptions.Item>
+              <Descriptions.Item label="预计出发时间">
+                {formatOrderDateTime(travelRoute.route.suggestedDepartureAt)}
+              </Descriptions.Item>
+              <Descriptions.Item label="路线来源">{travelRoute.route.source}</Descriptions.Item>
+              <Descriptions.Item label="数据时间">
+                {formatOrderDateTime(travelRoute.route.dataTime)}
+              </Descriptions.Item>
+              <Descriptions.Item label="有效期">
+                {formatOrderDateTime(travelRoute.route.expiresAt)}
+              </Descriptions.Item>
+            </Descriptions>
+            {(travelRoute.route.degraded || travelRoute.route.isExpired) && (
+              <Tag color="warning">
+                {travelRoute.route.isExpired ? '路线结果已过期' : '当前为降级路线结果'}
+              </Tag>
+            )}
+          </div>
+        )}
+      </Card>
 
       <Card
         title="天气与通用交通建议"

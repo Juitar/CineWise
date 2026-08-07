@@ -81,6 +81,30 @@
   min-height: 120px;
 }
 
+.travel-route-disclosure {
+  margin-top: 0;
+  color: var(--color-text-secondary);
+}
+
+.travel-route-controls {
+  display: grid;
+  justify-items: start;
+  gap: 14px;
+}
+
+.travel-route-controls .ant-btn {
+  min-height: 44px;
+}
+
+.travel-route-notice,
+.travel-route-result {
+  margin-top: 16px;
+}
+
+.travel-route-result .ant-tag {
+  margin-top: 8px;
+}
+
 .travel-advice-list {
   display: grid;
   gap: 8px;
@@ -105,5 +129,9 @@
   .travel-actions .ant-btn {
     width: 100%;
     min-height: 44px;
+  }
+
+  .travel-route-controls .ant-btn {
+    width: 100%;
   }
 }
