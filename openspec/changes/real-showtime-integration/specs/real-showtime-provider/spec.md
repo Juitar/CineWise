@@ -48,7 +48,7 @@
 
 ### Requirement: 候选必须具有统一时区、时效和降级标记
 
-系统 SHALL 将开场和散场时间转换为 `Asia/Shanghai` 的带偏移 ISO 8601 时间。每条候选必须返回 `source`、`dataAt`、`expiresAt`、`isExpired`、`degraded` 和 `fallbackType`。`endTime` 不晚于 `startTime`、时间无法解析或超过已确认未来窗口的记录必须隔离。
+系统 SHALL 将开场和散场时间转换为 `Asia/Shanghai` 的带偏移 ISO 8601 时间。每条候选必须返回 `source`、`dataAt`、`expiresAt`、`isExpired`、`degraded` 和 `fallbackType`。`endTime` 不晚于 `startTime`、时间无法解析或超过已确认未来窗口的记录必须隔离。`rejectedSnapshots` 最多返回 200 条，超出时必须返回 `rejectedTruncated=true`。
 
 #### Scenario: Provider 没有可靠散场时间
 

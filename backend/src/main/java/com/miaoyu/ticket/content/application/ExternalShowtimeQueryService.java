@@ -88,6 +88,7 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
     private static final int MAX_CINEMAS = 100;
     private static final int MAX_FUTURE_DAYS = 7;
     private static final int MAX_RESULTS = 200;
+    private static final int MAX_REJECTED_RESULTS = 200;
     private final ExternalShowtimeProvider provider;
     private final ContentExternalIdentityLookupPort externalIdentityLookupPort;
     private final ContentIdentityResolutionService identityResolutionService;
@@ -224,10 +225,15 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
         return new CandidateMapping(List.copyOf(accepted.values()), List.copyOf(rejected));
     }
 
-    /** 去重后限制返回规模；截断标记让 A 知道本次结果不是完整候选集。 */
+    /**
+     * 成功候选与拒绝明细分别限制为 200 条，避免上游批量脏数据把公开 Port 的响应放大。
+     * 两个截断标记互不影响：A 只导入成功候选；拒绝明细仅用于定位被隔离的来源数据。
+     */
     private QueryResult limitAndMark(CandidateMapping mapped) {
         boolean truncated = mapped.accepted().size() > MAX_RESULTS;
-        return new QueryResult(mapped.accepted().stream().limit(MAX_RESULTS).toList(), mapped.rejected(), truncated);
+        boolean rejectedTruncated = mapped.rejected().size() > MAX_REJECTED_RESULTS;
+        return new QueryResult(mapped.accepted().stream().limit(MAX_RESULTS).toList(),
+                mapped.rejected().stream().limit(MAX_REJECTED_RESULTS).toList(), truncated, rejectedTruncated);
     }
 
     private ExternalShowtimeSnapshot rejected(ExternalShowtimeProvider.Candidate candidate, Long movieId,

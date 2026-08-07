@@ -13,6 +13,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
 class ExternalShowtimeQueryServiceTest {
@@ -124,6 +125,31 @@ class ExternalShowtimeQueryServiceTest {
         assertThat(result.rejectedSnapshots()).singleElement()
                 .extracting(ExternalShowtimeQueryPort.ExternalShowtimeSnapshot::qualityStatus)
                 .isEqualTo(ExternalShowtimeQueryPort.QualityStatus.END_TIME_REJECTED);
+    }
+
+    @Test
+    void givenManyRejectedCandidates_whenProviderSucceeds_thenRejectedListIsCappedAndMarked() {
+        List<ExternalShowtimeProvider.Candidate> candidates = IntStream.range(0, 201)
+                .mapToObj(index -> new ExternalShowtimeProvider.Candidate(
+                        "s" + index, "unknown", "c1",
+                        OffsetDateTime.parse("2026-08-07T11:00:00+08:00"), null, null))
+                .toList();
+        ExternalShowtimeQueryService service = new ExternalShowtimeQueryService(
+                (date, cinemas) -> new ExternalShowtimeProvider.FetchResult(candidates, null),
+                (provider, type, ids) -> List.of(
+                        new ContentExternalIdentityLookupPort.ExternalIdentity(21L, "c1", "70")),
+                new ContentIdentityResolutionService((provider, type, ids) ->
+                        new ContentIdentityResolutionPort.ResolutionBatch(ids.stream()
+                                .map(id -> new ContentIdentityResolutionPort.Resolution(id, null,
+                                        ContentIdentityResolutionPort.ResolutionStatus.NOT_FOUND)).toList())),
+                new MemorySnapshots(), CLOCK);
+
+        ExternalShowtimeQueryPort.QueryResult result = service.query(
+                new ExternalShowtimeQueryPort.Query(DATE, List.of(21L)));
+
+        assertThat(result.snapshots()).isEmpty();
+        assertThat(result.rejectedSnapshots()).hasSize(200);
+        assertThat(result.rejectedTruncated()).isTrue();
     }
 
     @Test

@@ -34,10 +34,16 @@ public interface ExternalShowtimeQueryPort {
      * <p>降级和质量字段放在候选本身，避免 A 只取列表元素时丢失导入判断依据。</p>
      */
     record QueryResult(List<ExternalShowtimeSnapshot> snapshots, List<ExternalShowtimeSnapshot> rejectedSnapshots,
-                       boolean truncated) {
+                       boolean truncated, boolean rejectedTruncated) {
         public QueryResult {
             snapshots = List.copyOf(snapshots);
             rejectedSnapshots = List.copyOf(rejectedSnapshots);
+        }
+
+        /** 兼容只关心成功候选的调用方；拒绝列表为空时不会发生截断。 */
+        public QueryResult(List<ExternalShowtimeSnapshot> snapshots,
+                           List<ExternalShowtimeSnapshot> rejectedSnapshots, boolean truncated) {
+            this(snapshots, rejectedSnapshots, truncated, false);
         }
     }
 
