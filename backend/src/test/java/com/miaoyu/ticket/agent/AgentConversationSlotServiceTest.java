@@ -57,7 +57,7 @@ class AgentConversationSlotServiceTest {
     }
 
     @Test
-    void shouldKeepSlotsWhenTheAnswerIsInvalid() {
+    void shouldKeepSlotsWhenTheTicketCountIsTooLong() {
         CurrentUserAccessor users = mock(CurrentUserAccessor.class);
         AgentSessionRepository sessions = mock(AgentSessionRepository.class);
         AgentMessageRepository messages = mock(AgentMessageRepository.class);
@@ -76,7 +76,7 @@ class AgentConversationSlotServiceTest {
         AgentConversationSlotService service = new AgentConversationSlotService(users, sessions, messages, slots,
                 new ObjectMapper(), Clock.fixed(Instant.parse("2026-08-07T02:00:00Z"), ZoneId.of("Asia/Shanghai")));
 
-        var snapshot = service.prepare("session-1", "0", null);
+        var snapshot = service.prepare("session-1", "999999999999999999999999999999", null);
 
         assertThat(snapshot.values()).containsOnlyKeys("cityCode").containsEntry("cityCode", "430100");
         org.mockito.Mockito.verify(slots, org.mockito.Mockito.never())

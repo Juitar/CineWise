@@ -187,7 +187,7 @@ public class AgentController {
                 emitter.send(SseEmitter.event().id(Long.toString(replay.watermark())).name("stream.reset")
                         .data(new AgentCardEventResponse(Long.toString(replay.watermark()), replay.sessionId(),
                                 replay.runId(), null, null, null, "stream.reset", "已清理的事件不可续传",
-                                payload("{\"watermark\":\"" + replay.watermark() + "\"}"), null)));
+                                cardPayload("{\"watermark\":\"" + replay.watermark() + "\"}"), null)));
             }
             for (var event : replay.events()) {
                 emitter.send(SseEmitter.event().id(event.eventId()).name(event.eventType()).data(eventSummary(event)));
@@ -215,7 +215,8 @@ public class AgentController {
 
     private AgentCardEventResponse eventSummary(AgentInteractionRuntimeService.EventView event) {
         return new AgentCardEventResponse(event.eventId(), event.sessionId(), event.runId(), event.planId(),
-                event.planVersion(), event.nodeId(), event.eventType(), event.displayText(), event.payload(),
+                event.planVersion(), event.nodeId(), event.eventType(), event.displayText(),
+                AgentCardPayloadResponse.from(event.payload()),
                 event.occurredAt());
     }
 
@@ -269,9 +270,9 @@ public class AgentController {
                 view.payload(), view.status(), view.completedAt(), view.createdAt());
     }
 
-    private JsonNode payload(String value) {
+    private AgentCardPayloadResponse cardPayload(String value) {
         try {
-            return objectMapper.readTree(value);
+            return AgentCardPayloadResponse.from(objectMapper.readTree(value));
         } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
             throw new IllegalStateException("固定 SSE 重置载荷无效", exception);
         }

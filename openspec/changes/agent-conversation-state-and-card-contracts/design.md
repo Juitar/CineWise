@@ -10,7 +10,7 @@
 
 ## 卡片 DTO
 
-新增 API DTO 只作为 API 映射层：`AgentCardEventResponse` 保留既有外层字段，payload 使用 sealed 的 `AgentCardPayloadResponse`。QUESTION、PLAN_CARD、BUSINESS_INTENT、CONFIRMATION_CARD、CONFIRMATION_RESULT 都由现有持久化 JSON 映射；不改变已合入字段名或增加平行 payload 格式。历史消息使用同一 payload 映射，并保留字符串 UUID `runId`。
+新增 API DTO 只作为 API 映射层：`AgentCardEventResponse` 保留既有外层字段，payload 使用 sealed 的 `AgentCardPayloadResponse`。QUESTION、PLAN_CARD、BUSINESS_INTENT、确认卡都由现有持久化 JSON 校验后映射；确认结果沿用已有 `AgentActionResponse`。无法识别的非卡片运行事件只走 `Unknown` 安全降级，原样保留 JSON，不作为 C 的卡片类型。不改变已合入字段名或增加平行 payload 格式。历史消息使用同一 payload 映射，并保留字符串 UUID `runId`。
 
 无法由现有 JSON 确定的确认展示字段不新增。确认卡沿用当前 `actionId/actionType/status/expireAt/displayTitle/displayLines`；确认结果沿用当前 action 状态投影。若 C 要求额外字段，必须由 C/A 明确来源和字段含义后另开 change。
 

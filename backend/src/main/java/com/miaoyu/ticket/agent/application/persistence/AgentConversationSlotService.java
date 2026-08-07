@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AgentConversationSlotService {
     private static final Pattern CITY_CODE = Pattern.compile("\\d{6}");
-    private static final Pattern TICKET_COUNT = Pattern.compile("[1-9]\\d*");
+    private static final Pattern TICKET_COUNT = Pattern.compile("(?:[1-9]|1\\d|20)");
     private final CurrentUserAccessor currentUserAccessor;
     private final AgentSessionRepository sessionRepository;
     private final AgentMessageRepository messageRepository;
@@ -104,7 +104,7 @@ public class AgentConversationSlotService {
         return switch (slot) {
             case "cityCode" -> CITY_CODE.matcher(text).matches() ? text : null;
             case "date" -> validDate(text) ? text : null;
-            case "ticketCount" -> TICKET_COUNT.matcher(text).matches() && Integer.parseInt(text) <= 20 ? text : null;
+            case "ticketCount" -> TICKET_COUNT.matcher(text).matches() ? text : null;
             default -> null;
         };
     }
