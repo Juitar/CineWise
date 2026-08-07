@@ -34,6 +34,11 @@ public class MybatisAgentSessionRepository implements AgentSessionRepository {
     }
 
     @Override
+    public Optional<AgentSession> findById(long id) {
+        return Optional.ofNullable(mapper.findSessionById(id)).map(AgentPersistenceMappings::toDomain);
+    }
+
+    @Override
     public List<AgentSession> findActiveByUserId(long userId, int offset, int limit) {
         return mapper.findActiveSessionsByUserId(userId, offset, limit).stream()
                 .map(AgentPersistenceMappings::toDomain)
