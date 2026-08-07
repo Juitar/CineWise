@@ -10,7 +10,12 @@ public interface ReadOnlyToolExecutionAdapter {
     ExecutionResult execute(ExecutionRequest request);
 
     record ExecutionRequest(
-            ExecutionRunState state, String nodeId, String runId, String traceId, long remainingDeadlineMs) {
+            ExecutionRunState state, String nodeId, String runId, String traceId, long remainingDeadlineMs,
+            String distanceContextId, String distancePreference) {
+        public ExecutionRequest(
+                ExecutionRunState state, String nodeId, String runId, String traceId, long remainingDeadlineMs) {
+            this(state, nodeId, runId, traceId, remainingDeadlineMs, null, null);
+        }
     }
 
     record ExecutionResult(ExecutionRunState state, ToolResult<?> toolResult) {

@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.agent.application.persistence;
 
 import com.miaoyu.ticket.agent.application.AgentFailurePersistedException;
+import com.miaoyu.ticket.agent.application.AgentDistanceRecommendationApplicationService;
 import com.miaoyu.ticket.agent.application.confirmation.CreateOrderConfirmationActionOrchestrator;
 import com.miaoyu.ticket.agent.application.run.MultiToolSupervisor;
 import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorRequest;
@@ -25,6 +26,7 @@ public class AgentMessageSubmissionService {
     private final AgentMessageRepository messageRepository;
     private final AgentRunStepRepository stepRepository;
     private final AgentRunStaleRecoveryService staleRecoveryService;
+    private final AgentDistanceRecommendationApplicationService distanceRecommendationService;
 
     public AgentMessageSubmissionService(
             CurrentUserAccessor currentUserAccessor,
@@ -35,7 +37,8 @@ public class AgentMessageSubmissionService {
             CreateOrderConfirmationActionOrchestrator confirmationActionOrchestrator,
             AgentMessageRepository messageRepository,
             AgentRunStepRepository stepRepository,
-            AgentRunStaleRecoveryService staleRecoveryService) {
+            AgentRunStaleRecoveryService staleRecoveryService,
+            AgentDistanceRecommendationApplicationService distanceRecommendationService) {
         this.currentUserAccessor = currentUserAccessor;
         this.initialRunTransaction = initialRunTransaction;
         this.concurrentRequestLookupTransaction = concurrentRequestLookupTransaction;
@@ -45,6 +48,7 @@ public class AgentMessageSubmissionService {
         this.messageRepository = messageRepository;
         this.stepRepository = stepRepository;
         this.staleRecoveryService = staleRecoveryService;
+        this.distanceRecommendationService = distanceRecommendationService;
     }
 
     /** 创建持久化运行后再调用模型和只读工具；不在此方法上声明事务。 */
@@ -52,6 +56,8 @@ public class AgentMessageSubmissionService {
         AgentMessageSubmissionCommand request = Objects.requireNonNull(command, "提交命令不能为空");
         long userId = currentUserAccessor.requireCurrentUserId();
         staleRecoveryService.recoverStaleRuns();
+        // 普通消息入口也必须先恢复已过期的 WAITING_LOCATION，避免旧 active_run_id 阻塞新请求。
+        distanceRecommendationService.recoverExpiredWaitingRuns();
         AgentInitialRunResult initial;
         try {
             initial = initialRunTransaction.submit(userId, request);

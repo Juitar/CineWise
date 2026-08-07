@@ -10,7 +10,12 @@ public record MultiToolSupervisorRequest(
         PlanValidationContext validationContext,
         String runId,
         String traceId,
-        long remainingDeadlineMs) {
+        long remainingDeadlineMs, String distanceContextId, String distancePreference) {
+
+    public MultiToolSupervisorRequest(String clientRequestId, String input, PlanValidationContext validationContext,
+            String runId, String traceId, long remainingDeadlineMs) {
+        this(clientRequestId, input, validationContext, runId, traceId, remainingDeadlineMs, null, null);
+    }
 
     public MultiToolSupervisorRequest {
         requireText(clientRequestId, "clientRequestId");
@@ -20,6 +25,9 @@ public record MultiToolSupervisorRequest(
         requireText(traceId, "traceId");
         if (remainingDeadlineMs <= 0L) {
             throw new IllegalArgumentException("remainingDeadlineMs 必须大于 0");
+        }
+        if ((distanceContextId == null) != (distancePreference == null)) {
+            throw new IllegalArgumentException("距离上下文字段必须同时提供或同时为空");
         }
     }
 

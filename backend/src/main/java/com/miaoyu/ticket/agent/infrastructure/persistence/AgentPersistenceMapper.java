@@ -168,6 +168,11 @@ public interface AgentPersistenceMapper {
             + " AND update_time <= #{cutoff} ORDER BY update_time ASC LIMIT #{limit}")
     List<AgentRunEntity> findStaleRunningBefore(@Param("cutoff") LocalDateTime cutoff, @Param("limit") int limit);
 
+    @Select("SELECT " + RUN_COLUMNS + " FROM agent_run WHERE user_id = #{userId} AND status = 'WAITING_LOCATION'"
+            + " AND update_time <= DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 5 MINUTE)"
+            + " ORDER BY update_time ASC LIMIT #{limit}")
+    List<AgentRunEntity> findExpiredWaitingLocationByUser(@Param("userId") long userId, @Param("limit") int limit);
+
     @Insert("""
             INSERT INTO agent_run (
                 id, run_id, session_id, user_id, client_request_id, request_hash_version, request_hash,
@@ -181,6 +186,19 @@ public interface AgentPersistenceMapper {
             )
             """)
     void insertRun(@Param("run") AgentRunEntity run);
+
+    @Insert("""
+            INSERT INTO agent_run (
+                id, run_id, session_id, user_id, client_request_id, request_hash_version, request_hash,
+                plan_id, plan_version, status, trace_id, started_at, finished_at, version,
+                create_time, update_time, expire_at
+            ) VALUES (
+                #{run.id}, #{run.runId}, #{run.sessionId}, #{run.userId}, #{run.clientRequestId},
+                #{run.requestHashVersion}, #{run.requestHash}, NULL, NULL, 'WAITING_LOCATION', #{run.traceId},
+                CURRENT_TIMESTAMP(3), NULL, #{run.version}, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3), #{run.expireAt}
+            )
+            """)
+    void insertWaitingLocation(@Param("run") AgentRunEntity run);
 
     @Update("""
             UPDATE agent_run
@@ -197,6 +215,27 @@ public interface AgentPersistenceMapper {
              WHERE id = #{run.id} AND version = #{expectedVersion} AND status = 'RUNNING'
             """)
     int updateRunTerminalWithCas(@Param("run") AgentRunEntity run, @Param("expectedVersion") long expectedVersion);
+
+    @Update("""
+            UPDATE agent_run
+               SET plan_id = #{run.planId}, plan_version = #{run.planVersion}, status = #{run.status},
+                   finished_at = #{run.finishedAt}, version = version + 1, update_time = #{run.updateTime}
+             WHERE id = #{run.id} AND version = #{expectedVersion} AND status = #{expectedStatus}
+            """)
+    int updateRunWithCas(
+            @Param("run") AgentRunEntity run,
+            @Param("expectedVersion") long expectedVersion,
+            @Param("expectedStatus") String expectedStatus);
+
+    @Update("""
+            UPDATE agent_run
+               SET plan_id = #{run.planId}, plan_version = #{run.planVersion}, status = 'RUNNING',
+                   finished_at = NULL, version = version + 1, update_time = CURRENT_TIMESTAMP(3)
+             WHERE id = #{run.id} AND version = #{expectedVersion} AND status = 'WAITING_LOCATION'
+               AND update_time <= DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 5 MINUTE)
+            """)
+    int recoverExpiredWaitingLocationWithCas(@Param("run") AgentRunEntity run,
+            @Param("expectedVersion") long expectedVersion);
 
     @Delete("""
             DELETE FROM agent_run

@@ -126,7 +126,8 @@ public final class RankMoviePlanExecutionAdapter
     @Override
     public ReadOnlyToolExecutionAdapter.ExecutionResult execute(ReadOnlyToolExecutionAdapter.ExecutionRequest request) {
         RankMoviePlanExecutionResult result = execute(new RankMoviePlanExecutionRequest(
-                request.state(), request.nodeId(), request.runId(), request.traceId(), request.remainingDeadlineMs()));
+                request.state(), request.nodeId(), request.runId(), request.traceId(), request.remainingDeadlineMs(),
+                request.distanceContextId(), request.distancePreference()));
         return new ReadOnlyToolExecutionAdapter.ExecutionResult(result.state(), result.toolResult());
     }
 
@@ -155,7 +156,9 @@ public final class RankMoviePlanExecutionAdapter
                 request.traceId(),
                 null,
                 null,
-                node.slotSnapshot().version());
+                node.slotSnapshot().version(),
+                request.distanceContextId(),
+                request.distancePreference());
     }
 
     private static List<String> declaredSlotReferences(ExecutionPlanNode node) {
