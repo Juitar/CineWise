@@ -80,9 +80,6 @@ export default function ProfilePage() {
           <p>可以查看当前隐私说明，或退出本账号。</p>
         </div>
         <div className="profile-settings-actions">
-          <Link className="profile-orders-link" to="/orders">
-            我的订单
-          </Link>
           <Link className="profile-privacy-link" to="/privacy">
             查看隐私说明
           </Link>
