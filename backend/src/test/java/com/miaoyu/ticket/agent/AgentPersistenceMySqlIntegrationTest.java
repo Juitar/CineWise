@@ -20,6 +20,7 @@ import com.miaoyu.ticket.agent.application.persistence.AgentRunCancellationServi
 import com.miaoyu.ticket.agent.application.persistence.AgentRunRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionManagementService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
+import com.miaoyu.ticket.agent.application.model.AgentIntent;
 import com.miaoyu.ticket.agent.application.model.ModelGateway;
 import com.miaoyu.ticket.agent.application.model.PlanGenerationResponse;
 import com.miaoyu.ticket.agent.application.tool.RankMoviePlanExecutionAdapter;
@@ -191,6 +192,7 @@ class AgentPersistenceMySqlIntegrationTest {
         cleanupFixtures();
         toolCalledInsideTransaction = new AtomicBoolean(true);
         Mockito.reset(modelGateway, rankMoviePlanExecutionAdapter);
+        Mockito.when(modelGateway.classifyIntent(Mockito.any())).thenReturn(AgentIntent.MOVIE);
         // 注册表同时依赖工具名和定义；reset 后两者都必须恢复，不能让 Mockito 默认返回 null。
         Mockito.when(rankMoviePlanExecutionAdapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
         Mockito.when(rankMoviePlanExecutionAdapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
