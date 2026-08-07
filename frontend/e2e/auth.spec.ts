@@ -263,3 +263,50 @@ test('桌面端和移动端从个人中心退出后不能再访问个人中心',
   await page.goto('/profile');
   await expect(page).toHaveURL(/\/login\?returnUrl=%2Fprofile$/);
 });
+
+test('移动端画像开关返回 202004 后清除旧标签且不重试', async ({ page }) => {
+  const state = await installAuthApi(page);
+  state.authenticated = true;
+  let updateAttempts = 0;
+  await page.setViewportSize({ height: 844, width: 390 });
+  await page.route('**/api/v1/profile/me/**', async (route) => {
+    const request = route.request();
+    if (request.method() === 'GET') {
+      await respond(
+        route,
+        200,
+        apiResult({
+          preference: { enabled: true, updatedAt: '2026-08-07T00:00:00Z', version: 3 },
+          tags: [
+            {
+              confidence: 1,
+              expiresAt: null,
+              id: '1001',
+              polarity: 'LIKE',
+              source: 'MANUAL',
+              status: 'ACTIVE',
+              type: 'MOVIE_GENRE',
+              updatedAt: '2026-08-07T00:00:00Z',
+              value: '科幻',
+              version: 0,
+              weight: 0.9,
+            },
+          ],
+          total: 1,
+        }),
+      );
+      return;
+    }
+    updateAttempts += 1;
+    await respond(route, 403, apiResult(null, 202004, '请先同意保存个性化画像'));
+  });
+
+  await page.goto('/profile');
+  await expect(page.getByText('科幻')).toBeVisible();
+  await page.getByRole('checkbox', { name: '开启个性化' }).click();
+
+  await expect(page.getByRole('status')).toHaveText('未开启画像数据使用');
+  await expect(page.getByText('科幻')).toHaveCount(0);
+  await expect(page.getByRole('checkbox', { name: '开启个性化' })).toHaveCount(0);
+  expect(updateAttempts).toBe(1);
+});

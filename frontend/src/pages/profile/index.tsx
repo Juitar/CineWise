@@ -1,6 +1,7 @@
 import { Link } from 'umi';
 
 import { useLogout } from '../../modules/auth/useLogout';
+import { useProfile } from '../../modules/profile/useProfile';
 import { useAuth } from '../../shared/auth/AuthProvider';
 import './index.css';
 
@@ -13,6 +14,13 @@ const accountStatusLabels = {
 export default function ProfilePage() {
   const { currentUser } = useAuth();
   const { handleLogout, isLoggingOut } = useLogout();
+  const {
+    notice: profileNotice,
+    profile,
+    saving: profileSaving,
+    setEnabled,
+    state: profileState,
+  } = useProfile();
 
   if (!currentUser) {
     return (
@@ -95,6 +103,44 @@ export default function ProfilePage() {
             {isLoggingOut ? '正在退出' : '退出登录'}
           </button>
         </div>
+      </section>
+
+      <section className="profile-data-card" aria-labelledby="profile-data-title">
+        <div className="profile-data-heading">
+          <div>
+            <h2 id="profile-data-title">AI 观影画像</h2>
+            <p>管理用于影片推荐的长期偏好标签和个性化开关。</p>
+          </div>
+          {profile && (
+            <label className="profile-personalization-toggle">
+              <input
+                checked={profile.preference.enabled}
+                disabled={profileSaving}
+                type="checkbox"
+                onChange={(event) => void setEnabled(event.target.checked)}
+              />
+              开启个性化
+            </label>
+          )}
+        </div>
+
+        {profileNotice && (
+          <p className="profile-data-notice" role="status">
+            {profileNotice}
+          </p>
+        )}
+        {profileState === 'loading' && <p>正在读取画像数据...</p>}
+        {profileState === 'ready' &&
+          profile &&
+          (profile.tags.length > 0 ? (
+            <ul className="profile-tag-list">
+              {profile.tags.map((tag) => (
+                <li key={tag.id}>{tag.value}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>暂无画像标签</p>
+          ))}
       </section>
     </main>
   );

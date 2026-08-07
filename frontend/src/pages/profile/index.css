@@ -45,12 +45,67 @@
 
 .profile-account-card,
 .profile-settings-card,
+.profile-data-card,
 .profile-unavailable {
   padding: 28px;
 
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 16px;
+}
+
+.profile-data-card h2,
+.profile-data-card p {
+  margin: 0;
+}
+
+.profile-data-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.profile-data-heading h2 {
+  font-size: 18px;
+}
+
+.profile-data-heading p,
+.profile-data-card > p {
+  margin-top: 6px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.profile-personalization-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-weight: 600;
+}
+
+.profile-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0;
+  margin: 20px 0 0;
+  list-style: none;
+}
+
+.profile-tag-list li {
+  padding: 8px 12px;
+  color: #4f46d8;
+  background: rgba(99, 91, 255, 10%);
+  border-radius: 999px;
+  font-size: 14px;
+}
+
+.profile-data-notice {
+  padding: 12px;
+  background: var(--color-background);
+  border-radius: 10px;
 }
 
 .profile-account-identity {
@@ -236,6 +291,7 @@
 
   .profile-account-card,
   .profile-settings-card,
+  .profile-data-card,
   .profile-unavailable {
     padding: 20px;
     border-radius: 14px;
@@ -270,6 +326,7 @@
   }
 
   .profile-settings-card,
+  .profile-data-heading,
   .profile-settings-actions {
     align-items: stretch;
     flex-direction: column;

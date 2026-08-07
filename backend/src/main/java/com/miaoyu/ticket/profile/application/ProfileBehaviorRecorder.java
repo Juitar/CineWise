@@ -157,7 +157,7 @@ public class ProfileBehaviorRecorder {
   }
 
   private RecordResult recordForUser(long userId, BehaviorCommand command, Long orderId, Long orderVersion) {
-    if (!consentQuery.isGranted(userId)) {
+    if (!consentQuery.findByUserId(userId).granted()) {
       throw new BusinessException(ProfileErrorCode.PROFILE_DATA_CONSENT_REQUIRED);
     }
     validate(command);

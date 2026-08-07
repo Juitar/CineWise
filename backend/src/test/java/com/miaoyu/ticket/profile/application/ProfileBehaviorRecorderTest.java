@@ -140,8 +140,15 @@ class ProfileBehaviorRecorderTest {
         return id++;
       }
     };
-    return new ProfileBehaviorRecorder(users, userId -> true, new PreferenceRepository(), events, tags,
-        new EmptyCache(), ids, CLOCK);
+    return new ProfileBehaviorRecorder(
+        users,
+        userId -> new ProfileDataConsentSnapshot(true, 1L, 0L, null, null),
+        new PreferenceRepository(),
+        events,
+        tags,
+        new EmptyCache(),
+        ids,
+        CLOCK);
   }
 
   private static final class PreferenceRepository implements ProfilePreferenceRepository {

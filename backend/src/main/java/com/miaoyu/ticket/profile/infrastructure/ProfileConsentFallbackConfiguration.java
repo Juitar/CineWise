@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.profile.infrastructure;
 
 import com.miaoyu.ticket.profile.application.ProfileDataConsentQuery;
+import com.miaoyu.ticket.profile.application.ProfileDataConsentSnapshot;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +15,6 @@ public class ProfileConsentFallbackConfiguration {
   @Bean
   @ConditionalOnMissingBean(ProfileDataConsentQuery.class)
   public ProfileDataConsentQuery deniedProfileDataConsentQuery() {
-    return userId -> false;
+    return userId -> ProfileDataConsentSnapshot.notGranted();
   }
 }
