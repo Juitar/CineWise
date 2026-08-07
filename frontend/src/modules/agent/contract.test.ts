@@ -53,14 +53,23 @@ describe('Agent DTO 和事件校验', () => {
   it('出行建议天气摘要允许部分字段缺失；来源只在可用建议中必填', () => {
     const partialWeather = parseAgentEvent({
       ...travelAdviceCard,
-      payload: { ...travelAdviceCard.payload, weather: { area: null, condition: '小雨', risk: null } },
+      payload: {
+        ...travelAdviceCard.payload,
+        weather: { area: null, condition: '小雨', risk: null },
+      },
     });
     expect(validateAgentCardEvent(partialWeather).decision).toBe('render');
-    expect(validateAgentCardEvent(parseAgentEvent({
-      ...travelAdviceCard,
-      payload: { ...travelAdviceCard.payload, source: undefined },
-    })).decision).toBe('reject');
-    expect(validateAgentCardEvent(parseAgentEvent(unavailableTravelAdviceCard)).decision).toBe('render');
+    expect(
+      validateAgentCardEvent(
+        parseAgentEvent({
+          ...travelAdviceCard,
+          payload: { ...travelAdviceCard.payload, source: undefined },
+        }),
+      ).decision,
+    ).toBe('reject');
+    expect(validateAgentCardEvent(parseAgentEvent(unavailableTravelAdviceCard)).decision).toBe(
+      'render',
+    );
   });
 
   it('正式方案缺少影片名或问题选项值时拒绝渲染', () => {

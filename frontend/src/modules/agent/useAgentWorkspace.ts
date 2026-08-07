@@ -102,10 +102,12 @@ function isTerminal(status: AgentProjection['status']): boolean {
 
 function cardRecoveryRunIds(messages: readonly AgentMessage[]): readonly string[] {
   return Array.from(
-    new Set(
-      [...messages.filter((message) => typeof message.payload.actionId === 'string').map((message) => message.runId),
-        ...travelAdviceRecoveryRunIds(messages)],
-    ),
+    new Set([
+      ...messages
+        .filter((message) => typeof message.payload.actionId === 'string')
+        .map((message) => message.runId),
+      ...travelAdviceRecoveryRunIds(messages),
+    ]),
   );
 }
 

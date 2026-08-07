@@ -363,12 +363,29 @@ function exactKeys(value: Record<string, unknown>, keys: readonly string[]): voi
 
 function travelPositiveId(value: unknown): void {
   const id = text(value);
-  if (!POSITIVE_JAVA_LONG_PATTERN.test(id) || id.length > JAVA_LONG_MAX.length ||
-    (id.length === JAVA_LONG_MAX.length && id > JAVA_LONG_MAX)) throw new AgentContractError();
+  if (
+    !POSITIVE_JAVA_LONG_PATTERN.test(id) ||
+    id.length > JAVA_LONG_MAX.length ||
+    (id.length === JAVA_LONG_MAX.length && id > JAVA_LONG_MAX)
+  )
+    throw new AgentContractError();
 }
 
 function validateTravelAdviceCard(payload: Record<string, unknown>): void {
-  exactKeys(payload, ['type', 'taskId', 'taskStatus', 'available', 'weather', 'advice', 'source', 'degraded', 'fallbackType', 'dataAt', 'expiresAt', 'expired']);
+  exactKeys(payload, [
+    'type',
+    'taskId',
+    'taskStatus',
+    'available',
+    'weather',
+    'advice',
+    'source',
+    'degraded',
+    'fallbackType',
+    'dataAt',
+    'expiresAt',
+    'expired',
+  ]);
   travelPositiveId(payload.taskId);
   text(payload.taskStatus);
   const available = boolean(payload.available);
@@ -376,12 +393,15 @@ function validateTravelAdviceCard(payload: Record<string, unknown>): void {
   if (weather !== null) {
     const current = record(weather);
     exactKeys(current, ['area', 'condition', 'risk']);
-    nullableText(current.area); nullableText(current.condition); nullableText(current.risk);
+    nullableText(current.area);
+    nullableText(current.condition);
+    nullableText(current.risk);
   }
   array(payload.advice).forEach((item) => {
     const current = record(item);
     exactKeys(current, ['type', 'text']);
-    text(current.type); text(current.text);
+    text(current.type);
+    text(current.text);
   });
   const source = nullableText(payload.source);
   const degraded = boolean(payload.degraded);
@@ -390,7 +410,16 @@ function validateTravelAdviceCard(payload: Record<string, unknown>): void {
   const expiresAt = payload.expiresAt === null ? null : dateText(payload.expiresAt);
   boolean(payload.expired);
   if (available && source === null) throw new AgentContractError();
-  if (!available && (weather !== null || array(payload.advice).length > 0 || degraded || fallbackType !== null || dataAt !== null || expiresAt !== null)) throw new AgentContractError();
+  if (
+    !available &&
+    (weather !== null ||
+      array(payload.advice).length > 0 ||
+      degraded ||
+      fallbackType !== null ||
+      dataAt !== null ||
+      expiresAt !== null)
+  )
+    throw new AgentContractError();
   if (degraded !== (fallbackType !== null)) throw new AgentContractError();
 }
 
@@ -439,7 +468,8 @@ export function validateAgentCardEvent(event: AgentEvent): AgentCardValidation {
         throw new AgentContractError();
       validateBusinessIntent(event.payload as Record<string, unknown>);
     }
-    if (type === 'TRAVEL_ADVICE_CARD') validateTravelAdviceCard(event.payload as Record<string, unknown>);
+    if (type === 'TRAVEL_ADVICE_CARD')
+      validateTravelAdviceCard(event.payload as Record<string, unknown>);
     if (type === 'MOVIE_CARD' || type === 'PLAN_CARD') {
       validateRecommendation(event.payload as Record<string, unknown>, type);
     }

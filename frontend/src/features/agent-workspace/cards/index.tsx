@@ -234,7 +234,10 @@ function TravelAdviceCard({ item }: { item: AgentDisplayItem }) {
       <p className="agent-card-text">{item.text}</p>
       <CardFields fields={item.fields} />
       {item.travelTaskId && (
-        <Link className="agent-card-primary-link" to={`/travel/${encodeURIComponent(item.travelTaskId)}`}>
+        <Link
+          className="agent-card-primary-link"
+          to={`/travel/${encodeURIComponent(item.travelTaskId)}`}
+        >
           查看出行建议详情
         </Link>
       )}

@@ -394,18 +394,40 @@ describe('Agent 事件投影', () => {
   });
 
   it('初次加载会从运行快照恢复历史 TEXT 中的出行建议卡片', () => {
-    const history = [{
-      messageId: 'message-travel-advice', runId: 'run-travel', role: 'ASSISTANT', type: 'TEXT',
-      text: '已查询到出行建议', payload: travelAdviceCard.payload, status: 'COMPLETED',
-      completedAt: '2026-08-07T10:00:00Z', createdAt: '2026-08-07T10:00:00Z',
-    }];
+    const history = [
+      {
+        messageId: 'message-travel-advice',
+        runId: 'run-travel',
+        role: 'ASSISTANT',
+        type: 'TEXT',
+        text: '已查询到出行建议',
+        payload: travelAdviceCard.payload,
+        status: 'COMPLETED',
+        completedAt: '2026-08-07T10:00:00Z',
+        createdAt: '2026-08-07T10:00:00Z',
+      },
+    ];
     const event = parseAgentEvent({ ...travelAdviceCard, runId: 'run-travel' });
-    const projection = buildProjectionFromHistoryAndSnapshots('session-example-1', history, [{
-      runId: 'run-travel', sessionId: 'session-example-1', status: 'COMPLETED', planId: 'plan-example-2',
-      planVersion: 1, startedAt: null, finishedAt: null, lastEventId: event.eventId, messages: [], steps: [], events: [event],
-    }]);
+    const projection = buildProjectionFromHistoryAndSnapshots('session-example-1', history, [
+      {
+        runId: 'run-travel',
+        sessionId: 'session-example-1',
+        status: 'COMPLETED',
+        planId: 'plan-example-2',
+        planVersion: 1,
+        startedAt: null,
+        finishedAt: null,
+        lastEventId: event.eventId,
+        messages: [],
+        steps: [],
+        events: [event],
+      },
+    ]);
     expect(projection.items).toHaveLength(1);
-    expect(projection.items[0]).toMatchObject({ kind: 'travel-advice-card', travelTaskId: '90001' });
+    expect(projection.items[0]).toMatchObject({
+      kind: 'travel-advice-card',
+      travelTaskId: '90001',
+    });
   });
 
   it.each([
