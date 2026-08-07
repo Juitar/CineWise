@@ -16,7 +16,7 @@ import { formatOrderTime } from '../../../modules/order/formatters';
 import { buildOrderDetailPath, buildPaymentPath } from '../../../modules/order/routes';
 import { ApiError } from '../../../shared/api/ApiError';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
-import { TransactionBackButton } from '../../../features/transaction-back-button/TransactionBackButton';
+import { TransactionBreadcrumb } from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import './index.css';
 
 /**
@@ -125,10 +125,10 @@ export default function OrderConfirmPage() {
     );
   }
 
+  const seatsPath = `/shows/${encodeURIComponent(showId)}/seats?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`;
+
   const handleReturnToSeats = () => {
-    history.push(
-      `/shows/${encodeURIComponent(showId)}/seats?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`,
-    );
+    history.push(seatsPath);
   };
 
   const handleSubmitOrder = async () => {
@@ -214,7 +214,24 @@ export default function OrderConfirmPage() {
 
   return (
     <div className="confirm-page-container">
-      <TransactionBackButton onBack={handleReturnToSeats} label="返回选座" />
+      <TransactionBreadcrumb
+        items={
+          order
+            ? [
+                { label: '我的订单', to: '/orders' },
+                { label: '订单详情', to: buildOrderDetailPath(order.orderNo) },
+                { label: '订单已创建' },
+              ]
+            : [
+                {
+                  label: '选择场次',
+                  to: `/shows?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`,
+                },
+                { label: '选择座位', to: seatsPath },
+                { label: '确认订单' },
+              ]
+        }
+      />
       <h1 className="confirm-page-title">确认订单信息</h1>
 
       {order ? (
