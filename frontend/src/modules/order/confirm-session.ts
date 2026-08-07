@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { createOrderUuid } from './uuid';
 
 export interface ConfirmOrderSession {
   clientRequestId: string;
@@ -10,7 +11,8 @@ function sessionKey(showId: string, seatIds: string[]): string {
   return `cinewise:order-confirm:${showId}:${[...seatIds].sort().join('_')}`;
 }
 
-let fallbackUuidSequence = 0;
+// sessionStorage 被隐私策略禁用时，当前页面仍必须复用同一建单标识，不能因重渲染生成第二笔订单。
+const inMemorySessions = new Map<string, ConfirmOrderSession>();
 
 /**
  * 创建建单幂等标识。
@@ -18,35 +20,18 @@ let fallbackUuidSequence = 0;
  * `randomUUID` 只在安全上下文中保证可用；演示服务器可能通过 HTTP IP 访问，此时仍使用
  * `getRandomValues` 生成 RFC 4122 v4 标识，避免确认页在进入时因浏览器能力差异直接崩溃。
  */
-function createUuid(): string {
-  const cryptoApi = globalThis.crypto;
-  if (typeof cryptoApi?.randomUUID === 'function') {
-    return cryptoApi.randomUUID();
-  }
-
-  if (typeof cryptoApi?.getRandomValues === 'function') {
-    const bytes = new Uint8Array(16);
-    cryptoApi.getRandomValues(bytes);
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    return Array.from(bytes, (value) => value.toString(16).padStart(2, '0'))
-      .join('')
-      .replace(/^(........)(....)(....)(....)(............)$/, '$1-$2-$3-$4-$5');
-  }
-
-  // 仅用于极旧浏览器或受限测试环境；序列号保证同一页面内不复用幂等键。
-  fallbackUuidSequence = (fallbackUuidSequence + 1) % 0x1000000;
-  const timestamp = Date.now().toString(16).padStart(6, '0').slice(-6);
-  const sequence = fallbackUuidSequence.toString(16).padStart(6, '0');
-  return `00000000-0000-4000-8000-${timestamp}${sequence}`;
-}
-
 function createSession(): ConfirmOrderSession {
   return {
-    clientRequestId: createUuid(),
-    idempotencyKey: createUuid(),
+    clientRequestId: createOrderUuid(),
+    idempotencyKey: createOrderUuid(),
     isResultUnknown: false,
   };
+}
+
+function createInMemorySession(key: string): ConfirmOrderSession {
+  const session = createSession();
+  inMemorySessions.set(key, session);
+  return session;
 }
 
 /**
@@ -63,7 +48,7 @@ export function getConfirmOrderSession(showId: string, seatIds: string[]): Confi
   try {
     stored = sessionStorage.getItem(key);
   } catch {
-    return createSession();
+    return inMemorySessions.get(key) ?? createInMemorySession(key);
   }
   if (stored) {
     try {
@@ -73,18 +58,24 @@ export function getConfirmOrderSession(showId: string, seatIds: string[]): Confi
         typeof parsed.idempotencyKey === 'string' &&
         typeof parsed.isResultUnknown === 'boolean'
       ) {
-        return parsed as ConfirmOrderSession;
+        const session = parsed as ConfirmOrderSession;
+        inMemorySessions.set(key, session);
+        return session;
       }
     } catch {
-      sessionStorage.removeItem(key);
+      try {
+        sessionStorage.removeItem(key);
+      } catch {
+        // 损坏快照无法清理时仍使用当前页内存会话，避免重渲染生成新的建单标识。
+      }
     }
   }
 
-  const created = createSession();
+  const created = inMemorySessions.get(key) ?? createInMemorySession(key);
   try {
     sessionStorage.setItem(key, JSON.stringify(created));
   } catch {
-    // 浏览器禁用会话存储时仍允许当前页面内复用 Hook 返回的标识。
+    // 浏览器禁用会话存储时，模块内存会话仍可保证当前页面内复用原标识。
   }
   return created;
 }
@@ -109,8 +100,10 @@ export function markConfirmOrderUnknown(showId: string, seatIds: string[]): void
   }
   const key = sessionKey(showId, seatIds);
   const session = getConfirmOrderSession(showId, seatIds);
+  const resultUnknownSession = { ...session, isResultUnknown: true };
+  inMemorySessions.set(key, resultUnknownSession);
   try {
-    sessionStorage.setItem(key, JSON.stringify({ ...session, isResultUnknown: true }));
+    sessionStorage.setItem(key, JSON.stringify(resultUnknownSession));
   } catch {
     // 当前页面仍由 Hook 维持未知保护，持久化不可用时不泄露或重组标识。
   }
@@ -121,6 +114,7 @@ export function clearConfirmOrderSession(showId: string, seatIds: string[]): voi
   if (!showId || seatIds.length === 0) {
     return;
   }
+  inMemorySessions.delete(sessionKey(showId, seatIds));
   try {
     sessionStorage.removeItem(sessionKey(showId, seatIds));
   } catch {
