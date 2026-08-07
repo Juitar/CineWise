@@ -466,37 +466,102 @@ export function buildProjectionFromHistory(
   return { ...createAgentProjection(sessionId), items: messages.map(itemFromHistory) };
 }
 
-/** 使用运行快照和会话历史整体重建，不把快照事件重复追加到已有消息。 */
+function confirmationKey(runId: string, payload: Readonly<Record<string, unknown>>): string | null {
+  return typeof payload.actionId === 'string' ? `${runId}\u0000${payload.actionId}` : null;
+}
+
+function latestConfirmationEvents(snapshots: readonly AgentRunSnapshot[]): Map<string, AgentEvent> {
+  const latest = new Map<string, AgentEvent>();
+  for (const snapshot of snapshots) {
+    for (const event of snapshot.events) {
+      if (
+        event.sessionId !== snapshot.sessionId ||
+        event.runId !== snapshot.runId ||
+        event.eventType !== 'card' ||
+        validateAgentCardEvent(event).decision !== 'render'
+      ) {
+        continue;
+      }
+      const key = confirmationKey(event.runId, event.payload);
+      if (key === null) continue;
+      const previous = latest.get(key);
+      if (previous === undefined || compareDecimalStrings(event.eventId, previous.eventId) > 0) {
+        latest.set(key, event);
+      }
+    }
+  }
+  return latest;
+}
+
+/**
+ * 历史消息只保存生成时的确认状态。页面恢复时必须用运行快照的最新 CARD 覆盖同一操作，
+ * 否则已完成或失效的确认会在刷新后重新变成可点击状态。
+ */
+export function buildProjectionFromHistoryAndSnapshots(
+  sessionId: string,
+  history: readonly AgentMessage[],
+  snapshots: readonly AgentRunSnapshot[],
+): AgentProjection {
+  const historyProjection = buildProjectionFromHistory(sessionId, history);
+  const latest = latestConfirmationEvents(snapshots);
+  return {
+    ...historyProjection,
+    items: historyProjection.items.map((item, index) => {
+      const message = history[index];
+      const key = message === undefined ? null : confirmationKey(message.runId, message.payload);
+      const event = key === null ? undefined : latest.get(key);
+      return event === undefined ? item : confirmationItem(event);
+    }),
+  };
+}
+
+function restoredCards(snapshot: AgentRunSnapshot): AgentDisplayItem[] {
+  const events = snapshot.events.filter(
+    (event) =>
+      event.sessionId === snapshot.sessionId &&
+      event.runId === snapshot.runId &&
+      event.eventType === 'card' &&
+      validateAgentCardEvent(event).decision === 'render' &&
+      (event.payload.type === 'MOVIE_CARD' || event.payload.type === 'PLAN_CARD'),
+  );
+  const latestConfirmations = latestConfirmationEvents([snapshot]);
+  return [
+    ...events
+      .filter((event) => confirmationKey(event.runId, event.payload) === null)
+      .map((event) => typedCard(event)),
+    ...Array.from(latestConfirmations.values()).map((event) => confirmationItem(event)),
+  ];
+}
+
+/** 使用运行快照和会话历史整体重建；只替换该运行对应的卡片，不删除其他运行的历史卡片。 */
 export function buildProjectionFromSnapshot(
   snapshot: AgentRunSnapshot,
   history: readonly AgentMessage[],
 ): AgentProjection {
-  const historyProjection = buildProjectionFromHistory(snapshot.sessionId, history);
-  const restoredCards = snapshot.events
-    .filter(
-      (event) =>
-        event.sessionId === snapshot.sessionId &&
-        event.runId === snapshot.runId &&
-        event.eventType === 'card' &&
-        validateAgentCardEvent(event).decision === 'render' &&
-        (event.payload.type === 'MOVIE_CARD' || event.payload.type === 'PLAN_CARD'),
-    )
-    .map((event) => ('actionId' in event.payload ? confirmationItem(event) : typedCard(event)));
-  const historyItems =
-    restoredCards.length === 0
-      ? historyProjection.items
-      : historyProjection.items.filter((_, index) => {
-          const type = history[index]?.type.toUpperCase();
-          return type !== 'MOVIE_CARD' && type !== 'PLAN_CARD';
-        });
+  const historyProjection = buildProjectionFromHistoryAndSnapshots(snapshot.sessionId, history, [
+    snapshot,
+  ]);
+  const cards = restoredCards(snapshot);
+  const latestConfirmations = latestConfirmationEvents([snapshot]);
+  const historyItems = historyProjection.items.filter((_, index) => {
+    const message = history[index];
+    if (
+      message === undefined ||
+      message.runId !== snapshot.runId ||
+      (message.type !== 'MOVIE_CARD' && message.type !== 'PLAN_CARD')
+    ) {
+      return true;
+    }
+    const key = confirmationKey(message.runId, message.payload);
+    return key !== null && !latestConfirmations.has(key);
+  });
   const snapshotItems: AgentDisplayItem[] =
     history.length > 0
       ? []
       : snapshot.messages
           .filter(
             (message) =>
-              restoredCards.length === 0 ||
-              (message.type !== 'MOVIE_CARD' && message.type !== 'PLAN_CARD'),
+              cards.length === 0 || (message.type !== 'MOVIE_CARD' && message.type !== 'PLAN_CARD'),
           )
           .map((message) => ({
             key: `run-message:${message.messageId}`,
@@ -527,6 +592,6 @@ export function buildProjectionFromSnapshot(
     planVersion: snapshot.planVersion,
     lastEventId: snapshot.lastEventId,
     status: snapshot.status === 'RUNNING' ? 'STREAMING' : snapshot.status,
-    items: [...historyItems, ...snapshotItems, ...restoredCards, ...stepItems],
+    items: [...historyItems, ...snapshotItems, ...cards, ...stepItems],
   };
 }

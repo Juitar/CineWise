@@ -72,6 +72,23 @@ function snapshot(status: AgentRunSnapshot['status'], lastEventId = '40'): Agent
   };
 }
 
+function confirmationSnapshot(
+  confirmationStatus: 'PENDING_CONFIRMATION' | 'EXECUTING' | 'SUCCEEDED' | 'INVALIDATED',
+): AgentRunSnapshot {
+  return {
+    ...snapshot(confirmationStatus === 'EXECUTING' ? 'RUNNING' : 'COMPLETED'),
+    runId: 'run-1',
+    events: [
+      parseAgentEvent({
+        ...orderConfirmCardFixture,
+        sessionId: 'session-example-1',
+        runId: 'run-1',
+        payload: { ...orderConfirmCardFixture.payload, status: confirmationStatus },
+      }),
+    ],
+  };
+}
+
 beforeEach(() => {
   mocks.listAgentMessages.mockResolvedValue(emptyMessages);
   mocks.listAgentSessions.mockResolvedValue(sessionPage);
@@ -226,6 +243,21 @@ describe('useAgentWorkspace 状态与恢复', () => {
     expect(result.current.projection.items[0].confirmation?.status).toBe('SUCCEEDED');
   });
 
+  it('刷新历史确认卡时按消息 runId 恢复终态而不重新启用按钮', async () => {
+    mocks.listAgentMessages.mockResolvedValue({
+      ...emptyMessages,
+      total: 1,
+      records: [confirmationMessage],
+    });
+    mocks.getAgentRun.mockResolvedValue(confirmationSnapshot('SUCCEEDED'));
+
+    const { result } = renderHook(() => useAgentWorkspace('session-example-1'));
+
+    await waitFor(() => expect(result.current.loadStatus).toBe('ready'));
+    expect(mocks.getAgentRun).toHaveBeenCalledWith('run-1');
+    expect(result.current.projection.items[0].confirmation?.status).toBe('SUCCEEDED');
+  });
+
   it('确认超时后重新拉历史消息并按消息 runId 查询真实状态', async () => {
     mocks.listAgentMessages.mockResolvedValue({
       ...emptyMessages,
@@ -235,18 +267,9 @@ describe('useAgentWorkspace 状态与恢复', () => {
     mocks.confirmAgentAction.mockRejectedValue(
       new ApiError('timeout', { kind: 'TIMEOUT', isResultUnknown: true }),
     );
-    mocks.getAgentRun.mockResolvedValue({
-      ...snapshot('COMPLETED'),
-      runId: 'run-1',
-      events: [
-        parseAgentEvent({
-          ...orderConfirmCardFixture,
-          sessionId: 'session-example-1',
-          runId: 'run-1',
-          payload: { ...orderConfirmCardFixture.payload, status: 'SUCCEEDED' },
-        }),
-      ],
-    });
+    mocks.getAgentRun
+      .mockResolvedValueOnce(confirmationSnapshot('PENDING_CONFIRMATION'))
+      .mockResolvedValue(confirmationSnapshot('SUCCEEDED'));
     const { result } = renderHook(() => useAgentWorkspace('session-example-1'));
     await waitFor(() => expect(result.current.loadStatus).toBe('ready'));
     await act(async () => result.current.confirm(result.current.projection.items[0].key, true));
@@ -280,7 +303,7 @@ describe('useAgentWorkspace 状态与恢复', () => {
       expect(result.current.feedback).not.toContain('raw backend message');
       expect(result.current.projection.items[0].confirmation?.status).toBe(expectedStatus);
       expect(mocks.confirmAgentAction).toHaveBeenCalledOnce();
-      expect(mocks.getAgentRun).not.toHaveBeenCalled();
+      expect(mocks.getAgentRun).toHaveBeenCalledTimes(1);
     },
   );
 
@@ -298,18 +321,9 @@ describe('useAgentWorkspace 状态与恢复', () => {
       mocks.confirmAgentAction.mockRejectedValue(
         new ApiError('raw backend message', { kind: 'HTTP', status, code }),
       );
-      mocks.getAgentRun.mockResolvedValue({
-        ...snapshot(confirmationStatus === 'EXECUTING' ? 'RUNNING' : 'COMPLETED'),
-        runId: 'run-1',
-        events: [
-          parseAgentEvent({
-            ...orderConfirmCardFixture,
-            sessionId: 'session-example-1',
-            runId: 'run-1',
-            payload: { ...orderConfirmCardFixture.payload, status: confirmationStatus },
-          }),
-        ],
-      });
+      mocks.getAgentRun
+        .mockResolvedValueOnce(confirmationSnapshot('PENDING_CONFIRMATION'))
+        .mockResolvedValue(confirmationSnapshot(confirmationStatus));
       const { result } = renderHook(() => useAgentWorkspace('session-example-1'));
       await waitFor(() => expect(result.current.loadStatus).toBe('ready'));
       await act(async () => result.current.confirm(result.current.projection.items[0].key, true));
@@ -329,18 +343,9 @@ describe('useAgentWorkspace 状态与恢复', () => {
     mocks.confirmAgentAction.mockRejectedValue(
       new ApiError('service unavailable', { kind: 'HTTP', status: 503 }),
     );
-    mocks.getAgentRun.mockResolvedValue({
-      ...snapshot('COMPLETED'),
-      runId: 'run-1',
-      events: [
-        parseAgentEvent({
-          ...orderConfirmCardFixture,
-          sessionId: 'session-example-1',
-          runId: 'run-1',
-          payload: { ...orderConfirmCardFixture.payload, status: 'SUCCEEDED' },
-        }),
-      ],
-    });
+    mocks.getAgentRun
+      .mockResolvedValueOnce(confirmationSnapshot('PENDING_CONFIRMATION'))
+      .mockResolvedValue(confirmationSnapshot('SUCCEEDED'));
     const { result } = renderHook(() => useAgentWorkspace('session-example-1'));
     await waitFor(() => expect(result.current.loadStatus).toBe('ready'));
     await act(async () => result.current.confirm(result.current.projection.items[0].key, true));

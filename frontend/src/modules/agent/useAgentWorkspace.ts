@@ -15,7 +15,7 @@ import {
 } from './api';
 import { AgentContractError } from './contract';
 import {
-  buildProjectionFromHistory,
+  buildProjectionFromHistoryAndSnapshots,
   buildProjectionFromSnapshot,
   consumeAgentEvent,
   createAgentProjection,
@@ -24,7 +24,7 @@ import {
 import type { AgentDisplayItem, AgentProjection } from './projection';
 import { recoverFromStreamReset } from './recovery';
 import { postAgentStream } from './sse';
-import type { AgentSession, AgentStreamRequest } from './types';
+import type { AgentMessage, AgentSession, AgentStreamRequest } from './types';
 
 type LoadStatus = 'error' | 'loading' | 'ready';
 
@@ -99,6 +99,16 @@ function isTerminal(status: AgentProjection['status']): boolean {
   return ['CANCELLED', 'COMPLETED', 'FAILED'].includes(status);
 }
 
+function confirmationRunIds(messages: readonly AgentMessage[]): readonly string[] {
+  return Array.from(
+    new Set(
+      messages
+        .filter((message) => typeof message.payload.actionId === 'string')
+        .map((message) => message.runId),
+    ),
+  );
+}
+
 /**
  * 管理一个 Agent 工作区的会话、唯一活动流、投影和只读恢复。
  * 页面和桌面/移动视图只消费该 Hook，不各自保存运行游标。
@@ -145,21 +155,29 @@ export function useAgentWorkspace(sessionId: string) {
     stopActiveStream();
     setLoadStatus('loading');
     setFeedback(null);
-    Promise.all([listAgentMessages(sessionId), listAgentSessions()])
-      .then(([messages, sessionPage]) => {
+    const load = async () => {
+      try {
+        const [messages, sessionPage] = await Promise.all([
+          listAgentMessages(sessionId),
+          listAgentSessions(),
+        ]);
+        const snapshots = await Promise.all(
+          confirmationRunIds(messages.records).map((runId) => getAgentRun(runId)),
+        );
         if (!active) return;
-        const next = buildProjectionFromHistory(sessionId, messages.records);
+        const next = buildProjectionFromHistoryAndSnapshots(sessionId, messages.records, snapshots);
         projectionRef.current = next;
         setProjection(next);
         setSessions(sessionPage.records);
         setLoadStatus('ready');
-      })
-      .catch((error: unknown) => {
+      } catch (error) {
         if (!active) return;
         setProjection(createAgentProjection(sessionId));
         setFeedback(safeErrorMessage(error));
         setLoadStatus('error');
-      });
+      }
+    };
+    void load();
     return () => {
       active = false;
       stopActiveStream();

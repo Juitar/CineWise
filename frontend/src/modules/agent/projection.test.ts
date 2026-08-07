@@ -15,6 +15,7 @@ import unknownEventType from '../../../../backend/src/test/resources/fixtures/ag
 import unknownPayloadType from '../../../../backend/src/test/resources/fixtures/agent/c/unknown-payload-type.json';
 import { parseAgentEvent } from './contract';
 import {
+  buildProjectionFromHistoryAndSnapshots,
   compareDecimalStrings,
   consumeAgentEvent,
   createAgentProjection,
@@ -264,6 +265,97 @@ describe('Agent 事件投影', () => {
       expect.objectContaining({ kind: 'plan-card', text: '等待你的确认' }),
     ]);
     expect(JSON.stringify(result.projection.items[0].fields)).not.toContain('action-1');
+  });
+
+  it('只用同一运行和操作的最新确认事件替换对应历史卡片', () => {
+    const history = [
+      {
+        messageId: 'message-confirm-1',
+        runId: 'run-1',
+        role: 'ASSISTANT',
+        type: 'PLAN_CARD',
+        text: '请确认建单',
+        payload: { ...orderConfirmCard.payload, status: 'PENDING_CONFIRMATION' },
+        status: 'COMPLETED',
+        completedAt: '2026-08-05T16:30:00+08:00',
+        createdAt: '2026-08-05T16:30:00+08:00',
+      },
+      {
+        messageId: 'message-other-plan',
+        runId: 'run-other',
+        role: 'ASSISTANT',
+        type: 'PLAN_CARD',
+        text: '其他运行的卡片',
+        payload: {},
+        status: 'COMPLETED',
+        completedAt: '2026-08-05T16:30:00+08:00',
+        createdAt: '2026-08-05T16:30:00+08:00',
+      },
+      {
+        messageId: 'message-confirm-2',
+        runId: 'run-2',
+        role: 'ASSISTANT',
+        type: 'PLAN_CARD',
+        text: '请确认另一项操作',
+        payload: {
+          ...orderConfirmCard.payload,
+          actionId: 'action-2',
+          status: 'PENDING_CONFIRMATION',
+        },
+        status: 'COMPLETED',
+        completedAt: '2026-08-05T16:30:00+08:00',
+        createdAt: '2026-08-05T16:30:00+08:00',
+      },
+    ];
+    const pending = parseAgentEvent({ ...orderConfirmCard, eventId: '90001', runId: 'run-1' });
+    const succeeded = parseAgentEvent({
+      ...orderConfirmCard,
+      eventId: '90002',
+      runId: 'run-1',
+      payload: { ...orderConfirmCard.payload, status: 'SUCCEEDED' },
+    });
+    const rejected = parseAgentEvent({
+      ...orderConfirmCard,
+      eventId: '90003',
+      runId: 'run-2',
+      payload: { ...orderConfirmCard.payload, actionId: 'action-2', status: 'REJECTED' },
+    });
+    const projection = buildProjectionFromHistoryAndSnapshots('session-1', history, [
+      {
+        runId: 'run-1',
+        sessionId: 'session-1',
+        status: 'COMPLETED',
+        planId: 'plan-1',
+        planVersion: 2,
+        startedAt: '2026-08-05T16:30:00+08:00',
+        finishedAt: '2026-08-05T16:31:00+08:00',
+        lastEventId: '90002',
+        messages: [],
+        steps: [],
+        events: [pending, succeeded],
+      },
+      {
+        runId: 'run-2',
+        sessionId: 'session-1',
+        status: 'COMPLETED',
+        planId: 'plan-1',
+        planVersion: 2,
+        startedAt: '2026-08-05T16:30:00+08:00',
+        finishedAt: '2026-08-05T16:31:00+08:00',
+        lastEventId: '90003',
+        messages: [],
+        steps: [],
+        events: [rejected],
+      },
+    ]);
+
+    expect(projection.items).toHaveLength(3);
+    expect(projection.items[0].confirmation?.status).toBe('SUCCEEDED');
+    expect(projection.items[1]).toMatchObject({
+      kind: 'card-placeholder',
+      text: '卡片数据暂不完整',
+    });
+    expect(projection.items[2].confirmation?.status).toBe('REJECTED');
   });
 
   it.each([
