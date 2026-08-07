@@ -11,16 +11,26 @@ const accountStatusLabels = {
   NORMAL: '正常',
 } as const;
 
+function profileConsentStatusLabel(enabled: boolean, saving: boolean, stateKnown: boolean): string {
+  if (saving) return '正在保存';
+  if (!stateKnown) return '状态不可用';
+  return enabled ? '已开启' : '未开启';
+}
+
 export default function ProfilePage() {
   const { currentUser } = useAuth();
   const { handleLogout, isLoggingOut } = useLogout();
   const {
+    consentEnabled,
+    consentSaving,
+    consentStateKnown,
     notice: profileNotice,
     profile,
     saving: profileSaving,
+    setConsentEnabled,
     setEnabled,
     state: profileState,
-  } = useProfile();
+  } = useProfile(currentUser?.privacyPolicyVersion ?? '');
 
   if (!currentUser) {
     return (
@@ -109,20 +119,48 @@ export default function ProfilePage() {
         <div className="profile-data-heading">
           <div>
             <h2 id="profile-data-title">AI 观影画像</h2>
-            <p>管理用于影片推荐的长期偏好标签和个性化开关。</p>
+            <p>管理画像数据使用、长期偏好标签和个性化推荐。</p>
           </div>
-          {profile && (
+        </div>
+
+        <div className="profile-consent-setting">
+          <div>
+            <h3>使用用户画像</h3>
+            <p>开启后保存观影偏好；关闭后停止画像写入并清除当前页面画像。</p>
+          </div>
+          <label className="profile-consent-toggle">
+            <input
+              aria-label="使用用户画像"
+              checked={consentEnabled}
+              disabled={!consentStateKnown || consentSaving || profileSaving}
+              role="switch"
+              type="checkbox"
+              onChange={(event) => void setConsentEnabled(event.target.checked)}
+            />
+            <span>
+              {profileConsentStatusLabel(consentEnabled, consentSaving, consentStateKnown)}
+            </span>
+          </label>
+        </div>
+
+        {profile && (
+          <div className="profile-personalization-setting">
+            <div>
+              <h3>个性化推荐</h3>
+              <p>关闭后保留画像数据，但推荐时不使用画像偏好。</p>
+            </div>
             <label className="profile-personalization-toggle">
               <input
+                aria-label="开启个性化"
                 checked={profile.preference.enabled}
-                disabled={profileSaving}
+                disabled={profileSaving || consentSaving}
                 type="checkbox"
                 onChange={(event) => void setEnabled(event.target.checked)}
               />
-              开启个性化
+              <span>{profileSaving ? '正在保存' : '开启个性化'}</span>
             </label>
-          )}
-        </div>
+          </div>
+        )}
 
         {profileNotice && (
           <p className="profile-data-notice" role="status">
