@@ -69,6 +69,10 @@ class DemoSeedInitializerTest {
                 9_200_001L, "live-purchase-cinema", "长沙购票演示影院", "430100", "岳麓区",
                 "梅溪湖路1号", null, null, ContentSourceType.LIVE, "NETSTART_MAOYAN",
                 dataTime, dataTime.plusHours(6)));
+        long secondCinemaId = contentPersistencePort.ensureCinema(new ContentPersistencePort.CinemaRow(
+                9_200_002L, "live-purchase-cinema-2", "长沙购票演示影院二店", "430100", "开福区",
+                "芙蓉路2号", null, null, ContentSourceType.LIVE, "NETSTART_MAOYAN",
+                dataTime, dataTime.plusHours(6)));
         MovieContent movie = new MovieContent(movieId, "live-purchase-movie", "长沙购票演示片",
                 "[\"剧情\"]", 110, new BigDecimal("8.8"), null, null, null, null);
         CinemaContent cinema = new CinemaContent(cinemaId, "live-purchase-cinema", "长沙购票演示影院",
@@ -91,11 +95,33 @@ class DemoSeedInitializerTest {
                 "SELECT COUNT(*) FROM movie_show WHERE cinema_id = ? AND source = 'demo-seed'",
                 Long.class, cinemaId)).isEqualTo(42L);
         assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM movie_show WHERE cinema_id = ? AND source = 'demo-seed'",
+                Long.class, secondCinemaId)).isEqualTo(42L);
+        assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM auditorium WHERE cinema_id = ? AND data_type = 'MOCK'",
                 Long.class, cinemaId)).isEqualTo(2L);
         // LIVE 扩展可以增加独立票务数据，但不能改变固定 Demo 种子的统计基线。
         assertSeedCounts();
         assertContentSourceIdentity();
+    }
+
+    @Test
+    void givenExpiredLiveCatalog_whenSeedRuns_thenItDoesNotCreateNewMockSchedules() {
+        LocalDateTime dataTime = LocalDateTime.of(2026, 8, 2, 1, 0);
+        long movieId = contentPersistencePort.ensureMovie(new ContentPersistencePort.MovieRow(
+                9_100_010L, "expired-live-movie", "过期影片", "[\"剧情\"]", 100,
+                new BigDecimal("8.0"), null, null, null, null, ContentSourceType.LIVE, "NETSTART_MAOYAN",
+                dataTime, dataTime.plusHours(1)));
+        long cinemaId = contentPersistencePort.ensureCinema(new ContentPersistencePort.CinemaRow(
+                9_200_010L, "expired-live-cinema", "过期影院", "430100", "岳麓区",
+                "测试路10号", null, null, ContentSourceType.LIVE, "NETSTART_MAOYAN",
+                dataTime, dataTime.plusHours(1)));
+
+        initializer.initialize();
+
+        assertThat(movieId).isPositive();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM movie_show WHERE cinema_id = ?", Long.class, cinemaId)).isZero();
     }
 
     @Test

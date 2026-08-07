@@ -4,6 +4,7 @@ import com.miaoyu.ticket.ticketing.application.TicketingSeedRepository;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -89,13 +90,18 @@ public class JdbcTicketingSeedRepository implements TicketingSeedRepository {
     }
 
     @Override
-    public boolean hasExternalShowForDate(long cinemaId, java.time.LocalDate date) {
+    public boolean hasExternalShowForDate(long cinemaId, LocalDate showDate) {
         Integer count = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM movie_show
-                 WHERE cinema_id = ? AND source = 'external-sandbox'
-                   AND start_time >= ? AND start_time < ?
-                """, Integer.class, cinemaId, Timestamp.valueOf(date.atStartOfDay()),
-                Timestamp.valueOf(date.plusDays(1).atStartOfDay()));
+                SELECT COUNT(*)
+                  FROM movie_show
+                 WHERE cinema_id = ?
+                   AND source = 'external-sandbox'
+                   AND start_time >= ?
+                   AND start_time < ?
+                """, Integer.class,
+                cinemaId,
+                Timestamp.valueOf(showDate.atStartOfDay()),
+                Timestamp.valueOf(showDate.plusDays(1).atStartOfDay()));
         return count != null && count > 0;
     }
 

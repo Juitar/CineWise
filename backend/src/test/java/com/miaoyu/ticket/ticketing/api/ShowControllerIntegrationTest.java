@@ -15,10 +15,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.auth.application.RoleCode;
+import com.miaoyu.ticket.content.application.ContentCachePort;
+import com.miaoyu.ticket.content.application.ContentQuery;
+import com.miaoyu.ticket.content.application.ContentResult;
+import com.miaoyu.ticket.content.domain.ContentItem;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Map;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -312,6 +318,27 @@ class ShowControllerIntegrationTest {
         @Primary
         CurrentUserAccessor fixedCurrentUserAccessor() {
             return () -> new CurrentUser(9000001L, RoleCode.USER, 0L);
+        }
+
+        /**
+         * 场次控制器测试使用随机 H2 库，不能读取其他测试遗留在共享 Redis 的内容缓存。
+         *
+         * <p>生产仍使用 D 的缓存 Adapter；本替身只让本类通过自身 Demo 种子验证公开场次契约。</p>
+         */
+        @Bean
+        @Primary
+        ContentCachePort emptyContentCachePort() {
+            return new ContentCachePort() {
+                @Override
+                public Optional<ContentResult<List<? extends ContentItem>>> find(ContentQuery query) {
+                    return Optional.empty();
+                }
+
+                @Override
+                public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) {
+                    // 只读场次测试不产生内容缓存副作用。
+                }
+            };
         }
     }
 }
