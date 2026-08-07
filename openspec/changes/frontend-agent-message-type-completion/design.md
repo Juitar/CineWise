@@ -24,6 +24,8 @@
 
 B 的卡片校验白名单和 C 的 `AgentCardPayloadType` 当前一致：`TEXT`、`QUESTION`、`MOVIE_CARD`、`PLAN_CARD`、`BUSINESS_INTENT`、`PROGRESS`、`ERROR`。确认卡不是第八类 payload，而是带 `actionId` 的 `PLAN_CARD` 受控变体。
 
+`QUESTION` 与 B 的 `AgentCardEventValidator.question()` 保持一致：`allowFreeText=false` 时 `input` 可以不存在；只有允许自由输入时才校验 `input.name` 和 `input.type`。固定选项问题不能因为没有自由输入配置而被拒绝。
+
 建单固定夹具使用 `type=PLAN_CARD`、`actionType=CREATE_ORDER`。前端只把 `actionId` 留在模块内部，请求 `POST /api/v1/agent/actions/{actionId}/confirm` 时只发送 `{confirmed}`；执行中、结果未知和终态不再次提交。
 
 ## 缺少的 B 协议

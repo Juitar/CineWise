@@ -10,6 +10,12 @@
 - **THEN** C 不增加前端枚举、校验、投影或组件
 - **AND** OpenSpec 将该项标记为“等 B 提供正式协议”
 
+#### Scenario: 固定选项问题不提供自由输入配置
+
+- **WHEN** B 发送 `allowFreeText=false` 且不包含 `input` 的正式 `QUESTION`
+- **THEN** C 接受并展示该问题的固定选项
+- **AND** 只有 `allowFreeText=true` 时才要求 `input.name` 和 `input.type`
+
 ### Requirement: 建单确认必须复用统一确认卡
 
 系统 SHALL 将 `PLAN_CARD + actionId + actionType=CREATE_ORDER` 视为建单确认的正式协议，MUST NOT 再增加 `ORDER_CONFIRM`。

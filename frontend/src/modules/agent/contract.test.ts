@@ -47,6 +47,26 @@ describe('Agent DTO 和事件校验', () => {
     expect(validateAgentCardEvent(parseAgentEvent(planCard)).decision).toBe('render');
   });
 
+  it('固定选项问题不要求 input，自由输入问题仍要求 input', () => {
+    const choiceOnlyPayload: Record<string, unknown> = {
+      ...questionCard.payload,
+      allowFreeText: false,
+    };
+    delete choiceOnlyPayload.input;
+    expect(
+      validateAgentCardEvent(parseAgentEvent({ ...questionCard, payload: choiceOnlyPayload }))
+        .decision,
+    ).toBe('render');
+    expect(
+      validateAgentCardEvent(
+        parseAgentEvent({
+          ...questionCard,
+          payload: { ...choiceOnlyPayload, allowFreeText: true },
+        }),
+      ).decision,
+    ).toBe('reject');
+  });
+
   it('严格拒绝方案卡缺字段、未知字段和原始工具参数', () => {
     expect(
       validateAgentCardEvent(

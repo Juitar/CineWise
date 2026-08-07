@@ -344,12 +344,14 @@ function validateQuestion(payload: Record<string, unknown>): void {
     text(current.label);
     text(current.value);
   });
-  boolean(payload.allowFreeText);
+  const allowFreeText = boolean(payload.allowFreeText);
   boolean(payload.requiresConfirmation);
   dateText(payload.expiresAt);
-  const input = record(payload.input);
-  text(input.name);
-  text(input.type);
+  if (allowFreeText) {
+    const input = record(payload.input);
+    text(input.name);
+    text(input.type);
+  }
   if (payload.questionKind === 'LOCATION_PERMISSION') {
     const authorization = record(payload.locationAuthorization);
     if (authorization.permission !== 'DEVICE_LOCATION') throw new AgentContractError();
