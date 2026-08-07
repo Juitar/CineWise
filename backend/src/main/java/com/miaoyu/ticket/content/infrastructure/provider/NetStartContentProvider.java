@@ -337,7 +337,16 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
      */
     private boolean sameIfKnown(Object saved, Object current) {
         // 当前目录不带字段时只能说明本轮无法比较，不能覆盖已落库资料或触发无意义的详情刷新。
-        return saved == null || current == null || java.util.Objects.equals(saved, current);
+        // 但旧记录缺字段而本轮目录已给出值时，必须拉取详情补齐，不能把历史空值当成“相同”。
+        if (current == null) {
+            return true;
+        }
+        if (saved instanceof java.math.BigDecimal savedRating
+                && current instanceof java.math.BigDecimal currentRating) {
+            // Provider 评分的尾随零不表示资料变化，例如 8.0 和 8.00 应复用已有详情。
+            return savedRating.compareTo(currentRating) == 0;
+        }
+        return java.util.Objects.equals(saved, current);
     }
 
     /**
@@ -371,7 +380,7 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
      * 所有原始请求统一在此处消耗本地额度，并且只对连接失败或 5xx 重试一次。
      *
      * <p>请求成功只表示收到 JSON，字段质量仍由 normalizeAll 决定；不能因 HTTP 200
-     * 就把不完整数据标记为 LIVE 内容。</p>
+     * 不能把不完整数据标记为 LIVE。</p>
      *
      * <p>重试前再次检查额度，防止单个异常请求绕开限流。线程被中断时恢复中断标记，
      * 让调度器可按正常停止流程处理，而不是吞掉关闭信号。</p>

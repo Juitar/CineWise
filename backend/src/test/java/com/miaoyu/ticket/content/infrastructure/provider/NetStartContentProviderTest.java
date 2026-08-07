@@ -376,6 +376,44 @@ class NetStartContentProviderTest {
     }
 
     @Test
+    void givenStoredDirectoryMetadataIsMissing_whenIncrementalSync_thenItRefreshesTheDetail() {
+        AtomicInteger calls = new AtomicInteger();
+        NetStartContentProvider provider = provider(query -> {
+            calls.incrementAndGet();
+            if (query.contentId() == null) {
+                return json("{\"movieList\":[{\"id\":1,\"nm\":\"补全片名\",\"cat\":\"剧情\","
+                        + "\"sc\":8.0,\"rt\":\"2026-08-01\",\"globalReleased\":true}]}");
+            }
+            return json("{\"detailMovie\":{\"id\":1,\"nm\":\"补全片名\",\"cat\":\"剧情\","
+                    + "\"dur\":\"90分钟\",\"sc\":\"8.0\"}}");
+        });
+
+        var batch = provider.fetchCurrentHotMovies(Map.of("1", new ContentPersistencePort.MovieState(
+                null, "[\"剧情\"]", new java.math.BigDecimal("8.0"), "2026-08-01", "NOW_SHOWING",
+                LocalDateTime.of(2026, 8, 6, 10, 0))));
+
+        assertThat(calls).hasValue(2);
+        assertThat(batch.contents()).hasSize(1);
+    }
+
+    @Test
+    void givenEquivalentRatingWithDifferentScale_whenIncrementalSync_thenItSkipsUnchangedDetail() {
+        AtomicInteger calls = new AtomicInteger();
+        NetStartContentProvider provider = provider(query -> {
+            calls.incrementAndGet();
+            return json("{\"movieList\":[{\"id\":1,\"nm\":\"原片名\",\"cat\":\"剧情\","
+                    + "\"sc\":8.0,\"rt\":\"2026-08-01\",\"globalReleased\":true}]}");
+        });
+
+        var batch = provider.fetchCurrentHotMovies(Map.of("1", new ContentPersistencePort.MovieState(
+                "原片名", "[\"剧情\"]", new java.math.BigDecimal("8.00"), "2026-08-01", "NOW_SHOWING",
+                LocalDateTime.of(2026, 8, 6, 10, 0))));
+
+        assertThat(calls).hasValue(1);
+        assertThat(batch.contents()).isEmpty();
+    }
+
+    @Test
     void given429OrClientError_whenQuery_thenItDoesNotRetry() {
         AtomicInteger calls = new AtomicInteger();
         NetStartContentProvider provider = provider(query -> { calls.incrementAndGet();
