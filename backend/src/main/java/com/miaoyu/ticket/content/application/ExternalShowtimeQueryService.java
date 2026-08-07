@@ -168,9 +168,18 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
         }
         ContentIdentityResolutionPort.ResolutionBatch resolutions = identityResolutionService.resolve(PROVIDER,
                 ContentResourceType.MOVIE, movieExternalIds);
+        List<String> cinemaExternalIds = candidates.stream()
+                .map(ExternalShowtimeProvider.Candidate::externalCinemaId)
+                .filter(Objects::nonNull).distinct().toList();
+        ContentIdentityResolutionPort.ResolutionBatch cinemaResolutions = identityResolutionService.resolve(PROVIDER,
+                ContentResourceType.CINEMA, cinemaExternalIds);
         Map<String, ContentIdentityResolutionPort.Resolution> movieResolutions = new LinkedHashMap<>();
         for (ContentIdentityResolutionPort.Resolution resolution : resolutions.results()) {
             movieResolutions.put(resolution.externalId(), resolution);
+        }
+        Map<String, ContentIdentityResolutionPort.Resolution> cinemaResolutionByExternalId = new LinkedHashMap<>();
+        for (ContentIdentityResolutionPort.Resolution resolution : cinemaResolutions.results()) {
+            cinemaResolutionByExternalId.put(resolution.externalId(), resolution);
         }
         Map<ExternalShowtimeKey, ExternalShowtimeSnapshot> accepted = new LinkedHashMap<>();
         List<ExternalShowtimeSnapshot> rejected = new ArrayList<>();
@@ -180,24 +189,26 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
             Long movieId = movieResolution != null && movieResolution.status()
                     == ContentIdentityResolutionPort.ResolutionStatus.RESOLVED
                     ? movieResolution.internalContentId() : null;
-            ContentExternalIdentityLookupPort.ExternalIdentity cinemaIdentity =
-                    localCinemaIds.get(candidate.externalCinemaId());
-            Long cinemaId = cinemaIdentity == null ? null : cinemaIdentity.contentId();
+            ContentIdentityResolutionPort.Resolution cinemaResolution =
+                    cinemaResolutionByExternalId.get(candidate.externalCinemaId());
+            Long cinemaId = cinemaResolution != null && cinemaResolution.status()
+                    == ContentIdentityResolutionPort.ResolutionStatus.RESOLVED
+                    ? cinemaResolution.internalContentId() : null;
             ExternalShowtimeKey key = new ExternalShowtimeKey(PROVIDER, candidate.externalCinemaId(),
                     candidate.externalShowId());
             if (movieId == null || cinemaId == null) {
-                int code = movieResolution == null ? 303005 : movieResolution.errorCode();
+                int code = identityErrorCode(movieResolution, cinemaResolution);
                 rejected.add(rejected(candidate, movieId, cinemaId, dataAt,
                         QualityStatus.IDENTITY_REJECTED, code, key));
                 continue;
             }
-            // NetStart 没有已确认的可靠散场字段；不允许把 null 结束时间交给 A 临时推算。
-            if (candidate.endTime() == null || !candidate.endTime().isAfter(candidate.startTime())) {
+            if (candidate.startTime() == null || candidate.endTime() == null
+                    || !candidate.endTime().isAfter(candidate.startTime())) {
                 rejected.add(rejected(candidate, movieId, cinemaId, dataAt,
                         QualityStatus.END_TIME_REJECTED, null, key));
                 continue;
             }
-            if (candidate.startTime() == null || !candidate.startTime().isAfter(dataAt)) {
+            if (!candidate.startTime().isAfter(dataAt)) {
                 rejected.add(rejected(candidate, movieId, cinemaId, dataAt, QualityStatus.TIME_REJECTED, null, key));
                 continue;
             }
@@ -226,6 +237,16 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
                 candidate.externalCinemaId(), movieId, cinemaId, candidate.startTime(), candidate.endTime(),
                 candidate.listedPrice(), PriceSemantic.REFERENCE_ONLY, dataAt, dataAt, false, false, null,
                 qualityStatus, rejectionCode, key);
+    }
+
+    /** 影片和影院分别解析；优先返回实际失败身份的稳定错误码，绝不借用另一类资源的结果。 */
+    private static int identityErrorCode(ContentIdentityResolutionPort.Resolution movieResolution,
+                                         ContentIdentityResolutionPort.Resolution cinemaResolution) {
+        if (movieResolution == null || movieResolution.status()
+                != ContentIdentityResolutionPort.ResolutionStatus.RESOLVED) {
+            return movieResolution == null ? 303005 : movieResolution.errorCode();
+        }
+        return cinemaResolution == null ? 303005 : cinemaResolution.errorCode();
     }
 
     private Map<String, ContentExternalIdentityLookupPort.ExternalIdentity> resolveExternalCinemas(

@@ -41,8 +41,10 @@ Provider 调用复用现有学习用途保护：本地限流、连接/读取超�
 
 - 公开入口为 `com.miaoyu.ticket.content.application.ExternalShowtimeQueryPort#query`。
 - `QueryResult` 返回 `snapshots` 和 `truncated`；候选最多 200 条，按 `provider + externalCinemaId + externalShowId` 去重。
+- `QueryResult` 同时返回 `rejectedSnapshots`：它不写入 D 的成功快照、不计入 200 条 `snapshots` 上限，也绝不能由 A 导入。每条隔离记录带 `qualityStatus`；身份隔离带稳定的 `303005/303006/303007`。
 - `startTime`、`endTime`、`dataAt` 和 `expiresAt` 均为带 `Asia/Shanghai` 偏移的 `OffsetDateTime`。
 - A 只导入 `qualityStatus=ACCEPTED`、`isExpired=false`、`degraded=false`、`fallbackType=null` 且 `endTime != null && endTime > startTime` 的候选。
+- NetStart 当前未核验到可靠 `endTime`，因此真实记录会进入 `rejectedSnapshots` 的 `END_TIME_REJECTED`，当前不会产生可导入 A 的真实场次；这是一项数据源限制，不用本地推算掩盖。
 - `listedPrice` 只能作为参考价；本地沙箱价格由 A 配置，外部价格变化不得覆盖已导入场次或订单价格。
 
 日志和审计只记录来源、城市名、本地 ID 数量、脱敏外部 ID 摘要、结果数量、失败分类、耗时和时间戳。不得记录 `ci`、Key、Cookie、完整原始响应、精确地点原文或座位/订单数据。

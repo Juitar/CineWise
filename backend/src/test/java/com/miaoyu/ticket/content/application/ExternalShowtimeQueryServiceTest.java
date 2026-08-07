@@ -112,6 +112,21 @@ class ExternalShowtimeQueryServiceTest {
     }
 
     @Test
+    void givenMissingStartTimeAndPresentEndTime_whenProviderSucceeds_thenItRejectsWithoutThrowing() {
+        ExternalShowtimeQueryService service = service(new ExternalShowtimeProvider.FetchResult(List.of(
+                new ExternalShowtimeProvider.Candidate("s1", "m1", "c1", null,
+                        OffsetDateTime.parse("2026-08-07T13:00:00+08:00"), null)), null), new MemorySnapshots());
+
+        ExternalShowtimeQueryPort.QueryResult result = service.query(
+                new ExternalShowtimeQueryPort.Query(DATE, List.of(21L)));
+
+        assertThat(result.snapshots()).isEmpty();
+        assertThat(result.rejectedSnapshots()).singleElement()
+                .extracting(ExternalShowtimeQueryPort.ExternalShowtimeSnapshot::qualityStatus)
+                .isEqualTo(ExternalShowtimeQueryPort.QualityStatus.END_TIME_REJECTED);
+    }
+
+    @Test
     void givenDateOutsideSevenDays_whenQuery_thenItRejectsTheWholeRequest() {
         ExternalShowtimeQueryService service = service(
                 new ExternalShowtimeProvider.FetchResult(List.of(), null), new MemorySnapshots());
@@ -129,7 +144,8 @@ class ExternalShowtimeQueryServiceTest {
                         new ContentExternalIdentityLookupPort.ExternalIdentity(21L, "c1", "70")),
                 new ContentIdentityResolutionService((provider, type, ids) ->
                         new ContentIdentityResolutionPort.ResolutionBatch(
-                        ids.stream().map(id -> new ContentIdentityResolutionPort.Resolution(id, 11L,
+                        ids.stream().map(id -> new ContentIdentityResolutionPort.Resolution(id,
+                                type == ContentResourceType.CINEMA ? 21L : 11L,
                                 ContentIdentityResolutionPort.ResolutionStatus.RESOLVED)).toList())), snapshots, CLOCK);
     }
 
