@@ -195,6 +195,16 @@ class ContentQueryServiceTest {
     }
 
     @Test
+    void givenInvalidCityCode_whenFindingLiveDemoPurchaseCatalog_thenItReturns100001() {
+        ContentQueryService service = service(Optional.empty(), Optional.empty(), Optional.empty());
+
+        assertThatThrownBy(() -> service.findLiveDemoPurchaseCatalog("长沙"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo(100001);
+    }
+
+    @Test
     void givenMissingOrInvalidLocator_whenCreatingQuery_thenItRejectsBeforeAnyProviderAccess() {
         // 无定位条件和非正业务 ID 都必须在 Application 边界失败，避免生成无意义的缓存或快照键。
         assertThatThrownBy(() -> new ContentQuery(ContentResourceType.CINEMA, null, " ", ""))

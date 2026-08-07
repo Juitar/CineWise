@@ -94,6 +94,9 @@ class TravelTaskQueryServiceTest {
                 throw new BusinessException(TravelErrorCode.TASK_NOT_FOUND);
             }
             @Override public Optional<ContentSeedCatalog> findChangshaLivePurchaseCatalog() { return Optional.empty(); }
+            @Override public DemoPurchaseCatalog findLiveDemoPurchaseCatalog(String cityCode) {
+                throw new BusinessException(ContentSummaryQueryPort.ContentSummaryErrorCode.DATA_UNAVAILABLE);
+            }
         };
         TravelTaskQueryService service = detailedService(
                 repository, availableOrder(), unavailableMovies, availableCinemas());
@@ -125,6 +128,9 @@ class TravelTaskQueryServiceTest {
                         "DEMO_CONTENT_V1", LocalDateTime.of(2026, 8, 4, 8, 0)));
             }
             @Override public Optional<ContentSeedCatalog> findChangshaLivePurchaseCatalog() { return Optional.empty(); }
+            @Override public DemoPurchaseCatalog findLiveDemoPurchaseCatalog(String cityCode) {
+                throw new BusinessException(ContentSummaryQueryPort.ContentSummaryErrorCode.DATA_UNAVAILABLE);
+            }
         };
     }
 
