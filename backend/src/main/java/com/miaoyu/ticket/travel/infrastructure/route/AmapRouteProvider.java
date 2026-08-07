@@ -5,6 +5,7 @@ import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import com.miaoyu.ticket.travel.application.BasicRouteProvider;
 import com.miaoyu.ticket.travel.application.BasicRouteResult;
 import java.time.OffsetDateTime;
+import java.util.Locale;
 import java.util.Optional;
 
 /** 高德真实路线适配器，只输出时长和出发时间等安全摘要。 */
@@ -27,8 +28,17 @@ final class AmapRouteProvider implements BasicRouteProvider {
         }
         try {
             // 字符串坐标只在 HTTP Provider 边界短暂存在，不能返回到 Application 或写入任何缓存、日志。
-            JsonNode response = client.queryDrivingRoute(toAmapLocation(origin), toAmapLocation(destination),
-                    properties.key());
+            String mode = travelMode.trim().toUpperCase(Locale.ROOT);
+            JsonNode response = switch (mode) {
+                case "DRIVING" -> client.queryDrivingRoute(toAmapLocation(origin), toAmapLocation(destination),
+                        properties.key());
+                case "WALKING" -> client.queryWalkingRoute(toAmapLocation(origin), toAmapLocation(destination),
+                        properties.key());
+                default -> null;
+            };
+            if (response == null) {
+                return Optional.empty();
+            }
             if (!"1".equals(response.path("status").asText())) {
                 return Optional.empty();
             }
@@ -39,7 +49,7 @@ final class AmapRouteProvider implements BasicRouteProvider {
             }
             int minutes = Math.max(1, (int) Math.ceil(seconds / 60.0));
             return Optional.of(new BasicRouteResult(
-                    "AMAP", travelMode, minutes, requestedAt.plusMinutes(minutes), SOURCE, requestedAt,
+                    "AMAP", mode, minutes, requestedAt.plusMinutes(minutes), SOURCE, requestedAt,
                     requestedAt.plus(properties.resultTtl()), false, false, null));
         } catch (RuntimeException exception) {
             // 超时、网络异常和非 2xx 都交给降级 Provider；异常中不得拼入起点或 Key。

@@ -7,6 +7,7 @@ import com.miaoyu.ticket.content.application.CinemaLocationQueryService;
 import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.Locale;
 import java.util.Objects;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -82,7 +83,7 @@ public class BasicRouteService {
         } catch (IllegalArgumentException exception) {
             throw new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE);
         }
-        String mode = requireText(command.travelMode(), "出行方式不能为空");
+        String mode = requireTravelMode(command.travelMode());
         OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         try {
             return routeProvider.plan(origin, destination, mode, now)
@@ -111,5 +112,14 @@ public class BasicRouteService {
             throw new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE, message);
         }
         return text;
+    }
+
+    /** 目前只提供驾车和步行，其他模式不能悄悄降级成驾车或固定 Demo。 */
+    private String requireTravelMode(String value) {
+        String mode = requireText(value, "出行方式不能为空").toUpperCase(Locale.ROOT);
+        if (!"DRIVING".equals(mode) && !"WALKING".equals(mode)) {
+            throw new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE, "仅支持驾车或步行");
+        }
+        return mode;
     }
 }

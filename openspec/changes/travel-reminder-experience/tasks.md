@@ -29,7 +29,7 @@
 
 - [x] 4.1 D 已定义基础路线 Command、Provider 和响应摘要，接收一次性设备位置或手动地点；验证：`BasicRouteServiceTest` 覆盖仅确认共享后才调用 Provider，返回值只保留安全摘要。
 - [x] 4.2 D 已实现路线隐私与失败处理；验证：`BasicRouteServiceTest` 覆盖未确认不调用 Provider、Provider 不可用返回 `307001`；实现不向 MySQL、缓存、日志、画像、快照或 Agent 轨迹传递起点、路线折线或途经点。
-- [x] 4.3 D 实现高德真实路线 Provider，配置 `AMAP_ROUTE_ENABLED`、`AMAP_ROUTE_KEY`、2 秒连接超时和 5 秒读取超时；请求只传本次起点、影院终点和出行方式，成功返回路线摘要及 `source=AMAP_ROUTE`。验证：`AmapRouteProviderTest` 覆盖真实 Provider 成功、未配置、超时、非成功响应和字段不完整；失败时由 `DEMO_ROUTE_V1` 明确降级。
+- [x] 4.3 D 实现高德真实路线 Provider，配置 `AMAP_ROUTE_ENABLED`、`AMAP_ROUTE_KEY`、2 秒连接超时和 5 秒读取超时；请求只传本次起点、影院终点和出行方式，支持 `DRIVING` 和 `WALKING`，成功返回路线摘要及 `source=AMAP_ROUTE`。验证：`AmapRouteProviderTest` 与 `RestClientAmapRouteClientTest` 覆盖两种请求路径、未配置、超时、非成功响应和字段不完整；失败时由 `DEMO_ROUTE_V1` 明确降级。
 - [ ] 4.4 C、D 联调路线地图渲染与位置授权交互；验证：C 完成定位授权，定位允许、拒绝、超时和手动地点均有可继续路径；路线折线只在本次响应和页面内存使用。
 
 ## 5. 工具、接口与跨模块联调
