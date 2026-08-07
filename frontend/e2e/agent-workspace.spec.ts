@@ -142,6 +142,50 @@ async function mockAuthenticatedAgent(
       });
       return;
     }
+    if (showConfirmation && path === '/api/v1/agent/runs/52b810c5-4b03-4a41-9c36-07372f1a6f59') {
+      expect(request.method()).toBe('GET');
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          envelope({
+            runId: '52b810c5-4b03-4a41-9c36-07372f1a6f59',
+            sessionId,
+            status: 'COMPLETED',
+            planId: 'plan-e2e-1',
+            planVersion: 2,
+            startedAt: '2026-08-07T10:00:00+08:00',
+            finishedAt: '2026-08-07T10:00:00+08:00',
+            lastEventId: '42',
+            messages: [],
+            steps: [],
+            events: [
+              {
+                eventId: '42',
+                sessionId,
+                runId: '52b810c5-4b03-4a41-9c36-07372f1a6f59',
+                planId: 'plan-e2e-1',
+                planVersion: 2,
+                nodeId: 'create-order',
+                eventType: 'card',
+                displayText: '请确认建单',
+                payload: {
+                  type: 'PLAN_CARD',
+                  actionId: 'action-e2e-1',
+                  actionType: 'CREATE_ORDER',
+                  status: 'PENDING_CONFIRMATION',
+                  title: '确认建单',
+                  displayLines: ['影片：示例影片', '座位：已选择'],
+                  expiresAt: '2026-08-08T10:05:00+08:00',
+                },
+                occurredAt: '2026-08-07T10:00:00+08:00',
+              },
+            ],
+          }),
+        ),
+      });
+      return;
+    }
     if (path === '/api/v1/agent/actions/action-e2e-1/confirm') {
       expect(request.postDataJSON()).toEqual({ confirmed: true });
       await route.fulfill({
