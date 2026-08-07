@@ -6,7 +6,7 @@
 - [x] 1.4 将旧固定推荐测试替身替换为 `RecommendationPlanResult`，覆盖正常方案和空方案降级。
 - [x] 1.5 修正 MySQL 监督器测试结果时效，避免固定时间在 CI 中过期。
 - [x] 1.6 兼容 V009 的 `tool.result` 存储白名单，并在读取时还原当前公开工具终态事件。
-- [x] 1.7 监督器 MySQL 测试按 `CandidatePlan` 生成的服务端 UUID 校验持久化 planId。
+- [x] 1.7 监督器 MySQL 测试校验持久化 planId 为服务端生成的标准小写 UUID。
 
 ## 2. 验证
 

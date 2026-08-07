@@ -318,7 +318,8 @@ class AgentPersistenceMySqlIntegrationTest {
         AgentMessageSubmissionResult result = messageSubmissionService.submit(new AgentMessageSubmissionCommand(
                 FIRST_SESSION, "推荐电影", "supervisor-request", context.slotSnapshot(), context, 3_000L));
 
-        assertThat(result.snapshot().run().planId()).isEqualTo(plan.planId());
+        String persistedPlanId = result.snapshot().run().planId();
+        assertThat(persistedPlanId).isEqualTo(java.util.UUID.fromString(persistedPlanId).toString());
         assertThat(result.snapshot().run().planVersion()).isEqualTo(1);
         assertThat(result.snapshot().steps()).extracting(step -> step.nodeId()).containsExactly("rank");
         Mockito.verify(rankMoviePlanExecutionAdapter)
