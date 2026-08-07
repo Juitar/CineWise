@@ -36,7 +36,7 @@ function createUuid(): string {
 
   // 仅用于极旧浏览器或受限测试环境；序列号保证同一页面内不复用幂等键。
   fallbackUuidSequence = (fallbackUuidSequence + 1) % 0x1000000;
-  const timestamp = Date.now().toString(16).padStart(12, '0').slice(-12);
+  const timestamp = Date.now().toString(16).padStart(6, '0').slice(-6);
   const sequence = fallbackUuidSequence.toString(16).padStart(6, '0');
   return `00000000-0000-4000-8000-${timestamp}${sequence}`;
 }
