@@ -18,7 +18,7 @@
 ## Decisions
 
 - 在 mock Bean 创建和 `@BeforeEach` 的 reset 后，显式 stub `targetName()` 与 `definition()`。这是 Mockito reset 的必要恢复步骤，且直接复用生产白名单定义，避免测试复制字段。
-- 测试计划直接引用当前白名单必填字段，成功结果使用最小 `RecommendationPlanResult`。测试只验证 B 的监督器持久化，不依赖 D 已废弃的固定推荐服务。
+- 测试计划直接引用当前白名单必填字段，成功结果使用当前时刻生成、尚未过期的最小 `RecommendationPlanResult`。测试只验证 B 的监督器持久化，不依赖 D 已废弃的固定推荐服务。
 - 仅检查同一个测试配置中的其他 `AgentToolExecutor` mock；不扩大到无关测试重构。
 
 ## Risks / Trade-offs

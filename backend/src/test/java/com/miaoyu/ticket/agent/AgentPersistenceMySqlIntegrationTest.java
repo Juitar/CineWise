@@ -564,9 +564,10 @@ class AgentPersistenceMySqlIntegrationTest {
         ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(
                 new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan())));
         var running = stateMachine.startNode(request.state(), request.nodeId());
+        Instant dataAt = Instant.now().minusSeconds(1L);
         RecommendationPlanResult recommendation = new RecommendationPlanResult(
                 "1.0", "fixture", List.of(), List.of("SHOWTIME"), null, false, "fixture",
-                Instant.parse("2026-08-06T00:00:00Z"), Instant.parse("2026-08-06T00:05:00Z"), true);
+                dataAt, dataAt.plusSeconds(300L), true);
         ToolResult<RecommendationPlanResult> toolResult = new ToolResult<>(
                 ToolStatus.SUCCESS, recommendation, null, false, false, "CONTINUE", true,
                 "SHOWTIME_UNAVAILABLE", 1L, recommendation.dataAt(), recommendation.expiresAt());
