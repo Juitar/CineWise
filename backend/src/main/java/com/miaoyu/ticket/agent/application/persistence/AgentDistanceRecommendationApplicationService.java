@@ -61,6 +61,8 @@ public class AgentDistanceRecommendationApplicationService {
     }
 
     public AgentDistanceRunResponse initialize(String sessionId, AgentDistanceRunInitializeRequest request) {
+        // 新的距离推荐请求也必须先处理本人已过期的等待运行，不能让旧 active_run_id 长期占用会话。
+        recoverExpiredWaitingRuns();
         AgentInitialRunResult result = initializationService.initialize(
                 sessionId, request.clientRequestId(), request.content(), request.context().entry());
         return response(result.run());
