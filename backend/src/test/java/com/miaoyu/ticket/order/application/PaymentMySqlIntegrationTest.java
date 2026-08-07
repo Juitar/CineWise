@@ -5,6 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.auth.application.RoleCode;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -39,6 +43,8 @@ class PaymentMySqlIntegrationTest {
 
     private static final String REQUIRED_DATABASE = "cinewise_ticketing_concurrency_check";
     private static final long TEST_USER_ID = 9_500_001L;
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-08-02T00:00:00Z");
+    private static final LocalDateTime FIXED_LOCAL_TIME = LocalDateTime.of(2026, 8, 2, 8, 0);
 
     @Autowired
     private OrderApplicationService orderApplicationService;
@@ -114,10 +120,10 @@ class PaymentMySqlIntegrationTest {
                 SELECT id
                   FROM movie_show
                  WHERE status = 'ON_SALE'
-                   AND start_time > CURRENT_TIMESTAMP(3)
+                   AND start_time > ?
                  ORDER BY start_time, id
                  LIMIT 1
-                """, Long.class);
+                """, Long.class, FIXED_LOCAL_TIME);
         long seatId = jdbcTemplate.queryForObject("""
                 SELECT id
                   FROM show_seat
@@ -179,6 +185,13 @@ class PaymentMySqlIntegrationTest {
         @Primary
         CurrentUserAccessor fixedCurrentUserAccessor() {
             return () -> new CurrentUser(TEST_USER_ID, RoleCode.USER, 0L);
+        }
+
+        /** 与固定种子窗口使用相同业务时间，测试不得依赖 MySQL 或机器当前日期。 */
+        @Bean
+        @Primary
+        Clock fixedBusinessClock() {
+            return Clock.fixed(FIXED_INSTANT, ZoneId.of("Asia/Shanghai"));
         }
     }
 }
