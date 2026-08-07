@@ -53,6 +53,11 @@ public class GetWeatherTool {
             if (cinemaId == null || !cinemaId.matches("[1-9][0-9]*")) {
                 throw new IllegalArgumentException("cinemaId 必须是正整数");
             }
+            try {
+                Long.parseLong(cinemaId);
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("cinemaId 超出 Java long 范围", exception);
+            }
         }
 
         public long longCinemaId() { return Long.parseLong(cinemaId); }

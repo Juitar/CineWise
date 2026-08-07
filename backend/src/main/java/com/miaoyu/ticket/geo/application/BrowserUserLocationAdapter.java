@@ -3,6 +3,7 @@ package com.miaoyu.ticket.geo.application;
 import com.miaoyu.ticket.geo.domain.LocationGranularity;
 import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import org.springframework.stereotype.Component;
 
 /**
@@ -15,7 +16,15 @@ import org.springframework.stereotype.Component;
 public class BrowserUserLocationAdapter {
 
     /** 将 C 已获授权的数值坐标直接标为设备位置。 */
+    /**
+     * 浏览器可能返回超过 6 位小数；D 在入口按 HALF_UP 统一规范化，避免由各个前端页面自行截断。
+     * 规范化后的坐标仍由 {@link ResolvedGeoPoint} 进行空值与范围校验。
+     */
     public ResolvedGeoPoint fromBrowser(BigDecimal longitude, BigDecimal latitude) {
-        return new ResolvedGeoPoint(longitude, latitude, LocationGranularity.DEVICE);
+        return new ResolvedGeoPoint(normalize(longitude), normalize(latitude), LocationGranularity.DEVICE);
+    }
+
+    private BigDecimal normalize(BigDecimal value) {
+        return value == null ? null : value.setScale(6, RoundingMode.HALF_UP);
     }
 }

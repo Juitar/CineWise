@@ -66,6 +66,27 @@ class WeatherQueryServiceTest {
         org.mockito.Mockito.verify(adcodes).resolve(point);
     }
 
+    @Test
+    void givenCinemaCoordinateWithoutArea_whenQuerying_thenUsesReverseGeocodedAdcode() {
+        CinemaLocationQueryService cinemas = Mockito.mock(CinemaLocationQueryService.class);
+        WeatherAdcodeAdapter adcodes = Mockito.mock(WeatherAdcodeAdapter.class);
+        ResolvedGeoPoint point = new ResolvedGeoPoint(
+                new java.math.BigDecimal("112.938814"), new java.math.BigDecimal("28.228209"),
+                LocationGranularity.ADDRESS);
+        when(cinemas.findAreaByCinemaId(4L)).thenReturn(Optional.empty());
+        when(cinemas.findByCinemaId(4L)).thenReturn(Optional.of(point));
+        when(adcodes.resolve(point)).thenReturn(Optional.of("430104"));
+        WeatherQueryService service = new WeatherQueryService(
+                (key, time) -> Optional.of(observation("AMAP_WEATHER", false, null)),
+                (key, time) -> Optional.empty(), new InMemoryCache(), CLOCK, cinemas, adcodes);
+
+        WeatherObservation result = service.query(4L);
+
+        assertThat(result.source()).isEqualTo("AMAP_WEATHER");
+        assertThat(result.area()).isNull();
+        org.mockito.Mockito.verify(adcodes).resolve(point);
+    }
+
     private WeatherObservation observation(String source, boolean degraded, String fallback) {
         OffsetDateTime now = OffsetDateTime.ofInstant(CLOCK.instant(), ZoneOffset.UTC);
         return new WeatherObservation(

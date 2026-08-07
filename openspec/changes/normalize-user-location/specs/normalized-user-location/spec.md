@@ -18,6 +18,11 @@
 - **WHEN** 经度或纬度为空、越界或超过 6 位小数
 - **THEN** 系统拒绝该请求，且不创建距离上下文、不请求外部 Provider、不记录精确坐标
 
+#### Scenario: 浏览器坐标超过 6 位小数
+
+- **WHEN** C 将 `position.coords.longitude/latitude` 的原始数值提交给 D，且任一坐标超过 6 位小数
+- **THEN** `BrowserUserLocationAdapter` MUST 按 `HALF_UP` 统一四舍五入到 6 位小数后再校验范围；C 不得自行截断，也不得把原始坐标写入 URL、存储、日志、Mock 或 Agent/SSE 消息
+
 ### Requirement: 地点文本必须经地理编码并保留粒度
 
 系统 MUST 仅接收 B 已提取并确认的 `placeText`，通过高德地理编码 Adapter 解析为统一坐标。解析结果必须按 Provider 返回级别映射为 CITY、DISTRICT、POI 或 ADDRESS；多个候选不能唯一确定时必须返回结构化候选或明确错误。

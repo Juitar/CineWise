@@ -72,6 +72,16 @@ class TravelReadOnlyToolsTest {
     }
 
     @Test
+    void shouldRejectInvalidCinemaIdFormatsAndValuesBeforeExecution() {
+        List<String> invalidCinemaIds = List.of("0", "01", "-1", "movie-1", "9223372036854775808");
+
+        for (String cinemaId : invalidCinemaIds) {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                    () -> new GetWeatherTool.GetWeatherCommand(cinemaId));
+        }
+    }
+
+    @Test
     void shouldReadExistingAdviceWithoutRefreshingSnapshot() {
         TravelTaskQueryService service = mock(TravelTaskQueryService.class);
         TravelTaskQueryService.TravelAdviceSummary summary = new TravelTaskQueryService.TravelAdviceSummary(

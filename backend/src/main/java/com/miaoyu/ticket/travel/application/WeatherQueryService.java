@@ -62,11 +62,6 @@ public class WeatherQueryService {
             throw new IllegalStateException("影院位置查询服务未配置");
         }
         String area = cinemaLocationQueryService.findAreaByCinemaId(cinemaId).orElse(null);
-        if (area == null) {
-            OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
-            return new WeatherObservation(null, null, "天气暂不可用", "UNAVAILABLE", now, now,
-                    true, true, "NONE");
-        }
         ResolvedGeoPoint location = cinemaLocationQueryService.findByCinemaId(cinemaId).orElse(null);
         if (location != null && weatherAdcodeAdapter != null) {
             Optional<String> adcode = weatherAdcodeAdapter.resolve(location);
@@ -80,10 +75,15 @@ public class WeatherQueryService {
                         observation.fallbackType());
             }
         }
-        WeatherObservation fallback = query(area);
-        return new WeatherObservation(
-                area, fallback.condition(), fallback.risk(), fallback.source(), fallback.dataTime(),
-                fallback.expiresAt(), fallback.isExpired(), true, "AREA_ADCODE_FALLBACK");
+        if (area != null) {
+            WeatherObservation fallback = query(area);
+            return new WeatherObservation(
+                    area, fallback.condition(), fallback.risk(), fallback.source(), fallback.dataTime(),
+                    fallback.expiresAt(), fallback.isExpired(), true, "AREA_ADCODE_FALLBACK");
+        }
+        OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
+        return new WeatherObservation(null, null, "天气暂不可用", "UNAVAILABLE", now, now,
+                true, true, "NONE");
     }
 
     public WeatherObservation query(String cinemaArea) {
