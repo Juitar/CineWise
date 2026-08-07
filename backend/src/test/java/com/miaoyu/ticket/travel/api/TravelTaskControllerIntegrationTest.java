@@ -1,5 +1,6 @@
 package com.miaoyu.ticket.travel.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -16,8 +17,8 @@ import com.miaoyu.ticket.travel.application.TravelTaskSummary;
 import java.time.OffsetDateTime;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,11 +30,21 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** 验证建议接口只展示本人已生成快照，且不向页面泄漏位置或路线字段。 */
-@ActiveProfiles("test")
-@SpringBootTest
+@EnabledIfEnvironmentVariable(named = "CINEWISE_MYSQL_TRAVEL_IT", matches = "true")
+@ActiveProfiles("dev")
+@SpringBootTest(properties = {
+    "spring.flyway.enabled=true",
+    "cinewise.seed.enabled=true",
+    "cinewise.seed.fixed-value=20260802",
+    "cinewise.transaction.expiry-job-enabled=false",
+    "cinewise.transaction.paid-travel-reconciliation.enabled=false",
+    "cinewise.transaction.refunded-travel-reconciliation.enabled=false",
+    "management.health.redis.enabled=false"
+})
 @AutoConfigureMockMvc
-@Disabled("待 A 在已执行 V013 的 MySQL 集成环境验证 cinema_id")
 class TravelTaskControllerIntegrationTest {
+
+    private static final String REQUIRED_DATABASE = "cinewise_ticketing_concurrency_check";
 
     private static final long OWNER_ID = 66001L;
     private static final long OTHER_USER_ID = 66002L;
@@ -52,6 +63,9 @@ class TravelTaskControllerIntegrationTest {
 
     @BeforeEach
     void clearTravelData() {
+        assertThat(jdbcTemplate.queryForObject("SELECT DATABASE()", String.class))
+                .as("出行任务接口 MySQL 测试只允许操作隔离库")
+                .isEqualTo(REQUIRED_DATABASE);
         jdbcTemplate.update("DELETE FROM travel_notification_log");
         jdbcTemplate.update("DELETE FROM travel_advice_snapshot");
         jdbcTemplate.update("DELETE FROM travel_task");

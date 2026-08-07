@@ -16,8 +16,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -28,14 +28,17 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /** 使用真实A交易表和D公开服务验证退款取消恢复及PAID迟到竞态。 */
-@ActiveProfiles("test")
+@EnabledIfEnvironmentVariable(named = "CINEWISE_MYSQL_TRAVEL_IT", matches = "true")
+@ActiveProfiles("dev")
 @SpringBootTest(properties = {
+    "spring.flyway.enabled=true",
     "cinewise.seed.enabled=true",
     "cinewise.seed.fixed-value=20260802"
 })
 @Import(RefundedTravelTaskReconciliationIntegrationTest.ReconciliationTestConfiguration.class)
-@Disabled("待 A 在已执行 V013 的 MySQL 集成环境验证 cinema_id")
 class RefundedTravelTaskReconciliationIntegrationTest {
+
+    private static final String REQUIRED_DATABASE = "cinewise_ticketing_concurrency_check";
 
     private static final Instant FIXED_INSTANT = Instant.parse("2026-08-02T00:00:00Z");
     private static final LocalDateTime FIXED_LOCAL_TIME = LocalDateTime.of(2026, 8, 2, 8, 0);
@@ -64,6 +67,9 @@ class RefundedTravelTaskReconciliationIntegrationTest {
 
     @BeforeEach
     void resetTransactionAndTravelData() {
+        assertThat(jdbcTemplate.queryForObject("SELECT DATABASE()", String.class))
+                .as("REFUNDED 出行补偿 MySQL 测试只允许操作隔离库")
+                .isEqualTo(REQUIRED_DATABASE);
         jdbcTemplate.update("DELETE FROM travel_notification_log");
         jdbcTemplate.update("DELETE FROM travel_advice_snapshot");
         jdbcTemplate.update("DELETE FROM travel_task");

@@ -14,8 +14,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
@@ -26,10 +26,20 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 验证 D 只在发布事务提交后创建任务，且补偿与事件共用同一唯一任务。 */
-@ActiveProfiles("test")
-@SpringBootTest
-@Disabled("待 A 在已执行 V013 的 MySQL 集成环境验证 cinema_id")
+@EnabledIfEnvironmentVariable(named = "CINEWISE_MYSQL_TRAVEL_IT", matches = "true")
+@ActiveProfiles("dev")
+@SpringBootTest(properties = {
+    "spring.flyway.enabled=true",
+    "cinewise.seed.enabled=true",
+    "cinewise.seed.fixed-value=20260802",
+    "cinewise.transaction.expiry-job-enabled=false",
+    "cinewise.transaction.paid-travel-reconciliation.enabled=false",
+    "cinewise.transaction.refunded-travel-reconciliation.enabled=false",
+    "management.health.redis.enabled=false"
+})
 class TravelTaskPaymentEventIntegrationTest {
+
+    private static final String REQUIRED_DATABASE = "cinewise_ticketing_concurrency_check";
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;
@@ -60,6 +70,9 @@ class TravelTaskPaymentEventIntegrationTest {
 
     @BeforeEach
     void clearTravelTasks() {
+        assertThat(jdbcTemplate.queryForObject("SELECT DATABASE()", String.class))
+                .as("出行事件 MySQL 测试只允许操作隔离库")
+                .isEqualTo(REQUIRED_DATABASE);
         jdbcTemplate.update("DELETE FROM travel_notification_log");
         jdbcTemplate.update("DELETE FROM travel_advice_snapshot");
         jdbcTemplate.update("DELETE FROM travel_task");
@@ -218,7 +231,9 @@ class TravelTaskPaymentEventIntegrationTest {
         LocalDateTime futureStartAt = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID)
                 .plusDays(1);
         jdbcTemplate.update("UPDATE travel_task SET start_at = ? WHERE id = ?", futureStartAt, internalTaskId);
-        jdbcTemplate.update("UPDATE travel_task SET trigger_at = DATEADD('MINUTE', -1, CURRENT_TIMESTAMP) WHERE id = ?",
+        jdbcTemplate.update(
+                "UPDATE travel_task SET trigger_at = DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 MINUTE) "
+                        + "WHERE id = ?",
                 internalTaskId);
 
         travelReminderSchedulingService.runDueTasks();
@@ -245,7 +260,9 @@ class TravelTaskPaymentEventIntegrationTest {
         long elapsedId = jdbcTemplate.queryForObject(
                 "SELECT id FROM travel_task WHERE task_id = ?", Long.class, elapsed.taskId());
         travelAdviceService.generate(elapsedId);
-        jdbcTemplate.update("UPDATE travel_task SET start_at = DATEADD('HOUR', -3, CURRENT_TIMESTAMP) WHERE id = ?",
+        jdbcTemplate.update(
+                "UPDATE travel_task SET start_at = DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 3 HOUR) "
+                        + "WHERE id = ?",
                 elapsedId);
 
         travelReminderSchedulingService.runDueTasks();
@@ -325,7 +342,7 @@ class TravelTaskPaymentEventIntegrationTest {
 
     private String triggerAtForOrder(long orderId) {
         return jdbcTemplate.queryForObject(
-                "SELECT FORMATDATETIME(trigger_at, 'yyyy-MM-dd HH:mm:ss') FROM travel_task WHERE order_id = ?",
+                "SELECT DATE_FORMAT(trigger_at, '%Y-%m-%d %H:%i:%s') FROM travel_task WHERE order_id = ?",
                 String.class,
                 orderId);
     }

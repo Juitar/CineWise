@@ -74,9 +74,9 @@ D 实现 `AmapRouteProvider`，由 `AMAP_ROUTE_ENABLED`、`AMAP_ROUTE_KEY`、`AM
 
 其中 `travel_task.task_id` 与子表的 `travel_task_id` 不是同一字段：前者是对外字符串，后者是内部 `BIGINT` 逻辑关联，避免关联语义和字段类型混淆。三表不使用软删除；任务与快照按 30 天硬删除，通知日志按 90 天硬删除，保留期差异产生的逻辑孤儿是受控审计数据而不是可恢复任务。
 
-A 静态复核的 V013 仅追加 `travel_task.cinema_id BIGINT NULL`，位于 `show_id` 后，不建物理外键、索引、默认值或回填；新增约束必须明确写为 `CHECK (cinema_id IS NULL OR cinema_id > 0)`。该结构仍只作为 SQL 草案，不创建、执行或进入 Flyway 目录，直到 A 完成迁移复核和授权。
+A 已发布的 V013 仅追加 `travel_task.cinema_id BIGINT NULL`，位于 `show_id` 后，不建物理外键、索引、默认值或回填；约束为 `CHECK (cinema_id IS NULL OR cinema_id > 0)`。共享 MySQL 库已完成 V013/V017，D 不修改已发布迁移；本 change 仍需在 MySQL 隔离环境验证该字段相关的支付、退款、补偿、墓碑和任务查询场景。
 
-发布顺序固定为：1. A 先发布 V013；2. A、D 部署兼容事件与任务处理代码；3. 仅在 V013 与兼容代码均验证通过后，才启用基于影院终点的路线查询。前一步未完成时，后一步不得启用。
+发布顺序固定为：1. A 发布 V013；2. A、D 部署兼容事件与任务处理代码；3. MySQL 隔离工作流验证 V013 字段相关场景；4. 仅在前述验证通过后，才启用基于影院终点的路线查询。测试代码不得用 `@Disabled` 隐藏失败，H2 只运行不读取 `cinema_id` 的测试。
 
 ## Risks / Trade-offs
 

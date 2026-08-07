@@ -5,7 +5,7 @@
 - [x] 1.3 C 确认 `EmailDeliveryPort` 的 `deliveryKey` 发送/查询语义、Mock Provider 和已验证邮箱解析边界；验证：D 仅传 `recipientUserId`，重复键可查回原结果。
 - [x] 1.4 A 已正式分配 V007，并确认 `travel_task`、`travel_advice_snapshot`、`travel_notification_log` 的字段、索引、保留期、非负计数和终态时间 CHECK 及兼容方案；验证：记录 Owner 确认，未修改已发布迁移。
 - [x] 1.5 B、C、D 确认只读出行工具和卡片边界；验证：B 对话读取不创建任务、刷新快照、发送邮件或请求位置，C 只在用户主动操作时发起路线请求。
-- [ ] 1.6 A 已确认 `PaymentSucceededEvent`、`OrderInvalidated` 的 `String cinemaId` 字段、V013 的 `travel_task.cinema_id BIGINT NULL` 及 `CHECK (cinema_id IS NULL OR cinema_id > 0)`；待 V013 SQL、A/D 事件处理和测试实际完成后再勾选。字段不含用户位置、坐标或路线数据。
+- [ ] 1.6 A 已确认 `PaymentSucceededEvent`、`OrderInvalidated` 的 `String cinemaId` 字段、已发布 V013 的 `travel_task.cinema_id BIGINT NULL` 及 `CHECK (cinema_id IS NULL OR cinema_id > 0)`；待 MySQL 集成测试实际验证支付、退款、补偿、墓碑和任务查询场景后再勾选。字段不含用户位置、坐标或路线数据。
 
 ## 2. 任务、事件与数据基础
 
@@ -35,7 +35,7 @@
 ## 5. 工具、接口与跨模块联调
 
 - [x] 5.1 D 实现 `GetWeatherTool`、`GetTravelAdviceTool`、`PlanBasicRouteTool`，仅调用 D Application Service；验证：现有出行工具测试覆盖公开 `ToolContext`/`ToolResult<T>` 适配、只读调用和错误映射，不调用模型、不发布 SSE、不访问 Mapper。本期不将 `SearchNearbyFoodTool` 作为完成条件。
-- [ ] 5.2 A、D 联调支付事件实际发布、任务创建、订单失效和补偿；待 A 提供已执行 V013 的 MySQL 集成环境后验证提交后消费、回滚隔离、重复事件和补偿；当前 H2 基线停在 V009，不能证明 `cinema_id` 场景。
+- [ ] 5.2 A、D 联调支付事件实际发布、任务创建、订单失效和补偿；四个关键集成测试保留在代码中，仅由 `CINEWISE_MYSQL_TRAVEL_IT=true` 启用，并由 MySQL 工作流在已执行 V013 的隔离库运行；完成后再记录提交后消费、回滚隔离、重复事件和补偿结果。H2 默认不运行读取 `cinema_id` 的集成测试。
 - [ ] 5.3 B、D 联调对话中的只读建议摘要；验证：调用不产生 `agent_*`、任务、建议、通知或位置写入。
 - [ ] 5.4 C、D 联调本人任务、建议、刷新和路线接口；验证：401、403、404、409、422、429、503 与约定错误码、来源时效和降级展示一致。
 
@@ -44,5 +44,5 @@
 - [ ] 6.1 D 完成任务、Provider、缓存、调度、事件、通知、权限、并发、降级和隐私的单元及集成测试；验证：测试输出记录通过数、失败数、跳过数和失败复现信息。
 - [ ] 6.2 后续由 A、C、D 在 MySQL 8、Redis 和 Mock 邮件 Provider 环境执行事件、缓存、通知恢复和隐私验证；服务器 Key、Compose 实际注入、真实 SMTP 和生产环境验证不阻塞本 change 当前 D 代码与测试完成。验证：不在该任务中用普通应用环境执行 Flyway，真实环境结果附环境、命令和缺陷编号。
 - [ ] 6.3 D 执行离线演示回归：关闭真实天气、路线和邮件 Provider；验证：核心购票和电子票可用，出行能力明确降级，未把 Mock 作为实时事实。
-- [ ] 6.4 D 执行 `backend\mvnw.cmd verify`、`openspec validate travel-reminder-experience --strict`、`git diff --check` 和变更文件核对；待 V013 的 MySQL 集成测试和当前 dev 的既有 Checkstyle 问题处理后，才能声明构建、测试、架构检查、Checkstyle、SpotBugs、JaCoCo 全部通过。
+- [ ] 6.4 D 执行 `backend\mvnw.cmd verify`、`openspec validate travel-reminder-experience --strict`、`git diff --check` 和变更文件核对；待 MySQL 工作流实际执行 V013 集成测试并处理当前 dev 的既有 Checkstyle 问题后，才能声明构建、测试、架构检查、Checkstyle、SpotBugs、JaCoCo 全部通过。
 - [ ] 6.5 D 记录回归结果、缺陷、风险、关联提交和 A/B/C 审查结论；验证：所有已勾选任务均有对应证据，全部完成后再同步主规格并归档。
