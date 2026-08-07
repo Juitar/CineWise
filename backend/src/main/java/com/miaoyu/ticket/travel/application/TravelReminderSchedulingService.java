@@ -44,6 +44,11 @@ public class TravelReminderSchedulingService {
     /** 单条异常不能终止本轮其他任务；版本条件更新保证多个调度实例最终只写一个快照。 */
     public void runDueTasks() {
         LocalDateTime now = now();
+        LocalDateTime elapsedBefore = now.minusHours(COMPLETE_AFTER_HOURS);
+        // 先关闭已超过观影结束窗口的任务，避免同一轮调度先给过期任务生成建议再补做关闭。
+        for (Long taskId : taskRepository.listElapsedTaskIds(elapsedBefore, BATCH_SIZE)) {
+            taskRepository.completeIfElapsed(taskId, elapsedBefore, now);
+        }
         for (TravelTaskRepository.TravelTaskSnapshot task : taskRepository.listDueForAdvice(now, BATCH_SIZE)) {
             try {
                 TravelAdviceSnapshot snapshot = adviceService.generate(task.id());
@@ -55,11 +60,6 @@ public class TravelReminderSchedulingService {
                 LOGGER.warn("出行提醒建议生成失败，等待下一轮重试, taskId={}, errorType={}",
                         task.id(), exception.getClass().getSimpleName());
             }
-        }
-        LocalDateTime elapsedBefore = now.minusHours(COMPLETE_AFTER_HOURS);
-        for (Long taskId : taskRepository.listElapsedTaskIds(elapsedBefore, BATCH_SIZE)) {
-            // 阈值只用于判断是否已结束；closed_at 必须记录本次真实关闭时间，不能提前两小时。
-            taskRepository.completeIfElapsed(taskId, elapsedBefore, now);
         }
     }
 
