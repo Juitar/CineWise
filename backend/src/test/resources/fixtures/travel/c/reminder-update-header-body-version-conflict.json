@@ -1,0 +1,7 @@
+{
+  "httpStatus": 409,
+  "code": 100409,
+  "message": "资源状态冲突",
+  "data": null,
+  "traceId": "dddddddddddddddddddddddddddddddd"
+}
