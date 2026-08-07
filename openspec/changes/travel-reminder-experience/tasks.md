@@ -5,7 +5,7 @@
 - [x] 1.3 C 确认 `EmailDeliveryPort` 的 `deliveryKey` 发送/查询语义、Mock Provider 和已验证邮箱解析边界；验证：D 仅传 `recipientUserId`，重复键可查回原结果。
 - [x] 1.4 A 已正式分配 V007，并确认 `travel_task`、`travel_advice_snapshot`、`travel_notification_log` 的字段、索引、保留期、非负计数和终态时间 CHECK 及兼容方案；验证：记录 Owner 确认，未修改已发布迁移。
 - [x] 1.5 B、C、D 确认只读出行工具和卡片边界；验证：B 对话读取不创建任务、刷新快照、发送邮件或请求位置，C 只在用户主动操作时发起路线请求。
-- [ ] 1.6 A 已确认 `PaymentSucceededEvent`、`OrderInvalidated` 的 `String cinemaId` 字段、已发布 V013 的 `travel_task.cinema_id BIGINT NULL` 及 `CHECK (cinema_id IS NULL OR cinema_id > 0)`；待 MySQL 集成测试实际验证支付、退款、补偿、墓碑和任务查询场景后再勾选。字段不含用户位置、坐标或路线数据。
+- [x] 1.6 A 已确认 `PaymentSucceededEvent`、`OrderInvalidated` 的 `String cinemaId` 字段、已发布 V013 的 `travel_task.cinema_id BIGINT NULL` 及 `CHECK (cinema_id IS NULL OR cinema_id > 0)`；验证：V013 结构记录与合并后 MySQL 出行联调记录覆盖支付、退款、补偿、墓碑和任务查询场景。字段不含用户位置、坐标或路线数据。
 
 ## 2. 任务、事件与数据基础
 
@@ -14,7 +14,7 @@
 - [x] 2.3 D 实现 `PaymentSucceededEvent` 的 AFTER_COMMIT 消费、`eventId` 去重、`orderId` 唯一任务创建及 A 补偿共用的 `ensureTask`；验证：`TravelTaskApplicationServiceTest`、`TravelTaskPaymentEventIntegrationTest` 覆盖重复事件、首次消费失败后的补偿、并发创建、提交后消费和回滚不创建，均通过。
 - [x] 2.4 D 实现 `OrderInvalidated` 的版本比较、任务取消和建议过期处理；验证：`TravelTaskApplicationServiceTest`、`TravelTaskPaymentEventIntegrationTest` 覆盖退款提交后取消、退款先到的 CANCELLED 墓碑、支付事件随后到达不重开任务、低版本退款后较高版本退款推进墓碑审计字段及两版本并发到达时保留较高版本，均通过。
 - [x] 2.5 D 提供本人任务查询、提醒时间更新与只读建议摘要 Application/API 边界；验证：`TravelTaskQueryServiceTest` 覆盖跨用户隐藏、取消任务返回 `207002`、五分钟内刷新返回 `107001`，均通过。
-- [ ] 2.6 A、D 在 A 的事件代码合入后实现并验证 `cinemaId` 处理；验证：合法支付任务、非法支付后的 PAID 补偿、退款先到合法/非法影院 ID、已有任务退款保留原值、迟到支付不重开、历史 `cinema_id=NULL` 路线不可用，以及 V013 对 `0`/负数的 CHECK 均通过。
+- [x] 2.6 A、D 在 A 的事件代码合入后实现并验证 `cinemaId` 处理；验证：合法支付任务、非法支付后的 PAID 补偿、退款先到合法/非法影院 ID、已有任务退款保留原值、迟到支付不重开、历史 `cinema_id=NULL` 路线不可用，以及 V013 对 `0`/负数的 CHECK 均通过，详见 A/D MySQL 联调记录。
 
 ## 3. 天气建议、快照与提醒投递
 
@@ -35,7 +35,7 @@
 ## 5. 工具、接口与跨模块联调
 
 - [x] 5.1 D 实现 `GetWeatherTool`、`GetTravelAdviceTool`、`PlanBasicRouteTool`，仅调用 D Application Service；验证：现有出行工具测试覆盖公开 `ToolContext`/`ToolResult<T>` 适配、只读调用和错误映射，不调用模型、不发布 SSE、不访问 Mapper。本期不将 `SearchNearbyFoodTool` 作为完成条件。
-- [ ] 5.2 A、D 联调支付事件实际发布、任务创建、订单失效和补偿；四个关键集成测试保留在代码中，仅由 `CINEWISE_MYSQL_TRAVEL_IT=true` 启用，并由 MySQL 工作流在已执行 V013 的隔离库运行；完成后再记录提交后消费、回滚隔离、重复事件和补偿结果。H2 默认不运行读取 `cinema_id` 的集成测试。
+- [x] 5.2 A、D 联调支付事件实际发布、任务创建、订单失效和补偿；验证：`TravelTaskPaymentEventIntegrationTest` 13/13、PAID 补偿 2/2、REFUNDED 补偿 3/3、任务查询 2/2 均在 MySQL 8.4 隔离库通过，覆盖提交后消费、回滚隔离、重复事件、退款取消和补偿结果。H2 默认不运行读取 `cinema_id` 的集成测试。
 - [ ] 5.3 B、D 联调对话中的只读建议摘要；验证：调用不产生 `agent_*`、任务、建议、通知或位置写入。
 - [ ] 5.4 C、D 联调本人任务、建议、刷新和路线接口；验证：401、403、404、409、422、429、503 与约定错误码、来源时效和降级展示一致。
 
