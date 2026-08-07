@@ -23,14 +23,18 @@ export function ExternalShowtimeImportPanel() {
     setResult(null);
     setError(null);
     try {
-      setResult(await importExternalShowtimeReferences({
-        cinemaIds: values.cinemaIds,
-        showDate: values.showDate.format('YYYY-MM-DD'),
-      }));
+      setResult(
+        await importExternalShowtimeReferences({
+          cinemaIds: values.cinemaIds,
+          showDate: values.showDate.format('YYYY-MM-DD'),
+        }),
+      );
     } catch (requestError: unknown) {
-      setError(requestError instanceof ApiError
-        ? requestError
-        : new ApiError('导入请求失败', { kind: 'INVALID_RESPONSE' }));
+      setError(
+        requestError instanceof ApiError
+          ? requestError
+          : new ApiError('导入请求失败', { kind: 'INVALID_RESPONSE' }),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -43,7 +47,11 @@ export function ExternalShowtimeImportPanel() {
           开场参考来自 D；影厅、座位、库存与票价由 A 本地沙箱生成，不代表外部真实库存。
         </Typography.Paragraph>
         <Form form={form} layout="vertical" initialValues={{ showDate: dayjs() }}>
-          <Form.Item label="场次日期" name="showDate" rules={[{ required: true, message: '请选择场次日期' }]}>
+          <Form.Item
+            label="场次日期"
+            name="showDate"
+            rules={[{ required: true, message: '请选择场次日期' }]}
+          >
             <DatePicker allowClear={false} className="external-showtime-import-date" />
           </Form.Item>
           <Form.Item
@@ -70,29 +78,53 @@ export function ExternalShowtimeImportPanel() {
               showIcon
               type="warning"
               message="影院列表暂不可用，请稍后重试"
-              description={cinemasQuery.error.traceId ? `TraceId: ${cinemasQuery.error.traceId}` : undefined}
+              description={
+                cinemasQuery.error.traceId ? `TraceId: ${cinemasQuery.error.traceId}` : undefined
+              }
             />
           ) : null}
           <Button loading={isSubmitting} type="primary" onClick={handleSubmit}>
             导入本地沙箱场次
           </Button>
         </Form>
-        {error ? <Alert className="external-showtime-import-feedback" showIcon type="error" message={
-          error.status === 403 ? '无权执行导入' : error.message
-        } description={error.traceId ? `TraceId: ${error.traceId}` : undefined} /> : null}
-        {result ? <Result className="external-showtime-import-result"
-          status={result.truncated ? 'warning' : result.showIds.length === 0 ? 'info' : 'success'}
-          title={result.truncated
-            ? '候选结果被截断，未执行导入'
-            : result.showIds.length === 0
-              ? '该日期和影院没有可导入场次'
-              : `已处理 ${result.showIds.length} 个本地场次`}
-          subTitle={result.truncated
-            ? '请缩小影院范围后重新提交。'
-            : result.showIds.length === 0
-              ? '请尝试未来 1～7 天的日期，或选择其他影院。'
-              : undefined}
-          extra={<Space wrap>{result.showIds.map((showId) => <Typography.Text code key={showId}>{showId}</Typography.Text>)}</Space>} /> : null}
+        {error ? (
+          <Alert
+            className="external-showtime-import-feedback"
+            showIcon
+            type="error"
+            message={error.status === 403 ? '无权执行导入' : error.message}
+            description={error.traceId ? `TraceId: ${error.traceId}` : undefined}
+          />
+        ) : null}
+        {result ? (
+          <Result
+            className="external-showtime-import-result"
+            status={result.truncated ? 'warning' : result.showIds.length === 0 ? 'info' : 'success'}
+            title={
+              result.truncated
+                ? '候选结果被截断，未执行导入'
+                : result.showIds.length === 0
+                  ? '该日期和影院没有可导入场次'
+                  : `已处理 ${result.showIds.length} 个本地场次`
+            }
+            subTitle={
+              result.truncated
+                ? '请缩小影院范围后重新提交。'
+                : result.showIds.length === 0
+                  ? '请尝试未来 1～7 天的日期，或选择其他影院。'
+                  : undefined
+            }
+            extra={
+              <Space wrap>
+                {result.showIds.map((showId) => (
+                  <Typography.Text code key={showId}>
+                    {showId}
+                  </Typography.Text>
+                ))}
+              </Space>
+            }
+          />
+        ) : null}
       </Card>
     </section>
   );
