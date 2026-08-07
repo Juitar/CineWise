@@ -10,6 +10,7 @@ import java.time.OffsetDateTime;
  */
 public record ExternalShowtimeSandboxReference(
         String provider,
+        String source,
         String externalCinemaId,
         String externalShowId,
         Long movieId,
@@ -23,4 +24,15 @@ public record ExternalShowtimeSandboxReference(
         boolean expired,
         boolean degraded,
         boolean fallback) {
+
+    /**
+     * 兼容仅提供身份信息的测试构造；生产映射必须使用 D 返回的 source。
+     */
+    public ExternalShowtimeSandboxReference(String provider, String externalCinemaId, String externalShowId,
+            Long movieId, Long cinemaId, OffsetDateTime startTime, Integer durationMinutes, String auditoriumText,
+            OffsetDateTime dataAt, OffsetDateTime expiresAt, boolean sandboxReferenceEligible, boolean expired,
+            boolean degraded, boolean fallback) {
+        this(provider, provider, externalCinemaId, externalShowId, movieId, cinemaId, startTime, durationMinutes,
+                auditoriumText, dataAt, expiresAt, sandboxReferenceEligible, expired, degraded, fallback);
+    }
 }

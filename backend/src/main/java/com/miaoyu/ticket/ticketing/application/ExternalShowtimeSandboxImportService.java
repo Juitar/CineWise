@@ -63,6 +63,7 @@ public class ExternalShowtimeSandboxImportService {
             ExternalShowtimeQueryPort.ExternalShowtimeSnapshot snapshot) {
         return new ExternalShowtimeSandboxReference(
                 snapshot.externalShowtimeKey().provider(),
+                snapshot.source(),
                 snapshot.externalCinemaId(),
                 snapshot.externalShowId(),
                 snapshot.movieId(),

@@ -47,7 +47,7 @@ public class ExternalShowtimeSandboxPersistenceService {
         try {
             repository.insertMapping(new ExternalShowtimeSandboxImportRepository.MappingRow(
                     idGenerator.nextId(), reference.provider(), reference.externalCinemaId(),
-                    reference.externalShowId(), showId, "SANDBOX_REFERENCE",
+                    reference.externalShowId(), showId, reference.source(),
                     LocalDateTime.ofInstant(reference.dataAt().toInstant(), ClockConfiguration.BUSINESS_ZONE_ID),
                     LocalDateTime.ofInstant(
                             reference.expiresAt().toInstant(), ClockConfiguration.BUSINESS_ZONE_ID), now));

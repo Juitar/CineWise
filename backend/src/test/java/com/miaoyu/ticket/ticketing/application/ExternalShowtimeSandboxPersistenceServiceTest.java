@@ -48,7 +48,7 @@ class ExternalShowtimeSandboxPersistenceServiceTest {
         assertThat(show.getValue().basePrice()).isEqualByComparingTo("39.90");
         assertThat(show.getValue().endTime()).isEqualTo(LocalDateTime.of(2026, 8, 7, 11, 30));
         assertThat(mapping.getValue().showId()).isEqualTo(showId);
-        assertThat(mapping.getValue().source()).isEqualTo("SANDBOX_REFERENCE");
+        assertThat(mapping.getValue().source()).isEqualTo("NETSTART-LIVE");
         assertThat(seats.getValue()).hasSize(80)
                 .allSatisfy(seat -> assertThat(seat.showId()).isEqualTo(showId));
     }
@@ -85,7 +85,7 @@ class ExternalShowtimeSandboxPersistenceServiceTest {
 
     private static ExternalShowtimeSandboxImportPlan.Entry entry() {
         return new ExternalShowtimeSandboxImportPlan.Entry(new ExternalShowtimeSandboxReference(
-                "NETSTART", "cinema-1", "show-1", 11L, 22L,
+                "NETSTART", "NETSTART-LIVE", "cinema-1", "show-1", 11L, 22L,
                 OffsetDateTime.parse("2026-08-07T10:00:00+08:00"), 90, "1号厅",
                 OffsetDateTime.parse("2026-08-07T09:00:00+08:00"),
                 OffsetDateTime.parse("2026-08-07T10:00:00+08:00"), true, false, false, false),

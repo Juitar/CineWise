@@ -29,6 +29,7 @@ class ExternalShowtimeSandboxImportServiceTest {
         assertThat(plan.truncated()).isFalse();
         assertThat(plan.entries()).singleElement().satisfies(entry -> {
             assertThat(entry.reference().externalShowId()).isEqualTo("show-1");
+            assertThat(entry.reference().source()).isEqualTo("NETSTART_MAOYAN");
             assertThat(entry.reference().auditoriumText()).isEqualTo("1号厅");
             assertThat(entry.estimatedEndTime()).hasToString("2026-08-07T11:30");
         });
