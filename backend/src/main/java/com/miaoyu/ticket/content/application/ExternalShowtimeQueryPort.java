@@ -33,7 +33,7 @@ public interface ExternalShowtimeQueryPort {
      *
      * <p>降级和质量字段放在候选本身，避免 A 只取列表元素时丢失导入判断依据。</p>
      */
-    record QueryResult(List<ExternalShowtimeSnapshot> snapshots) {
+    record QueryResult(List<ExternalShowtimeSnapshot> snapshots, boolean truncated) {
         public QueryResult {
             snapshots = List.copyOf(snapshots);
         }

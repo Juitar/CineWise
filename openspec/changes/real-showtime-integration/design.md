@@ -37,6 +37,14 @@ Provider 调用复用现有学习用途保护：本地限流、连接/读取超�
 
 参数非法使用 `100001`；身份未找到、歧义和失效分别沿用 `303005`、`303006`、`303007`。Provider 整体不可用使用 `303004`，并在结果或审计中细分 `RATE_LIMITED`、`TIMEOUT`、`NETWORK`、`UPSTREAM_5XX`、`INVALID_DATA` 和 `INTERNAL`。没有任何合格候选是正常空结果；Provider 故障不是空结果。
 
+## A 已确认的导入规则
+
+- 公开入口为 `com.miaoyu.ticket.content.application.ExternalShowtimeQueryPort#query`。
+- `QueryResult` 返回 `snapshots` 和 `truncated`；候选最多 200 条，按 `provider + externalCinemaId + externalShowId` 去重。
+- `startTime`、`endTime`、`dataAt` 和 `expiresAt` 均为带 `Asia/Shanghai` 偏移的 `OffsetDateTime`。
+- A 只导入 `qualityStatus=ACCEPTED`、`isExpired=false`、`degraded=false`、`fallbackType=null` 且 `endTime != null && endTime > startTime` 的候选。
+- `listedPrice` 只能作为参考价；本地沙箱价格由 A 配置，外部价格变化不得覆盖已导入场次或订单价格。
+
 日志和审计只记录来源、城市名、本地 ID 数量、脱敏外部 ID 摘要、结果数量、失败分类、耗时和时间戳。不得记录 `ci`、Key、Cookie、完整原始响应、精确地点原文或座位/订单数据。
 
 ## A 的导入规则
