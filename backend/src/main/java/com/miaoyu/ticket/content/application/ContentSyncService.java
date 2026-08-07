@@ -216,7 +216,8 @@ public class ContentSyncService {
         int failureCount = totalItemCount - synchronizedItemCount;
         requireWritePermission(writeGuard);
         String resourceType = cinemaSyncContext == null ? "DAILY_CONTENT" : "CITY_CINEMAS";
-        String requestId = "daily-" + startedAt + (cinemaSyncContext == null ? "" : "-" + cinemaSyncContext.providerCityId());
+        String requestId = "daily-" + startedAt
+                + (cinemaSyncContext == null ? "" : "-" + cinemaSyncContext.providerCityId());
         persistence.insertSyncLog(new ContentPersistencePort.SyncLogRow(idGenerator.nextId(), "NETSTART_MAOYAN",
                 resourceType, requestId, statusOf(totalItemCount, synchronizedItemCount, failureCount, batch.outcome()),
                 batch.errorCode(), totalItemCount, synchronizedItemCount, failureCount, startedAt, finishedAt,
