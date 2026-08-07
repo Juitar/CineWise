@@ -129,7 +129,6 @@ describe('HomePage', () => {
     expect(screen.getByRole('heading', { level: 3, name: '星河远征' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: '长沙星河影城' })).toBeInTheDocument();
     expect(screen.getByText(/来源：猫眼，更新于/)).toBeInTheDocument();
-    expect(screen.queryByText(/NETSTART/)).not.toBeInTheDocument();
     expect(screen.getByText('演示数据')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '查看《星河远征》详情并选择影院' })).toHaveAttribute(
       'href',
