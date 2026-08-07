@@ -14,6 +14,7 @@ export type AgentDisplayKind =
   | 'card-placeholder'
   | 'movie-card'
   | 'plan-card'
+  | 'travel-advice-card'
   | 'completed'
   | 'error'
   | 'progress'
@@ -36,6 +37,7 @@ export interface AgentDisplayItem {
   plans?: readonly AgentPlanDisplay[];
   relaxationSuggestion?: string;
   selectSeatsPath?: string;
+  travelTaskId?: string;
   confirmation?: {
     actionId: string;
     runId: string;
@@ -162,6 +164,10 @@ function payloadText(payload: Readonly<Record<string, unknown>>, key: string): s
   return typeof value === 'string' && value ? value : null;
 }
 
+function isTravelAdviceHistory(message: AgentMessage): boolean {
+  return message.payload.type === 'TRAVEL_ADVICE_CARD';
+}
+
 function cardStatusFields(event: AgentEvent): Array<{ label: string; value: string }> {
   const source = payloadText(event.payload, 'source');
   const dataAt = payloadText(event.payload, 'dataAt');
@@ -286,6 +292,45 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
   }
   if (type === 'ERROR') {
     return { key, kind: 'error', text: event.displayText || '本次请求未完成' };
+  }
+  if (type === 'TRAVEL_ADVICE_CARD') {
+    const weather = event.payload.weather as Record<string, unknown> | null;
+    const advice = event.payload.advice as readonly Record<string, unknown>[];
+    const fields: Array<{ label: string; value: string }> = [
+      { label: '出行任务', value: event.payload.taskId as string },
+      { label: '任务状态', value: event.payload.taskStatus as string },
+    ];
+    if (weather !== null) {
+      if (typeof weather.area === 'string') fields.push({ label: '天气区域', value: weather.area });
+      if (typeof weather.condition === 'string')
+        fields.push({ label: '天气情况', value: weather.condition });
+      if (typeof weather.risk === 'string') fields.push({ label: '天气提示', value: weather.risk });
+    }
+    advice.forEach((item, index) =>
+      fields.push({
+        label: `建议 ${index + 1} · ${item.type as string}`,
+        value: item.text as string,
+      }),
+    );
+    fields.push({
+      label: '建议状态',
+      value: event.payload.available === true ? '已生成' : '暂未生成',
+    });
+    if (event.payload.fallbackType)
+      fields.push({ label: '降级原因', value: event.payload.fallbackType as string });
+    return {
+      key,
+      kind: 'travel-advice-card',
+      title: '出行建议',
+      text:
+        event.payload.available === true
+          ? event.payload.degraded === true
+            ? '当前为降级建议，请注意有效时间'
+            : '以下为当前出行建议'
+          : '该出行任务暂未生成建议',
+      fields: [...fields, ...cardStatusFields(event)],
+      travelTaskId: event.payload.taskId as string,
+    };
   }
   const isPlan = type === 'PLAN_CARD';
   const plans = isPlan
@@ -501,6 +546,13 @@ function itemFromHistory(message: AgentMessage): AgentDisplayItem {
       text: confirmationText,
     };
   }
+  if (isTravelAdviceHistory(message)) {
+    return {
+      key: `message:${message.messageId}`,
+      kind: 'card-placeholder',
+      text: '正在恢复出行建议卡片',
+    };
+  }
   if (type === 'MOVIE_CARD' || type === 'PLAN_CARD') {
     return {
       key: `message:${message.messageId}`,
@@ -534,6 +586,32 @@ export function buildProjectionFromHistory(
 
 function confirmationKey(runId: string, payload: Readonly<Record<string, unknown>>): string | null {
   return typeof payload.actionId === 'string' ? `${runId}\u0000${payload.actionId}` : null;
+}
+
+export function travelAdviceRecoveryRunIds(messages: readonly AgentMessage[]): readonly string[] {
+  return Array.from(
+    new Set(messages.filter(isTravelAdviceHistory).map((message) => message.runId)),
+  );
+}
+
+function latestTravelAdviceEvents(snapshots: readonly AgentRunSnapshot[]): Map<string, AgentEvent> {
+  const latest = new Map<string, AgentEvent>();
+  for (const snapshot of snapshots) {
+    for (const event of snapshot.events) {
+      if (
+        event.sessionId !== snapshot.sessionId ||
+        event.runId !== snapshot.runId ||
+        event.eventType !== 'card' ||
+        event.payload.type !== 'TRAVEL_ADVICE_CARD' ||
+        validateAgentCardEvent(event).decision !== 'render'
+      )
+        continue;
+      const previous = latest.get(event.runId);
+      if (previous === undefined || compareDecimalStrings(event.eventId, previous.eventId) > 0)
+        latest.set(event.runId, event);
+    }
+  }
+  return latest;
 }
 
 function latestConfirmationEvents(snapshots: readonly AgentRunSnapshot[]): Map<string, AgentEvent> {
@@ -570,13 +648,19 @@ export function buildProjectionFromHistoryAndSnapshots(
 ): AgentProjection {
   const historyProjection = buildProjectionFromHistory(sessionId, history);
   const latest = latestConfirmationEvents(snapshots);
+  const latestTravelAdvice = latestTravelAdviceEvents(snapshots);
   return {
     ...historyProjection,
     items: historyProjection.items.map((item, index) => {
       const message = history[index];
       const key = message === undefined ? null : confirmationKey(message.runId, message.payload);
       const event = key === null ? undefined : latest.get(key);
-      return event === undefined ? item : confirmationItem(event);
+      if (event !== undefined) return confirmationItem(event);
+      const travelAdviceEvent =
+        message !== undefined && isTravelAdviceHistory(message)
+          ? latestTravelAdvice.get(message.runId)
+          : undefined;
+      return travelAdviceEvent === undefined ? item : typedCard(travelAdviceEvent);
     }),
   };
 }
@@ -588,7 +672,9 @@ function restoredCards(snapshot: AgentRunSnapshot): AgentDisplayItem[] {
       event.runId === snapshot.runId &&
       event.eventType === 'card' &&
       validateAgentCardEvent(event).decision === 'render' &&
-      (event.payload.type === 'MOVIE_CARD' || event.payload.type === 'PLAN_CARD'),
+      (event.payload.type === 'MOVIE_CARD' ||
+        event.payload.type === 'PLAN_CARD' ||
+        event.payload.type === 'TRAVEL_ADVICE_CARD'),
   );
   const latestConfirmations = latestConfirmationEvents([snapshot]);
   return [
@@ -614,7 +700,9 @@ export function buildProjectionFromSnapshot(
     if (
       message === undefined ||
       message.runId !== snapshot.runId ||
-      (message.type !== 'MOVIE_CARD' && message.type !== 'PLAN_CARD')
+      (message.type !== 'MOVIE_CARD' &&
+        message.type !== 'PLAN_CARD' &&
+        message.type !== 'TRAVEL_ADVICE_CARD')
     ) {
       return true;
     }
@@ -627,18 +715,25 @@ export function buildProjectionFromSnapshot(
       : snapshot.messages
           .filter(
             (message) =>
-              cards.length === 0 || (message.type !== 'MOVIE_CARD' && message.type !== 'PLAN_CARD'),
+              cards.length === 0 ||
+              (message.type !== 'MOVIE_CARD' &&
+                message.type !== 'PLAN_CARD' &&
+                message.type !== 'TRAVEL_ADVICE_CARD'),
           )
           .map((message) => ({
             key: `run-message:${message.messageId}`,
             kind:
-              message.type === 'MOVIE_CARD' || message.type === 'PLAN_CARD'
+              message.type === 'MOVIE_CARD' ||
+              message.type === 'PLAN_CARD' ||
+              message.type === 'TRAVEL_ADVICE_CARD'
                 ? 'card-placeholder'
                 : message.role === 'USER'
                   ? 'user-text'
                   : 'assistant-text',
             text:
-              message.type === 'MOVIE_CARD' || message.type === 'PLAN_CARD'
+              message.type === 'MOVIE_CARD' ||
+              message.type === 'PLAN_CARD' ||
+              message.type === 'TRAVEL_ADVICE_CARD'
                 ? '卡片数据暂不完整'
                 : message.text,
           }));

@@ -143,6 +143,20 @@ describe('Agent 类型化卡片', () => {
     );
   });
 
+  it('出行建议卡只使用投影提供的任务 ID 跳转详情页', () => {
+    renderItem({
+      key: 'travel-advice',
+      kind: 'travel-advice-card',
+      title: '出行建议',
+      text: '以下为当前出行建议',
+      travelTaskId: '90001',
+    });
+    expect(screen.getByRole('link', { name: '查看出行建议详情' })).toHaveAttribute(
+      'href',
+      '/travel/90001',
+    );
+  });
+
   it('确认卡调用外层回调且提交中禁止重复操作', () => {
     const item: AgentDisplayItem = {
       key: 'confirmation',
