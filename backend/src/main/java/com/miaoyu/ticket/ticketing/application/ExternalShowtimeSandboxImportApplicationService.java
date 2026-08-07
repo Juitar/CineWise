@@ -1,5 +1,7 @@
 package com.miaoyu.ticket.ticketing.application;
 
+import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.common.error.CommonErrorCode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,19 +29,34 @@ public class ExternalShowtimeSandboxImportApplicationService {
     public ImportResult importReferences(LocalDate showDate, List<Long> cinemaIds) {
         ExternalShowtimeSandboxImportPlan plan = planningService.prepare(showDate, cinemaIds);
         if (plan.truncated()) {
-            return new ImportResult(List.of(), true);
+            return new ImportResult(0, 0, 0, List.of(), true, null);
         }
         List<Long> showIds = new ArrayList<>();
+        int failureCount = 0;
+        Integer errorCode = null;
         for (ExternalShowtimeSandboxImportPlan.Entry entry : plan.entries()) {
-            showIds.add(persistenceService.importEntry(entry));
+            try {
+                showIds.add(persistenceService.importEntry(entry));
+            } catch (BusinessException exception) {
+                failureCount++;
+                errorCode = errorCode == null ? exception.getErrorCode().code() : errorCode;
+            } catch (RuntimeException exception) {
+                failureCount++;
+                errorCode = errorCode == null ? CommonErrorCode.INTERNAL_ERROR.code() : errorCode;
+            }
         }
-        return new ImportResult(showIds, false);
+        return new ImportResult(plan.entries().size(), showIds.size(), failureCount, showIds, false, errorCode);
     }
 
     /** 导入结果只返回 A 本地场次 ID；外部三元键与候选原文不向调用方扩散。 */
-    public record ImportResult(List<Long> showIds, boolean truncated) {
+    public record ImportResult(int totalCount, int successCount, int failureCount, List<Long> showIds,
+                               boolean truncated, Integer errorCode) {
         public ImportResult {
             showIds = List.copyOf(showIds);
+        }
+
+        public ImportResult(List<Long> showIds, boolean truncated) {
+            this(showIds.size(), showIds.size(), 0, showIds, truncated, null);
         }
     }
 }

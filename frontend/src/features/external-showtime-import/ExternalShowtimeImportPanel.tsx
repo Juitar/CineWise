@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Card, DatePicker, Form, Result, Select, Space, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useCinemaList } from '../../modules/content/useCinemaList';
@@ -17,6 +17,7 @@ export function ExternalShowtimeImportPanel() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<ExternalShowtimeImportResponse | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  const clientRequestIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!result || !['PENDING', 'RUNNING'].includes(result.status)) return undefined;
@@ -34,17 +35,25 @@ export function ExternalShowtimeImportPanel() {
     return () => window.clearInterval(timer);
   }, [result]);
 
+  useEffect(() => {
+    if (result && ['SUCCESS', 'PARTIAL', 'FAILED'].includes(result.status)) {
+      clientRequestIdRef.current = null;
+    }
+  }, [result]);
+
   const handleSubmit = async () => {
     const values = await form.validateFields();
     setIsSubmitting(true);
     setResult(null);
     setError(null);
+    const clientRequestId = clientRequestIdRef.current ?? window.crypto.randomUUID();
+    clientRequestIdRef.current = clientRequestId;
     try {
       setResult(
         await importExternalShowtimeReferences({
           cinemaIds: values.cinemaIds,
           showDate: values.showDate.format('YYYY-MM-DD'),
-          clientRequestId: window.crypto.randomUUID(),
+          clientRequestId,
         }),
       );
     } catch (requestError: unknown) {

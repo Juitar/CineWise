@@ -4,12 +4,15 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.miaoyu.ticket.ticketing.application.AdminExternalShowtimeSandboxImportService;
 import com.miaoyu.ticket.ticketing.application.ExternalShowtimeImportTaskRepository;
 import com.miaoyu.ticket.ticketing.application.ExternalShowtimeImportTaskService;
+import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.common.error.CommonErrorCode;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -53,5 +56,26 @@ class AdminExternalShowtimeSandboxImportControllerTest {
 
         verify(importService).createTask(
                 eq(showDate), eq(List.of("2001", "2002")), org.mockito.ArgumentMatchers.isNull());
+    }
+
+    @Test
+    void givenMalformedTaskId_whenQuery_thenReturnBadRequest() throws Exception {
+        when(importService.queryTask("bad-task-id"))
+                .thenThrow(new BusinessException(CommonErrorCode.INVALID_PARAMETER));
+
+        mockMvc.perform(get("/api/v1/admin/ticketing/external-showtimes/import/bad-task-id"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(100001));
+    }
+
+    @Test
+    void givenMissingTask_whenQuery_thenReturnNotFound() throws Exception {
+        when(importService.queryTask("550e8400-e29b-41d4-a716-446655440000"))
+                .thenThrow(new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
+
+        mockMvc.perform(get("/api/v1/admin/ticketing/external-showtimes/import/"
+                        + "550e8400-e29b-41d4-a716-446655440000"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(100404));
     }
 }

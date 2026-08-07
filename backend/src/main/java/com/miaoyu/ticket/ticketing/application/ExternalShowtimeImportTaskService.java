@@ -1,6 +1,8 @@
 package com.miaoyu.ticket.ticketing.application;
 
 import com.miaoyu.ticket.common.config.ClockConfiguration;
+import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -14,7 +16,8 @@ import org.springframework.stereotype.Service;
 /** 异步导入任务编排；HTTP 线程只登记任务，外部 Provider 和座位写入在 Worker 执行。 */
 @Service
 public class ExternalShowtimeImportTaskService {
-    private static final int PROVIDER_UNAVAILABLE = 303004;
+    private static final String TASK_ID_PATTERN =
+            "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$";
     private final ExternalShowtimeImportTaskRepository repository;
     private final ExternalShowtimeSandboxImportApplicationService importService;
     private final BusinessIdGenerator idGenerator;
@@ -53,8 +56,11 @@ public class ExternalShowtimeImportTaskService {
     }
 
     public TaskView find(String taskId) {
+        if (taskId == null || !taskId.matches(TASK_ID_PATTERN)) {
+            throw new BusinessException(CommonErrorCode.INVALID_PARAMETER);
+        }
         return repository.findByTaskId(taskId).map(this::view)
-                .orElseThrow(() -> new IllegalArgumentException("导入任务不存在"));
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
     }
 
     public void recover() {
@@ -79,14 +85,22 @@ public class ExternalShowtimeImportTaskService {
         }
         try {
             var result = importService.importReferences(running.showDate(), running.cinemaIds());
-            int success = result.showIds().size();
+            ExternalShowtimeImportTaskRepository.TaskStatus status = result.failureCount() == 0
+                    ? ExternalShowtimeImportTaskRepository.TaskStatus.SUCCESS
+                    : result.successCount() > 0
+                        ? ExternalShowtimeImportTaskRepository.TaskStatus.PARTIAL
+                        : ExternalShowtimeImportTaskRepository.TaskStatus.FAILED;
             repository.finish(taskId, owner, running.version(),
-                    ExternalShowtimeImportTaskRepository.TaskStatus.SUCCESS,
-                    success, success, 0, result.truncated(), result.showIds(), null, now());
+                    status, result.totalCount(), result.successCount(), result.failureCount(), result.truncated(),
+                    result.showIds(), result.errorCode(), now());
+        } catch (BusinessException exception) {
+            repository.finish(taskId, owner, running.version(),
+                    ExternalShowtimeImportTaskRepository.TaskStatus.FAILED, 0, 0, 0, false, null,
+                    exception.getErrorCode().code(), now());
         } catch (RuntimeException exception) {
             repository.finish(taskId, owner, running.version(),
                     ExternalShowtimeImportTaskRepository.TaskStatus.FAILED, 0, 0, 0, false, null,
-                    PROVIDER_UNAVAILABLE, now());
+                    CommonErrorCode.INTERNAL_ERROR.code(), now());
         }
     }
 
