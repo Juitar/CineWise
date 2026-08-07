@@ -27,7 +27,7 @@ A 不读取 D 的持久化对象，也不重复维护 NetStart Provider。A 通�
 
 D 按城市目录将城市名解析为内部 `providerCityId`，只在 Provider 调用边界使用。调用者传入的是本地 `cinemaIds`、业务日期以及可选的本地 `movieIds`；D 在内部反查已确认的外部身份。单次请求的影院 ID 最多 100 个，空集合返回空结果，不发起 Provider 调用。
 
-已于 2026-08-07 用脱敏请求核验 `GET /cinema/shows?ci={providerCityId}&cinemaId={externalCinemaId}`；结果返回影片 ID、`showDate`、`seqNo`、`tm` 和 `vipPrice`，但不返回余座和座位图。`seqNo` 是唯一可用的外部场次 ID，缺失时隔离。D 只查询当天至未来 7 天，成功快照的 `expiresAt=min(startTime, dataAt + 10 分钟)`；具体字段表见 `provider-evidence.md`。所有 Provider 时间统一转换为 `Asia/Shanghai`；无法解析、时间不在允许的未来窗口内或外部 ID 缺失的记录均隔离。Provider 没有可靠散场时间时，DTO 返回 `endTime=null`，A 不得据此推导本地场次时长。
+已于 2026-08-07 用脱敏请求核验 `GET /cinema/shows?ci={providerCityId}&cinemaId={externalCinemaId}`；结果返回影片 ID、`showDate`、`seqNo`、`tm` 和 `vipPrice`，但不返回余座、座位图或可靠散场时间。`seqNo` 只在 Provider/影院范围内使用，缺失时隔离。D 只查询当天至未来 7 天，成功快照的 `expiresAt=min(startTime, dataAt + 10 分钟)`；具体字段表见 `provider-evidence.md`。所有 Provider 时间统一转换为 `Asia/Shanghai`；无法解析、时间不在允许的未来窗口内、外部 ID 缺失或没有可靠 `endTime` 的记录均进入 `rejectedSnapshots`，不会成为 `ACCEPTED` 候选。
 
 Provider 调用复用现有学习用途保护：本地限流、连接/读取超时，以及仅针对连接失败或 5xx 的一次短重试；429、不可重试 4xx、字段不合格和身份失败不重试。Provider 调用在数据库事务外执行。成功的合格候选写入 D 自己的快照；失败不会删除最后一份成功快照。
 
