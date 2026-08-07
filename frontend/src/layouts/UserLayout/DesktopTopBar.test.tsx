@@ -23,5 +23,6 @@ describe('DesktopTopBar', () => {
     expect(screen.getByLabelText('当前城市：长沙')).toHaveTextContent('长沙');
     expect(screen.queryByText('杭州')).not.toBeInTheDocument();
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('搜索电影、影院')).not.toBeInTheDocument();
   });
 });

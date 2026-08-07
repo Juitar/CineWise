@@ -49,7 +49,6 @@ vi.mock('antd', () => ({
       </div>
     </div>
   ),
-  Input: () => <input />,
   Menu: ({ items }: { items: Array<{ icon?: React.ReactNode; label?: React.ReactNode }> }) => (
     <nav>
       {items.map((item, index) => (
@@ -67,7 +66,6 @@ vi.mock('../../shared/components/icons/layout-icons', () => ({
   HomeIcon: () => <span data-testid="home-icon" />,
   MapPinIcon: () => <span data-testid="map-pin-icon" />,
   OrderIcon: () => <span data-testid="order-icon" />,
-  SearchIcon: () => <span data-testid="search-icon" />,
   UserIcon: () => <span data-testid="user-icon" />,
 }));
 

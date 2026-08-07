@@ -185,19 +185,6 @@
   align-items: center;
 }
 
-.desktop-search-input {
-  width: 280px;
-  border-radius: 20px;
-  border-color: #e2e4eb;
-  background-color: #f8f9fa;
-}
-
-.desktop-search-input:focus,
-.desktop-search-input:hover {
-  border-color: #635bff;
-  background-color: #fff;
-}
-
 .desktop-user-profile {
   display: flex;
   align-items: center;
@@ -236,10 +223,6 @@
   margin-left: 2px;
   color: #8f959e;
   font-size: 12px;
-}
-
-.desktop-search-icon {
-  color: #8f959e;
 }
 
 .logout-menu-label {
