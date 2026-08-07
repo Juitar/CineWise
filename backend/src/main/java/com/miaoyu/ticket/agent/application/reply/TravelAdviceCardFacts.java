@@ -12,7 +12,11 @@ public record TravelAdviceCardFacts(
     public TravelAdviceCardFacts {
         requireText(taskId, "taskId");
         requireText(taskStatus, "taskStatus");
-        requireText(source, "source");
+        if (available) {
+            requireText(source, "source");
+        } else {
+            requireNullableText(source, "source");
+        }
         advice = List.copyOf(Objects.requireNonNull(advice, "advice 不能为空"));
         if (!taskId.matches("[1-9][0-9]*")) {
             throw new IllegalArgumentException("taskId 必须是正十进制字符串");

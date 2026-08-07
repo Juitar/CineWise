@@ -104,7 +104,7 @@ public final class AgentCardEventValidator {
     private static ValidationResult travelAdviceCard(JsonNode payload) {
         if (!validPositiveLongDecimal(payload, "taskId") || !required(payload, "taskStatus")
                 || !payload.path("available").isBoolean() || !payload.path("advice").isArray()
-                || !required(payload, "source")
+                || !hasNullableText(payload, "source")
                 || !payload.path("degraded").isBoolean() || !payload.path("expired").isBoolean()
                 || !hasNullableText(payload, "fallbackType") || !hasNullableTime(payload, "dataAt")
                 || !hasNullableTime(payload, "expiresAt") || !onlyFields(payload,
@@ -116,6 +116,9 @@ public final class AgentCardEventValidator {
             return rejected("TRAVEL_ADVICE_CARD 展示摘要无效");
         }
         boolean available = payload.path("available").asBoolean();
+        if (available && !required(payload, "source")) {
+            return rejected("可用建议缺少来源");
+        }
         if (!available && (!payload.path("weather").isNull() || !payload.path("advice").isEmpty()
                 || payload.path("degraded").asBoolean() || !payload.path("fallbackType").isNull()
                 || !payload.path("dataAt").isNull() || !payload.path("expiresAt").isNull())) {

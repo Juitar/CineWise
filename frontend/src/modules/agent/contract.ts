@@ -383,12 +383,13 @@ function validateTravelAdviceCard(payload: Record<string, unknown>): void {
     exactKeys(current, ['type', 'text']);
     text(current.type); text(current.text);
   });
-  text(payload.source);
+  const source = nullableText(payload.source);
   const degraded = boolean(payload.degraded);
   const fallbackType = nullableText(payload.fallbackType);
   const dataAt = payload.dataAt === null ? null : dateText(payload.dataAt);
   const expiresAt = payload.expiresAt === null ? null : dateText(payload.expiresAt);
   boolean(payload.expired);
+  if (available && source === null) throw new AgentContractError();
   if (!available && (weather !== null || array(payload.advice).length > 0 || degraded || fallbackType !== null || dataAt !== null || expiresAt !== null)) throw new AgentContractError();
   if (degraded !== (fallbackType !== null)) throw new AgentContractError();
 }

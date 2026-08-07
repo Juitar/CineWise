@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.application.reply.TravelAdviceCardFacts;
+import com.miaoyu.ticket.agent.application.reply.TravelAdviceCardFactsMapper;
 import com.miaoyu.ticket.agent.application.run.AgentRunReplyFactory;
 import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorResult;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlan;
@@ -18,6 +19,19 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class AgentRunReplyFactoryTravelAdviceTest {
+    @Test
+    void shouldMapUnavailableAdviceWithNullSourceToCardReply() {
+        TravelAdviceToolResult advice = new TravelAdviceToolResult(false, "90001", "PENDING", null,
+                List.of(), null, null, null, false, false, null);
+        ToolResult<TravelAdviceToolResult> result = new ToolResult<>(ToolStatus.SUCCESS, advice, null, false,
+                false, "RENDER_RESULT", false, null, 1L, null, null);
+
+        TravelAdviceCardFacts facts = TravelAdviceCardFactsMapper.from(result);
+
+        assertThat(facts.available()).isFalse();
+        assertThat(facts.source()).isNull();
+    }
+
     @Test
     void shouldMapSuccessfulStructuredTravelAdviceToCardReply() {
         TravelAdviceToolResult advice = new TravelAdviceToolResult(true, "90001", "READY",

@@ -100,7 +100,7 @@ export interface TravelAdviceCardPayload {
   available: boolean;
   weather: TravelAdviceWeatherSummary | null;
   advice: readonly TravelAdviceItem[];
-  source: string;
+  source: string | null;
   degraded: boolean;
   fallbackType: string | null;
   dataAt: string | null;

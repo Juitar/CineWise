@@ -11,6 +11,7 @@ import orderConfirmCard from '../../../../backend/src/test/resources/fixtures/ag
 import planCard from '../../../../backend/src/test/resources/fixtures/agent/c/plan-card.json';
 import questionCard from '../../../../backend/src/test/resources/fixtures/agent/c/question-card.json';
 import travelAdviceCard from '../../../../backend/src/test/resources/fixtures/agent/c/travel-advice-card.json';
+import unavailableTravelAdviceCard from '../../../../backend/src/test/resources/fixtures/agent/c/travel-advice-unavailable-card.json';
 import {
   AgentContractError,
   parseAgentEvent,
@@ -49,7 +50,7 @@ describe('Agent DTO 和事件校验', () => {
     expect(validateAgentCardEvent(parseAgentEvent(travelAdviceCard)).decision).toBe('render');
   });
 
-  it('出行建议天气摘要允许部分字段缺失，但来源必须存在', () => {
+  it('出行建议天气摘要允许部分字段缺失；来源只在可用建议中必填', () => {
     const partialWeather = parseAgentEvent({
       ...travelAdviceCard,
       payload: { ...travelAdviceCard.payload, weather: { area: null, condition: '小雨', risk: null } },
@@ -59,6 +60,7 @@ describe('Agent DTO 和事件校验', () => {
       ...travelAdviceCard,
       payload: { ...travelAdviceCard.payload, source: undefined },
     })).decision).toBe('reject');
+    expect(validateAgentCardEvent(parseAgentEvent(unavailableTravelAdviceCard)).decision).toBe('render');
   });
 
   it('正式方案缺少影片名或问题选项值时拒绝渲染', () => {

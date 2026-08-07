@@ -61,12 +61,13 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
         if ("TRAVEL_ADVICE_CARD".equals(type)) {
             TravelWeather weather = travelWeather(payload.path("weather"));
             List<TravelAdviceItem> advice = travelAdvice(payload.path("advice"));
-            if (hasText(payload, "taskId") && hasText(payload, "taskStatus") && hasText(payload, "source")
-                    && advice != null
+            boolean available = payload.path("available").isBoolean() && payload.path("available").asBoolean();
+            if (hasText(payload, "taskId") && hasText(payload, "taskStatus") && hasNullableText(payload, "source")
+                    && (!available || hasText(payload, "source")) && advice != null
                     && payload.path("available").isBoolean() && payload.path("degraded").isBoolean()
                     && payload.path("expired").isBoolean()) {
                 return new TravelAdviceCard(type, text(payload, "taskId"), text(payload, "taskStatus"),
-                        payload.path("available").asBoolean(), weather, advice, text(payload, "source"),
+                        available, weather, advice, nullableText(payload, "source"),
                         payload.path("degraded").asBoolean(),
                         nullableText(payload, "fallbackType"), nullableText(payload, "dataAt"),
                         nullableText(payload, "expiresAt"), payload.path("expired").asBoolean());
@@ -194,6 +195,10 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
 
     private static boolean hasText(JsonNode value, String name) {
         return text(value, name) != null;
+    }
+
+    private static boolean hasNullableText(JsonNode value, String name) {
+        return value.has(name) && (value.path(name).isNull() || hasText(value, name));
     }
 
     private static Boolean bool(JsonNode value, String name) {

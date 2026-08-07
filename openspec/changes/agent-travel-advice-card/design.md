@@ -28,7 +28,7 @@
 
 ### 2. `available=false` 是成功的只读卡片
 
-工具成功但没有已生成快照时仍产生 `TRAVEL_ADVICE_CARD`，携带任务号、状态和 D 返回的 `source`，`weather=null`、`advice=[]`、`dataAt=null`、`expiresAt=null`、`degraded=false`、`fallbackType=null`。它不触发重试、刷新、任务创建或确认；C 可直接显示“建议尚未生成”。过期卡片仍只读，保留原时效字段与 `expired=true`。
+工具成功但没有已生成快照时仍产生 `TRAVEL_ADVICE_CARD`，携带任务号和状态；D 返回 `source=null` 时卡片保持 null，不补造来源。此时 `weather=null`、`advice=[]`、`dataAt=null`、`expiresAt=null`、`degraded=false`、`fallbackType=null`。它不触发重试、刷新、任务创建或确认；C 可直接显示“建议尚未生成”。过期卡片仍只读，保留原时效字段与 `expired=true`。
 
 ### 3. Slot 是唯一任务号来源
 
