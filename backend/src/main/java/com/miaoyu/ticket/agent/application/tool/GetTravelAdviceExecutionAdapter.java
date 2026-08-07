@@ -93,9 +93,11 @@ public final class GetTravelAdviceExecutionAdapter
     private static ToolContext createContext(ExecutionRequest request, ExecutionPlanNode node) {
         long deadlineMs = Math.min(
                 request.remainingDeadlineMs(), AgentToolDefinitions.TRAVEL_ADVICE_TIMEOUT.toMillis());
+        // 缺失槽位快照仍要先建立可记录失败的上下文；命令构造会在下方统一拒绝该计划结构。
+        Long stateVersion = node.slotSnapshot() == null ? null : node.slotSnapshot().version();
         return new ToolContext(request.runId(), node.nodeId(), GetTravelAdviceTool.TARGET_NAME,
                 List.of("slots." + TRAVEL_TASK_ID_SLOT), deadlineMs, request.traceId(), null, null,
-                node.slotSnapshot().version());
+                stateVersion);
     }
 
     private static ToolResult<TravelAdviceToolResult> invalidInput(ToolContext context) {

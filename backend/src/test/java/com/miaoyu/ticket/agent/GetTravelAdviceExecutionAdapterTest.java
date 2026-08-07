@@ -12,6 +12,7 @@ import com.miaoyu.ticket.agent.application.tool.ReadOnlyToolExecutionAdapter;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlan;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlanNode;
 import com.miaoyu.ticket.agent.domain.plan.ExecutionPlan;
+import com.miaoyu.ticket.agent.domain.plan.ExecutionPlanNode;
 import com.miaoyu.ticket.agent.domain.plan.FailurePolicy;
 import com.miaoyu.ticket.agent.domain.plan.InputReference;
 import com.miaoyu.ticket.agent.domain.plan.InputReferenceSource;
@@ -70,6 +71,26 @@ class GetTravelAdviceExecutionAdapterTest {
                         new SlotSnapshot(7L, Map.of("otherTaskId", "90001"))));
 
         assertThat(validation.isValid()).isFalse();
+    }
+
+    @Test
+    void shouldFailNodeWithoutCallingToolWhenPersistedPlanLacksSlotSnapshot() {
+        GetTravelAdviceTool tool = mock(GetTravelAdviceTool.class);
+        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry());
+        GetTravelAdviceExecutionAdapter adapter = new GetTravelAdviceExecutionAdapter(tool, stateMachine);
+        ExecutionPlan plan = new ExecutionPlan("missing-snapshot", 1, List.of(new ExecutionPlanNode(
+                "advice", PlanNodeType.CALL_TOOL, GetTravelAdviceTool.TARGET_NAME,
+                List.of(new InputReference("travelTaskId", InputReferenceSource.SLOT, "travelTaskId")),
+                List.of(), FailurePolicy.FAIL, PlanNodeStatus.PENDING, false, false, null, null, null)));
+
+        var result = adapter.execute(new ReadOnlyToolExecutionAdapter.ExecutionRequest(
+                stateMachine.initialize(plan), "advice", "run-1", "trace-1", 9_000L));
+
+        // 脏的持久化计划不能让节点卡在 RUNNING；必须留下稳定参数失败且绝不访问 D 的查询入口。
+        assertThat(result.toolResult().status()).isEqualTo(ToolStatus.FAILED);
+        assertThat(result.toolResult().errorCode()).isEqualTo(100001);
+        assertThat(result.state().nodeState("advice").status()).isEqualTo(PlanNodeStatus.FAILED);
+        org.mockito.Mockito.verifyNoInteractions(tool);
     }
 
     private static ToolRegistry registry() {
