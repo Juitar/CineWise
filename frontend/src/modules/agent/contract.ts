@@ -418,10 +418,6 @@ function validateBusinessIntent(payload: Record<string, unknown>): void {
   }
 }
 
-function exactKeys(value: Record<string, unknown>, keys: readonly string[]): void {
-  if (Object.keys(value).some((key) => !keys.includes(key))) throw new AgentContractError();
-}
-
 function travelPositiveId(value: unknown): void {
   const id = text(value);
   if (
