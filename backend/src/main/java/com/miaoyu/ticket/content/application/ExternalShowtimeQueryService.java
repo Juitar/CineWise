@@ -48,6 +48,11 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
     }
 
     @Override
+    /**
+     * 查询实时候选并在成功后更新 D 自己的快照。
+     *
+     * <p>外部调用始终发生在内容持久化事务之外；任何候选都不会写入 A 的场次、影厅、座位或订单表。</p>
+     */
     public QueryResult query(Query query) {
         validate(query);
         if (query.cinemaIds().isEmpty()) {
@@ -82,6 +87,7 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
     }
 
     private QueryResult fallback(LocalDate showDate, List<Long> cinemaIds) {
+        // 只读尚未过期的整批快照，避免将部分实时结果与旧结果混合交给 A 导入。
         OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         return snapshotPort.find(showDate, cinemaIds)
                 .filter(snapshot -> snapshot.expiresAt().isAfter(now))
@@ -94,6 +100,7 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
                                                         Map<String, ContentExternalIdentityLookupPort.ExternalIdentity>
                                                                 localCinemaIds,
                                                         OffsetDateTime dataAt) {
+        // 影片身份解析批量执行；单个未映射影片只隔离自己，不能阻塞同批其他已映射候选。
         List<String> movieExternalIds = candidates.stream().map(ExternalShowtimeProvider.Candidate::externalMovieId)
                 .filter(Objects::nonNull).distinct().toList();
         if (movieExternalIds.isEmpty()) {
@@ -113,6 +120,7 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
             ContentExternalIdentityLookupPort.ExternalIdentity cinemaIdentity =
                     localCinemaIds.get(candidate.externalCinemaId());
             Long cinemaId = cinemaIdentity == null ? null : cinemaIdentity.contentId();
+            // 不以名称补齐映射，也不允许已经开场或无开始时间的候选进入公开 DTO。
             if (movieId == null || cinemaId == null || candidate.startTime() == null
                     || !candidate.startTime().isAfter(dataAt)) {
                 continue;
@@ -123,6 +131,7 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
                     candidate.listedPrice(), PriceSemantic.REFERENCE_ONLY, dataAt, expiresAt, false, false, null,
                     QualityStatus.ACCEPTED, new ExternalShowtimeKey(PROVIDER, candidate.externalCinemaId(),
                     candidate.externalShowId()));
+            // seqNo 没有跨影院唯一保证，三元键是 A 后续导入时唯一可复用的幂等身份。
             accepted.putIfAbsent(snapshot.externalShowtimeKey(), snapshot);
         }
         return List.copyOf(accepted.values());
@@ -136,6 +145,7 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
 
     private Map<String, ContentExternalIdentityLookupPort.ExternalIdentity> resolveExternalCinemas(
             List<Long> cinemaIds) {
+        // 本地影院没有 ACTIVE 映射时不能请求第三方，防止凭显示名称猜错影院。
         Map<String, ContentExternalIdentityLookupPort.ExternalIdentity> externalToLocal = new LinkedHashMap<>();
         for (ContentExternalIdentityLookupPort.ExternalIdentity identity : externalIdentityLookupPort
                 .findActiveExternalIds(PROVIDER, ContentResourceType.CINEMA, cinemaIds)) {
@@ -162,6 +172,7 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
     }
 
     private void validate(Query query) {
+        // 参数错误在访问 Provider 前返回，避免无效请求消耗共享限流预算。
         if (query == null || query.showDate() == null || query.cinemaIds() == null
                 || query.cinemaIds().size() > MAX_CINEMAS
                 || query.cinemaIds().stream().anyMatch(id -> id == null || id <= 0)) {

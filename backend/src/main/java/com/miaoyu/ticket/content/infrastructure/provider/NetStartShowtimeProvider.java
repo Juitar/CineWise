@@ -48,6 +48,11 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
     }
 
     @Override
+    /**
+     * 一个影院失败即回退整批查询。
+     *
+     * <p>这样 A 不会把不完整的实时列表当作完整排期导入；失败时由 Application 统一决定是否读取快照。</p>
+     */
     public FetchResult fetch(LocalDate showDate, List<ExternalCinema> externalCinemas) {
         if (!properties.enabled() || !isLearningEnvironment()) {
             return new FetchResult(List.of(), FailureCategory.PROVIDER_DISABLED);
@@ -73,6 +78,7 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
             return parse(showDate, externalCinema.externalCinemaId(), request(externalCinema));
         } catch (Exception firstFailure) {
             if (!retryable(firstFailure)) {
+                // 429、普通 4xx 和字段错误不会重试，避免无效调用扩大上游压力。
                 return new FetchOneResult(List.of(), classify(firstFailure));
             }
             pauseBeforeRetry();
@@ -88,6 +94,7 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
     }
 
     private JsonNode request(ExternalCinema externalCinema) {
+        // ci 仅在请求 URI 中短暂使用，日志、快照和公开 DTO 都不会保存该内部城市编号。
         return restClient.get().uri(uri -> uri.path("/cinema/shows")
                 .queryParam("ci", externalCinema.providerCityId())
                 .queryParam("cinemaId", externalCinema.externalCinemaId()).build()).retrieve().body(JsonNode.class);
@@ -101,6 +108,7 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
         for (JsonNode movie : response.path("data").path("movies")) {
             String movieId = text(movie, "id");
             for (JsonNode shows : movie.path("shows")) {
+                // 上游按影院返回多天资料时，只接受调用方请求的业务日期。
                 if (!expectedDate.toString().equals(text(shows, "showDate"))) {
                     continue;
                 }
@@ -132,6 +140,7 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
     }
 
     private static BigDecimal price(String value) {
+        // 标价为缺失或负数时保持 null；A 使用自己的沙箱价格，不能补造交易金额。
         if (blank(value)) {
             return null;
         }
@@ -149,6 +158,7 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
     }
 
     private boolean isLearningEnvironment() {
+        // 防止测试配置误带到测试、预发或生产环境后实际访问学习用途 Provider。
         for (String profile : environment.getActiveProfiles()) {
             if ("dev".equals(profile) || "demo".equals(profile)) {
                 return true;
@@ -190,6 +200,7 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
     }
 
     private void pauseBeforeRetry() {
+        // 仅在允许重试的网络或 5xx 失败后等待一次，Interrupted 时保留中断标记。
         try {
             Thread.sleep(properties.retryBackoff());
         } catch (InterruptedException exception) {

@@ -6,6 +6,12 @@ import java.util.List;
 /** 从本地内容 ID 反查唯一的 ACTIVE 外部身份，仅供 D 访问 Provider 前定位资源。 */
 public interface ContentExternalIdentityLookupPort {
 
+    /**
+     * 只按内部业务 ID 查找外部身份，禁止按名称、地址或坐标猜测映射。
+     *
+     * <p>调用方会用返回的外部影院 ID 和城市 ID 组装 Provider 请求；没有 ACTIVE 映射时返回空集合，
+     * 由上层把该影院从本次排期查询中隔离。</p>
+     */
     List<ExternalIdentity> findActiveExternalIds(String provider, ContentResourceType resourceType,
                                                  List<Long> contentIds);
 
