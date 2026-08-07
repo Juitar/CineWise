@@ -164,6 +164,10 @@ function payloadText(payload: Readonly<Record<string, unknown>>, key: string): s
   return typeof value === 'string' && value ? value : null;
 }
 
+function isTravelAdviceHistory(message: AgentMessage): boolean {
+  return message.payload.type === 'TRAVEL_ADVICE_CARD';
+}
+
 function cardStatusFields(event: AgentEvent): Array<{ label: string; value: string }> {
   const source = payloadText(event.payload, 'source');
   const dataAt = payloadText(event.payload, 'dataAt');
@@ -567,10 +571,6 @@ export function buildProjectionFromHistory(
 
 function confirmationKey(runId: string, payload: Readonly<Record<string, unknown>>): string | null {
   return typeof payload.actionId === 'string' ? `${runId}\u0000${payload.actionId}` : null;
-}
-
-function isTravelAdviceHistory(message: AgentMessage): boolean {
-  return message.payload.type === 'TRAVEL_ADVICE_CARD';
 }
 
 export function travelAdviceRecoveryRunIds(messages: readonly AgentMessage[]): readonly string[] {

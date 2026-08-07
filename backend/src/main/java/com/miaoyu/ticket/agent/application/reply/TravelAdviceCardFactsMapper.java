@@ -14,7 +14,8 @@ public final class TravelAdviceCardFactsMapper {
             throw new IllegalArgumentException("出行建议 Tool 成功结果不能为空");
         }
         if (!advice.available()) {
-            return new TravelAdviceCardFacts(advice.taskId(), advice.taskStatus(), false, null, List.of(), advice.source(), false,
+            return new TravelAdviceCardFacts(advice.taskId(), advice.taskStatus(), false, null, List.of(),
+                    advice.source(), false,
                     null, null, null, advice.expired());
         }
         TravelAdviceCardFacts.Weather weather = advice.weather() == null ? null
@@ -24,7 +25,8 @@ public final class TravelAdviceCardFactsMapper {
                 advice.advice().stream()
                         .map(item -> new TravelAdviceCardFacts.Advice(item.type(), item.text()))
                         .toList(),
-                advice.source(), advice.degraded(), advice.fallbackType(), advice.dataAt() == null ? null : advice.dataAt().toInstant(),
+                advice.source(), advice.degraded(), advice.fallbackType(),
+                advice.dataAt() == null ? null : advice.dataAt().toInstant(),
                 advice.expiresAt() == null ? null : advice.expiresAt().toInstant(), advice.expired());
     }
 }

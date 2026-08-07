@@ -61,11 +61,13 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
         if ("TRAVEL_ADVICE_CARD".equals(type)) {
             TravelWeather weather = travelWeather(payload.path("weather"));
             List<TravelAdviceItem> advice = travelAdvice(payload.path("advice"));
-            if (hasText(payload, "taskId") && hasText(payload, "taskStatus") && hasText(payload, "source") && advice != null
+            if (hasText(payload, "taskId") && hasText(payload, "taskStatus") && hasText(payload, "source")
+                    && advice != null
                     && payload.path("available").isBoolean() && payload.path("degraded").isBoolean()
                     && payload.path("expired").isBoolean()) {
                 return new TravelAdviceCard(type, text(payload, "taskId"), text(payload, "taskStatus"),
-                        payload.path("available").asBoolean(), weather, advice, text(payload, "source"), payload.path("degraded").asBoolean(),
+                        payload.path("available").asBoolean(), weather, advice, text(payload, "source"),
+                        payload.path("degraded").asBoolean(),
                         nullableText(payload, "fallbackType"), nullableText(payload, "dataAt"),
                         nullableText(payload, "expiresAt"), payload.path("expired").asBoolean());
             }
@@ -230,7 +232,8 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
     }
 
     record TravelAdviceCard(String type, String taskId, String taskStatus, boolean available, TravelWeather weather,
-            List<TravelAdviceItem> advice, String source, boolean degraded, String fallbackType, String dataAt, String expiresAt,
+            List<TravelAdviceItem> advice, String source, boolean degraded, String fallbackType, String dataAt,
+            String expiresAt,
             boolean expired) implements AgentCardPayloadResponse {
     }
 
