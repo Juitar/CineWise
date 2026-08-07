@@ -15,8 +15,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -27,10 +27,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /** 验证结束失效任务只迁移电子票，并依赖数据库条件更新抵御重复和并发触发。 */
-@ActiveProfiles("test")
+@EnabledIfEnvironmentVariable(named = "CINEWISE_MYSQL_IT", matches = "true")
+@ActiveProfiles("dev")
 @SpringBootTest(properties = {
-    "cinewise.seed.enabled=true",
-    "cinewise.seed.fixed-value=20260802"
+    "cinewise.seed.enabled=false",
+    "spring.flyway.enabled=true",
+    "cinewise.transaction.expiry-job-enabled=false",
+    "cinewise.transaction.show-end-invalidation-job-enabled=false",
+    "management.health.redis.enabled=false"
 })
 @Import(ShowEndTicketInvalidationIntegrationTest.FixedClockConfiguration.class)
 class ShowEndTicketInvalidationIntegrationTest {
@@ -39,6 +43,7 @@ class ShowEndTicketInvalidationIntegrationTest {
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 8, 2, 8, 0);
     private static final String TEST_SOURCE = "show-end-invalidation-test";
     private static final AtomicLong NEXT_TEST_ID = new AtomicLong(9_700_000_000L);
+    private static final long AUDITORIUM_ID = 9_700_000_001L;
 
     @Autowired
     private ShowEndTicketInvalidationService invalidationService;
@@ -51,22 +56,18 @@ class ShowEndTicketInvalidationIntegrationTest {
 
     @BeforeEach
     void resetFixtures() {
-        Assumptions.assumeTrue(hasInvalidationReasonColumn(),
-                "固定H2测试结构只执行到V009；V022电子票失效原因与索引由MySQL集成环境验证");
+        assertThat(jdbcTemplate.queryForObject("SELECT DATABASE()", String.class))
+                .isEqualTo("cinewise_ticketing_concurrency_check");
         jdbcTemplate.update("DELETE FROM electronic_ticket WHERE ticket_code LIKE 'END-TEST-%'");
         jdbcTemplate.update("DELETE FROM ticket_order WHERE order_no LIKE 'END-TEST-%'");
         jdbcTemplate.update("DELETE FROM show_seat WHERE lock_order_no LIKE 'END-TEST-%'");
         jdbcTemplate.update("DELETE FROM movie_show WHERE source = ?", TEST_SOURCE);
-    }
-
-    private boolean hasInvalidationReasonColumn() {
-        try {
-            jdbcTemplate.query("SELECT invalidation_reason FROM electronic_ticket WHERE 1 = 0",
-                    (resultSet, rowNumber) -> null);
-            return true;
-        } catch (org.springframework.dao.DataAccessException exception) {
-            return false;
-        }
+        jdbcTemplate.update("DELETE FROM auditorium WHERE id = ?", AUDITORIUM_ID);
+        jdbcTemplate.update("""
+                INSERT INTO auditorium (id, cinema_id, name, hall_type, row_count, seat_count,
+                data_type, status, version, create_time, update_time)
+                VALUES (?, ?, '结束失效测试厅', 'NORMAL', 1, 1, 'MOCK', 'ENABLED', 0, ?, ?)
+                """, AUDITORIUM_ID, 8_800_002L, NOW, NOW);
     }
 
     @Test
@@ -80,6 +81,7 @@ class ShowEndTicketInvalidationIntegrationTest {
         assertThat(report.invalidatedCount()).isEqualTo(1);
         assertThat(ticketStatus(ended.ticketId())).isEqualTo("INVALIDATED");
         assertThat(ticketInvalidatedAt(ended.ticketId())).isEqualTo(NOW);
+        assertThat(ticketInvalidationReason(ended.ticketId())).isEqualTo("SHOW_ENDED");
         assertThat(ticketVersion(ended.ticketId())).isEqualTo(1);
         assertThat(ticketStatus(future.ticketId())).isEqualTo("VALID");
         assertThat(orderStatus(ended.orderId())).isEqualTo("PAID");
@@ -157,9 +159,6 @@ class ShowEndTicketInvalidationIntegrationTest {
         long showId = nextBusinessId();
         long seatId = nextBusinessId();
         String orderNo = "END-TEST-" + orderId;
-        long auditoriumId = jdbcTemplate.queryForObject(
-                "SELECT id FROM auditorium ORDER BY id LIMIT 1",
-                Long.class);
         jdbcTemplate.update("""
                 INSERT INTO movie_show (
                     id, movie_id, cinema_id, auditorium_id, start_time, end_time,
@@ -169,7 +168,7 @@ class ShowEndTicketInvalidationIntegrationTest {
                 showId,
                 8_800_001L,
                 8_800_002L,
-                auditoriumId,
+                AUDITORIUM_ID,
                 NOW.minusHours(2).minusSeconds(showId % 1_000),
                 showEndTime,
                 new BigDecimal("39.90"),
@@ -204,8 +203,8 @@ class ShowEndTicketInvalidationIntegrationTest {
         jdbcTemplate.update("""
                 INSERT INTO electronic_ticket (
                     id, ticket_code, order_id, user_id, status, qr_payload,
-                    issued_time, invalidated_time, version, create_time, update_time
-                ) VALUES (?, ?, ?, ?, 'VALID', ?, ?, NULL, 0, ?, ?)
+                    issued_time, invalidated_time, invalidation_reason, version, create_time, update_time
+                ) VALUES (?, ?, ?, ?, 'VALID', ?, ?, NULL, NULL, 0, ?, ?)
                 """,
                 ticketId,
                 "END-TEST-" + ticketId,
@@ -236,6 +235,11 @@ class ShowEndTicketInvalidationIntegrationTest {
         Integer version = jdbcTemplate.queryForObject(
                 "SELECT version FROM electronic_ticket WHERE id = ?", Integer.class, ticketId);
         return version == null ? -1 : version;
+    }
+
+    private String ticketInvalidationReason(long ticketId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT invalidation_reason FROM electronic_ticket WHERE id = ?", String.class, ticketId);
     }
 
     private String orderStatus(long orderId) {
