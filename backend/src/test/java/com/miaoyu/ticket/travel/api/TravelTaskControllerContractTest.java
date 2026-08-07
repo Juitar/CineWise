@@ -108,7 +108,7 @@ class TravelTaskControllerContractTest {
         assertThat(request.required("body").required("version").asLong()).isEqualTo(1L);
 
         JsonNode success = fixtureJson("reminder-update-success.json");
-        assertThat(success.required("httpStatus").asInt()).isEqualTo(200);
+        assertSuccessEnvelope(success, 200);
         assertThat(success.required("data").required("version").asLong()).isEqualTo(2L);
 
         assertFixtureError("reminder-update-header-body-version-conflict.json", 409, CommonErrorCode.CONFLICT.code());
@@ -116,7 +116,15 @@ class TravelTaskControllerContractTest {
         assertFixtureError("reminder-update-not-found.json", 404, TravelErrorCode.TASK_NOT_FOUND.code());
         assertFixtureError("reminder-update-cancelled.json", 409, TravelErrorCode.TASK_CANCELLED.code());
         JsonNode recovery = fixtureJson("reminder-update-timeout-get-recovery.json");
+        assertSuccessEnvelope(recovery.required("getResponse"), 200);
         assertThat(recovery.required("getResponse").required("data").required("version").asLong()).isEqualTo(2L);
+        assertSuccessEnvelope(fixtureJson("task-detail-success.json"), null);
+        assertSuccessEnvelope(fixtureJson("task-detail-cancelled.json"), null);
+        for (String adviceFixture : new String[] {
+                "advice-weather-normal.json", "advice-weather-unavailable.json", "advice-weather-demo.json",
+                "advice-expired.json", "advice-not-generated.json"}) {
+            assertSuccessEnvelope(fixtureJson(adviceFixture), null);
+        }
     }
 
     private void assertAdviceFixture(String fixtureName, TravelTaskQueryService.TravelAdviceSummary summary)
@@ -152,6 +160,16 @@ class TravelTaskControllerContractTest {
         JsonNode error = fixtureJson(fixtureName);
         assertThat(error.required("httpStatus").asInt()).isEqualTo(statusCode);
         assertThat(error.required("code").asInt()).isEqualTo(errorCode);
+    }
+
+    private void assertSuccessEnvelope(JsonNode response, Integer expectedHttpStatus) {
+        if (expectedHttpStatus != null) {
+            assertThat(response.required("httpStatus").asInt()).isEqualTo(expectedHttpStatus);
+        }
+        assertThat(response.required("code").asInt()).isZero();
+        assertThat(response.required("message").asText()).isEqualTo("success");
+        assertThat(response.required("traceId").asText()).hasSize(32);
+        assertThat(response.required("data").isObject()).isTrue();
     }
 
     private TravelTaskQueryService.TravelAdviceSummary summary(

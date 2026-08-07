@@ -6,6 +6,7 @@
     "httpStatus": 200,
     "code": 0,
     "message": "success",
+    "traceId": "dddddddddddddddddddddddddddddddd",
     "data": {
       "taskId": "90001",
       "status": "READY",

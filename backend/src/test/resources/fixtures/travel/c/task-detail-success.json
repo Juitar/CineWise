@@ -1,6 +1,7 @@
 {
   "code": 0,
   "message": "success",
+  "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "data": {
     "taskId": "90001",
     "status": "READY",
