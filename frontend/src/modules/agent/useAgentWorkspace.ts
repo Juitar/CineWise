@@ -8,6 +8,7 @@ import {
   clearAgentSession,
   clearAllAgentSessions,
   createAgentSession,
+  confirmAgentAction,
   getAgentRun,
   listAgentMessages,
   listAgentSessions,
@@ -18,6 +19,7 @@ import {
   buildProjectionFromSnapshot,
   consumeAgentEvent,
   createAgentProjection,
+  updateConfirmationItem,
 } from './projection';
 import type { AgentDisplayItem, AgentProjection } from './projection';
 import { recoverFromStreamReset } from './recovery';
@@ -35,6 +37,16 @@ function safeErrorMessage(error: unknown): string {
   if (error.status === 409 || error.code === 206008) return '会话仍在运行，请先取消或等待完成';
   if (error.kind === 'NETWORK') return '网络连接失败，已保留当前内容';
   return 'Agent 请求未成功，请稍后重试';
+}
+
+function confirmationErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) return '确认请求未完成，请稍后查看实际状态';
+  if (error.status === 401 || error.code === 201006) return '登录状态已失效，请重新登录';
+  if (error.status === 403 || error.status === 404 || error.code === 206005)
+    return '该确认操作不可用';
+  if (error.status === 409 || error.code === 206006) return '确认操作正在处理，请勿重复提交';
+  if (error.status === 422 || error.code === 206004) return '确认内容已失效';
+  return '确认请求未完成，请稍后查看实际状态';
 }
 
 /** 为 `/assistant` 创建一次会话；页面只负责在成功后替换路由。 */
@@ -103,6 +115,7 @@ export function useAgentWorkspace(sessionId: string) {
   const sequenceRef = useRef(0);
   const inactivityRef = useRef<number | null>(null);
   const projectionRef = useRef(projection);
+  const confirmingActionIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     projectionRef.current = projection;
@@ -184,6 +197,21 @@ export function useAgentWorkspace(sessionId: string) {
           status: 'RESULT_UNKNOWN',
           safeError: safeErrorMessage(error),
         });
+      }
+    },
+    [replaceProjection],
+  );
+
+  const recoverConfirmation = useCallback(
+    async (actionId: string) => {
+      try {
+        const history = await listAgentMessages(projectionRef.current.sessionId);
+        const message = history.records.find((record) => record.payload.actionId === actionId);
+        if (!message) throw new AgentContractError('确认操作不在当前会话历史中');
+        const snapshot = await getAgentRun(message.runId);
+        replaceProjection(buildProjectionFromSnapshot(snapshot, history.records));
+      } catch (error) {
+        replaceProjection({ ...projectionRef.current, safeError: safeErrorMessage(error) });
       }
     },
     [replaceProjection],
@@ -332,6 +360,59 @@ export function useAgentWorkspace(sessionId: string) {
     }
   }, [replaceProjection, stopActiveStream]);
 
+  const confirm = useCallback(
+    async (itemKey: string, confirmed: boolean): Promise<void> => {
+      const item = projectionRef.current.items.find((candidate) => candidate.key === itemKey);
+      const action = item?.confirmation;
+      if (
+        !action ||
+        action.status !== 'PENDING_CONFIRMATION' ||
+        action.submitting ||
+        confirmingActionIdsRef.current.has(action.actionId)
+      )
+        return;
+      confirmingActionIdsRef.current.add(action.actionId);
+      replaceProjection(
+        updateConfirmationItem(projectionRef.current, itemKey, { submitting: true }),
+      );
+      try {
+        const result = await confirmAgentAction(action.actionId, confirmed);
+        replaceProjection(updateConfirmationItem(projectionRef.current, itemKey, result));
+        if (result.status === 'EXECUTING' || result.status === 'RESULT_UNKNOWN')
+          await recoverConfirmation(action.actionId);
+      } catch (error) {
+        const unknown =
+          error instanceof ApiError &&
+          (error.isResultUnknown || (error.status !== undefined && error.status >= 500));
+        if (unknown) {
+          replaceProjection(
+            updateConfirmationItem(projectionRef.current, itemKey, { status: 'RESULT_UNKNOWN' }),
+          );
+          await recoverConfirmation(action.actionId);
+        } else {
+          const status =
+            error instanceof ApiError && [403, 404, 422].includes(error.status ?? 0)
+              ? 'INVALIDATED'
+              : error instanceof ApiError && error.status === 409
+                ? 'EXECUTING'
+                : null;
+          replaceProjection(
+            status
+              ? updateConfirmationItem(projectionRef.current, itemKey, { status })
+              : updateConfirmationItem(projectionRef.current, itemKey, { submitting: false }),
+          );
+          setFeedback(confirmationErrorMessage(error));
+          if (error instanceof ApiError && [409, 422].includes(error.status ?? 0)) {
+            await recoverConfirmation(action.actionId);
+          }
+        }
+      } finally {
+        confirmingActionIdsRef.current.delete(action.actionId);
+      }
+    },
+    [recoverConfirmation, replaceProjection],
+  );
+
   const clearCurrent = useCallback(async () => {
     try {
       await clearAgentSession(sessionId);
@@ -372,6 +453,7 @@ export function useAgentWorkspace(sessionId: string) {
     cancel,
     clearAll,
     clearCurrent,
+    confirm,
     createNewSession,
     feedback,
     loadStatus,

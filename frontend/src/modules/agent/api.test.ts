@@ -7,9 +7,11 @@ import sessionCreated from '../../../../backend/src/test/resources/fixtures/agen
 import sessionList from '../../../../backend/src/test/resources/fixtures/agent/c/session-list.json';
 import sessionMessages from '../../../../backend/src/test/resources/fixtures/agent/c/session-message-history.json';
 import sessionsBulkCleared from '../../../../backend/src/test/resources/fixtures/agent/c/sessions-bulk-cleared.json';
+import confirmationFixtures from '../../../../backend/src/test/resources/fixtures/agent/c/confirmation-api-fixtures.json';
 import { clearCsrfToken } from '../../shared/api/client';
 import {
   cancelAgentRun,
+  confirmAgentAction,
   clearAgentSession,
   clearAllAgentSessions,
   createAgentSession,
@@ -63,5 +65,18 @@ describe('Agent REST API', () => {
     await expect(clearAllAgentSessions()).resolves.toEqual({ clearedCount: 2, skippedCount: 1 });
     await expect(getAgentRun('run-example-1')).resolves.toMatchObject({ lastEventId: '42' });
     await expect(cancelAgentRun('run-example-2')).resolves.toMatchObject({ status: 'CANCELLED' });
+  });
+
+  it.each([true, false])('确认操作请求体只包含 confirmed=%s', async (confirmed) => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(csrfResponse())
+      .mockResolvedValueOnce(response(confirmationFixtures.success));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(confirmAgentAction('action-1', confirmed)).resolves.toMatchObject({
+      status: 'SUCCEEDED',
+    });
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/agent/actions/action-1/confirm');
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ confirmed });
   });
 });

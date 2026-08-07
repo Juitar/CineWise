@@ -222,7 +222,7 @@ describe('Agent 事件投影', () => {
     },
   );
 
-  it('最新确认卡夹具只显示固定占位，不读取动作字段或生成按钮', () => {
+  it('确认卡展示脱敏摘要和可执行状态', () => {
     const result = consumeAgentEvent(
       createAgentProjection('session-1'),
       parseAgentEvent(orderConfirmCard),
@@ -230,15 +230,19 @@ describe('Agent 事件投影', () => {
     expect(result.outcome).toBe('applied');
     expect(result.projection.items).toEqual([
       expect.objectContaining({
-        kind: 'card-placeholder',
-        text: '确认操作待处理（只读）',
+        kind: 'plan-card',
+        title: '确认建单',
+        text: '等待你的确认',
+        confirmation: expect.objectContaining({
+          status: 'PENDING_CONFIRMATION',
+          submitting: false,
+        }),
       }),
     ]);
-    expect(JSON.stringify(result.projection)).not.toContain('action-1');
-    expect(JSON.stringify(result.projection)).not.toContain('A1');
+    expect(JSON.stringify(result.projection.items[0].fields)).not.toContain('action-1');
   });
 
-  it('B 后续补齐为 PLAN_CARD 的确认卡仍只读显示，不暴露 actionId 和订单行', () => {
+  it('确认 PLAN_CARD 不在可见字段中暴露 actionId', () => {
     const result = consumeAgentEvent(
       createAgentProjection('session-1'),
       parseAgentEvent({
@@ -257,17 +261,19 @@ describe('Agent 事件投影', () => {
       }),
     );
     expect(result.projection.items).toEqual([
-      expect.objectContaining({ kind: 'card-placeholder', text: '确认操作待处理（只读）' }),
+      expect.objectContaining({ kind: 'plan-card', text: '等待你的确认' }),
     ]);
-    expect(JSON.stringify(result.projection)).not.toMatch(/action-1|A1|A2/);
+    expect(JSON.stringify(result.projection.items[0].fields)).not.toContain('action-1');
   });
 
   it.each([
-    ['SUCCEEDED', '确认操作已完成（只读）'],
-    ['REJECTED', '确认操作已拒绝（只读）'],
+    ['EXECUTING', '确认操作处理中'],
+    ['SUCCEEDED', '确认操作已完成'],
+    ['FAILED', '确认操作未完成'],
+    ['REJECTED', '确认操作已拒绝'],
     ['RESULT_UNKNOWN', '确认结果暂时无法确定，请等待状态恢复'],
-    ['EXPIRED', '确认操作已过期（只读）'],
-    ['INVALIDATED', '确认内容已失效（只读）'],
+    ['EXPIRED', '确认操作已过期'],
+    ['INVALIDATED', '确认内容已失效'],
   ])('确认结果 %s 只映射固定状态文案', (status, expected) => {
     expect(safeConfirmationStatusText(status)).toBe(expected);
   });

@@ -162,6 +162,13 @@
   overflow-wrap: anywhere;
 }
 
+.agent-confirmation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .agent-composer {
   align-items: flex-end;
   padding: 14px;

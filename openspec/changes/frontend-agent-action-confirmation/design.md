@@ -1,0 +1,12 @@
+# 设计
+
+## 分层
+`contract.ts` 校验确认卡、历史消息 `runId` 和确认响应；`api.ts` 通过公共 `apiRequest` 发送仅含 `confirmed` 的 POST；`projection.ts` 只输出标题、脱敏摘要、有效期和固定状态；`useAgentWorkspace.ts` 管理提交互斥和恢复。
+
+## 恢复
+确认请求超时、断网、5xx 或返回 `RESULT_UNKNOWN` 后，不重发 POST。前端重新请求历史消息，按原 `actionId` 找到确认卡所属消息，读取 PR #145 提供的 UUID `runId`，再调用 `GET /api/v1/agent/runs/{runId}`，以运行快照重建页面。
+
+403/404 显示相同的操作不可用提示；409 显示处理中；422 显示已失效。终态、处理中和未知状态均禁止再次提交。401 继续由公共认证处理。
+
+## 测试
+单测覆盖请求体、夹具解析、脱敏、重复点击、未知结果恢复和错误状态；Playwright 覆盖桌面与移动历史确认卡。

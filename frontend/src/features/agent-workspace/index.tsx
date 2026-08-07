@@ -148,6 +148,30 @@ export function AgentWorkspace({ sessionId }: { sessionId: string }) {
                       ))}
                     </dl>
                   )}
+                  {item.confirmation && (
+                    <div className="agent-confirmation-actions">
+                      <Button
+                        type="primary"
+                        disabled={
+                          item.confirmation.status !== 'PENDING_CONFIRMATION' ||
+                          item.confirmation.submitting
+                        }
+                        loading={item.confirmation.submitting}
+                        onClick={() => void workspace.confirm(item.key, true)}
+                      >
+                        确认操作
+                      </Button>
+                      <Button
+                        disabled={
+                          item.confirmation.status !== 'PENDING_CONFIRMATION' ||
+                          item.confirmation.submitting
+                        }
+                        onClick={() => void workspace.confirm(item.key, false)}
+                      >
+                        拒绝操作
+                      </Button>
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
