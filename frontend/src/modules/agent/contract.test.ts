@@ -6,6 +6,8 @@ import messageHistory from '../../../../backend/src/test/resources/fixtures/agen
 import runCompleted from '../../../../backend/src/test/resources/fixtures/agent/c/run-completed.json';
 import sessionCreated from '../../../../backend/src/test/resources/fixtures/agent/c/session-created.json';
 import sessionList from '../../../../backend/src/test/resources/fixtures/agent/c/session-list.json';
+import confirmationFixtures from '../../../../backend/src/test/resources/fixtures/agent/c/confirmation-api-fixtures.json';
+import orderConfirmCard from '../../../../backend/src/test/resources/fixtures/agent/c/order-confirm-card.json';
 import {
   AgentContractError,
   parseAgentEvent,
@@ -13,6 +15,7 @@ import {
   parseAgentRunSnapshot,
   parseAgentSession,
   parseAgentSessionPage,
+  parseAgentActionConfirmationResult,
   validateAgentCardEvent,
 } from './contract';
 
@@ -23,7 +26,18 @@ describe('Agent DTO 和事件校验', () => {
     expect(parseAgentMessagePage(messageHistory.data).records[0].messageId).toBe(
       'message-example-2',
     );
+    expect(parseAgentMessagePage(messageHistory.data).records[0].runId).toBe(
+      '52b810c5-4b03-4a41-9c36-07372f1a6f59',
+    );
     expect(parseAgentRunSnapshot(runCompleted.data).lastEventId).toBe('42');
+  });
+
+  it('校验确认卡并解析确认结果', () => {
+    expect(validateAgentCardEvent(parseAgentEvent(orderConfirmCard)).decision).toBe('render');
+    expect(parseAgentActionConfirmationResult(confirmationFixtures.success.data)).toMatchObject({
+      actionId: 'action-1',
+      status: 'SUCCEEDED',
+    });
   });
 
   it('合法事件忽略未知顶层字段但不把它带入投影', () => {

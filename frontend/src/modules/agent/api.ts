@@ -1,6 +1,7 @@
 import { apiRequest } from '../../shared/api/client';
 import {
   parseAgentMessagePage,
+  parseAgentActionConfirmationResult,
   parseAgentRunSnapshot,
   parseAgentSession,
   parseAgentSessionPage,
@@ -10,6 +11,7 @@ import {
 } from './contract';
 import type {
   AgentMessagePage,
+  AgentActionConfirmationResult,
   AgentRunCancelResult,
   AgentRunSnapshot,
   AgentSession,
@@ -66,6 +68,17 @@ export async function cancelAgentRun(runId: string): Promise<AgentRunCancelResul
   return parseRunCancelResult(
     await apiRequest<unknown>(`${basePath}/runs/${encodeURIComponent(runId)}/cancel`, {
       method: 'POST',
+    }),
+  );
+}
+export async function confirmAgentAction(
+  actionId: string,
+  confirmed: boolean,
+): Promise<AgentActionConfirmationResult> {
+  return parseAgentActionConfirmationResult(
+    await apiRequest<unknown>(`${basePath}/actions/${encodeURIComponent(actionId)}/confirm`, {
+      method: 'POST',
+      body: { confirmed },
     }),
   );
 }

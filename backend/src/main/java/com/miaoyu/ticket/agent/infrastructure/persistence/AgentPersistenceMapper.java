@@ -157,6 +157,13 @@ public interface AgentPersistenceMapper {
             @Param("sessionId") long sessionId,
             @Param("clientRequestId") String clientRequestId);
 
+    @Select({"<script>", "SELECT " + RUN_COLUMNS + " FROM agent_run",
+            "WHERE user_id = #{userId} AND session_id = #{sessionId} AND id IN",
+            "<foreach item='runId' collection='runIds' open='(' separator=',' close=')'>",
+            "#{runId}", "</foreach>", "</script>"})
+    List<AgentRunEntity> findRunsByIdsAndUserIdAndSessionId(
+            @Param("runIds") List<Long> runIds, @Param("userId") long userId, @Param("sessionId") long sessionId);
+
     @Select("SELECT " + RUN_COLUMNS + " FROM agent_run WHERE status = 'RUNNING'"
             + " AND update_time <= #{cutoff} ORDER BY update_time ASC LIMIT #{limit}")
     List<AgentRunEntity> findStaleRunningBefore(@Param("cutoff") LocalDateTime cutoff, @Param("limit") int limit);

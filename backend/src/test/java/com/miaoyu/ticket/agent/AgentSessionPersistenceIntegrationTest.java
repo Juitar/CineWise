@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.miaoyu.ticket.agent.application.AgentErrorCode;
 import com.miaoyu.ticket.agent.application.persistence.AgentInitialRunTransaction;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageRepository;
+import com.miaoyu.ticket.agent.application.persistence.AgentRunRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionCommand;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionManagementService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
@@ -13,6 +14,9 @@ import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessageRole;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessageStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessageType;
+import com.miaoyu.ticket.agent.domain.persistence.AgentRequestHash;
+import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
+import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSessionStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
@@ -47,6 +51,9 @@ class AgentSessionPersistenceIntegrationTest {
     private AgentMessageRepository messageRepository;
 
     @Autowired
+    private AgentRunRepository runRepository;
+
+    @Autowired
     private AgentSessionManagementService sessionManagementService;
 
     @Autowired
@@ -73,6 +80,7 @@ class AgentSessionPersistenceIntegrationTest {
         AgentSession running = session(9_709_900_012L, "session-control-running", 9_709_900_101L, now.plusMinutes(1));
         sessionRepository.insert(idle);
         sessionRepository.insert(running);
+        runRepository.insert(run(9_709_900_201L, "52b810c5-4b03-4a41-9c36-07372f1a6f59", idle.id(), now));
         messageRepository.insert(new AgentMessage(9_709_900_021L, "message-control-1", idle.id(), 9_709_900_201L,
                 USER_ID, AgentMessageRole.ASSISTANT, AgentMessageType.TEXT, "历史消息", new AgentStoredJson("{}"),
                 AgentMessageStatus.COMPLETED, now, now, now.plusDays(30)));
@@ -82,7 +90,10 @@ class AgentSessionPersistenceIntegrationTest {
         var bulk = sessionManagementService.clearMySessions();
 
         assertThat(sessions.total()).isEqualTo(2L);
-        assertThat(messages.records()).extracting(AgentMessage::messageId).containsExactly("message-control-1");
+        assertThat(messages.records()).extracting(record -> record.message().messageId())
+                .containsExactly("message-control-1");
+        assertThat(messages.records()).extracting(AgentSessionManagementService.MessageRecord::runId)
+                .containsExactly("52b810c5-4b03-4a41-9c36-07372f1a6f59");
         assertThat(bulk.clearedCount()).isEqualTo(1);
         assertThat(bulk.skippedCount()).isEqualTo(1);
         assertThat(sessionRepository.findBySessionIdAndUserId(idle.sessionId(), USER_ID).orElseThrow().status())
@@ -120,6 +131,12 @@ class AgentSessionPersistenceIntegrationTest {
     private static AgentSession session(long id, String sessionId, Long activeRunId, LocalDateTime now) {
         return new AgentSession(id, sessionId, USER_ID, null, AgentSessionStatus.ACTIVE, activeRunId, 0L,
                 now, now, now.plusDays(30));
+    }
+
+    private static AgentRun run(long id, String runId, long sessionId, LocalDateTime now) {
+        return new AgentRun(id, runId, sessionId, USER_ID, "request-" + id,
+                new AgentRequestHash("v1", "a".repeat(64)), null, null, AgentRunStatus.RUNNING,
+                "trace", now, null, 0L, now, now, now.plusDays(30));
     }
 
     @TestConfiguration(proxyBeanMethods = false)
