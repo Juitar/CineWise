@@ -1,5 +1,6 @@
 package com.miaoyu.ticket.agent.application.run;
 
+import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlan;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationResult;
 import com.miaoyu.ticket.agent.domain.run.ExecutionRunState;
@@ -13,7 +14,18 @@ public record MultiToolSupervisorResult(
         ExecutionRunState state,
         List<NodeToolResult> toolResults,
         boolean awaitingConfirmation,
-        String safeNextAction) {
+        String safeNextAction,
+        ReplyGenerationResponse generatedReply) {
+
+    public MultiToolSupervisorResult(
+            CandidatePlan candidatePlan,
+            PlanValidationResult validation,
+            ExecutionRunState state,
+            List<NodeToolResult> toolResults,
+            boolean awaitingConfirmation,
+            String safeNextAction) {
+        this(candidatePlan, validation, state, toolResults, awaitingConfirmation, safeNextAction, null);
+    }
 
     public MultiToolSupervisorResult {
         toolResults = List.copyOf(toolResults == null ? List.of() : toolResults);

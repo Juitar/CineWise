@@ -91,7 +91,7 @@ public class AgentRunResultTransaction {
         if (!updated) {
             throw new IllegalStateException("Agent 运行已由其他事务处理");
         }
-        if (state != null) {
+        if (state != null && !state.plan().nodes().isEmpty()) {
             stepRepository.insertAll(state.plan().nodes().stream()
                     .map(node -> toStep(run, state, node, now))
                     .toList());
@@ -322,7 +322,7 @@ public class AgentRunResultTransaction {
 
     /** V008 的 message_type 不增加枚举值；卡片恢复一律依赖带 eventId 的持久化 CARD 事件。 */
     private static AgentMessageType messageType(AgentReplyMessageType replyType) {
-        return replyType == AgentReplyMessageType.TRAVEL_ADVICE_CARD
+        return replyType == AgentReplyMessageType.TEXT || replyType == AgentReplyMessageType.TRAVEL_ADVICE_CARD
                 ? AgentMessageType.TEXT : AgentMessageType.valueOf(replyType.name());
     }
 

@@ -9,6 +9,7 @@ import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFactsMapp
 import com.miaoyu.ticket.agent.application.reply.SelectSeatsReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.TravelAdviceCardFacts;
 import com.miaoyu.ticket.agent.application.reply.TravelAdviceCardFactsMapper;
+import com.miaoyu.ticket.agent.application.reply.TextReplyFacts;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
@@ -30,6 +31,14 @@ public final class AgentRunReplyFactory {
             return new com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse(
                     "当前请求无法安全执行", AgentReplyMessageType.ERROR,
                     new ErrorReplyFacts(null, List.of("PLAN_REJECTED")));
+        }
+        if ("GENERAL_CHAT".equals(result.safeNextAction())) {
+            if (result.generatedReply() != null) {
+                return result.generatedReply();
+            }
+            return new com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse(
+                    "我可以帮你找电影、推荐观影方案或查询场次。你想看什么类型的电影？",
+                    AgentReplyMessageType.TEXT, new TextReplyFacts());
         }
         if (result.safeNextAction() != null && result.safeNextAction().startsWith("QUESTION:")) {
             String missingSlot = result.safeNextAction().substring("QUESTION:".length());

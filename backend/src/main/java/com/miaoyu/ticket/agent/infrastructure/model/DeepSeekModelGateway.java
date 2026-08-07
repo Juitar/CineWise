@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.agent.application.model.ModelGateway;
+import com.miaoyu.ticket.agent.application.model.AgentIntent;
+import com.miaoyu.ticket.agent.application.model.IntentClassificationRequest;
 import com.miaoyu.ticket.agent.application.model.PlanGenerationRequest;
 import com.miaoyu.ticket.agent.application.model.PlanGenerationResponse;
 import com.miaoyu.ticket.agent.application.model.ReplyGenerationRequest;
@@ -30,12 +32,19 @@ public final class DeepSeekModelGateway implements ModelGateway {
     private static final String PLAN_SYSTEM_PROMPT = """
             你是 CineWise Agent 计划器。只输出 JSON 对象，不得输出 Markdown。
             根字段为 planId、version、nodes。每个节点为 nodeId、type、targetName、inputRefs、dependsOn、failurePolicy。
+            ASK_USER 节点的 targetName 必须是需要补充字段的允许 Tool 名称。
             inputRefs 每项为 inputName、source、sourceId；只能引用已给出的 slots，不能填写业务值。
             只能使用 allowTools 中的工具，写工具必须依赖 CONFIRM_ACTION 节点。
             """;
     private static final String REPLY_SYSTEM_PROMPT = """
             你是 CineWise Agent 回复生成器。只输出 JSON 对象，字段为 text、messageType。
             只能依据提供的已校验 facts 润色文案，不能新增业务事实、工具、订单或座位。
+            """;
+    private static final String INTENT_SYSTEM_PROMPT = """
+            你是 CineWise Agent 意图分类器。只输出 JSON 对象，字段为 intent。
+            intent 只能是 MOVIE、TRAVEL、GENERAL_CHAT。找电影、推荐、日期或场次为 MOVIE；
+            已有出行任务的天气或出行建议为 TRAVEL；问候、页面解释、闲聊和不确定输入为 GENERAL_CHAT。
+            不得输出工具名、参数、ID 或解释。
             """;
 
     private final RestClient restClient;
@@ -52,6 +61,18 @@ public final class DeepSeekModelGateway implements ModelGateway {
         this.properties = Objects.requireNonNull(properties, "properties 不能为空");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper 不能为空");
         this.validator = Objects.requireNonNull(validator, "validator 不能为空");
+    }
+
+    @Override
+    public AgentIntent classifyIntent(IntentClassificationRequest request) {
+        try {
+            JsonNode content = complete(INTENT_SYSTEM_PROMPT,
+                    object("input", PromptSanitizer.sanitize(Objects.requireNonNull(request, "request 不能为空").input())));
+            return AgentIntent.valueOf(requiredText(content, "intent"));
+        } catch (RuntimeException exception) {
+            // 意图不确定时不允许模型扩大工具范围。
+            return AgentIntent.GENERAL_CHAT;
+        }
     }
 
     @Override
