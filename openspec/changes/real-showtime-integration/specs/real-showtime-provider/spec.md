@@ -45,6 +45,7 @@
 - **WHEN** A 决定导入候选
 - **THEN** A 使用该三元组进行幂等判断
 - **AND** 候选仍必须是 `qualityStatus=ACCEPTED`、`isExpired=false`、`degraded=false`
+- **AND** `SANDBOX_REFERENCE` 只允许用于本地沙箱参考创建，不得走真实本地交易场次导入
 
 ### Requirement: 候选必须具有统一时区、时效和降级标记
 
@@ -65,12 +66,26 @@
 - **THEN** D 将该条返回到 `rejectedSnapshots` 并标记 `qualityStatus=END_TIME_REJECTED`
 - **AND** 不把该条放入 `snapshots`，A 无法将其导入本地场次
 
+#### Scenario: A 使用沙箱参考候选
+
+- **GIVEN** 候选为 `SANDBOX_REFERENCE`、未过期且未降级
+- **WHEN** A 处理该候选
+- **THEN** A 可以使用 `durationMinutes` 计算本地预计结束时间，并使用 `auditoriumText` 创建明确标识的本地沙箱影厅、座位和本地价格
+- **AND** A 不得把该候选标记为外部真实影厅、真实散场或真实库存
+
 #### Scenario: 影片或影院身份无法解析
 
 - **GIVEN** 影片或影院缺少 ACTIVE 映射、映射存在歧义或已经失效
 - **WHEN** D 标准化该排期
 - **THEN** D 将该条返回到 `rejectedSnapshots`，并带 `IDENTITY_REJECTED` 与 `303005`、`303006` 或 `303007`
 - **AND** 其他合格候选仍可继续返回
+
+#### Scenario: Provider 返回空数据结构
+
+- **GIVEN** Provider 返回 `code=0` 但 `data=null` 或 `data.movies` 不是数组
+- **WHEN** D 解析响应
+- **THEN** D 将响应归类为 `INVALID_DATA`
+- **AND** D 不把它转换为空排期或覆盖最近成功快照
 
 #### Scenario: Provider 不可用但存在未过期快照
 

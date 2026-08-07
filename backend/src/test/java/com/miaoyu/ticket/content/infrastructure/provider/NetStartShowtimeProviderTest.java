@@ -116,6 +116,36 @@ class NetStartShowtimeProviderTest {
         server.verify();
     }
 
+    @Test
+    void givenCodeZeroWithNullData_whenFetch_thenItReturnsInvalidData() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://netstart.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("https://netstart.test/cinema/shows?ci=70&cinemaId=c1"))
+                .andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"code\":0,\"data\":null}"));
+        NetStartShowtimeProvider provider = provider(builder.build());
+
+        assertThat(provider.fetch(LocalDate.of(2026, 8, 7),
+                List.of(new ExternalShowtimeProvider.ExternalCinema("c1", "70"))).failureCategory())
+                .isEqualTo(ExternalShowtimeProvider.FailureCategory.INVALID_DATA);
+        server.verify();
+    }
+
+    @Test
+    void givenCodeZeroWithInvalidMoviesShape_whenFetch_thenItReturnsInvalidData() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://netstart.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("https://netstart.test/cinema/shows?ci=70&cinemaId=c1"))
+                .andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"code\":0,\"data\":{\"movies\":{}}}"));
+        NetStartShowtimeProvider provider = provider(builder.build());
+
+        assertThat(provider.fetch(LocalDate.of(2026, 8, 7),
+                List.of(new ExternalShowtimeProvider.ExternalCinema("c1", "70"))).failureCategory())
+                .isEqualTo(ExternalShowtimeProvider.FailureCategory.INVALID_DATA);
+        server.verify();
+    }
+
     private static NetStartShowtimeProvider provider(RestClient restClient) {
         return new NetStartShowtimeProvider(new NetStartProperties(true, false, "https://netstart.test", "0 0 3 * * *",
                 Duration.ofMillis(500), Duration.ofMillis(1500), 10, 1, Duration.ofMillis(1)),

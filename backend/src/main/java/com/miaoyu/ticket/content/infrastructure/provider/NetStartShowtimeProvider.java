@@ -156,11 +156,13 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
     }
 
     private FetchOneResult parse(LocalDate expectedDate, String externalCinemaId, JsonNode response) {
-        if (response == null || response.path("code").asInt(-1) != 0 || response.path("data").isMissingNode()) {
+        JsonNode data = response == null ? null : response.path("data");
+        if (response == null || response.path("code").asInt(-1) != 0
+                || data.isMissingNode() || data.isNull() || !data.path("movies").isArray()) {
             return new FetchOneResult(List.of(), FailureCategory.INVALID_DATA);
         }
         List<Candidate> candidates = new ArrayList<>();
-        for (JsonNode movie : response.path("data").path("movies")) {
+        for (JsonNode movie : data.path("movies")) {
             String movieId = text(movie, "id");
             for (JsonNode shows : movie.path("shows")) {
                 // 上游按影院返回多天资料时，只接受调用方请求的业务日期。

@@ -42,10 +42,10 @@ Provider 调用复用现有学习用途保护：本地限流、连接/读取超�
 ## A 已确认的导入规则
 
 - 公开入口为 `com.miaoyu.ticket.content.application.ExternalShowtimeQueryPort#query`。
-- `QueryResult` 返回 `snapshots` 和 `truncated`；候选最多 200 条，按 `provider + externalCinemaId + externalShowId` 去重。
+- `QueryResult` 返回 `snapshots` 和 `truncated`；候选最多 200 条，按 `provider + externalCinemaId + externalShowId` 去重。`ACCEPTED` 候选可导入真实本地交易场次，`SANDBOX_REFERENCE` 候选可用于创建明确标识的本地沙箱参考，但不能描述为外部真实交易场次。
 - `QueryResult` 同时返回 `rejectedSnapshots`、`rejectedTruncated`：拒绝明细最多返回 200 条，超出部分只通过 `rejectedTruncated=true` 表示；它不写入 D 的成功快照、不计入成功候选上限，也绝不能由 A 导入。`snapshots` 可包含 `ACCEPTED` 和 `SANDBOX_REFERENCE`，A 只能导入前者。每条记录带 `qualityStatus`；身份隔离带稳定的 `303005/303006/303007`。
 - `startTime`、`endTime`、`dataAt` 和 `expiresAt` 均为带 `Asia/Shanghai` 偏移的 `OffsetDateTime`。
-- A 只导入 `qualityStatus=ACCEPTED`、`isExpired=false`、`degraded=false`、`fallbackType=null` 且 `endTime != null && endTime > startTime` 的候选。
+- A 对 `qualityStatus=ACCEPTED`、`isExpired=false`、`degraded=false`、`fallbackType=null` 且 `endTime != null && endTime > startTime` 的候选执行真实本地交易场次导入；对 `SANDBOX_REFERENCE` 候选可按 `durationMinutes` 和 `auditoriumText` 创建明确标识的本地沙箱影厅、预计结束时间、座位和本地价格，但不得宣称这些是外部真实交易事实。
 - NetStart 当前未核验到可靠 `endTime`，但返回正 `dur` 时记录会以 `SANDBOX_REFERENCE` 进入 `snapshots`，仅供 A 创建本地沙箱事实；D 不把 `dur` 推算成外部真实 `endTime`。
 - `listedPrice` 只能作为参考价；本地沙箱价格由 A 配置，外部价格变化不得覆盖已导入场次或订单价格。
 
