@@ -10,10 +10,41 @@ function sessionKey(showId: string, seatIds: string[]): string {
   return `cinewise:order-confirm:${showId}:${[...seatIds].sort().join('_')}`;
 }
 
+let fallbackUuidSequence = 0;
+
+/**
+ * 创建建单幂等标识。
+ *
+ * `randomUUID` 只在安全上下文中保证可用；演示服务器可能通过 HTTP IP 访问，此时仍使用
+ * `getRandomValues` 生成 RFC 4122 v4 标识，避免确认页在进入时因浏览器能力差异直接崩溃。
+ */
+function createUuid(): string {
+  const cryptoApi = globalThis.crypto;
+  if (typeof cryptoApi?.randomUUID === 'function') {
+    return cryptoApi.randomUUID();
+  }
+
+  if (typeof cryptoApi?.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16);
+    cryptoApi.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    return Array.from(bytes, (value) => value.toString(16).padStart(2, '0'))
+      .join('')
+      .replace(/^(........)(....)(....)(....)(............)$/, '$1-$2-$3-$4-$5');
+  }
+
+  // 仅用于极旧浏览器或受限测试环境；序列号保证同一页面内不复用幂等键。
+  fallbackUuidSequence = (fallbackUuidSequence + 1) % 0x1000000;
+  const timestamp = Date.now().toString(16).padStart(6, '0').slice(-6);
+  const sequence = fallbackUuidSequence.toString(16).padStart(6, '0');
+  return `00000000-0000-4000-8000-${timestamp}${sequence}`;
+}
+
 function createSession(): ConfirmOrderSession {
   return {
-    clientRequestId: crypto.randomUUID(),
-    idempotencyKey: crypto.randomUUID(),
+    clientRequestId: createUuid(),
+    idempotencyKey: createUuid(),
     isResultUnknown: false,
   };
 }

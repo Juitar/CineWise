@@ -10,6 +10,7 @@ public record TravelTaskInsertRow(
         long userId,
         long orderId,
         long showId,
+        Long cinemaId,
         String cinemaArea,
         LocalDateTime startAt,
         LocalDateTime triggerAt,

@@ -21,8 +21,8 @@ class JdbcContentIdentityResolutionAdapterTest {
                     external_id VARCHAR(128), internal_content_id BIGINT, status VARCHAR(16))
                 """);
         jdbc.update("INSERT INTO content_identity_mapping VALUES (1, 'NETSTART_MAOYAN', 'MOVIE', 'm1', 101, 'ACTIVE')");
-        jdbc.update("INSERT INTO content_identity_mapping VALUES (2, 'NETSTART_MAOYAN', 'MOVIE', 'm2', 102, "
-                + "'INVALID')");
+        jdbc.update("INSERT INTO content_identity_mapping VALUES "
+                + "(2, 'NETSTART_MAOYAN', 'MOVIE', 'm2', 102, 'INVALID')");
         jdbc.update("INSERT INTO content_identity_mapping VALUES (3, 'NETSTART_MAOYAN', 'MOVIE', 'm4', 104, 'ACTIVE')");
         jdbc.update("INSERT INTO content_identity_mapping VALUES (4, 'NETSTART_MAOYAN', 'MOVIE', 'm4', 105, 'ACTIVE')");
 

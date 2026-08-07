@@ -1,0 +1,153 @@
+.available-cinemas-page {
+  margin: 0 auto;
+  max-width: 1120px;
+  min-height: 420px;
+  padding: 24px;
+}
+
+.available-cinemas-breadcrumb {
+  color: var(--color-text-secondary);
+  margin-bottom: 20px;
+}
+
+.available-cinemas-breadcrumb a,
+.available-cinemas-back {
+  color: var(--color-primary);
+}
+
+.available-cinemas-header h1 {
+  margin: 0;
+}
+
+.available-cinemas-title {
+  margin: 24px 0 16px;
+}
+
+.movie-detail-card {
+  align-items: flex-start;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+  padding: 20px;
+}
+
+.movie-detail-card img {
+  border-radius: 8px;
+  height: 180px;
+  object-fit: cover;
+  width: 128px;
+}
+
+.movie-detail-card h1 {
+  margin: 0;
+}
+
+.movie-detail-card p {
+  color: var(--color-text-secondary);
+  margin: 8px 0 0;
+}
+
+.available-cinemas-notices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.available-cinemas-header p {
+  color: var(--color-text-secondary);
+  margin: 8px 0 20px;
+}
+
+.available-cinemas-list {
+  display: grid;
+  gap: 16px;
+}
+
+.available-cinemas-status {
+  margin-bottom: 16px;
+}
+
+.available-cinemas-card {
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 20px;
+}
+
+.available-cinemas-card-title-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.available-cinemas-card h2 {
+  margin: 0;
+}
+
+.available-cinemas-card address,
+.available-cinemas-card p {
+  color: var(--color-text-secondary);
+  font-style: normal;
+  margin: 8px 0 0;
+}
+
+.available-cinemas-card .available-cinemas-data-time {
+  font-size: 13px;
+}
+
+.available-cinemas-purchase-link,
+.available-cinemas-back {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.available-cinemas-purchase-link {
+  background: var(--color-primary);
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 600;
+  min-width: 112px;
+  padding: 0 18px;
+}
+
+.available-cinemas-purchase-link:focus-visible,
+.available-cinemas-back:focus-visible {
+  outline: 3px solid rgba(22, 119, 255, 35%);
+  outline-offset: 3px;
+}
+
+.available-cinemas-back {
+  margin-top: 16px;
+}
+
+@media (max-width: 767px) {
+  .available-cinemas-page {
+    padding: 16px;
+  }
+
+  .available-cinemas-card {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .movie-detail-card {
+    flex-direction: column;
+    padding: 16px;
+  }
+
+  .available-cinemas-purchase-link {
+    width: 100%;
+  }
+}

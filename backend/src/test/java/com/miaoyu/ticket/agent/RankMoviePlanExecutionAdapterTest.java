@@ -62,7 +62,7 @@ class RankMoviePlanExecutionAdapterTest {
         assertThat(definition.timeout()).isEqualTo(AgentToolDefinitions.RANK_MOVIE_PLAN_TIMEOUT);
         assertThat(definition.inputs()).extracting("name").containsExactly(
                 "cityCode", "date", "ticketCount", "movieId", "cinemaId", "genres",
-                "timeFrom", "timeTo", "latestEndTime", "budget", "excludedGenres");
+                "timeFrom", "timeTo", "latestEndTime", "budget", "excludedGenres", "maxDistanceMeters");
 
         var validation = new PlanSchemaValidator(registry).validate(
                 candidatePlan(FailurePolicy.FAIL, false), validValidationContext());
@@ -80,8 +80,8 @@ class RankMoviePlanExecutionAdapterTest {
     }
 
     @Test
-    void shouldCallRealDToolAndKeepShowtimeUnavailableAsSuccessfulDegradation() {
-        RankMoviePlanTool tool = spy(realUnavailableShowtimeTool());
+    void shouldMapMockedRecommendationToolDegradationAsSuccessfulResult() {
+        RankMoviePlanTool tool = unavailableRecommendationTool();
         ToolRegistry registry = registry();
         ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry);
         ExecutionPlan plan = validatedPlan(registry, FailurePolicy.FAIL, false);
@@ -258,12 +258,15 @@ class RankMoviePlanExecutionAdapterTest {
         return new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan()));
     }
 
-    private static RankMoviePlanTool realUnavailableShowtimeTool() {
-        return new RankMoviePlanTool(new FixedRecommendationQueryService(
-                () -> new FixedRecommendationCatalog(
-                        "fixed-rec-v1", "FIXED_RECOMMENDATION", ContentSourceType.MOCK, 360L),
-                query -> List.of(),
-                Clock.fixed(NOW, ZoneOffset.UTC)));
+    private static RankMoviePlanTool unavailableRecommendationTool() {
+        RankMoviePlanTool tool = mock(RankMoviePlanTool.class);
+        RecommendationPlanResult result = new RecommendationPlanResult(
+                "1.0", "fixture", List.of(), List.of("SHOWTIME"), null, false, "TICKETING:MOCK",
+                NOW, NOW.plusSeconds(1_800), true);
+        when(tool.executeRecommendationPlan(any(ToolContext.class), any(RankMoviePlanCommand.class)))
+                .thenReturn(new ToolResult<>(ToolStatus.SUCCESS, result, null, false, false, "RENDER_RESULT",
+                        true, "SHOWTIME_UNAVAILABLE", 1L, result.dataAt(), result.expiresAt()));
+        return tool;
     }
 
     private static ExecutionPlan validatedPlan(

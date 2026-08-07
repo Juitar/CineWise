@@ -13,6 +13,15 @@ const pageMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('umi', () => ({
+  Link: ({
+    children,
+    to,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { to: string }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
   useSearchParams: () => [new URLSearchParams(pageMocks.search), pageMocks.setSearchParams],
 }));
 
@@ -86,6 +95,10 @@ describe('MoviesPage', () => {
     expect(screen.getByText('演示数据')).toBeInTheDocument();
     expect(screen.getByText('共 1 部影片')).toBeInTheDocument();
     expect(screen.queryByText('云边有个小卖部')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '为《星河远征》选择影院' })).toHaveAttribute(
+      'href',
+      '/movies/8100001',
+    );
   });
 
   it('选择影片类型时写入 genre 并重置页码', () => {

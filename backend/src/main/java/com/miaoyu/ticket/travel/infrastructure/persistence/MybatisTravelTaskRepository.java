@@ -81,6 +81,7 @@ public class MybatisTravelTaskRepository implements TravelTaskRepository {
                 task.userId(),
                 task.orderId(),
                 task.showId(),
+                task.cinemaId(),
                 task.cinemaArea(),
                 task.startAt(),
                 task.triggerAt(),
@@ -95,6 +96,7 @@ public class MybatisTravelTaskRepository implements TravelTaskRepository {
     public void insertCancelled(NewCancelledTravelTask task) {
         int inserted = mapper.insertCancelled(new TravelTaskCancelledInsertRow(
                 task.id(), task.taskId(), task.invalidationEventId(), task.userId(), task.orderId(), task.showId(),
+                task.cinemaId(),
                 task.cinemaArea(), task.startAt(), task.triggerAt(), task.orderVersion(), task.closedAt()));
         if (inserted != 1) {
             throw new IllegalStateException("出行取消墓碑写入行数异常");
@@ -108,6 +110,7 @@ public class MybatisTravelTaskRepository implements TravelTaskRepository {
                 row.userId(),
                 row.orderId(),
                 row.showId(),
+                row.cinemaId(),
                 row.cinemaArea(),
                 row.startAt(),
                 row.triggerAt(),

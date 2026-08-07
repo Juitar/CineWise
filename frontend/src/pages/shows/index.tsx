@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { history, Link, useSearchParams } from 'umi';
+import { history, useSearchParams } from 'umi';
 import { Alert } from 'antd';
 import { ErrorBlock } from 'antd-mobile';
 import { ShowList } from '../../features/show-list/ShowList';
@@ -7,6 +7,7 @@ import type { ShowItemUI } from '../../features/show-list/ShowList';
 import { useShows } from '../../modules/ticketing/hooks';
 import { formatShowDate, formatShowTime } from '../../modules/ticketing/formatters';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
+import { TransactionBreadcrumb } from '../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import './index.css';
 
 /**
@@ -63,13 +64,13 @@ export default function ShowsPage() {
 
   return (
     <div className="shows-page-container">
-      <nav aria-label="面包屑" className="shows-breadcrumb">
-        <Link to="/cinemas">影院列表</Link>
-        <span aria-hidden="true"> / </span>
-        <span>{cinemaName}</span>
-        <span aria-hidden="true"> / </span>
-        <span className="current">选择场次</span>
-      </nav>
+      <TransactionBreadcrumb
+        items={[
+          { label: '影院列表', to: '/cinemas' },
+          { label: cinemaName, to: `/cinemas/${encodeURIComponent(cinemaId)}` },
+          { label: '选择场次' },
+        ]}
+      />
       <div className="shows-page-header">
         <h1 className="shows-page-title">选择场次</h1>
         <div className="shows-cinema-sub">{cinemaName}</div>

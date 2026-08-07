@@ -6,13 +6,13 @@ import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationQueryService;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
-import com.miaoyu.ticket.recommendation.application.RecommendationCandidate;
 import com.miaoyu.ticket.recommendation.application.PersonalizedRecommendationQueryService;
+import com.miaoyu.ticket.recommendation.domain.RecommendationEvidence;
 import com.miaoyu.ticket.recommendation.domain.RecommendationPlan;
 import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
 import java.math.BigDecimal;
-import java.util.Objects;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -120,6 +120,51 @@ public class RankMoviePlanTool {
      */
     public ToolResult<RecommendationPlanResult> executeRecommendationPlan(
             ToolContext context, RankMoviePlanCommand command) {
+        Objects.requireNonNull(context, "context 不能为空");
+        Objects.requireNonNull(command, "command 不能为空");
+        if (!TARGET_NAME.equals(context.targetName())) {
+            return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INVALID_PARAMETER.code(), false, false,
+                    "CHECK_TOOL_TARGET", false, null, context.stateVersion(), null, null);
+        }
+        if (command.cityCode() == null || command.cityCode().isBlank()) {
+            return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INVALID_PARAMETER.code(), false, false,
+                    "COMPLETE_CONSTRAINTS_REQUIRED", false, null, context.stateVersion(), null, null);
+        }
+        String distancePreference = context.distancePreference();
+        String distanceContextId = context.distanceContextId();
+        if (personalizedQueryService == null) {
+            if (distancePreference != null) {
+                return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INTERNAL_ERROR.code(), false, false,
+                        "RETRY_LATER", false, null, context.stateVersion(), null, null);
+            }
+            RecommendationPlanResult fallback = toPlanResult(queryService.query(command.toQuery()));
+            return new ToolResult<>(ToolStatus.SUCCESS, fallback, null, false, false, "RENDER_RESULT",
+                    fallback.degraded(), fallback.degraded() ? "RECOMMENDATION_DEGRADED" : null,
+                    context.stateVersion(), fallback.dataAt(), fallback.expiresAt());
+        }
+        if (distancePreference != null && !"NEAREST".equals(distancePreference)) {
+            return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INVALID_PARAMETER.code(), false, false,
+                    "CHECK_DISTANCE_PREFERENCE", false, null, context.stateVersion(), null, null);
+        }
+        if ("NEAREST".equals(distancePreference) && (distanceContextId == null || distanceContextId.isBlank())) {
+            return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INVALID_PARAMETER.code(), false, false,
+                    "CHECK_DISTANCE_CONTEXT", false, null, context.stateVersion(), null, null);
+        }
+        RecommendationPlanResult result = "NEAREST".equals(distancePreference)
+                ? personalizedQueryService.queryWithDistanceContext(
+                        command.toConstraints(), distanceContextId, context.runId())
+                : personalizedQueryService.query(command.toConstraints());
+        return new ToolResult<>(ToolStatus.SUCCESS, result, null, false, false, "RENDER_RESULT",
+                result.degraded(), result.degraded() ? "RECOMMENDATION_DEGRADED" : null,
+                context.stateVersion(), result.dataAt(), result.expiresAt());
+    }
+
+    /**
+     * B 在确认后的可信上下文中调用的附近推荐入口。精确位置不进入 Command；D 只接收一次性上下文 ID，
+     * 并把消费动作交给距离 Application Service。distancePreference 目前只允许 NEAREST。
+     */
+    private ToolResult<RecommendationPlanResult> executeRecommendationPlanWithDistance(
+            ToolContext context, RankMoviePlanCommand command, String distanceContextId, String distancePreference) {
         // 上下文只提供 B 已验证的运行元数据，用户条件只能来自类型化 Command。
         Objects.requireNonNull(context, "context 不能为空");
         Objects.requireNonNull(command, "command 不能为空");
@@ -134,32 +179,53 @@ public class RankMoviePlanTool {
                     "COMPLETE_CONSTRAINTS_REQUIRED", false, null, context.stateVersion(), null, null);
         }
         if (personalizedQueryService == null) {
-            // 旧构造器仍被已发布的 Agent 适配器和回归测试使用；只读转换保持兼容，绝不补造场次或写票务事实。
-            RecommendationPlanResult legacyResult = toLegacyPlanResult(queryService.query(command.toQuery()));
-            return new ToolResult<>(ToolStatus.SUCCESS, legacyResult, null, false, false, "RENDER_RESULT",
-                    legacyResult.degraded(), legacyResult.degraded() ? "RECOMMENDATION_DEGRADED" : null,
-                    context.stateVersion(), legacyResult.dataAt(), legacyResult.expiresAt());
+            // 旧 Agent 夹具只装配固定推荐服务。生产容器仍通过双参数构造器注入完整查询；此处只把既有的
+            // 只读固定结果转换成同一公开结构，避免回归测试把“无场次的成功降级”误判为工具故障。
+            if (distancePreference != null) {
+                return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INTERNAL_ERROR.code(), false, false,
+                        "RETRY_LATER", false, null, context.stateVersion(), null, null);
+            }
+            RecommendationPlanResult fallback = toPlanResult(queryService.query(command.toQuery()));
+            return new ToolResult<>(ToolStatus.SUCCESS, fallback, null, false, false, "RENDER_RESULT",
+                    fallback.degraded(), fallback.degraded() ? "RECOMMENDATION_DEGRADED" : null,
+                    context.stateVersion(), fallback.dataAt(), fallback.expiresAt());
+        }
+        if (distancePreference != null && !"NEAREST".equals(distancePreference)) {
+            return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INVALID_PARAMETER.code(), false, false,
+                    "CHECK_DISTANCE_PREFERENCE", false, null, context.stateVersion(), null, null);
+        }
+        if ("NEAREST".equals(distancePreference)
+                && (distanceContextId == null || distanceContextId.isBlank())) {
+            return new ToolResult<>(ToolStatus.FAILED, null, CommonErrorCode.INVALID_PARAMETER.code(), false, false,
+                    "CHECK_DISTANCE_CONTEXT", false, null, context.stateVersion(), null, null);
         }
         // 只把 D 的完整计算结果原样交给 B，卡片、SSE 和 Agent 状态仍由 B 负责。
-        RecommendationPlanResult result = personalizedQueryService.query(command.toConstraints());
+        RecommendationPlanResult result = "NEAREST".equals(distancePreference)
+                ? personalizedQueryService.queryWithDistanceContext(
+                        command.toConstraints(), distanceContextId, context.runId())
+                : personalizedQueryService.query(command.toConstraints());
         // 空方案或放宽建议仍是成功查询；降级标识只描述结果可用性，不能变成自动重试。
         return new ToolResult<>(ToolStatus.SUCCESS, result, null, false, false, "RENDER_RESULT",
                 result.degraded(), result.degraded() ? "RECOMMENDATION_DEGRADED" : null,
                 context.stateVersion(), result.dataAt(), result.expiresAt());
     }
 
-    /** 旧固定推荐只转换已有可购候选；无场次保持空方案和 SHOWTIME 缺失，不生成任何虚构票务数据。 */
-    private RecommendationPlanResult toLegacyPlanResult(FixedRecommendationResult result) {
-        List<RecommendationPlan> plans = result.candidates().stream()
-                .filter(RecommendationCandidate::purchaseEligible)
-                .map(candidate -> new RecommendationPlan(RecommendationPlan.PlanType.COMPREHENSIVE,
-                        candidate.movieId(), candidate.cinemaId(), candidate.showId(),
-                        new BigDecimal(candidate.price()), candidate.startTime(), 0D, List.of(), List.of(),
-                        candidate.source(), result.dataAt(), result.expiresAt(), true))
-                .limit(3)
+    private static RecommendationPlanResult toPlanResult(FixedRecommendationResult fixed) {
+        List<RecommendationPlan> plans = fixed.candidates().stream()
+                .filter(candidate -> candidate.purchaseEligible() && !candidate.isExpired())
+                .filter(candidate -> candidate.showId() != null && candidate.price() != null
+                        && candidate.startTime() != null)
+                .map(candidate -> new RecommendationPlan(
+                        RecommendationPlan.PlanType.COMPREHENSIVE, candidate.movieId(), null, candidate.cinemaId(),
+                        null, candidate.showId(), new BigDecimal(candidate.price()), candidate.startTime(), null, null,
+                        null, 0D, List.of("固定推荐结果"),
+                        List.of(new RecommendationEvidence("showtime", candidate.showId(), candidate.source(),
+                                candidate.startTime(), fixed.expiresAt())), candidate.source(), fixed.dataAt(),
+                        fixed.expiresAt(), true))
                 .toList();
-        return new RecommendationPlanResult(result.algorithmVersion(), plans, result.missingFactors(), null,
-                result.source(), result.dataAt(), result.expiresAt(), !result.purchaseEligible());
+        boolean degraded = fixed.isExpired() || !fixed.purchaseEligible() || !fixed.missingFactors().isEmpty();
+        return new RecommendationPlanResult("1.0", fixed.algorithmVersion(), plans, fixed.missingFactors(), null,
+                fixed.profileApplied(), fixed.source(), fixed.dataAt(), fixed.expiresAt(), degraded);
     }
 
 }

@@ -8,6 +8,9 @@ import { ApiError } from '../../../shared/api/ApiError';
 vi.mock('umi', () => ({
   history: { push: vi.fn() },
   useParams: () => ({ orderNo: 'CW1' }),
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => (
+    <a href={to}>{children}</a>
+  ),
 }));
 vi.mock('../../../modules/order/transaction-hooks', () => ({
   useRefundPage: vi.fn(),

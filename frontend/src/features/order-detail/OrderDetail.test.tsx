@@ -88,6 +88,15 @@ describe('OrderDetail 组件', () => {
     expect(recover).toHaveBeenCalledTimes(1);
   });
 
+  it('终态订单仅提供订单列表入口，不再提供返回首页', () => {
+    const onViewOrders = vi.fn();
+    render(<OrderDetail {...defaultProps} status="CANCELLED" onViewOrders={onViewOrders} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '查看订单列表' }));
+    expect(onViewOrders).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: '返回首页' })).not.toBeInTheDocument();
+  });
+
   it('在移动端视图渲染 ErrorBlock、SpinLoading 以及 antd-mobile 按钮', () => {
     setMobileView(true);
     const { container, rerender } = render(<OrderDetail {...defaultProps} loading={true} />);

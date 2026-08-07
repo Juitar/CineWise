@@ -240,7 +240,8 @@ public class ContentSyncService {
             for (ContentItem item : accepted.data()) {
                 MovieContent movie = (MovieContent) item;
                 // 详情只接受内部 movieId；外部 sourceMovieId 不能成为页面快照键。
-                saveLiveResult(new ContentQuery(com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
+                saveLiveResult(new ContentQuery(
+                        com.miaoyu.ticket.content.domain.ContentResourceType.MOVIE,
                         movie.movieId(), null, null), contentResult(List.of(movie), accepted), writeGuard);
                 synchronizedMovies.add(movie);
             }

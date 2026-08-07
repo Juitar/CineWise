@@ -2,13 +2,19 @@
 
 ### Requirement: 影片入口必须在正式接口确认后进入选影院
 
-在 A/D 确认正式按影片查询可售影院接口后，系统 SHALL 让 `/movies` 卡片提供语义化、可键盘激活的入口并传递服务端字符串 `movieId`。接口未确认时 MUST NOT 发猜测请求或使用临时 Mock。
+在 A/D 确认正式按影片查询可售影院接口后，系统 SHALL 让首页和 `/movies` 卡片提供语义化、可键盘激活的入口并传递服务端字符串 `movieId`。系统 SHALL 让首页影院卡片以服务端字符串 `cinemaId` 进入 `/cinemas/:cinemaId`，不得直接构造 `/shows`。接口未确认时 MUST NOT 发猜测请求或使用临时 Mock。
 
 #### Scenario: 从影片列表进入选影院
 
-- **GIVEN** 影片卡片包含合法 `movieId`
+- **GIVEN** 首页或影片列表卡片包含合法 `movieId`
 - **WHEN** 用户点击或键盘激活入口
-- **THEN** 进入既有 `/movies/:movieId` 影片详情/选影院路由，并由确认后的模块 Hook 查询影院
+- **THEN** 进入既有 `/movies/:movieId` 影片详情/选影院路由，并由 content、ticketing 模块 Hook 查询影片资料和影院
+
+#### Scenario: 从首页影院卡片进入影院详情
+
+- **GIVEN** 首页影院卡片包含合法 `cinemaId`
+- **WHEN** 用户点击或键盘激活入口
+- **THEN** 进入 `/cinemas/:cinemaId`，不构造 `/shows` 地址
 
 ### Requirement: 影院选择必须只跳转既有场次页
 
@@ -29,6 +35,12 @@
 - **GIVEN** 合法影片分别返回空数组、可重试错误或 `contentExpired=true` 的影院记录
 - **WHEN** 页面处理响应
 - **THEN** 空数组显示“暂无可售影院”且无购票入口，失败可重试；过期资料显示时效提示但保留使用原 `movieId` 与记录 `cinemaId` 进入场次页的入口
+
+#### Scenario: 影片详情不存在或查询失败
+
+- **GIVEN** `GET /api/v1/movies/{movieId}` 返回 404 或可重试错误
+- **WHEN** 页面处理响应
+- **THEN** 404 显示影片不存在；失败显示重试入口，且不得用可售影院空结果替代影片详情错误
 
 ### Requirement: PC、移动端和键盘均可用
 

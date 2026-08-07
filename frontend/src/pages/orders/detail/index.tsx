@@ -8,7 +8,7 @@ import {
   usePaymentQuery,
 } from '../../../modules/order/transaction-hooks';
 import { formatOrderDateTime } from '../../../modules/order/formatters';
-import { TransactionBackButton } from '../../../features/transaction-back-button/TransactionBackButton';
+import { TransactionBreadcrumb } from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import { OrderContentNotice } from '../../../features/order-content-notice/OrderContentNotice';
 import { useOrderContentDetails } from '../../../modules/order/useOrderContentDetails';
 import './index.css';
@@ -59,12 +59,12 @@ export default function OrderDetailPage() {
   return (
     <div className="order-detail-page-wrapper">
       <div className="order-detail-page-content">
-        <TransactionBackButton onBack={() => history.push('/orders')} label="返回订单列表" />
+        <TransactionBreadcrumb
+          items={[{ label: '我的订单', to: '/orders' }, { label: '订单详情' }]}
+        />
         <OrderContentNotice
           isLoading={content.isLoading}
           hasUnavailableContent={content.hasUnavailableContent}
-          movieFreshness={movie ? [movie] : []}
-          cinemaFreshness={cinema ? [cinema] : []}
           onRetry={content.refresh}
         />
         <OrderDetail
@@ -97,7 +97,7 @@ export default function OrderDetailPage() {
           onCancel={() => void handleCancel()}
           onViewTicket={() => void handleViewTicket()}
           onApplyRefund={() => history.push(`/orders/${encodeURIComponent(orderNo)}/refund`)}
-          onBackToHome={() => history.push('/')}
+          onViewOrders={() => history.push('/orders')}
           cancelResultUnknown={cancellation.resultUnknown}
           onRecoverCancel={() => void recoverCancellation()}
         />

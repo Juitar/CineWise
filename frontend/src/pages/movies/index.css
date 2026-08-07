@@ -226,6 +226,24 @@
   font-size: 12px;
 }
 
+.movie-grid-purchase-link {
+  align-items: center;
+  background: var(--color-primary);
+  border-radius: 8px;
+  color: #fff;
+  display: inline-flex;
+  font-weight: 600;
+  justify-content: center;
+  margin-top: 4px;
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.movie-grid-purchase-link:focus-visible {
+  outline: 3px solid rgba(22, 119, 255, 35%);
+  outline-offset: 3px;
+}
+
 .movie-grid-card--skeleton {
   padding-bottom: 12px;
 }

@@ -1,5 +1,6 @@
 {
   "code": 0,
   "message": "success",
+  "traceId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "data": { "taskId": "90002", "status": "CANCELLED", "triggerAt": "2026-08-05T17:00:00+08:00", "version": 2, "order": { "orderId": "80002", "orderNo": "ORD-80002", "showId": "70002", "showStartTime": "2026-08-05T19:00:00+08:00" }, "movie": { "movieId": "10002", "title": "已取消示例", "posterUrl": null, "source": "LIVE_CONTENT", "dataAt": "2026-08-04T08:00:00+08:00" }, "cinema": { "cinemaId": "20002", "name": "示例影院", "area": null, "address": null, "source": "LIVE_CONTENT", "dataAt": "2026-08-04T08:00:00+08:00", "expiresAt": null, "isExpired": false } }
 }

@@ -1,0 +1,16 @@
+## 1. 测试替身修复
+
+- [x] 1.1 检查 `AgentPersistenceMySqlIntegrationTest` 中所有 `AgentToolExecutor` mock 的固定行为。
+- [x] 1.2 为推荐执行器 mock 在 Bean 创建和 reset 后恢复 `targetName()` 与 `definition()`。
+- [x] 1.3 将监督器测试计划和成功结果同步到当前完整推荐工具契约。
+- [x] 1.4 将旧固定推荐测试替身替换为 `RecommendationPlanResult`，覆盖正常方案和空方案降级。
+- [x] 1.5 修正 MySQL 监督器测试结果时效，避免固定时间在 CI 中过期。
+- [x] 1.6 兼容 V009 的 `tool.result` 存储白名单，并在读取时还原当前公开工具终态事件。
+- [x] 1.7 监督器 MySQL 测试校验持久化 planId 为服务端生成的标准小写 UUID。
+
+## 2. 验证
+
+- [x] 2.1 GitHub Actions MySQL 8.4 run `31142798288` 在 head `d3368dc` 运行 `AgentPersistenceMySqlIntegrationTest`；首次与重复 Flyway 初始化后均为 12/12 通过。
+- [x] 2.2 执行严格 OpenSpec 校验和差异检查。
+
+> 本地未设置 `CINEWISE_MYSQL_AGENT_PERSISTENCE_IT=true`，定向 MySQL 测试的 12 个用例均按条件跳过。run `31141461079` 的 job 结论为 `cancelled`，不能作为验证证据；run `31142798288` 已完成 2.1。

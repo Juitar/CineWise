@@ -22,7 +22,17 @@ public record RecommendationConstraints(
         LocalTime timeTo,
         LocalTime latestEndTime,
         BigDecimal budget,
-        List<String> excludedGenres) {
+        List<String> excludedGenres,
+        Integer maxDistanceMeters) {
+
+    /** 保留未启用附近推荐时的旧构造器，避免普通推荐调用方被迫携带位置条件。 */
+    public RecommendationConstraints(
+            String cityCode, LocalDate date, int ticketCount, String movieId, String cinemaId,
+            List<String> genres, LocalTime timeFrom, LocalTime timeTo, LocalTime latestEndTime,
+            BigDecimal budget, List<String> excludedGenres) {
+        this(cityCode, date, ticketCount, movieId, cinemaId, genres, timeFrom, timeTo, latestEndTime,
+                budget, excludedGenres, null);
+    }
 
     /** 统一拒绝半个时段和不受控的数量，避免不同调用入口得到不同结果。 */
     public RecommendationConstraints {
@@ -36,6 +46,9 @@ public record RecommendationConstraints(
         }
         if (budget != null && budget.signum() < 0) {
             throw new IllegalArgumentException("budget 不能为负数");
+        }
+        if (maxDistanceMeters != null && maxDistanceMeters <= 0) {
+            throw new IllegalArgumentException("maxDistanceMeters 必须大于 0");
         }
         // List.copyOf 同时禁止空元素，防止类型过滤在运行期出现空指针。
         genres = List.copyOf(Objects.requireNonNull(genres, "genres 不能为空"));
