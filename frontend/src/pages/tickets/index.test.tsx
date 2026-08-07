@@ -4,7 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupTestEnvironment } from '../../features/test-utils';
 import { useElectronicTicket, useOrder } from '../../modules/order/transaction-hooks';
 
-vi.mock('umi', () => ({ useParams: () => ({ ticketId: '99' }) }));
+vi.mock('umi', () => ({
+  useParams: () => ({ ticketId: '99' }),
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => (
+    <a href={to}>{children}</a>
+  ),
+}));
 vi.mock('../../modules/order/transaction-hooks', () => ({
   useElectronicTicket: vi.fn(),
   useOrder: vi.fn(),

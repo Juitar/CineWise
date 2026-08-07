@@ -29,7 +29,7 @@ export interface OrderDetailProps {
   onCancel?: () => void;
   onViewTicket?: () => void;
   onApplyRefund?: () => void;
-  onBackToHome?: () => void;
+  onViewOrders?: () => void;
   cancelResultUnknown?: boolean;
   onRecoverCancel?: () => void;
 }
@@ -62,7 +62,7 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
   onCancel,
   onViewTicket,
   onApplyRefund,
-  onBackToHome,
+  onViewOrders,
   cancelResultUnknown = false,
   onRecoverCancel,
 }) => {
@@ -147,7 +147,7 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
 
     if (isOfflineReadOnly) {
       return (
-        <div className="order-detail-actions">{renderDefaultBtn('返回首页', onBackToHome)}</div>
+        <div className="order-detail-actions">{renderDefaultBtn('查看订单列表', onViewOrders)}</div>
       );
     }
 
@@ -223,7 +223,9 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
       case 'EXPIRED':
       default:
         return (
-          <div className="order-detail-actions">{renderDefaultBtn('返回首页', onBackToHome)}</div>
+          <div className="order-detail-actions">
+            {renderDefaultBtn('查看订单列表', onViewOrders)}
+          </div>
         );
     }
   };

@@ -3,8 +3,7 @@ import { useParams } from 'umi';
 import { ElectronicTicketCard } from '../../features/electronic-ticket-card/ElectronicTicketCard';
 import { useElectronicTicket, useOrder } from '../../modules/order/transaction-hooks';
 import { formatOrderDateTime } from '../../modules/order/formatters';
-import { history } from 'umi';
-import { TransactionBackButton } from '../../features/transaction-back-button/TransactionBackButton';
+import { TransactionBreadcrumb } from '../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import { OrderContentNotice } from '../../features/order-content-notice/OrderContentNotice';
 import { useOrderContentDetails } from '../../modules/order/useOrderContentDetails';
 import './index.css';
@@ -31,19 +30,20 @@ export default function TicketPage() {
   return (
     <div className="ticket-page-wrapper">
       <div className="ticket-page-content">
-        <TransactionBackButton
-          onBack={() =>
-            history.push(
-              order?.orderNo ? `/orders/${encodeURIComponent(order.orderNo)}` : '/orders',
-            )
+        <TransactionBreadcrumb
+          items={
+            order?.orderNo
+              ? [
+                  { label: '我的订单', to: '/orders' },
+                  { label: '订单详情', to: `/orders/${encodeURIComponent(order.orderNo)}` },
+                  { label: '电子票' },
+                ]
+              : [{ label: '我的订单', to: '/orders' }, { label: '电子票' }]
           }
-          label={order?.orderNo ? '返回订单详情' : '返回订单列表'}
         />
         <OrderContentNotice
           isLoading={content.isLoading}
           hasUnavailableContent={content.hasUnavailableContent}
-          movieFreshness={movie ? [movie] : []}
-          cinemaFreshness={cinema ? [cinema] : []}
           onRetry={content.refresh}
         />
         <ElectronicTicketCard
