@@ -1,5 +1,6 @@
 package com.miaoyu.ticket.agent;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -154,7 +155,7 @@ class AgentControllerTest {
                 "session-1", null, "ACTIVE", created, created));
         when(runtimeService.listMySessions(1, 20)).thenReturn(new PageResult<>(1L, 1, 20,
                 List.of(new AgentInteractionRuntimeService.SessionView(
-                        "session-1", "摘要", "ACTIVE", created, created))));
+                        "session-1", null, "ACTIVE", created, created))));
         when(runtimeService.listMySessionMessages("session-1", 1, 20)).thenReturn(new PageResult<>(1L, 1, 20,
                 List.of(new AgentInteractionRuntimeService.MessageView("message-1", "ASSISTANT", "TEXT", "已完成",
                         "52b810c5-4b03-4a41-9c36-07372f1a6f59", new ObjectMapper().readTree("{}"), "COMPLETED",
@@ -168,11 +169,15 @@ class AgentControllerTest {
 
         mockMvc.perform(post("/api/v1/agent/sessions"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.sessionId").value("session-1"));
+                .andExpect(jsonPath("$.data.sessionId").value("session-1"))
+                .andExpect(jsonPath("$.data.summary").hasJsonPath())
+                .andExpect(jsonPath("$.data.summary").value(nullValue()));
         mockMvc.perform(get("/api/v1/agent/sessions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(1))
-                .andExpect(jsonPath("$.data.records[0].sessionId").value("session-1"));
+                .andExpect(jsonPath("$.data.records[0].sessionId").value("session-1"))
+                .andExpect(jsonPath("$.data.records[0].summary").hasJsonPath())
+                .andExpect(jsonPath("$.data.records[0].summary").value(nullValue()));
         mockMvc.perform(get("/api/v1/agent/sessions/session-1/messages"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records[0].messageId").value("message-1"))
