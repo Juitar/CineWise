@@ -181,8 +181,9 @@ class AgentPersistenceMySqlIntegrationTest {
         cleanupFixtures();
         toolCalledInsideTransaction = new AtomicBoolean(true);
         Mockito.reset(modelGateway, rankMoviePlanExecutionAdapter);
-        // Supervisor 在 Spring 上下文创建时按 targetName 建立只读适配器表；reset 后必须恢复这个固定类型标识。
+        // 注册表同时依赖工具名和定义；reset 后两者都必须恢复，不能让 Mockito 默认返回 null。
         Mockito.when(rankMoviePlanExecutionAdapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
+        Mockito.when(rankMoviePlanExecutionAdapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
     }
 
     @AfterEach
@@ -629,8 +630,9 @@ class AgentPersistenceMySqlIntegrationTest {
         @Primary
         RankMoviePlanExecutionAdapter agentPersistenceRankMoviePlanExecutionAdapter() {
             RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
-            // 该适配器的目标名是类型边界，不应由每个 MySQL 测试重复决定。
+            // 注册表要求执行器同时提供稳定的目标名和工具定义，避免上下文初始化读取到 Mockito 默认 null。
             Mockito.when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
+            Mockito.when(adapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
             return adapter;
         }
 
