@@ -4,6 +4,8 @@ import { queryContentSources, queryContentSync, requestContentSync } from './api
 import type { ContentSourceStatus, ContentSyncTask } from './types';
 
 const key = 'cinewise:admin-content-sync';
+const isTerminalTask = (task: ContentSyncTask) =>
+  task.status === 'SUCCESS' || task.status === 'PARTIAL' || task.status === 'FAILED';
 const toError = (error: unknown) =>
   error instanceof ApiError ? error : new ApiError('请求失败', { kind: 'NETWORK' });
 
@@ -39,7 +41,8 @@ export function useAdminContentSync() {
       try {
         const next = await requestContentSync(clientRequestId, cityName);
         setTask(next);
-        sessionStorage.removeItem(key);
+        if (isTerminalTask(next)) sessionStorage.removeItem(key);
+        setResultUnknown(false);
         await refresh();
       } catch (e) {
         const apiError = toError(e);
@@ -60,8 +63,9 @@ export function useAdminContentSync() {
     setSubmitting(true);
     setError(null);
     try {
-      setTask(await queryContentSync(id));
-      sessionStorage.removeItem(key);
+      const next = await queryContentSync(id);
+      setTask(next);
+      if (isTerminalTask(next)) sessionStorage.removeItem(key);
       setResultUnknown(false);
       await refresh();
     } catch (e) {
@@ -70,6 +74,9 @@ export function useAdminContentSync() {
       setSubmitting(false);
     }
   }, [refresh]);
+  useEffect(() => {
+    if (resultUnknown && task === null) void recover();
+  }, [recover, resultUnknown, task]);
   return {
     sources,
     task,
