@@ -52,7 +52,8 @@ import com.miaoyu.ticket.agent.domain.tool.ToolContext;
 import com.miaoyu.ticket.agent.domain.tool.ToolRegistry;
 import com.miaoyu.ticket.agent.domain.run.ExecutionPlanStateMachine;
 import com.miaoyu.ticket.recommendation.api.RankMoviePlanTool;
-import com.miaoyu.ticket.recommendation.application.FixedRecommendationResult;
+import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
+import java.time.Instant;
 import java.time.LocalDate;
 import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
@@ -303,7 +304,8 @@ class AgentPersistenceMySqlIntegrationTest {
         PlanValidationContext context = rankValidationContext();
         CandidatePlan plan = new CandidatePlan("supervisor-plan", 1, List.of(new CandidatePlanNode(
                 "rank", PlanNodeType.CALL_TOOL, RankMoviePlanTool.TARGET_NAME,
-                List.of(slotReference("movieId"), slotReference("cinemaId"), slotReference("date")),
+                List.of(slotReference("cityCode"), slotReference("date"), slotReference("ticketCount"),
+                        slotReference("movieId"), slotReference("cinemaId")),
                 List.of(), FailurePolicy.FAIL)));
         Mockito.when(modelGateway.generatePlan(Mockito.any())).thenReturn(new PlanGenerationResponse(
                 plan, PlanValidationResult.invalid(List.of(new PlanValidationIssue(
@@ -546,9 +548,11 @@ class AgentPersistenceMySqlIntegrationTest {
 
     private static PlanValidationContext rankValidationContext() {
         return new PlanValidationContext(
-                Map.of("movieId", String.class, "cinemaId", String.class, "date", LocalDate.class),
+                Map.of("cityCode", String.class, "date", LocalDate.class, "ticketCount", Integer.class,
+                        "movieId", String.class, "cinemaId", String.class),
                 Map.of(), new SlotSnapshot(1L, Map.of(
-                        "movieId", "1", "cinemaId", "2", "date", "2026-08-06")));
+                        "cityCode", "430100", "date", "2026-08-06", "ticketCount", "1",
+                        "movieId", "1", "cinemaId", "2")));
     }
 
     private static InputReference slotReference(String name) {
@@ -560,8 +564,12 @@ class AgentPersistenceMySqlIntegrationTest {
         ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(
                 new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan())));
         var running = stateMachine.startNode(request.state(), request.nodeId());
-        ToolResult<FixedRecommendationResult> toolResult = new ToolResult<>(
-                ToolStatus.SUCCESS, null, null, false, false, "CONTINUE", false, null, 1L, null, null);
+        RecommendationPlanResult recommendation = new RecommendationPlanResult(
+                "1.0", "fixture", List.of(), List.of("SHOWTIME"), null, false, "fixture",
+                Instant.parse("2026-08-06T00:00:00Z"), Instant.parse("2026-08-06T00:05:00Z"), true);
+        ToolResult<RecommendationPlanResult> toolResult = new ToolResult<>(
+                ToolStatus.SUCCESS, recommendation, null, false, false, "CONTINUE", true,
+                "SHOWTIME_UNAVAILABLE", 1L, recommendation.dataAt(), recommendation.expiresAt());
         return new ReadOnlyToolExecutionAdapter.ExecutionResult(
                 stateMachine.recordToolResult(running, request.nodeId(), toolResult), toolResult);
     }

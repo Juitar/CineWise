@@ -10,3 +10,10 @@
 #### Scenario: reset 后执行推荐测试
 - **WHEN** `@BeforeEach` 重置推荐执行器 mock
 - **THEN** 测试重新配置目标名称和工具定义，后续测试可正常执行
+
+### Requirement: MySQL 监督器测试使用当前推荐工具契约
+`AgentPersistenceMySqlIntegrationTest` 的监督器计划 SHALL 提供当前 `rankMoviePlan` 必填的 `cityCode`、`date` 和 `ticketCount`，成功 mock 结果 SHALL 使用 `RecommendationPlanResult`。
+
+#### Scenario: 监督器持久化完整推荐计划
+- **WHEN** 测试提交有效的完整推荐计划
+- **THEN** 计划通过校验、调用 mock 执行器并持久化计划标识和版本

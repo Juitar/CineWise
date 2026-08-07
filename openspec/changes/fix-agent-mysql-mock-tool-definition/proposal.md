@@ -6,6 +6,8 @@
 
 - 为 `RankMoviePlanExecutionAdapter` 的 MySQL 测试 mock 同时配置 `targetName()` 和 `definition()`。
 - 在每次 `Mockito.reset(...)` 后恢复上述两项固定行为。
+- 将监督器测试计划夹具更新为当前完整 `rankMoviePlan` 的必填输入和结果类型。
+- 将仍依赖旧固定推荐服务的 B Agent 测试替换为完整推荐结果替身。
 - 检查同一测试配置中的其他 `AgentToolExecutor` mock，防止出现同类空工具定义。
 
 ## Capabilities

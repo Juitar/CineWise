@@ -2,6 +2,8 @@
 
 - [x] 1.1 检查 `AgentPersistenceMySqlIntegrationTest` 中所有 `AgentToolExecutor` mock 的固定行为。
 - [x] 1.2 为推荐执行器 mock 在 Bean 创建和 reset 后恢复 `targetName()` 与 `definition()`。
+- [x] 1.3 将监督器测试计划和成功结果同步到当前完整推荐工具契约。
+- [x] 1.4 将旧固定推荐测试替身替换为 `RecommendationPlanResult`，覆盖正常方案和空方案降级。
 
 ## 2. 验证
 
