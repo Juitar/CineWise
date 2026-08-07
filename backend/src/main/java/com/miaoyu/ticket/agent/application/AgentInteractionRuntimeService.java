@@ -7,9 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.miaoyu.ticket.agent.api.AgentCardEventValidator;
 import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationService;
 import com.miaoyu.ticket.agent.application.persistence.AgentEventReplayService;
-import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionCommand;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionService;
-import com.miaoyu.ticket.agent.application.persistence.AgentConversationSlotService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeQueryService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunCancellationService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionCreationService;
@@ -18,15 +16,11 @@ import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
 import com.miaoyu.ticket.common.api.PageResult;
-import com.miaoyu.ticket.agent.domain.plan.PlanValidationContext;
-import com.miaoyu.ticket.agent.domain.plan.SlotSnapshot;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.observability.TraceIdHolder;
 import java.time.LocalDateTime;
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -34,7 +28,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class AgentInteractionRuntimeService {
     private final AgentMessageSubmissionService submissionService;
-    private final AgentConversationSlotService conversationSlotService;
     private final AgentEventReplayService replayService;
     private final AgentRuntimeQueryService queryService;
     private final AgentSessionCreationService sessionCreationService;
@@ -44,7 +37,6 @@ public class AgentInteractionRuntimeService {
     private final ObjectMapper objectMapper;
 
     public AgentInteractionRuntimeService(AgentMessageSubmissionService submissionService,
-            AgentConversationSlotService conversationSlotService,
             AgentEventReplayService replayService, AgentRuntimeQueryService queryService,
             AgentSessionCreationService sessionCreationService,
             AgentSessionManagementService sessionManagementService,
@@ -52,7 +44,6 @@ public class AgentInteractionRuntimeService {
             AgentConfirmationService confirmationService,
             ObjectMapper objectMapper) {
         this.submissionService = submissionService;
-        this.conversationSlotService = conversationSlotService;
         this.replayService = replayService;
         this.queryService = queryService;
         this.sessionCreationService = sessionCreationService;
@@ -98,9 +89,7 @@ public class AgentInteractionRuntimeService {
 
     public StreamView submitAndReplay(
             String sessionId, String clientRequestId, String content, String entry, long cursor) {
-        SlotSnapshot slots = conversationSlotService.prepare(sessionId, content, entry);
-        var submitted = submissionService.submit(new AgentMessageSubmissionCommand(sessionId, content, clientRequestId,
-                slots, new PlanValidationContext(slotTypes(slots), Map.of(), slots), 30_000L));
+        var submitted = submissionService.submitConversation(sessionId, content, clientRequestId, entry, 30_000L);
         var replay = replayService.replay(sessionId, cursor);
         return new StreamView(sessionId, submitted.snapshot().run().runId(), replay.reset(), replay.watermark(),
                 replay.events().stream().map(this::event).toList());
@@ -282,24 +271,6 @@ public class AgentInteractionRuntimeService {
 
     private static OffsetDateTime time(LocalDateTime time) {
         return time == null ? null : time.atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime();
-    }
-
-    /** 槽位类型由 B 的工具定义固定，模型和浏览器只能提供经过会话服务校验后的字符串值。 */
-    private static Map<String, Class<?>> slotTypes(SlotSnapshot slots) {
-        Map<String, Class<?>> types = new java.util.LinkedHashMap<>();
-        if (slots.values().containsKey("cityCode")) {
-            types.put("cityCode", String.class);
-        }
-        if (slots.values().containsKey("date")) {
-            types.put("date", LocalDate.class);
-        }
-        if (slots.values().containsKey("ticketCount")) {
-            types.put("ticketCount", Integer.class);
-        }
-        if (slots.values().containsKey("context.entry")) {
-            types.put("context.entry", String.class);
-        }
-        return Map.copyOf(types);
     }
 
     public record StreamView(String sessionId, String runId, boolean reset, long watermark, List<EventView> events) {

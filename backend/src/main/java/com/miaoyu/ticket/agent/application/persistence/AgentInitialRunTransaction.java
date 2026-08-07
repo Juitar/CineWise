@@ -12,6 +12,7 @@ import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSessionStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
 import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
+import com.miaoyu.ticket.agent.domain.plan.SlotSnapshot;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
@@ -33,6 +34,7 @@ public class AgentInitialRunTransaction {
     private final AgentMessageRepository messageRepository;
     private final AgentRequestHashFactory requestHashFactory;
     private final AgentRuntimeEventService runtimeEventService;
+    private final AgentConversationSlotService conversationSlotService;
     private final BusinessIdGenerator idGenerator;
     private final Clock clock;
 
@@ -42,6 +44,7 @@ public class AgentInitialRunTransaction {
             AgentMessageRepository messageRepository,
             AgentRequestHashFactory requestHashFactory,
             AgentRuntimeEventService runtimeEventService,
+            AgentConversationSlotService conversationSlotService,
             BusinessIdGenerator idGenerator,
             Clock clock) {
         this.sessionRepository = sessionRepository;
@@ -49,6 +52,7 @@ public class AgentInitialRunTransaction {
         this.messageRepository = messageRepository;
         this.requestHashFactory = requestHashFactory;
         this.runtimeEventService = runtimeEventService;
+        this.conversationSlotService = conversationSlotService;
         this.idGenerator = idGenerator;
         this.clock = clock;
     }
@@ -97,5 +101,53 @@ public class AgentInitialRunTransaction {
         runtimeEventService.append(session, run, AgentEventType.MESSAGE_START,
                 new AgentStoredJson("{\"phase\":\"accepted\"}"));
         return new AgentInitialRunResult(run, false);
+    }
+
+    /** 幂等查询、槽位更新和 run 占用必须在同一把会话行锁及同一短事务内完成。 */
+    @Transactional
+    public AgentInitialRunResult submitConversation(long userId, String sessionId, String content,
+            String clientRequestId, String entry) {
+        AgentSession session = sessionRepository.findBySessionIdAndUserIdForUpdate(sessionId, userId)
+                .orElseThrow(() -> new BusinessException(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND));
+        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
+        if (session.status() != AgentSessionStatus.ACTIVE || !session.expireAt().isAfter(now)) {
+            throw new BusinessException(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND);
+        }
+        AgentConversationSlotService.PreparedSlots prepared = conversationSlotService
+                .prepareLocked(session, userId, content, entry);
+        SlotSnapshot slotSnapshot = prepared.snapshot();
+        AgentRequestHash requestHash = requestHashFactory.create(content, slotSnapshot);
+        AgentRun existing = runRepository.findByClientRequestId(userId, session.id(), clientRequestId).orElse(null);
+        if (existing != null) {
+            if (!existing.requestHash().equals(requestHash)) {
+                throw new BusinessException(AgentErrorCode.REQUEST_HASH_MISMATCH);
+            }
+            return new AgentInitialRunResult(existing, true, slotSnapshot);
+        }
+        conversationSlotService.persistLocked(session, userId, prepared);
+        long runId = idGenerator.nextId();
+        LocalDateTime expireAt = now.plusDays(RETENTION_DAYS);
+        String traceId = TraceIdHolder.currentTraceId();
+        if (traceId.isBlank()) {
+            traceId = UUID.randomUUID().toString().replace("-", "");
+        }
+        AgentRun run = new AgentRun(
+                runId, UUID.randomUUID().toString(), session.id(), userId, clientRequestId, requestHash,
+                null, null, AgentRunStatus.RUNNING, traceId, now, null, 0L, now, now, expireAt);
+        try {
+            runRepository.insert(run);
+        } catch (DuplicateKeyException exception) {
+            throw new AgentConcurrentDuplicateRequestException(requestHash, exception);
+        }
+        messageRepository.insert(new AgentMessage(
+                idGenerator.nextId(), UUID.randomUUID().toString(), session.id(), runId, userId,
+                AgentMessageRole.USER, AgentMessageType.TEXT, content, null, AgentMessageStatus.COMPLETED,
+                now, now, expireAt));
+        if (!sessionRepository.claimActiveRun(session.id(), userId, runId, expireAt)) {
+            throw new BusinessException(AgentErrorCode.ACTIVE_RUN_CONFLICT);
+        }
+        runtimeEventService.append(session, run, AgentEventType.MESSAGE_START,
+                new AgentStoredJson("{\"phase\":\"accepted\"}"));
+        return new AgentInitialRunResult(run, false, slotSnapshot);
     }
 }

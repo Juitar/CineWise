@@ -12,7 +12,6 @@ import com.miaoyu.ticket.agent.application.AgentInteractionRuntimeService;
 import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationResult;
 import com.miaoyu.ticket.agent.application.confirmation.AgentConfirmationService;
 import com.miaoyu.ticket.agent.application.persistence.AgentEventReplayService;
-import com.miaoyu.ticket.agent.application.persistence.AgentConversationSlotService;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeQueryService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunCancellationService;
@@ -40,7 +39,6 @@ class AgentInteractionRuntimeServiceTest {
     @Test
     void shouldReplayPersistedEventsWithoutSubmittingAnotherRun() {
         AgentMessageSubmissionService submissionService = mock(AgentMessageSubmissionService.class);
-        AgentConversationSlotService conversationSlotService = mock(AgentConversationSlotService.class);
         AgentEventReplayService replayService = mock(AgentEventReplayService.class);
         AgentRuntimeQueryService queryService = mock(AgentRuntimeQueryService.class);
         AgentSessionCreationService sessionCreationService = mock(AgentSessionCreationService.class);
@@ -48,7 +46,7 @@ class AgentInteractionRuntimeServiceTest {
         AgentRunCancellationService runCancellationService = mock(AgentRunCancellationService.class);
         AgentConfirmationService confirmationService = mock(AgentConfirmationService.class);
         AgentInteractionRuntimeService service = new AgentInteractionRuntimeService(
-                submissionService, conversationSlotService, replayService, queryService,
+                submissionService, replayService, queryService,
                 sessionCreationService, sessionManagementService,
                 runCancellationService, confirmationService, new ObjectMapper());
         LocalDateTime time = LocalDateTime.of(2026, 8, 5, 11, 20);
@@ -74,7 +72,6 @@ class AgentInteractionRuntimeServiceTest {
     @Test
     void shouldProjectTheLatestServerActionStatusWhenReplayingAnOldCard() {
         AgentMessageSubmissionService submissionService = mock(AgentMessageSubmissionService.class);
-        AgentConversationSlotService conversationSlotService = mock(AgentConversationSlotService.class);
         AgentEventReplayService replayService = mock(AgentEventReplayService.class);
         AgentRuntimeQueryService queryService = mock(AgentRuntimeQueryService.class);
         AgentSessionCreationService sessionCreationService = mock(AgentSessionCreationService.class);
@@ -82,7 +79,7 @@ class AgentInteractionRuntimeServiceTest {
         AgentRunCancellationService runCancellationService = mock(AgentRunCancellationService.class);
         AgentConfirmationService confirmationService = mock(AgentConfirmationService.class);
         AgentInteractionRuntimeService service = new AgentInteractionRuntimeService(
-                submissionService, conversationSlotService, replayService, queryService,
+                submissionService, replayService, queryService,
                 sessionCreationService, sessionManagementService,
                 runCancellationService, confirmationService, new ObjectMapper());
         LocalDateTime time = LocalDateTime.of(2026, 8, 5, 11, 20);
@@ -110,7 +107,6 @@ class AgentInteractionRuntimeServiceTest {
     @Test
     void shouldRecoverUnknownCardOnlyByOriginalIdentifiersWithoutConfirmingAgain() {
         AgentMessageSubmissionService submissionService = mock(AgentMessageSubmissionService.class);
-        AgentConversationSlotService conversationSlotService = mock(AgentConversationSlotService.class);
         AgentEventReplayService replayService = mock(AgentEventReplayService.class);
         AgentRuntimeQueryService queryService = mock(AgentRuntimeQueryService.class);
         AgentSessionCreationService sessionCreationService = mock(AgentSessionCreationService.class);
@@ -118,7 +114,7 @@ class AgentInteractionRuntimeServiceTest {
         AgentRunCancellationService runCancellationService = mock(AgentRunCancellationService.class);
         AgentConfirmationService confirmationService = mock(AgentConfirmationService.class);
         AgentInteractionRuntimeService service = new AgentInteractionRuntimeService(
-                submissionService, conversationSlotService, replayService, queryService,
+                submissionService, replayService, queryService,
                 sessionCreationService, sessionManagementService,
                 runCancellationService, confirmationService, new ObjectMapper());
         LocalDateTime time = LocalDateTime.of(2026, 8, 5, 11, 20);
@@ -153,7 +149,6 @@ class AgentInteractionRuntimeServiceTest {
     @Test
     void shouldReplayDuplicatePendingCardsWithoutConfirmingOrRecovering() {
         AgentMessageSubmissionService submissionService = mock(AgentMessageSubmissionService.class);
-        AgentConversationSlotService conversationSlotService = mock(AgentConversationSlotService.class);
         AgentEventReplayService replayService = mock(AgentEventReplayService.class);
         AgentRuntimeQueryService queryService = mock(AgentRuntimeQueryService.class);
         AgentSessionCreationService sessionCreationService = mock(AgentSessionCreationService.class);
@@ -161,7 +156,7 @@ class AgentInteractionRuntimeServiceTest {
         AgentRunCancellationService runCancellationService = mock(AgentRunCancellationService.class);
         AgentConfirmationService confirmationService = mock(AgentConfirmationService.class);
         AgentInteractionRuntimeService service = new AgentInteractionRuntimeService(
-                submissionService, conversationSlotService, replayService, queryService,
+                submissionService, replayService, queryService,
                 sessionCreationService, sessionManagementService,
                 runCancellationService, confirmationService, new ObjectMapper());
         LocalDateTime time = LocalDateTime.of(2026, 8, 5, 11, 20);

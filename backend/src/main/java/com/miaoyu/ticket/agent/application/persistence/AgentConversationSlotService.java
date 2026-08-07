@@ -50,23 +50,33 @@ public class AgentConversationSlotService {
         if (session.status() != AgentSessionStatus.ACTIVE || !session.expireAt().isAfter(now())) {
             throw new BusinessException(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND);
         }
-        if (session.activeRunId() != null) {
-            throw new BusinessException(AgentErrorCode.ACTIVE_RUN_CONFLICT);
-        }
-        PersistedSlots current = slotRepository.findBySessionIdAndUserId(sessionId, userId)
+        PreparedSlots prepared = prepareLocked(session, userId, content, entry);
+        persistLocked(session, userId, prepared);
+        return prepared.snapshot();
+    }
+
+    /** 会话已由调用方加锁；这里只计算候选快照，不提前改写会话。 */
+    PreparedSlots prepareLocked(AgentSession session, long userId, String content, String entry) {
+        PersistedSlots current = slotRepository.findBySessionIdAndUserId(session.sessionId(), userId)
                 .map(this::read).orElse(PersistedSlots.empty());
         String requestedSlot = latestQuestionSlot(session, userId);
         PersistedSlots next = accepted(current, requestedSlot, content);
-        if (!next.equals(current)) {
-            if (!slotRepository.update(session.id(), userId, session.version(), write(next))) {
-                throw new IllegalStateException("会话槽位已被并发更新");
-            }
-        }
         Map<String, String> values = new LinkedHashMap<>(next.values());
         if (entry != null && !entry.isBlank()) {
             values.put("context.entry", entry);
         }
-        return new SlotSnapshot(next.version(), values);
+        return new PreparedSlots(new SlotSnapshot(next.version(), values), !next.equals(current), write(next));
+    }
+
+    /** 与 run 占用共用同一事务；失败时槽位更新随事务一起回滚。 */
+    void persistLocked(AgentSession session, long userId, PreparedSlots prepared) {
+        if (session.activeRunId() != null) {
+            throw new BusinessException(AgentErrorCode.ACTIVE_RUN_CONFLICT);
+        }
+        if (prepared.changed()
+                && !slotRepository.update(session.id(), userId, session.version(), prepared.persistedJson())) {
+            throw new IllegalStateException("会话槽位已被并发更新");
+        }
     }
 
     private String latestQuestionSlot(AgentSession session, long userId) {
@@ -79,6 +89,9 @@ public class AgentConversationSlotService {
     private String questionSlot(String payload) {
         try {
             JsonNode root = objectMapper.readTree(payload);
+            if (root.isTextual()) {
+                root = objectMapper.readTree(root.asText());
+            }
             String missing = root.path("missingSlot").asText();
             return isConversationSlot(missing) ? missing : null;
         } catch (Exception exception) {
@@ -154,5 +167,8 @@ public class AgentConversationSlotService {
     private record PersistedSlots(long version, Map<String, String> values) {
         private static PersistedSlots empty() { return new PersistedSlots(0L, Map.of()); }
         private PersistedSlots { values = Map.copyOf(values); }
+    }
+
+    record PreparedSlots(SlotSnapshot snapshot, boolean changed, String persistedJson) {
     }
 }

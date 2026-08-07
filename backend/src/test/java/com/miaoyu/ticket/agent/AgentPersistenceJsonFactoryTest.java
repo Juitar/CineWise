@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miaoyu.ticket.agent.api.AgentCardPayloadResponse;
 import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
 import com.miaoyu.ticket.agent.application.persistence.AgentPersistenceJsonFactory;
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFacts;
 import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardItem;
+import com.miaoyu.ticket.agent.application.reply.RelaxationSuggestionFacts;
 import com.miaoyu.ticket.agent.application.reply.SelectSeatsReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.QuestionReplyFacts;
 import java.time.Instant;
@@ -42,7 +44,8 @@ class AgentPersistenceJsonFactoryTest {
                 "1.0", "rank-v1", List.of(new RecommendationPlanCardItem(
                         "COMPREHENSIVE", "10001", "影片", "20001", "影院", "30001", "68.00", "CNY",
                         dataAt.plusSeconds(3600), "8.5", 1.0D, List.of("匹配条件"), "recommendation", dataAt,
-                        dataAt.plusSeconds(300), false, true, null)), List.of(), null, true, "recommendation", dataAt,
+                        dataAt.plusSeconds(300), false, true, 1200)), List.of(),
+                new RelaxationSuggestionFacts("DISTANCE", "可适当扩大距离范围"), true, "recommendation", dataAt,
                 dataAt.plusSeconds(300), false, false);
 
         JsonNode payload = mapper.readTree(factory.cardPayload(new ReplyGenerationResponse(
@@ -51,6 +54,10 @@ class AgentPersistenceJsonFactoryTest {
         assertThat(payload.path("type").asText()).isEqualTo("PLAN_CARD");
         assertThat(payload.path("title").asText()).isEqualTo("推荐场次");
         assertThat(payload.path("plans")).hasSize(1);
+        AgentCardPayloadResponse response = AgentCardPayloadResponse.from(payload);
+        JsonNode serialized = mapper.valueToTree(response);
+        assertThat(response).isInstanceOf(AgentCardPayloadResponse.PlanCard.class);
+        assertThat(serialized).isEqualTo(payload);
         assertThat(payload.toString()).doesNotContain("seat", "actionId", "parameterHash", "token", "evidence",
                 "latitude", "longitude", "address", "estimatedTravelMinutes");
     }

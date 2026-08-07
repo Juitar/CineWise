@@ -8,9 +8,13 @@ import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorRequest;
 import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorResult;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
+import com.miaoyu.ticket.agent.domain.plan.PlanValidationContext;
+import com.miaoyu.ticket.agent.domain.plan.SlotSnapshot;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
 
@@ -55,9 +59,7 @@ public class AgentMessageSubmissionService {
     public AgentMessageSubmissionResult submit(AgentMessageSubmissionCommand command) {
         AgentMessageSubmissionCommand request = Objects.requireNonNull(command, "提交命令不能为空");
         long userId = currentUserAccessor.requireCurrentUserId();
-        staleRecoveryService.recoverStaleRuns();
-        // 普通消息入口也必须先恢复已过期的 WAITING_LOCATION，避免旧 active_run_id 阻塞新请求。
-        distanceRecommendationService.recoverExpiredWaitingRuns();
+        recoverBeforeSubmission();
         AgentInitialRunResult initial;
         try {
             initial = initialRunTransaction.submit(userId, request);
@@ -65,6 +67,31 @@ public class AgentMessageSubmissionService {
             AgentRun winner = concurrentRequestLookupTransaction.findWinner(userId, request, exception.requestHash());
             return new AgentMessageSubmissionResult(snapshot(winner, userId), true);
         }
+        return execute(request, userId, initial);
+    }
+
+    /** 真实消息入口将幂等查询、槽位更新和 run 占用放入同一个会话锁事务。 */
+    public AgentMessageSubmissionResult submitConversation(String sessionId, String content, String clientRequestId,
+            String entry, long remainingDeadlineMs) {
+        long userId = currentUserAccessor.requireCurrentUserId();
+        recoverBeforeSubmission();
+        AgentInitialRunResult initial = initialRunTransaction
+                .submitConversation(userId, sessionId, content, clientRequestId, entry);
+        SlotSnapshot slots = Objects.requireNonNull(initial.slotSnapshot(), "会话提交必须返回槽位快照");
+        AgentMessageSubmissionCommand request = new AgentMessageSubmissionCommand(sessionId, content,
+                clientRequestId, slots, new PlanValidationContext(slotTypes(slots), Map.of(), slots),
+                remainingDeadlineMs);
+        return execute(request, userId, initial);
+    }
+
+    private void recoverBeforeSubmission() {
+        staleRecoveryService.recoverStaleRuns();
+        // 普通消息入口也必须先恢复已过期的 WAITING_LOCATION，避免旧 active_run_id 阻塞新请求。
+        distanceRecommendationService.recoverExpiredWaitingRuns();
+    }
+
+    private AgentMessageSubmissionResult execute(
+            AgentMessageSubmissionCommand request, long userId, AgentInitialRunResult initial) {
         if (initial.reused()) {
             return new AgentMessageSubmissionResult(snapshot(initial.run(), userId), true);
         }
@@ -84,6 +111,23 @@ public class AgentMessageSubmissionService {
             runResultTransaction.recordFailure(initial.run());
             throw new AgentFailurePersistedException();
         }
+    }
+
+    private static Map<String, Class<?>> slotTypes(SlotSnapshot slots) {
+        Map<String, Class<?>> types = new java.util.LinkedHashMap<>();
+        if (slots.values().containsKey("cityCode")) {
+            types.put("cityCode", String.class);
+        }
+        if (slots.values().containsKey("date")) {
+            types.put("date", LocalDate.class);
+        }
+        if (slots.values().containsKey("ticketCount")) {
+            types.put("ticketCount", Integer.class);
+        }
+        if (slots.values().containsKey("context.entry")) {
+            types.put("context.entry", String.class);
+        }
+        return Map.copyOf(types);
     }
 
     /**

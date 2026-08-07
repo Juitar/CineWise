@@ -147,7 +147,9 @@ class AgentConversationSlotServiceTest {
         assertThatThrownBy(() -> service(users, sessions, messages, slots).prepare("session-1", "430100", null))
                 .isInstanceOf(com.miaoyu.ticket.common.error.BusinessException.class)
                 .hasMessageContaining("活动运行");
-        org.mockito.Mockito.verifyNoInteractions(messages, slots);
+        org.mockito.Mockito.verify(slots, org.mockito.Mockito.never())
+                .update(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString());
     }
 
     private static AgentConversationSlotService service(CurrentUserAccessor users, AgentSessionRepository sessions,
