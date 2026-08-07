@@ -12,6 +12,7 @@
       "2084194402305432068"
     ],
     "status": "VALID",
+    "invalidationReason": null,
     "qrPayload": "cinewise:ticket:TKT2084194700000000001",
     "issuedAt": "2026-08-03T18:05:00+08:00",
     "stateVersion": 0,
