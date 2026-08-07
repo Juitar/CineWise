@@ -1,7 +1,10 @@
 import React from 'react';
 import { Alert, QRCode, Spin, Tag } from 'antd';
 import { ELECTRONIC_TICKET_STATUS_LABELS } from '../../modules/order/status-presentation';
-import type { ElectronicTicketStatus } from '../../modules/order/types';
+import type {
+  ElectronicTicketInvalidationReason,
+  ElectronicTicketStatus,
+} from '../../modules/order/types';
 import './index.css';
 
 export type { ElectronicTicketStatus } from '../../modules/order/types';
@@ -20,6 +23,7 @@ export interface ElectronicTicketCardProps {
   issuedAt?: string;
   qrPayload?: string;
   status: ElectronicTicketStatus;
+  invalidationReason?: ElectronicTicketInvalidationReason | null;
   loading?: boolean;
   error?: string;
   isOfflineReadOnly?: boolean;
@@ -44,6 +48,7 @@ export const ElectronicTicketCard: React.FC<ElectronicTicketCardProps> = ({
   issuedAt,
   qrPayload,
   status,
+  invalidationReason = null,
   loading = false,
   error,
   isOfflineReadOnly = false,
@@ -148,7 +153,7 @@ export const ElectronicTicketCard: React.FC<ElectronicTicketCardProps> = ({
             className="ticket-invalidated-alert"
             type="warning"
             showIcon
-            message="影片已结束，电子票已失效"
+            message={invalidationReason === 'SHOW_ENDED' ? '影片已结束，电子票已失效' : '电子票已失效'}
             description="该电子票不可作为入场凭证使用。"
           />
         )}

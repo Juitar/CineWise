@@ -15,6 +15,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -50,10 +51,22 @@ class ShowEndTicketInvalidationIntegrationTest {
 
     @BeforeEach
     void resetFixtures() {
+        Assumptions.assumeTrue(hasInvalidationReasonColumn(),
+                "固定H2测试结构只执行到V009；V022电子票失效原因与索引由MySQL集成环境验证");
         jdbcTemplate.update("DELETE FROM electronic_ticket WHERE ticket_code LIKE 'END-TEST-%'");
         jdbcTemplate.update("DELETE FROM ticket_order WHERE order_no LIKE 'END-TEST-%'");
         jdbcTemplate.update("DELETE FROM show_seat WHERE lock_order_no LIKE 'END-TEST-%'");
         jdbcTemplate.update("DELETE FROM movie_show WHERE source = ?", TEST_SOURCE);
+    }
+
+    private boolean hasInvalidationReasonColumn() {
+        try {
+            jdbcTemplate.query("SELECT invalidation_reason FROM electronic_ticket WHERE 1 = 0",
+                    (resultSet, rowNumber) -> null);
+            return true;
+        } catch (org.springframework.dao.DataAccessException exception) {
+            return false;
+        }
     }
 
     @Test

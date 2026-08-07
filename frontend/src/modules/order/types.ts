@@ -66,6 +66,9 @@ export interface PaymentResponse {
 
 export type ElectronicTicketStatus = 'VALID' | 'REFUNDED' | 'INVALIDATED';
 
+/** INVALIDATED 的可信原因；页面不得从票状态或时间自行推断。 */
+export type ElectronicTicketInvalidationReason = 'SHOW_ENDED' | 'ADMIN_INVALIDATED';
+
 export interface ElectronicTicketResponse {
   ticketId: string;
   ticketCode: string;
@@ -74,6 +77,7 @@ export interface ElectronicTicketResponse {
   showId: string;
   seatIds: string[];
   status: ElectronicTicketStatus;
+  invalidationReason: ElectronicTicketInvalidationReason | null;
   qrPayload: string;
   issuedAt: string;
   stateVersion: number;

@@ -17,13 +17,13 @@ public interface ElectronicTicketLifecycleMapper {
     @Select("""
             SELECT tickets.id AS ticket_id,
                    tickets.version AS ticket_version
-              FROM electronic_ticket tickets
-              INNER JOIN ticket_order orders ON orders.id = tickets.order_id
-              INNER JOIN movie_show shows ON shows.id = orders.show_id
+              FROM movie_show shows
+              STRAIGHT_JOIN ticket_order orders ON orders.show_id = shows.id
+              STRAIGHT_JOIN electronic_ticket tickets ON tickets.order_id = orders.id
              WHERE tickets.status = 'VALID'
                AND orders.status = 'PAID'
                AND shows.end_time <= #{endedAtOrBefore}
-             ORDER BY shows.end_time, tickets.id
+             ORDER BY shows.end_time, shows.id
              LIMIT #{limit}
             """)
     List<ShowEndedTicketCandidateRow> findShowEndedTicketCandidates(
@@ -37,6 +37,7 @@ public interface ElectronicTicketLifecycleMapper {
             UPDATE electronic_ticket AS tickets
                SET status = 'INVALIDATED',
                    invalidated_time = #{invalidatedAt},
+                   invalidation_reason = 'SHOW_ENDED',
                    version = version + 1,
                    update_time = #{invalidatedAt}
              WHERE tickets.id = #{ticketId}

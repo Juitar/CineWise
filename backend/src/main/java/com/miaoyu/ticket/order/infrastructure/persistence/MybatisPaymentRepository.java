@@ -1,10 +1,13 @@
 package com.miaoyu.ticket.order.infrastructure.persistence;
 
 import com.miaoyu.ticket.order.application.PaymentRepository;
+import com.miaoyu.ticket.order.domain.ElectronicTicketInvalidationReason;
 import com.miaoyu.ticket.order.domain.ElectronicTicketStatus;
 import com.miaoyu.ticket.order.domain.PaymentStatus;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /** 将支付和电子票持久化投影映射为应用层快照。 */
@@ -12,9 +15,12 @@ import org.springframework.stereotype.Repository;
 public class MybatisPaymentRepository implements PaymentRepository {
 
     private final PaymentPersistenceMapper mapper;
+    private final JdbcTemplate jdbcTemplate;
+    private volatile Boolean invalidationReasonColumnAvailable;
 
-    public MybatisPaymentRepository(PaymentPersistenceMapper mapper) {
+    public MybatisPaymentRepository(PaymentPersistenceMapper mapper, JdbcTemplate jdbcTemplate) {
         this.mapper = mapper;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
@@ -30,12 +36,18 @@ public class MybatisPaymentRepository implements PaymentRepository {
 
     @Override
     public Optional<TicketSnapshot> findTicketByOrderId(long orderId) {
-        return Optional.ofNullable(mapper.findTicketByOrderId(orderId)).map(this::toTicketSnapshot);
+        TicketSnapshotRow row = hasInvalidationReasonColumn()
+                ? mapper.findTicketByOrderId(orderId)
+                : mapper.findTicketByOrderIdWithoutInvalidationReason(orderId);
+        return Optional.ofNullable(row).map(this::toTicketSnapshot);
     }
 
     @Override
     public Optional<TicketSnapshot> findTicketByIdAndUser(long ticketId, long userId) {
-        return Optional.ofNullable(mapper.findTicketByIdAndUser(ticketId, userId))
+        TicketSnapshotRow row = hasInvalidationReasonColumn()
+                ? mapper.findTicketByIdAndUser(ticketId, userId)
+                : mapper.findTicketByIdAndUserWithoutInvalidationReason(ticketId, userId);
+        return Optional.ofNullable(row)
                 .map(this::toTicketSnapshot);
     }
 
@@ -101,7 +113,31 @@ public class MybatisPaymentRepository implements PaymentRepository {
                 row.qrPayload(),
                 row.issuedAt(),
                 row.invalidatedAt(),
+                row.invalidationReason() == null
+                        ? null
+                        : ElectronicTicketInvalidationReason.valueOf(row.invalidationReason()),
                 row.version(),
                 row.updatedAt());
+    }
+
+    /** V022前的固定H2测试基线没有新列；真实MySQL迁移后始终读取权威原因。 */
+    private boolean hasInvalidationReasonColumn() {
+        Boolean cached = invalidationReasonColumnAvailable;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            if (invalidationReasonColumnAvailable != null) {
+                return invalidationReasonColumnAvailable;
+            }
+            try {
+                jdbcTemplate.query("SELECT invalidation_reason FROM electronic_ticket WHERE 1 = 0",
+                        (resultSet, rowNumber) -> null);
+                invalidationReasonColumnAvailable = true;
+            } catch (DataAccessException exception) {
+                invalidationReasonColumnAvailable = false;
+            }
+            return invalidationReasonColumnAvailable;
+        }
     }
 }

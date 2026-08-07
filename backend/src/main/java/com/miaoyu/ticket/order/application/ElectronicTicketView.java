@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.order.application;
 
 import com.miaoyu.ticket.order.domain.ElectronicTicketStatus;
+import com.miaoyu.ticket.order.domain.ElectronicTicketInvalidationReason;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -13,6 +14,7 @@ public record ElectronicTicketView(
         long showId,
         List<Long> seatIds,
         ElectronicTicketStatus status,
+        ElectronicTicketInvalidationReason invalidationReason,
         String qrPayload,
         LocalDateTime issuedAt,
         int stateVersion,

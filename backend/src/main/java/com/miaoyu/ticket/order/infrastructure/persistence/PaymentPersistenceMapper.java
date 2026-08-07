@@ -52,12 +52,22 @@ public interface PaymentPersistenceMapper {
                    qr_payload,
                    issued_time AS issued_at,
                    invalidated_time AS invalidated_at,
+                   invalidation_reason,
                    version,
                    update_time AS updated_at
               FROM electronic_ticket
              WHERE order_id = #{orderId}
             """)
     TicketSnapshotRow findTicketByOrderId(@Param("orderId") long orderId);
+
+    /** 固定H2 V009测试基线没有失效原因列，兼容路径只用于旧测试库。 */
+    @Select("""
+            SELECT id AS ticket_id, ticket_code, order_id, user_id, status, qr_payload,
+                   issued_time AS issued_at, invalidated_time AS invalidated_at,
+                   NULL AS invalidation_reason, version, update_time AS updated_at
+              FROM electronic_ticket WHERE order_id = #{orderId}
+            """)
+    TicketSnapshotRow findTicketByOrderIdWithoutInvalidationReason(@Param("orderId") long orderId);
 
     @Select("""
             SELECT id AS ticket_id,
@@ -68,6 +78,7 @@ public interface PaymentPersistenceMapper {
                    qr_payload,
                    issued_time AS issued_at,
                    invalidated_time AS invalidated_at,
+                   invalidation_reason,
                    version,
                    update_time AS updated_at
               FROM electronic_ticket
@@ -75,6 +86,18 @@ public interface PaymentPersistenceMapper {
                AND user_id = #{userId}
             """)
     TicketSnapshotRow findTicketByIdAndUser(
+            @Param("ticketId") long ticketId,
+            @Param("userId") long userId);
+
+    /** 固定H2 V009测试基线没有失效原因列，兼容路径只用于旧测试库。 */
+    @Select("""
+            SELECT id AS ticket_id, ticket_code, order_id, user_id, status, qr_payload,
+                   issued_time AS issued_at, invalidated_time AS invalidated_at,
+                   NULL AS invalidation_reason, version, update_time AS updated_at
+              FROM electronic_ticket
+             WHERE id = #{ticketId} AND user_id = #{userId}
+            """)
+    TicketSnapshotRow findTicketByIdAndUserWithoutInvalidationReason(
             @Param("ticketId") long ticketId,
             @Param("userId") long userId);
 

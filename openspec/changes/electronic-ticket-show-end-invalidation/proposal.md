@@ -6,7 +6,7 @@
 
 ## 范围
 
-- A 在 `movie_show.end_time <= 当前业务时间` 时，使对应的 `VALID` 电子票自动变为 `INVALIDATED`。
+- A 在 `movie_show.end_time <= 当前业务时间` 时，使对应的 `VALID` 电子票自动变为 `INVALIDATED`，并记录可信原因 `SHOW_ENDED`。
 - A 提供可重复执行、有界扫描且由 `Clock` 驱动的内部调度与应用服务。
 - A 在电子票页面明确说明“影片已结束，电子票已失效”，且失效票不展示有效二维码。
 
@@ -14,7 +14,7 @@
 
 - 不改变订单 `PAID` 状态，不退款，不释放 `SOLD` 座位。
 - 不发布 `OrderInvalidated` 或 `PaymentSucceededEvent`，不影响 D 的出行任务。
-- 不新增表、Flyway、REST 接口或前端路由。
+- 不新增表或前端路由；新增前向 Flyway 迁移，为失效原因及任务候选查询添加列和索引。
 
 ## 验收
 

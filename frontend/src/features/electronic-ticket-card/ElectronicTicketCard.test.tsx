@@ -45,11 +45,25 @@ describe('ElectronicTicketCard 组件', () => {
         ticketCode="202608051234"
         orderNo="202608050001"
         status="INVALIDATED"
+        invalidationReason="SHOW_ENDED"
         qrPayload="cinewise:ticket:202608051234"
       />,
     );
     expect(screen.getByText('影片已结束，电子票已失效')).toBeInTheDocument();
     expect(screen.queryByLabelText('有效电子票二维码')).not.toBeInTheDocument();
     expect(screen.getByText('当前电子票二维码不可用')).toBeInTheDocument();
+  });
+
+  it('当管理员因异常作废电子票时，使用通用失效提示而不推断为影片结束', () => {
+    render(
+      <ElectronicTicketCard
+        ticketCode="202608051234"
+        orderNo="202608050001"
+        status="INVALIDATED"
+        invalidationReason="ADMIN_INVALIDATED"
+      />,
+    );
+    expect(screen.getByText('电子票已失效')).toBeInTheDocument();
+    expect(screen.queryByText('影片已结束，电子票已失效')).not.toBeInTheDocument();
   });
 });
