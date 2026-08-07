@@ -1,6 +1,16 @@
+import { useState } from 'react';
+import { Modal } from 'antd';
 import { Link } from 'umi';
 
+import type { ProfileTagPolarity, ProfileTagType } from '../../modules/profile/api';
 import { useLogout } from '../../modules/auth/useLogout';
+import {
+  PROFILE_TAG_POLARITY_OPTIONS,
+  PROFILE_TAG_STATUS_LABELS,
+  PROFILE_TAG_TYPE_LABELS,
+  PROFILE_TAG_TYPE_OPTIONS,
+  PROFILE_TAG_VALUE_OPTIONS,
+} from '../../modules/profile/options';
 import { useProfile } from '../../modules/profile/useProfile';
 import { useAuth } from '../../shared/auth/AuthProvider';
 import './index.css';
@@ -17,6 +27,12 @@ function profileConsentStatusLabel(enabled: boolean, saving: boolean, stateKnown
   return enabled ? '已开启' : '未开启';
 }
 
+const profileTagSourceLabels = {
+  BEHAVIOR: '行为偏好',
+  CONVERSATION: '对话偏好',
+  MANUAL: '手动设置',
+} as const;
+
 export default function ProfilePage() {
   const { currentUser } = useAuth();
   const { handleLogout, isLoggingOut } = useLogout();
@@ -27,10 +43,35 @@ export default function ProfilePage() {
     notice: profileNotice,
     profile,
     saving: profileSaving,
+    createTag,
+    deleteTag,
     setConsentEnabled,
     setEnabled,
     state: profileState,
+    updateTag,
   } = useProfile(currentUser?.privacyPolicyVersion ?? '');
+  const [tagType, setTagType] = useState<ProfileTagType>('MOVIE_GENRE');
+  const [tagValue, setTagValue] = useState('');
+  const [tagPolarity, setTagPolarity] = useState<ProfileTagPolarity>('LIKE');
+
+  const tagValueOptions =
+    tagType === 'CINEMA' || tagType === 'HALL' ? null : PROFILE_TAG_VALUE_OPTIONS[tagType];
+  const handleTagTypeChange = (value: ProfileTagType) => {
+    setTagType(value);
+    setTagValue('');
+  };
+  const handleCreateTag = async () => {
+    const normalizedValue = tagValue.trim();
+    if (normalizedValue.length === 0 || normalizedValue.length > 100) {
+      return;
+    }
+    await createTag({
+      type: tagType,
+      value: normalizedValue,
+      polarity: tagPolarity,
+      weight: 1,
+    });
+  };
 
   if (!currentUser) {
     return (
@@ -168,17 +209,164 @@ export default function ProfilePage() {
           </p>
         )}
         {profileState === 'loading' && <p>正在读取画像数据...</p>}
-        {profileState === 'ready' &&
-          profile &&
-          (profile.tags.length > 0 ? (
-            <ul className="profile-tag-list">
-              {profile.tags.map((tag) => (
-                <li key={tag.id}>{tag.value}</li>
-              ))}
-            </ul>
-          ) : (
-            <p>暂无画像标签</p>
-          ))}
+        {profileState === 'ready' && profile && (
+          <>
+            <form
+              className="profile-tag-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleCreateTag();
+              }}
+            >
+              <div className="profile-tag-form-field">
+                <label htmlFor="profile-tag-type">标签类型</label>
+                <select
+                  id="profile-tag-type"
+                  value={tagType}
+                  disabled={profileSaving || consentSaving}
+                  onChange={(event) => handleTagTypeChange(event.target.value as ProfileTagType)}
+                >
+                  {PROFILE_TAG_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="profile-tag-form-field">
+                <label htmlFor="profile-tag-value">标签值</label>
+                {tagValueOptions ? (
+                  <select
+                    id="profile-tag-value"
+                    value={tagValue}
+                    disabled={profileSaving || consentSaving}
+                    onChange={(event) => setTagValue(event.target.value)}
+                  >
+                    <option value="">请选择</option>
+                    {tagValueOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    id="profile-tag-value"
+                    maxLength={100}
+                    placeholder={tagType === 'CINEMA' ? '输入影院名称' : '输入影厅名称'}
+                    value={tagValue}
+                    disabled={profileSaving || consentSaving}
+                    onChange={(event) => setTagValue(event.target.value)}
+                  />
+                )}
+              </div>
+              <div className="profile-tag-form-field">
+                <label htmlFor="profile-tag-polarity">倾向</label>
+                <select
+                  id="profile-tag-polarity"
+                  value={tagPolarity}
+                  disabled={profileSaving || consentSaving}
+                  onChange={(event) => setTagPolarity(event.target.value as ProfileTagPolarity)}
+                >
+                  {PROFILE_TAG_POLARITY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                className="profile-tag-submit"
+                disabled={profileSaving || consentSaving || tagValue.trim().length === 0}
+                type="submit"
+              >
+                {profileSaving ? '正在保存' : '添加标签'}
+              </button>
+            </form>
+
+            {profile.tags.length > 0 ? (
+              <ul className="profile-tag-list">
+                {profile.tags.map((tag) => {
+                  // D 的更新接口只允许 ACTIVE 的手动标签修改倾向；已停用标签必须先恢复。
+                  const canChangePolarity = tag.source === 'MANUAL' && tag.status === 'ACTIVE';
+                  // CONVERSATION、BEHAVIOR 标签由受控服务维护，用户不能从个人中心改变其状态。
+                  const canChangeStatus =
+                    tag.source === 'MANUAL' &&
+                    (tag.status === 'ACTIVE' || tag.status === 'DISABLED');
+                  return (
+                    <li className="profile-tag-item" key={tag.id}>
+                      <div className="profile-tag-summary">
+                        <span className="profile-tag-type">
+                          {PROFILE_TAG_TYPE_LABELS[tag.type]}
+                        </span>
+                        <strong>{tag.value}</strong>
+                        <span>{tag.polarity === 'LIKE' ? '喜欢' : '不喜欢'}</span>
+                        <span>{PROFILE_TAG_STATUS_LABELS[tag.status]}</span>
+                        <span>{profileTagSourceLabels[tag.source]}</span>
+                      </div>
+                      <div className="profile-tag-actions">
+                        {canChangePolarity && (
+                          <label className="profile-tag-action-field">
+                            <span>修改倾向</span>
+                            <select
+                              aria-label={`修改${tag.value}倾向`}
+                              value={tag.polarity}
+                              disabled={profileSaving || consentSaving}
+                              onChange={(event) =>
+                                void updateTag(tag.id, {
+                                  polarity: event.target.value as ProfileTagPolarity,
+                                  weight: tag.weight,
+                                })
+                              }
+                            >
+                              {PROFILE_TAG_POLARITY_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                        {canChangeStatus && (
+                          <button
+                            className="profile-tag-action-button"
+                            disabled={profileSaving || consentSaving}
+                            type="button"
+                            onClick={() =>
+                              void updateTag(tag.id, {
+                                status: tag.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE',
+                              })
+                            }
+                          >
+                            {tag.status === 'ACTIVE' ? '停用' : '恢复'}
+                          </button>
+                        )}
+                        <button
+                          className="profile-tag-action-button profile-tag-action-button--danger"
+                          disabled={profileSaving || consentSaving}
+                          type="button"
+                          onClick={() => {
+                            Modal.confirm({
+                              cancelText: '取消',
+                              content: `确定删除“${tag.value}”标签吗？删除后可重新添加。`,
+                              okText: '删除',
+                              title: '确认删除画像标签',
+                              onOk: () => deleteTag(tag.id),
+                            });
+                          }}
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p>暂无画像标签，请添加你的观影偏好。</p>
+            )}
+          </>
+        )}
       </section>
     </main>
   );

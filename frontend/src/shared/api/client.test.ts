@@ -438,6 +438,28 @@ describe('apiRequest', () => {
     });
   });
 
+  it('明确允许时成功写接口可以不返回 data', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        createApiResponse({
+          code: 0,
+          message: 'success',
+          data: { token: 'csrf-empty-success', headerName: 'X-XSRF-TOKEN' },
+          traceId: 'trace-csrf-empty-success',
+        }),
+      )
+      .mockResolvedValueOnce(
+        createApiResponse({ code: 0, message: 'success', traceId: 'trace-empty-success' }),
+      );
+
+    await expect(
+      apiRequest<void>('/api/v1/profile/me/tags/1001', {
+        allowEmptyResponse: true,
+        method: 'DELETE',
+      }),
+    ).resolves.toBeUndefined();
+  });
+
   it('当前正式接口要求成功数据时，显式 data null 仍返回响应格式错误', async () => {
     fetchMock.mockResolvedValue(
       createApiResponse({ code: 0, message: 'success', data: null, traceId: 'trace-null' }),

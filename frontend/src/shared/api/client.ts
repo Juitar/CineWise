@@ -4,6 +4,8 @@ type QueryPrimitive = boolean | number | string;
 type QueryValue = QueryPrimitive | null | readonly QueryPrimitive[] | undefined;
 
 export interface ApiRequestOptions extends Omit<RequestInit, 'body'> {
+  /** 允许明确声明的成功写接口不返回 data 字段。其他接口仍要求完整响应数据。 */
+  allowEmptyResponse?: boolean;
   body?: unknown;
   handleUnauthorized?: boolean;
   query?: Record<string, QueryValue>;
@@ -201,6 +203,7 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler): () => void
  */
 export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
   const {
+    allowEmptyResponse = false,
     body,
     handleUnauthorized = true,
     query,
@@ -289,6 +292,9 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     }
 
     if (!hasRequiredResponseData(result)) {
+      if (allowEmptyResponse && response.ok && result.code === 0) {
+        return undefined as T;
+      }
       throw new ApiError('服务返回的数据格式不正确', {
         kind: 'INVALID_RESPONSE',
         status: response.status,
