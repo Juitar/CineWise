@@ -19,7 +19,8 @@ describe('getFreshnessNotices', () => {
 
     expect(notices).toHaveLength(1);
     expect(notices[0]).toMatchObject({ id: 'source', tone: 'info' });
-    expect(notices[0].text).toContain('NETSTART');
+    expect(notices[0].text).toContain('猫眼');
+    expect(notices[0].text).not.toContain('NETSTART');
   });
 
   it.each([
@@ -67,7 +68,7 @@ describe('getFreshnessNotices', () => {
     });
 
     expect(notices.map((notice) => notice.text)).toEqual([
-      expect.stringContaining('原始来源：NETSTART'),
+      expect.stringContaining('原始来源：猫眼'),
       '当前为降级数据',
       label,
     ]);

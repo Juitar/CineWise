@@ -6,6 +6,11 @@ import type {
 
 const SOURCE_TYPES = new Set<ContentSourceType>(['LIVE', 'MOCK', 'SNAPSHOT']);
 const FALLBACK_TYPES = new Set<ContentFallbackType>(['CACHE', 'MOCK', 'SNAPSHOT']);
+const SOURCE_LABELS: Record<string, string> = {
+  DEMO_CONTENT: '演示内容',
+  NETSTART: '猫眼',
+  NETSTART_MAOYAN: '猫眼',
+};
 
 export type FreshnessNoticeTone = 'info' | 'warning';
 
@@ -33,6 +38,11 @@ function formatDataTime(value: string): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
+}
+
+/** 后端来源标识用于存储和排障；页面只展示用户能理解的名称。 */
+function formatSource(source: string): string {
+  return SOURCE_LABELS[source.trim().toUpperCase()] ?? '内容服务';
 }
 
 function fallbackLabel(fallbackType: ContentFallbackType): string {
@@ -133,8 +143,8 @@ export function getFreshnessNotices(
   ) {
     const sourceText =
       freshness.degraded === true
-        ? `原始来源：${freshness.source}，更新时间：${formatDataTime(freshness.dataTime)}`
-        : `来源：${freshness.source}，更新于 ${formatDataTime(freshness.dataTime)}`;
+        ? `原始来源：${formatSource(freshness.source)}，更新时间：${formatDataTime(freshness.dataTime)}`
+        : `来源：${formatSource(freshness.source)}，更新于 ${formatDataTime(freshness.dataTime)}`;
     notices.push({
       id: 'source',
       text: sourceText,
