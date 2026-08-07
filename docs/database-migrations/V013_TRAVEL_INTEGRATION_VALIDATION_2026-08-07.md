@@ -27,7 +27,9 @@
 - `RefundedTravelTaskReconciliationIntegrationTest`：3/3 通过。
 - `TravelTaskControllerIntegrationTest`：2/2 通过。
 
-覆盖：支付提交后建任务、重复支付幂等、支付回滚不建任务、退款取消、退款先到取消墓碑、非法影院 ID 写入 `NULL`、迟到支付不重开、历史 `cinema_id=NULL` 兼容、过期任务关闭和任务查询。
+覆盖：支付提交后建任务、重复支付幂等、支付回滚不建任务、退款取消、退款先到取消墓碑、非法影院 ID 写入 `NULL`、迟到支付不重开、过期任务关闭和任务查询。
+
+历史 `cinema_id=NULL` 的持久化兼容已由 V013 验证记录和取消墓碑场景覆盖；“路线查询必须拒绝该历史任务”尚未实现或经 MySQL 验证，保留为 D 的后续路线任务，不得据此声明完成。
 
 ## 迁移结构复核
 
@@ -39,4 +41,4 @@
 
 ## 结论
 
-PR #143 合并后的 A/D `cinemaId` 兼容链路和 V013 出行任务 MySQL 验收通过。本记录不代表 Redis、邮件、路线 Provider 或 C/D 前端联调已完成。
+PR #143 合并后的 A/D `cinemaId` 事件、补偿和取消墓碑 MySQL 验收通过。本记录不代表历史 `cinema_id=NULL` 的路线拒绝、Redis、邮件、路线 Provider 或 C/D 前端联调已完成。

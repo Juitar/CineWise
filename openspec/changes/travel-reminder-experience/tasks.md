@@ -14,7 +14,7 @@
 - [x] 2.3 D 实现 `PaymentSucceededEvent` 的 AFTER_COMMIT 消费、`eventId` 去重、`orderId` 唯一任务创建及 A 补偿共用的 `ensureTask`；验证：`TravelTaskApplicationServiceTest`、`TravelTaskPaymentEventIntegrationTest` 覆盖重复事件、首次消费失败后的补偿、并发创建、提交后消费和回滚不创建，均通过。
 - [x] 2.4 D 实现 `OrderInvalidated` 的版本比较、任务取消和建议过期处理；验证：`TravelTaskApplicationServiceTest`、`TravelTaskPaymentEventIntegrationTest` 覆盖退款提交后取消、退款先到的 CANCELLED 墓碑、支付事件随后到达不重开任务、低版本退款后较高版本退款推进墓碑审计字段及两版本并发到达时保留较高版本，均通过。
 - [x] 2.5 D 提供本人任务查询、提醒时间更新与只读建议摘要 Application/API 边界；验证：`TravelTaskQueryServiceTest` 覆盖跨用户隐藏、取消任务返回 `207002`、五分钟内刷新返回 `107001`，均通过。
-- [x] 2.6 A、D 在 A 的事件代码合入后实现并验证 `cinemaId` 处理；验证：合法支付任务、非法支付后的 PAID 补偿、退款先到合法/非法影院 ID、已有任务退款保留原值、迟到支付不重开、历史 `cinema_id=NULL` 路线不可用，以及 V013 对 `0`/负数的 CHECK 均通过，详见 A/D MySQL 联调记录。
+- [ ] 2.6 A、D 在 A 的事件代码合入后实现并验证 `cinemaId` 处理；已验证：合法支付任务、非法支付后的 PAID 补偿、退款先到合法/非法影院 ID、已有任务退款保留原值、迟到支付不重开，以及 V013 对 `0`/负数的 CHECK。待 D 在路线查询实现并以 MySQL 测试验证历史 `cinema_id=NULL` 路线不可用后再勾选。
 
 ## 3. 天气建议、快照与提醒投递
 
