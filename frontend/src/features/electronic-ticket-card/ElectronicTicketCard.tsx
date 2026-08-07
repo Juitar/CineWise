@@ -153,7 +153,9 @@ export const ElectronicTicketCard: React.FC<ElectronicTicketCardProps> = ({
             className="ticket-invalidated-alert"
             type="warning"
             showIcon
-            message={invalidationReason === 'SHOW_ENDED' ? '影片已结束，电子票已失效' : '电子票已失效'}
+            message={
+              invalidationReason === 'SHOW_ENDED' ? '影片已结束，电子票已失效' : '电子票已失效'
+            }
             description="该电子票不可作为入场凭证使用。"
           />
         )}
