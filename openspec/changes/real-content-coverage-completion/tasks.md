@@ -25,6 +25,7 @@
 - [ ] 2.8 D 实现 `GET /api/v1/admin/content/sources`、`POST /api/v1/admin/content/sync` 和按请求查询的 Application/API 层：请求只含 `clientRequestId/cityName`，服务端由本地城市目录解析 `ci`；先写 PENDING 审计记录，以随机 `leaseOwner` 条件取得 RUNNING 租约后才调用 Provider；每 20 秒续租，Provider 调用含短重试总超时不超过 60 秒；重复、超时或断网后只按原请求查询。当前已完成接口、城市目录校验、PENDING、续租、过期恢复、异常终态收敛、同请求恢复及来源时间字段读取；仍缺真正按城市同步影院和完整安全/异常 MySQL 集成测试。验证：长沙/杭州成功、目录中不存在的城市拒绝、`201006/201007/201009/100001/100409/100404/303004`、城市状态查询、无地点原文/Provider 城市 ID/Key/原始响应泄露测试。V014 阶段仅验证旧日志兼容和 PENDING，不将严格五态 CHECK 作为完成条件。
 - [ ] 2.8a D 在 2.8 的新 Writer 发布、受控兼容处理和共享库只读预检通过后，提交 V015 严格 CHECK 并完成同步恢复验证。验证：PENDING 多实例租约竞争、慢 Provider 下存活持有者续租与结果保存、RUNNING 进程中断真正到期后 FAILED+INTERNAL 且不重调 Provider、持有者不匹配时不得写资料或覆盖终态，以及五种状态的合法与非法计数组合。
 - [x] 2.9 D 实现公开批量内容身份解析 Application API、ACTIVE/INVALID 映射状态和测试；只按稳定外部身份返回唯一内部 ID。验证：`ContentIdentityResolutionServiceTest`、`JdbcContentIdentityResolutionAdapterTest` 覆盖唯一命中、重复/未匹配、歧义 `303006`、失效 `303007`；服务层覆盖空输入和批量边界校验，编译与定向测试通过。
+- [x] 2.9a D 按 A 确认新增 `DemoPurchaseCatalog` 公开只读目录：指定城市全部未过期真实影院、最多三部真实影片、单一 `NETSTART_MAOYAN` 来源、稳定 ID 排序去重、空目录与 `303004` 区分。验证：`JdbcLiveDemoPurchaseCatalogAdapterTest` 覆盖全量影院、三部影片上限、时效、Demo/过期空目录和存储不可读；`ContentQueryServiceTest` 覆盖非法 `cityCode=100001`。
 
 ## 3. C 完成页面真实展示
 
