@@ -45,8 +45,8 @@ import org.springframework.stereotype.Service;
  * <p>任何缺少稳定 ID 的候选都会被隔离。</p>
  * <p>时间统一为 Asia/Shanghai 的 OffsetDateTime。</p>
  * <p>开场时间不晚于采集时间的候选不会公开。</p>
- * <p>endTime 为空时保留给 A 判断，不允许 D 自行推算。</p>
- * <p>A 只导入 endTime 大于 startTime 的候选。</p>
+ * <p>endTime 为空但 durationMinutes 为正时标记 SANDBOX_REFERENCE，供 A 生成本地预计结束时间；D 不自行推算外部散场。</p>
+ * <p>A 只有在 endTime 大于 startTime 且状态为 ACCEPTED 时才导入真实本地交易场次。</p>
  * <p>listedPrice 永远只是参考价。</p>
  * <p>A 的本地价格不会被外部价格覆盖。</p>
  * <p>每条候选使用 provider、影院 ID 和场次 ID 三元键。</p>
@@ -203,8 +203,7 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
                         QualityStatus.IDENTITY_REJECTED, code, key));
                 continue;
             }
-            if (candidate.startTime() == null || candidate.endTime() == null
-                    || !candidate.endTime().isAfter(candidate.startTime())) {
+            if (candidate.startTime() == null) {
                 rejected.add(rejected(candidate, movieId, cinemaId, dataAt,
                         QualityStatus.END_TIME_REJECTED, null, key));
                 continue;
@@ -213,12 +212,29 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
                 rejected.add(rejected(candidate, movieId, cinemaId, dataAt, QualityStatus.TIME_REJECTED, null, key));
                 continue;
             }
+            QualityStatus qualityStatus;
+            if (candidate.endTime() != null) {
+                if (!candidate.endTime().isAfter(candidate.startTime())) {
+                    rejected.add(rejected(candidate, movieId, cinemaId, dataAt,
+                            QualityStatus.TIME_REJECTED, null, key));
+                    continue;
+                }
+                qualityStatus = QualityStatus.ACCEPTED;
+            } else if (candidate.durationMinutes() != null && candidate.durationMinutes() > 0) {
+                // 片长只能支持 A 生成本地预计结束时间，不能冒充 Provider 的真实散场事实。
+                qualityStatus = QualityStatus.SANDBOX_REFERENCE;
+            } else {
+                rejected.add(rejected(candidate, movieId, cinemaId, dataAt,
+                        QualityStatus.END_TIME_REJECTED, null, key));
+                continue;
+            }
             OffsetDateTime expiresAt = min(candidate.startTime(), dataAt.plusMinutes(10));
             ExternalShowtimeSnapshot snapshot = new ExternalShowtimeSnapshot(
                     PROVIDER, candidate.externalShowId(), candidate.externalMovieId(),
                     candidate.externalCinemaId(), movieId, cinemaId, candidate.startTime(), candidate.endTime(),
-                    candidate.listedPrice(), PriceSemantic.REFERENCE_ONLY, dataAt, expiresAt, false, false, null,
-                    QualityStatus.ACCEPTED, null, key);
+                    candidate.listedPrice(), candidate.durationMinutes(), candidate.auditoriumText(),
+                    PriceSemantic.REFERENCE_ONLY, dataAt, expiresAt, false, false, null,
+                    qualityStatus, null, key);
             // seqNo 没有跨影院唯一保证，三元键是 A 后续导入时唯一可复用的幂等身份。
             accepted.putIfAbsent(snapshot.externalShowtimeKey(), snapshot);
         }
@@ -241,7 +257,8 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
                                               Integer rejectionCode, ExternalShowtimeKey key) {
         return new ExternalShowtimeSnapshot(PROVIDER, candidate.externalShowId(), candidate.externalMovieId(),
                 candidate.externalCinemaId(), movieId, cinemaId, candidate.startTime(), candidate.endTime(),
-                candidate.listedPrice(), PriceSemantic.REFERENCE_ONLY, dataAt, dataAt, false, false, null,
+                candidate.listedPrice(), candidate.durationMinutes(), candidate.auditoriumText(),
+                PriceSemantic.REFERENCE_ONLY, dataAt, dataAt, false, false, null,
                 qualityStatus, rejectionCode, key);
     }
 
@@ -274,7 +291,8 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
     private ExternalShowtimeSnapshot asSnapshotFallback(ExternalShowtimeSnapshot snapshot) {
         return new ExternalShowtimeSnapshot(snapshot.source(), snapshot.externalShowId(), snapshot.externalMovieId(),
                 snapshot.externalCinemaId(), snapshot.movieId(), snapshot.cinemaId(), snapshot.startTime(),
-                snapshot.endTime(), snapshot.listedPrice(), snapshot.priceSemantic(), snapshot.dataAt(),
+                snapshot.endTime(), snapshot.listedPrice(), snapshot.durationMinutes(), snapshot.auditoriumText(),
+                snapshot.priceSemantic(), snapshot.dataAt(),
                 snapshot.expiresAt(), snapshot.isExpired(), true, FallbackType.SNAPSHOT, snapshot.qualityStatus(),
                 snapshot.rejectionCode(), snapshot.externalShowtimeKey());
     }

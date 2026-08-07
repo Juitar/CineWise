@@ -128,6 +128,25 @@ class ExternalShowtimeQueryServiceTest {
     }
 
     @Test
+    void givenStartTimeAndDurationWithoutEndTime_whenProviderSucceeds_thenItReturnsSandboxReference() {
+        ExternalShowtimeQueryService service = service(new ExternalShowtimeProvider.FetchResult(List.of(
+                new ExternalShowtimeProvider.Candidate("s1", "m1", "c1",
+                        OffsetDateTime.parse("2026-08-07T11:00:00+08:00"), null, new BigDecimal("36"),
+                        135, "1号厅")), null), new MemorySnapshots());
+
+        ExternalShowtimeQueryPort.QueryResult result = service.query(
+                new ExternalShowtimeQueryPort.Query(DATE, List.of(21L)));
+
+        assertThat(result.snapshots()).singleElement().satisfies(snapshot -> {
+            assertThat(snapshot.qualityStatus()).isEqualTo(ExternalShowtimeQueryPort.QualityStatus.SANDBOX_REFERENCE);
+            assertThat(snapshot.durationMinutes()).isEqualTo(135);
+            assertThat(snapshot.auditoriumText()).isEqualTo("1号厅");
+            assertThat(snapshot.endTime()).isNull();
+        });
+        assertThat(result.rejectedSnapshots()).isEmpty();
+    }
+
+    @Test
     void givenManyRejectedCandidates_whenProviderSucceeds_thenRejectedListIsCappedAndMarked() {
         List<ExternalShowtimeProvider.Candidate> candidates = IntStream.range(0, 201)
                 .mapToObj(index -> new ExternalShowtimeProvider.Candidate(
