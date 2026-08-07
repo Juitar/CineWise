@@ -55,7 +55,6 @@ export interface AgentPlanDisplay {
   currency: string;
   startTime: string;
   rating: string | null;
-  score: number | null;
   reasons: readonly string[];
   source: string;
   dataAt: string;
@@ -343,7 +342,6 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
         currency: plan.currency as string,
         startTime: plan.startTime as string,
         rating: plan.rating as string | null,
-        score: plan.score as number | null,
         reasons: plan.reasons as readonly string[],
         source: plan.source as string,
         dataAt: plan.dataAt as string,

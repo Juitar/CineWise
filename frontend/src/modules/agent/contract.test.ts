@@ -72,6 +72,56 @@ describe('Agent DTO 和事件校验', () => {
     );
   });
 
+  it('固定选项问题不要求 input，自由输入问题仍要求 input', () => {
+    const choiceOnlyPayload: Record<string, unknown> = {
+      ...questionCard.payload,
+      allowFreeText: false,
+    };
+    delete choiceOnlyPayload.input;
+    expect(
+      validateAgentCardEvent(parseAgentEvent({ ...questionCard, payload: choiceOnlyPayload }))
+        .decision,
+    ).toBe('render');
+    expect(
+      validateAgentCardEvent(
+        parseAgentEvent({
+          ...questionCard,
+          payload: { ...choiceOnlyPayload, allowFreeText: true },
+        }),
+      ).decision,
+    ).toBe('reject');
+  });
+
+  it('严格拒绝方案卡缺字段、未知字段和原始工具参数', () => {
+    expect(
+      validateAgentCardEvent(
+        parseAgentEvent({
+          ...planCard,
+          payload: { ...planCard.payload, schemaVersion: undefined },
+        }),
+      ).decision,
+    ).toBe('reject');
+    expect(
+      validateAgentCardEvent(
+        parseAgentEvent({
+          ...planCard,
+          payload: { ...planCard.payload, internalEvidence: 'hidden' },
+        }),
+      ).decision,
+    ).toBe('reject');
+    expect(
+      validateAgentCardEvent(
+        parseAgentEvent({
+          ...planCard,
+          payload: {
+            ...planCard.payload,
+            plans: [{ ...planCard.payload.plans[0], rawToolArguments: '{}' }],
+          },
+        }),
+      ).decision,
+    ).toBe('reject');
+  });
+
   it('正式方案缺少影片名或问题选项值时拒绝渲染', () => {
     const invalidPlan = {
       ...planCard,

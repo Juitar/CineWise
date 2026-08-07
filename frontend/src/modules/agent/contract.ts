@@ -224,39 +224,107 @@ function textArray(value: unknown): void {
   array(value).forEach((item) => text(item));
 }
 
-function nullableNumber(value: unknown): void {
-  if (value !== null && (typeof value !== 'number' || !Number.isFinite(value))) {
-    throw new AgentContractError();
+function exactKeys(current: Record<string, unknown>, allowedKeys: readonly string[]): void {
+  const allowed = new Set(allowedKeys);
+  if (Object.keys(current).some((key) => !allowed.has(key))) throw new AgentContractError();
+}
+
+function finiteNumber(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new AgentContractError();
+  return value;
+}
+
+function requiredNullableText(current: Record<string, unknown>, key: string): void {
+  if (!(key in current)) throw new AgentContractError();
+  if (current[key] !== null) text(current[key]);
+}
+
+function requiredNullableNonNegativeInteger(current: Record<string, unknown>, key: string): void {
+  if (!(key in current)) throw new AgentContractError();
+  if (current[key] !== null) nonNegativeInteger(current[key]);
+}
+
+function validatePlanItem(value: unknown): void {
+  const item = record(value);
+  exactKeys(item, [
+    'planType',
+    'movieId',
+    'movieName',
+    'cinemaId',
+    'cinemaName',
+    'showId',
+    'price',
+    'currency',
+    'startTime',
+    'rating',
+    'score',
+    'reasons',
+    'source',
+    'dataAt',
+    'expiresAt',
+    'expired',
+    'purchaseEligible',
+    'distanceMeters',
+  ]);
+  text(item.planType);
+  businessId(item.movieId);
+  text(item.movieName);
+  businessId(item.cinemaId);
+  text(item.cinemaName);
+  businessId(item.showId);
+  text(item.price);
+  text(item.currency);
+  dateText(item.startTime);
+  requiredNullableText(item, 'rating');
+  finiteNumber(item.score);
+  textArray(item.reasons);
+  text(item.source);
+  dateText(item.dataAt);
+  dateText(item.expiresAt);
+  boolean(item.expired);
+  boolean(item.purchaseEligible);
+  requiredNullableNonNegativeInteger(item, 'distanceMeters');
+}
+
+function validatePlanCard(payload: Record<string, unknown>): void {
+  exactKeys(payload, [
+    'type',
+    'title',
+    'schemaVersion',
+    'algorithmVersion',
+    'plans',
+    'missingFactors',
+    'relaxationSuggestion',
+    'usedProfile',
+    'source',
+    'dataAt',
+    'expiresAt',
+    'degraded',
+    'expired',
+  ]);
+  text(payload.title);
+  text(payload.schemaVersion);
+  text(payload.algorithmVersion);
+  array(payload.plans).forEach(validatePlanItem);
+  textArray(payload.missingFactors);
+  if (!('relaxationSuggestion' in payload)) throw new AgentContractError();
+  if (payload.relaxationSuggestion !== null) {
+    const relaxation = record(payload.relaxationSuggestion);
+    exactKeys(relaxation, ['factor', 'message']);
+    text(relaxation.factor);
+    text(relaxation.message);
   }
+  boolean(payload.usedProfile);
+  text(payload.source);
+  dateText(payload.dataAt);
+  dateText(payload.expiresAt);
+  boolean(payload.degraded);
+  boolean(payload.expired);
 }
 
-function nullableNonNegativeInteger(value: unknown): void {
-  if (value !== null) nonNegativeInteger(value);
-}
-
-function validateRecommendationItem(value: unknown, type: 'MOVIE_CARD' | 'PLAN_CARD'): void {
+function validateMovieRecommendationItem(value: unknown): void {
   const item = record(value);
   businessId(item.movieId);
-  if (type === 'PLAN_CARD') {
-    text(item.planType);
-    text(item.movieName);
-    businessId(item.cinemaId);
-    text(item.cinemaName);
-    businessId(item.showId);
-    text(item.price);
-    text(item.currency);
-    dateText(item.startTime);
-    if (item.rating !== null) text(item.rating);
-    nullableNumber(item.score);
-    textArray(item.reasons);
-    text(item.source);
-    dateText(item.dataAt);
-    dateText(item.expiresAt);
-    boolean(item.expired);
-    boolean(item.purchaseEligible);
-    nullableNonNegativeInteger(item.distanceMeters);
-    return;
-  }
   optionalText(item, 'title');
   optionalBusinessId(item, 'cinemaId');
   optionalBusinessId(item, 'showId');
@@ -277,12 +345,14 @@ function validateQuestion(payload: Record<string, unknown>): void {
     text(current.label);
     text(current.value);
   });
-  boolean(payload.allowFreeText);
+  const allowFreeText = boolean(payload.allowFreeText);
   boolean(payload.requiresConfirmation);
   dateText(payload.expiresAt);
-  const input = record(payload.input);
-  text(input.name);
-  text(input.type);
+  if (allowFreeText) {
+    const input = record(payload.input);
+    text(input.name);
+    text(input.type);
+  }
   if (payload.questionKind === 'LOCATION_PERMISSION') {
     const authorization = record(payload.locationAuthorization);
     if (authorization.permission !== 'DEVICE_LOCATION') throw new AgentContractError();
@@ -303,25 +373,16 @@ function validateRecommendation(
   payload: Record<string, unknown>,
   type: 'MOVIE_CARD' | 'PLAN_CARD',
 ): void {
+  if (type === 'PLAN_CARD') {
+    validatePlanCard(payload);
+    return;
+  }
   text(payload.title);
-  const candidates = array(type === 'MOVIE_CARD' ? payload.movies : payload.plans);
-  candidates.forEach((item) => validateRecommendationItem(item, type));
+  array(payload.movies).forEach(validateMovieRecommendationItem);
   text(payload.source);
   dateText(payload.dataAt);
   dateText(payload.expiresAt);
   boolean(payload.degraded);
-  if (type === 'PLAN_CARD') {
-    text(payload.schemaVersion);
-    text(payload.algorithmVersion);
-    textArray(payload.missingFactors);
-    boolean(payload.usedProfile);
-    boolean(payload.expired);
-    if (payload.relaxationSuggestion !== null) {
-      const suggestion = record(payload.relaxationSuggestion);
-      text(suggestion.factor);
-      text(suggestion.message);
-    }
-  }
   optionalBoolean(payload, 'expired');
   optionalBoolean(payload, 'purchaseEligible');
   if ('missingFactors' in payload) textArray(payload.missingFactors);

@@ -109,6 +109,9 @@ describe('Agent 事件投影', () => {
     expect(result.projection.items[0].fields).not.toContainEqual(
       expect.objectContaining({ label: expect.stringMatching(/ID/) }),
     );
+    expect(JSON.stringify(result.projection)).not.toMatch(
+      /score|internalEvidence|rawToolArguments/,
+    );
   });
 
   it('TEXT 使用纯文本投影，过期空方案卡仍明确显示过期且不生成业务按钮', () => {
