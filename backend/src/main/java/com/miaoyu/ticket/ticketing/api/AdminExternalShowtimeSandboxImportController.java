@@ -3,6 +3,7 @@ package com.miaoyu.ticket.ticketing.api;
 import com.miaoyu.ticket.common.api.Result;
 import com.miaoyu.ticket.ticketing.application.AdminExternalShowtimeSandboxImportService;
 import com.miaoyu.ticket.ticketing.application.ExternalShowtimeSandboxImportApplicationService;
+import com.miaoyu.ticket.ticketing.application.ExternalShowtimeImportTaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -14,6 +15,8 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -47,24 +50,31 @@ public class AdminExternalShowtimeSandboxImportController {
     @PostMapping("/import")
     @Operation(summary = "管理员手动导入本地沙箱场次")
     public Result<ImportResponse> importReferences(@Valid @RequestBody ImportRequest request) {
-        ExternalShowtimeSandboxImportApplicationService.ImportResult result = importService.importReferences(
-                request.showDate(),
-                request.cinemaIds());
-        return Result.success(new ImportResponse(
-                result.showIds().stream().map(showId -> Long.toString(showId)).toList(),
-                result.truncated()));
+        ExternalShowtimeImportTaskService.TaskView task = importService.createTask(
+                request.showDate(), request.cinemaIds(), request.clientRequestId());
+        return Result.success(ImportResponse.from(task));
+    }
+
+    @GetMapping("/import/{taskId}")
+    @Operation(summary = "查询外部排期沙箱导入任务")
+    public Result<ImportResponse> query(@PathVariable String taskId) {
+        return Result.success(ImportResponse.from(importService.queryTask(taskId)));
     }
 
     /** 请求只声明查询范围；票价、座位和库存永远由 A 本地策略生成。 */
     public record ImportRequest(
             @NotNull @Schema(example = "2026-08-10") LocalDate showDate,
-            @NotEmpty @Size(max = 100) @Schema(example = "[\"2084825488119652354\"]") List<String> cinemaIds) {
+            @NotEmpty @Size(max = 100) @Schema(example = "[\"2084825488119652354\"]") List<String> cinemaIds,
+            @Schema(description = "网络结果未知时用于恢复原任务") String clientRequestId) {
     }
 
     /** 不返回外部三元键或原始快照，避免管理 API 成为 D Provider 数据透传接口。 */
-    public record ImportResponse(List<String> showIds, boolean truncated) {
-        public ImportResponse {
-            showIds = List.copyOf(showIds);
+    public record ImportResponse(String taskId, String status, int totalCount, int successCount,
+                                 int failureCount, boolean truncated, List<String> showIds, Integer errorCode) {
+        static ImportResponse from(ExternalShowtimeImportTaskService.TaskView task) {
+            return new ImportResponse(task.taskId(), task.status().name(), task.totalCount(), task.successCount(),
+                    task.failureCount(), task.truncated(), task.showIds() == null ? null
+                            : task.showIds().stream().map(showId -> Long.toString(showId)).toList(), task.errorCode());
         }
     }
 }

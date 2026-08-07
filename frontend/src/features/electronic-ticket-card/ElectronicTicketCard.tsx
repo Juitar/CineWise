@@ -152,12 +152,18 @@ export const ElectronicTicketCard: React.FC<ElectronicTicketCardProps> = ({
         <div className="ticket-cutout right" />
       </div>
 
-      {/* 电子票副卡部（二维码占位区及票号） */}
+      {/* 二维码周围必须保留完整白色静区，不能叠加票根虚线或装饰边框。 */}
       <div className="ticket-card-footer">
         <div className="ticket-qr-placeholder" aria-label="电子票二维码本地渲染区">
           <div className="ticket-qr-box">
             {qrPayload && status === 'VALID' ? (
-              <QRCode value={qrPayload} type="svg" bordered={false} aria-label="有效电子票二维码" />
+              <QRCode
+                value={qrPayload}
+                type="svg"
+                size={144}
+                bordered={false}
+                aria-label="有效电子票二维码"
+              />
             ) : (
               <span className="ticket-qr-tip">当前电子票二维码不可用</span>
             )}

@@ -89,6 +89,17 @@ public class JdbcTicketingSeedRepository implements TicketingSeedRepository {
     }
 
     @Override
+    public boolean hasExternalShowForDate(long cinemaId, java.time.LocalDate date) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM movie_show
+                 WHERE cinema_id = ? AND source = 'external-sandbox'
+                   AND start_time >= ? AND start_time < ?
+                """, Integer.class, cinemaId, Timestamp.valueOf(date.atStartOfDay()),
+                Timestamp.valueOf(date.plusDays(1).atStartOfDay()));
+        return count != null && count > 0;
+    }
+
+    @Override
     public Set<String> findSeatKeys(long showId) {
         List<String> keys = jdbcTemplate.query("""
                 SELECT row_no, seat_no

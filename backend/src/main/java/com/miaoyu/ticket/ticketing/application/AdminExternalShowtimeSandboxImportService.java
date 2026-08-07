@@ -11,6 +11,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -27,14 +28,27 @@ public class AdminExternalShowtimeSandboxImportService {
 
     private final CurrentUserAccessor currentUserAccessor;
     private final ExternalShowtimeSandboxImportApplicationService importApplicationService;
+    private final ExternalShowtimeImportTaskService taskService;
 
+    @Autowired
     public AdminExternalShowtimeSandboxImportService(
             CurrentUserAccessor currentUserAccessor,
-            ExternalShowtimeSandboxImportApplicationService importApplicationService) {
+            ExternalShowtimeSandboxImportApplicationService importApplicationService,
+            ExternalShowtimeImportTaskService taskService) {
         this.currentUserAccessor = Objects.requireNonNull(currentUserAccessor, "currentUserAccessor must not be null");
         this.importApplicationService = Objects.requireNonNull(
                 importApplicationService,
                 "importApplicationService must not be null");
+        this.taskService = Objects.requireNonNull(taskService, "taskService must not be null");
+    }
+
+    /** 保留旧同步用例的测试构造；生产 Bean 始终注入异步任务服务。 */
+    AdminExternalShowtimeSandboxImportService(CurrentUserAccessor currentUserAccessor,
+            ExternalShowtimeSandboxImportApplicationService importApplicationService) {
+        this.currentUserAccessor = Objects.requireNonNull(currentUserAccessor, "currentUserAccessor must not be null");
+        this.importApplicationService = Objects.requireNonNull(importApplicationService,
+                "importApplicationService must not be null");
+        this.taskService = null;
     }
 
     /**
@@ -50,6 +64,19 @@ public class AdminExternalShowtimeSandboxImportService {
         LocalDate normalizedShowDate = requireShowDate(showDate);
         List<Long> normalizedCinemaIds = normalizeCinemaIds(cinemaIds);
         return importApplicationService.importReferences(normalizedShowDate, normalizedCinemaIds);
+    }
+
+    /** 创建异步任务；权限和影院 ID 校验仍在请求线程完成。 */
+    public ExternalShowtimeImportTaskService.TaskView createTask(
+            LocalDate showDate, List<String> cinemaIds, String clientRequestId) {
+        requireAdministrator();
+        return taskService.create(clientRequestId, requireShowDate(showDate), normalizeCinemaIds(cinemaIds));
+    }
+
+    /** 查询任务也必须经过 ADMIN 复核，避免泄漏管理导入结果。 */
+    public ExternalShowtimeImportTaskService.TaskView queryTask(String taskId) {
+        requireAdministrator();
+        return taskService.find(taskId);
     }
 
     /** 读取 C 的当前身份摘要后复核角色，禁止信任任何请求字段描述的权限。 */

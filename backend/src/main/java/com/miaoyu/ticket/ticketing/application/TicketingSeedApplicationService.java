@@ -74,8 +74,12 @@ public class TicketingSeedApplicationService {
                 long auditoriumId = ensureAuditorium(cinema.id(), hallNumber, generatedAt);
                 auditoriumCount++;
                 for (int dayOffset = 0; dayOffset < DAYS; dayOffset++) {
+                    LocalDate showDate = runDate.plusDays(dayOffset);
+                    if (repository.hasExternalShowForDate(cinema.id(), showDate)) {
+                        continue;
+                    }
                     for (int slotIndex = 0; slotIndex < SHOW_TIMES.size(); slotIndex++) {
-                        LocalDateTime startTime = runDate.plusDays(dayOffset).atTime(SHOW_TIMES.get(slotIndex));
+                        LocalDateTime startTime = showDate.atTime(SHOW_TIMES.get(slotIndex));
                         ContentSeedCatalog.MovieRef movie = selectMovie(
                                 catalog.movies(), cinema.sourceCinemaId(), hallNumber, dayOffset, slotIndex);
                         long showId = ensureShow(

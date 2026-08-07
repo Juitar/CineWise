@@ -22,6 +22,9 @@ public interface TicketingQueryMapper {
               FROM movie_show ms
              WHERE ms.movie_id = #{criteria.movieId}
                AND ms.status = 'ON_SALE'
+               AND (ms.source != 'demo-seed' OR NOT EXISTS (SELECT 1 FROM movie_show real_ms
+                    WHERE real_ms.cinema_id = ms.cinema_id AND real_ms.source = 'external-sandbox'
+                      AND DATE(real_ms.start_time) = DATE(ms.start_time)))
                AND ms.start_time > #{criteria.startsAfter}
                AND ms.start_time < #{criteria.startsBefore}
                AND EXISTS (
@@ -46,6 +49,9 @@ public interface TicketingQueryMapper {
               FROM movie_show ms
              WHERE ms.cinema_id = #{criteria.cinemaId}
                AND ms.status = 'ON_SALE'
+               AND (ms.source != 'demo-seed' OR NOT EXISTS (SELECT 1 FROM movie_show real_ms
+                    WHERE real_ms.cinema_id = ms.cinema_id AND real_ms.source = 'external-sandbox'
+                      AND DATE(real_ms.start_time) = DATE(ms.start_time)))
                AND ms.start_time > #{criteria.startsAfter}
                AND ms.start_time < #{criteria.startsBefore}
              GROUP BY ms.movie_id
@@ -65,6 +71,9 @@ public interface TicketingQueryMapper {
              WHERE ms.movie_id = #{criteria.movieId}
                AND ms.cinema_id = #{criteria.cinemaId}
                AND ms.status = 'ON_SALE'
+               AND (ms.source != 'demo-seed' OR NOT EXISTS (SELECT 1 FROM movie_show real_ms
+                    WHERE real_ms.cinema_id = ms.cinema_id AND real_ms.source = 'external-sandbox'
+                      AND DATE(real_ms.start_time) = DATE(ms.start_time)))
                AND ms.start_time > #{criteria.startsAfter}
                AND ms.start_time < #{criteria.startsBefore}
              GROUP BY CAST(ms.start_time AS DATE)
@@ -97,6 +106,9 @@ public interface TicketingQueryMapper {
              WHERE ms.movie_id = #{criteria.movieId}
                AND ms.cinema_id = #{criteria.cinemaId}
                AND ms.status = 'ON_SALE'
+               AND (ms.source != 'demo-seed' OR NOT EXISTS (SELECT 1 FROM movie_show real_ms
+                    WHERE real_ms.cinema_id = ms.cinema_id AND real_ms.source = 'external-sandbox'
+                      AND DATE(real_ms.start_time) = DATE(ms.start_time)))
                AND ms.start_time &gt; #{criteria.startsAfter}
                AND ms.start_time &lt; #{criteria.startsBefore}
             <if test="criteria.dateStart != null">
@@ -143,6 +155,9 @@ public interface TicketingQueryMapper {
                 #{cinemaId}
             </foreach>
                AND ms.status = 'ON_SALE'
+               AND (ms.source != 'demo-seed' OR NOT EXISTS (SELECT 1 FROM movie_show real_ms
+                    WHERE real_ms.cinema_id = ms.cinema_id AND real_ms.source = 'external-sandbox'
+                      AND DATE(real_ms.start_time) = DATE(ms.start_time)))
                AND ms.start_time &gt; #{criteria.startsAfter}
                AND ms.start_time &gt;= #{criteria.dateStart}
                AND ms.start_time &lt; #{criteria.dateEnd}

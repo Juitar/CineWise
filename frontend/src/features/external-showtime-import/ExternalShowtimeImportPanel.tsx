@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Button, Card, DatePicker, Form, Result, Select, Space, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useCinemaList } from '../../modules/content/useCinemaList';
 import { ApiError } from '../../shared/api/ApiError';
 import {
   importExternalShowtimeReferences,
+  queryExternalShowtimeImport,
   type ExternalShowtimeImportResponse,
 } from '../../modules/ticketing/adminImport';
 import './index.css';
@@ -17,6 +18,22 @@ export function ExternalShowtimeImportPanel() {
   const [result, setResult] = useState<ExternalShowtimeImportResponse | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
 
+  useEffect(() => {
+    if (!result || !['PENDING', 'RUNNING'].includes(result.status)) return undefined;
+    const timer = window.setInterval(() => {
+      void queryExternalShowtimeImport(result.taskId)
+        .then(setResult)
+        .catch((requestError: unknown) => {
+          setError(
+            requestError instanceof ApiError
+              ? requestError
+              : new ApiError('任务查询失败', { kind: 'INVALID_RESPONSE' }),
+          );
+        });
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [result]);
+
   const handleSubmit = async () => {
     const values = await form.validateFields();
     setIsSubmitting(true);
@@ -27,6 +44,7 @@ export function ExternalShowtimeImportPanel() {
         await importExternalShowtimeReferences({
           cinemaIds: values.cinemaIds,
           showDate: values.showDate.format('YYYY-MM-DD'),
+          clientRequestId: window.crypto.randomUUID(),
         }),
       );
     } catch (requestError: unknown) {
@@ -99,24 +117,38 @@ export function ExternalShowtimeImportPanel() {
         {result ? (
           <Result
             className="external-showtime-import-result"
-            status={result.truncated ? 'warning' : result.showIds.length === 0 ? 'info' : 'success'}
+            status={
+              result.truncated
+                ? 'warning'
+                : result.status === 'FAILED'
+                  ? 'error'
+                  : result.successCount === 0
+                    ? 'info'
+                    : 'success'
+            }
             title={
               result.truncated
                 ? '候选结果被截断，未执行导入'
-                : result.showIds.length === 0
-                  ? '该日期和影院没有可导入场次'
-                  : `已处理 ${result.showIds.length} 个本地场次`
+                : result.status === 'FAILED'
+                  ? `导入失败（错误码 ${result.errorCode ?? '未知'}）`
+                  : result.status === 'PENDING' || result.status === 'RUNNING'
+                    ? `导入处理中：已成功 ${result.successCount} 个`
+                    : result.successCount === 0
+                      ? '该日期和影院没有可导入场次'
+                      : `已导入 ${result.successCount} 个本地场次`
             }
             subTitle={
               result.truncated
                 ? '请缩小影院范围后重新提交。'
-                : result.showIds.length === 0
-                  ? '请尝试未来 1～7 天的日期，或选择其他影院。'
-                  : undefined
+                : result.status === 'PENDING' || result.status === 'RUNNING'
+                  ? '任务已创建，页面会自动查询进度。'
+                  : result.successCount === 0
+                    ? '请尝试未来 1～7 天的日期，或选择其他影院。'
+                    : undefined
             }
             extra={
               <Space wrap>
-                {result.showIds.map((showId) => (
+                {(result.showIds ?? []).map((showId) => (
                   <Typography.Text code key={showId}>
                     {showId}
                   </Typography.Text>
