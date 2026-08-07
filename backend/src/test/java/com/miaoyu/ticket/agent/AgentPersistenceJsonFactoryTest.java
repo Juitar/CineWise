@@ -10,11 +10,29 @@ import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFacts;
 import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardItem;
 import com.miaoyu.ticket.agent.application.reply.SelectSeatsReplyFacts;
+import com.miaoyu.ticket.agent.application.reply.QuestionReplyFacts;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class AgentPersistenceJsonFactoryTest {
+    @Test
+    void shouldBuildRenderableQuestionCardFromTheServerSelectedSlot() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        AgentPersistenceJsonFactory factory = new AgentPersistenceJsonFactory(mapper);
+
+        JsonNode payload = mapper.readTree(factory.cardPayload(new ReplyGenerationResponse(
+                "请补充cityCode。", AgentReplyMessageType.QUESTION, new QuestionReplyFacts("cityCode")),
+                LocalDateTime.of(2026, 8, 7, 10, 0)).value());
+
+        assertThat(payload.path("type").asText()).isEqualTo("QUESTION");
+        assertThat(payload.path("questionId").isTextual()).isTrue();
+        assertThat(payload.path("input").path("name").asText()).isEqualTo("cityCode");
+        assertThat(payload.path("options").isArray()).isTrue();
+        assertThat(payload.path("expiresAt").asText()).isEqualTo("2026-08-07T10:10+08:00");
+    }
+
     @Test
     void shouldBuildCardEventFromSafeRecommendationFactsOnly() throws Exception {
         ObjectMapper mapper = new ObjectMapper();

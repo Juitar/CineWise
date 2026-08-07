@@ -27,7 +27,9 @@ import com.miaoyu.ticket.common.error.BusinessException;
 import java.time.LocalDateTime;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -41,6 +43,7 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 @SpringBootTest
 @Import(AgentSessionPersistenceIntegrationTest.TestCurrentUserConfiguration.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AgentSessionPersistenceIntegrationTest {
     private static final long USER_ID = 9_709_900_001L;
 
@@ -61,6 +64,12 @@ class AgentSessionPersistenceIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @BeforeAll
+    void addAgentSlotSnapshotColumnForH2() {
+        jdbcTemplate.execute("ALTER TABLE agent_session ADD COLUMN IF NOT EXISTS "
+                + "slot_snapshot_json JSON NOT NULL DEFAULT '{}'");
+    }
 
     @AfterEach
     void cleanup() {

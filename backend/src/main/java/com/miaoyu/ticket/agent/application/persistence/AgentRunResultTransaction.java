@@ -179,7 +179,8 @@ public class AgentRunResultTransaction {
             recordToolEvents(session, run, result, nodeToolResults, null);
         }
         AgentReplyMessageType replyType = result.reply().messageType();
-        boolean isCardReply = replyType == AgentReplyMessageType.MOVIE_CARD
+        boolean isCardReply = replyType == AgentReplyMessageType.QUESTION
+                || replyType == AgentReplyMessageType.MOVIE_CARD
                 || replyType == AgentReplyMessageType.PLAN_CARD
                 || replyType == AgentReplyMessageType.SELECT_SEATS;
         AgentEventType replyEvent = isCardReply
@@ -187,7 +188,7 @@ public class AgentRunResultTransaction {
                         ? AgentEventType.MESSAGE_ERROR : replyType == AgentReplyMessageType.PROGRESS
                                 ? AgentEventType.MESSAGE_START : AgentEventType.MESSAGE_COMPLETE;
         AgentStoredJson replyEventPayload = replyEvent == AgentEventType.CARD
-                ? jsonFactory.cardPayload(result.reply())
+                ? jsonFactory.cardPayload(result.reply(), now)
                 : jsonFactory.eventPayload(Map.of("messageType", replyType.name()));
         runtimeEventService.append(session, run, replyEvent, replyEventPayload);
         if (run.status().isTerminal()) {

@@ -185,7 +185,7 @@ public class AgentController {
         try {
             if (replay.reset()) {
                 emitter.send(SseEmitter.event().id(Long.toString(replay.watermark())).name("stream.reset")
-                        .data(new AgentRunResponse.EventSummary(Long.toString(replay.watermark()), replay.sessionId(),
+                        .data(new AgentCardEventResponse(Long.toString(replay.watermark()), replay.sessionId(),
                                 replay.runId(), null, null, null, "stream.reset", "已清理的事件不可续传",
                                 payload("{\"watermark\":\"" + replay.watermark() + "\"}"), null)));
             }
@@ -213,8 +213,8 @@ public class AgentController {
         }
     }
 
-    private AgentRunResponse.EventSummary eventSummary(AgentInteractionRuntimeService.EventView event) {
-        return new AgentRunResponse.EventSummary(event.eventId(), event.sessionId(), event.runId(), event.planId(),
+    private AgentCardEventResponse eventSummary(AgentInteractionRuntimeService.EventView event) {
+        return new AgentCardEventResponse(event.eventId(), event.sessionId(), event.runId(), event.planId(),
                 event.planVersion(), event.nodeId(), event.eventType(), event.displayText(), event.payload(),
                 event.occurredAt());
     }

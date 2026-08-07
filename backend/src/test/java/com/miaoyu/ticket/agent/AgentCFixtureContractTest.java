@@ -98,6 +98,29 @@ class AgentCFixtureContractTest {
         assertThat(waiting.toString()).doesNotContain("distanceContextId", "latitude", "longitude", "address");
     }
 
+    @Test
+    void shouldKeepQuestionPlanIntentAndConfirmationContractsDirectlyRenderable() throws Exception {
+        JsonNode question = fixture("question-card.json");
+        JsonNode plan = fixture("plan-card.json");
+        JsonNode businessIntent = fixture("business-intent-card.json");
+        JsonNode confirmation = fixture("order-confirm-card.json");
+        JsonNode confirmationApi = fixture("confirmation-api-fixtures.json");
+
+        assertThat(question.path("eventType").asText()).isEqualTo("card");
+        assertThat(question.path("payload").path("type").asText()).isEqualTo("QUESTION");
+        assertThat(question.path("payload").path("input").path("name").isTextual()).isTrue();
+        assertThat(plan.path("payload").path("type").asText()).isEqualTo("PLAN_CARD");
+        assertThat(plan.path("payload").path("plans").isArray()).isTrue();
+        assertThat(businessIntent.path("payload").path("type").asText()).isEqualTo("BUSINESS_INTENT");
+        assertThat(businessIntent.path("payload").path("businessRef").path("showId").isTextual()).isTrue();
+        assertThat(confirmation.path("payload").path("type").asText()).isEqualTo("PLAN_CARD");
+        assertThat(confirmation.path("payload").path("actionId").isTextual()).isTrue();
+        assertThat(confirmation.path("payload").path("status").isTextual()).isTrue();
+        assertThat(confirmationApi.path("success").path("data").path("runId").isTextual()).isTrue();
+        assertThat(confirmationApi.path("resultUnknown").path("data").path("status").asText())
+                .isEqualTo("RESULT_UNKNOWN");
+    }
+
     private JsonNode fixture(String fixtureName) throws Exception {
         try (InputStream input = getClass().getResourceAsStream("/fixtures/agent/c/" + fixtureName)) {
             assertThat(input).as("夹具必须存在: %s", fixtureName).isNotNull();

@@ -71,6 +71,16 @@ public interface AgentPersistenceMapper {
     @Select("SELECT " + SESSION_COLUMNS + " FROM agent_session WHERE id = #{id} AND user_id = #{userId} LIMIT 1")
     AgentSessionEntity findSessionByIdAndUserId(@Param("id") long id, @Param("userId") long userId);
 
+    @Select("SELECT slot_snapshot_json FROM agent_session WHERE session_id = #{sessionId}"
+            + " AND user_id = #{userId} LIMIT 1")
+    String findSessionSlotSnapshot(@Param("sessionId") String sessionId, @Param("userId") long userId);
+
+    @Update("UPDATE agent_session SET slot_snapshot_json = #{slotSnapshotJson}, version = version + 1"
+            + " WHERE id = #{sessionId} AND user_id = #{userId} AND version = #{expectedVersion}"
+            + " AND status = 'ACTIVE'")
+    int updateSessionSlotSnapshot(@Param("sessionId") long sessionId, @Param("userId") long userId,
+            @Param("expectedVersion") long expectedVersion, @Param("slotSnapshotJson") String slotSnapshotJson);
+
     @Select("SELECT " + SESSION_COLUMNS + " FROM agent_session WHERE user_id = #{userId} AND status = 'ACTIVE'"
             + " ORDER BY update_time DESC, id DESC LIMIT #{limit} OFFSET #{offset}")
     List<AgentSessionEntity> findActiveSessionsByUserId(
