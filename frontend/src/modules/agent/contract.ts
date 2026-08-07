@@ -22,6 +22,7 @@ const CARD_PAYLOAD_TYPES = new Set<AgentCardPayloadType>([
   'QUESTION',
   'MOVIE_CARD',
   'PLAN_CARD',
+  'TRAVEL_ADVICE_CARD',
   'BUSINESS_INTENT',
   'PROGRESS',
   'ERROR',
@@ -356,6 +357,42 @@ function validateBusinessIntent(payload: Record<string, unknown>): void {
   }
 }
 
+function exactKeys(value: Record<string, unknown>, keys: readonly string[]): void {
+  if (Object.keys(value).some((key) => !keys.includes(key))) throw new AgentContractError();
+}
+
+function travelPositiveId(value: unknown): void {
+  const id = text(value);
+  if (!POSITIVE_JAVA_LONG_PATTERN.test(id) || id.length > JAVA_LONG_MAX.length ||
+    (id.length === JAVA_LONG_MAX.length && id > JAVA_LONG_MAX)) throw new AgentContractError();
+}
+
+function validateTravelAdviceCard(payload: Record<string, unknown>): void {
+  exactKeys(payload, ['type', 'taskId', 'taskStatus', 'available', 'weather', 'advice', 'source', 'degraded', 'fallbackType', 'dataAt', 'expiresAt', 'expired']);
+  travelPositiveId(payload.taskId);
+  text(payload.taskStatus);
+  const available = boolean(payload.available);
+  const weather = payload.weather;
+  if (weather !== null) {
+    const current = record(weather);
+    exactKeys(current, ['area', 'condition', 'risk']);
+    nullableText(current.area); nullableText(current.condition); nullableText(current.risk);
+  }
+  array(payload.advice).forEach((item) => {
+    const current = record(item);
+    exactKeys(current, ['type', 'text']);
+    text(current.type); text(current.text);
+  });
+  text(payload.source);
+  const degraded = boolean(payload.degraded);
+  const fallbackType = nullableText(payload.fallbackType);
+  const dataAt = payload.dataAt === null ? null : dateText(payload.dataAt);
+  const expiresAt = payload.expiresAt === null ? null : dateText(payload.expiresAt);
+  boolean(payload.expired);
+  if (!available && (weather !== null || array(payload.advice).length > 0 || degraded || fallbackType !== null || dataAt !== null || expiresAt !== null)) throw new AgentContractError();
+  if (degraded !== (fallbackType !== null)) throw new AgentContractError();
+}
+
 function validateToolPayload(event: AgentEvent): void {
   const payload = event.payload;
   text(payload.toolName);
@@ -401,6 +438,7 @@ export function validateAgentCardEvent(event: AgentEvent): AgentCardValidation {
         throw new AgentContractError();
       validateBusinessIntent(event.payload as Record<string, unknown>);
     }
+    if (type === 'TRAVEL_ADVICE_CARD') validateTravelAdviceCard(event.payload as Record<string, unknown>);
     if (type === 'MOVIE_CARD' || type === 'PLAN_CARD') {
       validateRecommendation(event.payload as Record<string, unknown>, type);
     }

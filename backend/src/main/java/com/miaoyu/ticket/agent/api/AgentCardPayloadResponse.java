@@ -11,12 +11,14 @@ import java.util.List;
 @Schema(oneOf = {
         AgentCardPayloadResponse.Question.class,
         AgentCardPayloadResponse.PlanCard.class,
+        AgentCardPayloadResponse.TravelAdviceCard.class,
         AgentCardPayloadResponse.BusinessIntent.class,
         AgentCardPayloadResponse.ConfirmationCard.class,
         AgentCardPayloadResponse.Unknown.class
 })
 public sealed interface AgentCardPayloadResponse permits AgentCardPayloadResponse.Question,
-        AgentCardPayloadResponse.PlanCard, AgentCardPayloadResponse.BusinessIntent,
+        AgentCardPayloadResponse.PlanCard, AgentCardPayloadResponse.TravelAdviceCard,
+        AgentCardPayloadResponse.BusinessIntent,
         AgentCardPayloadResponse.ConfirmationCard, AgentCardPayloadResponse.Unknown {
 
     static AgentCardPayloadResponse from(JsonNode payload) {
@@ -54,6 +56,18 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
                         text(payload, "nodeId"), text(payload, "status"), text(payload, "expireAt"),
                         text(payload, "title"), displayLines, plans, text(payload, "source"), text(payload, "dataAt"),
                         text(payload, "expiresAt"), bool(payload, "degraded"));
+            }
+        }
+        if ("TRAVEL_ADVICE_CARD".equals(type)) {
+            TravelWeather weather = travelWeather(payload.path("weather"));
+            List<TravelAdviceItem> advice = travelAdvice(payload.path("advice"));
+            if (hasText(payload, "taskId") && hasText(payload, "taskStatus") && hasText(payload, "source") && advice != null
+                    && payload.path("available").isBoolean() && payload.path("degraded").isBoolean()
+                    && payload.path("expired").isBoolean()) {
+                return new TravelAdviceCard(type, text(payload, "taskId"), text(payload, "taskStatus"),
+                        payload.path("available").asBoolean(), weather, advice, text(payload, "source"), payload.path("degraded").asBoolean(),
+                        nullableText(payload, "fallbackType"), nullableText(payload, "dataAt"),
+                        nullableText(payload, "expiresAt"), payload.path("expired").asBoolean());
             }
         }
         if ("PLAN_CARD".equals(type)) {
@@ -133,6 +147,29 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
         return List.copyOf(result);
     }
 
+    private static TravelWeather travelWeather(JsonNode value) {
+        if (value.isNull()) {
+            return null;
+        }
+        return value.isObject() && value.has("area") && value.has("condition") && value.has("risk")
+                        ? new TravelWeather(nullableText(value, "area"), nullableText(value, "condition"),
+                                nullableText(value, "risk")) : null;
+    }
+
+    private static List<TravelAdviceItem> travelAdvice(JsonNode value) {
+        if (!value.isArray()) {
+            return null;
+        }
+        List<TravelAdviceItem> result = new ArrayList<>();
+        for (JsonNode item : value) {
+            if (!hasText(item, "type") || !hasText(item, "text")) {
+                return null;
+            }
+            result.add(new TravelAdviceItem(text(item, "type"), text(item, "text")));
+        }
+        return List.copyOf(result);
+    }
+
     private static RelaxationSuggestion relaxation(JsonNode value) {
         if (value.isNull()) {
             return null;
@@ -190,6 +227,17 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
             String showId, String price, String currency, String startTime, String rating, Double score,
             List<String> reasons, String source, String dataAt, String expiresAt, boolean expired,
             boolean purchaseEligible, Integer distanceMeters) {
+    }
+
+    record TravelAdviceCard(String type, String taskId, String taskStatus, boolean available, TravelWeather weather,
+            List<TravelAdviceItem> advice, String source, boolean degraded, String fallbackType, String dataAt, String expiresAt,
+            boolean expired) implements AgentCardPayloadResponse {
+    }
+
+    record TravelWeather(String area, String condition, String risk) {
+    }
+
+    record TravelAdviceItem(String type, String text) {
     }
 
     record RelaxationSuggestion(String factor, String message) {

@@ -16,6 +16,7 @@ import {
 import { AgentContractError } from './contract';
 import {
   buildProjectionFromHistoryAndSnapshots,
+  travelAdviceRecoveryRunIds,
   buildProjectionFromSnapshot,
   consumeAgentEvent,
   createAgentProjection,
@@ -99,12 +100,11 @@ function isTerminal(status: AgentProjection['status']): boolean {
   return ['CANCELLED', 'COMPLETED', 'FAILED'].includes(status);
 }
 
-function confirmationRunIds(messages: readonly AgentMessage[]): readonly string[] {
+function cardRecoveryRunIds(messages: readonly AgentMessage[]): readonly string[] {
   return Array.from(
     new Set(
-      messages
-        .filter((message) => typeof message.payload.actionId === 'string')
-        .map((message) => message.runId),
+      [...messages.filter((message) => typeof message.payload.actionId === 'string').map((message) => message.runId),
+        ...travelAdviceRecoveryRunIds(messages)],
     ),
   );
 }
@@ -162,7 +162,7 @@ export function useAgentWorkspace(sessionId: string) {
           listAgentSessions(),
         ]);
         const snapshots = await Promise.all(
-          confirmationRunIds(messages.records).map((runId) => getAgentRun(runId)),
+          cardRecoveryRunIds(messages.records).map((runId) => getAgentRun(runId)),
         );
         if (!active) return;
         const next = buildProjectionFromHistoryAndSnapshots(sessionId, messages.records, snapshots);

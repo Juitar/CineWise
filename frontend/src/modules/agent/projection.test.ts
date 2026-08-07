@@ -5,6 +5,7 @@ import errorEvent from '../../../../backend/src/test/resources/fixtures/agent/c/
 import errorCard from '../../../../backend/src/test/resources/fixtures/agent/c/error-card.json';
 import locationPermissionQuestion from '../../../../backend/src/test/resources/fixtures/agent/c/location-permission-question.json';
 import orderConfirmCard from '../../../../backend/src/test/resources/fixtures/agent/c/order-confirm-card.json';
+import travelAdviceCard from '../../../../backend/src/test/resources/fixtures/agent/c/travel-advice-card.json';
 import movieCard from '../../../../backend/src/test/resources/fixtures/agent/c/recommendation-card.json';
 import planCard from '../../../../backend/src/test/resources/fixtures/agent/c/plan-card.json';
 import processingEvent from '../../../../backend/src/test/resources/fixtures/agent/c/processing-event.json';
@@ -390,6 +391,21 @@ describe('Agent 事件投影', () => {
       text: '卡片数据暂不完整',
     });
     expect(projection.items[2].confirmation?.status).toBe('REJECTED');
+  });
+
+  it('初次加载会从运行快照恢复历史 TEXT 中的出行建议卡片', () => {
+    const history = [{
+      messageId: 'message-travel-advice', runId: 'run-travel', role: 'ASSISTANT', type: 'TEXT',
+      text: '已查询到出行建议', payload: travelAdviceCard.payload, status: 'COMPLETED',
+      completedAt: '2026-08-07T10:00:00Z', createdAt: '2026-08-07T10:00:00Z',
+    }];
+    const event = parseAgentEvent({ ...travelAdviceCard, runId: 'run-travel' });
+    const projection = buildProjectionFromHistoryAndSnapshots('session-example-1', history, [{
+      runId: 'run-travel', sessionId: 'session-example-1', status: 'COMPLETED', planId: 'plan-example-2',
+      planVersion: 1, startedAt: null, finishedAt: null, lastEventId: event.eventId, messages: [], steps: [], events: [event],
+    }]);
+    expect(projection.items).toHaveLength(1);
+    expect(projection.items[0]).toMatchObject({ kind: 'travel-advice-card', travelTaskId: '90001' });
   });
 
   it.each([

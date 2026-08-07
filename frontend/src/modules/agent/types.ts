@@ -73,7 +73,40 @@ export interface AgentEvent {
 }
 
 export type AgentCardPayloadType =
-  'TEXT' | 'QUESTION' | 'MOVIE_CARD' | 'PLAN_CARD' | 'BUSINESS_INTENT' | 'PROGRESS' | 'ERROR';
+  | 'TEXT'
+  | 'QUESTION'
+  | 'MOVIE_CARD'
+  | 'PLAN_CARD'
+  | 'TRAVEL_ADVICE_CARD'
+  | 'BUSINESS_INTENT'
+  | 'PROGRESS'
+  | 'ERROR';
+
+export interface TravelAdviceWeatherSummary {
+  area: string | null;
+  condition: string | null;
+  risk: string | null;
+}
+
+export interface TravelAdviceItem {
+  type: string;
+  text: string;
+}
+
+export interface TravelAdviceCardPayload {
+  type: 'TRAVEL_ADVICE_CARD';
+  taskId: string;
+  taskStatus: string;
+  available: boolean;
+  weather: TravelAdviceWeatherSummary | null;
+  advice: readonly TravelAdviceItem[];
+  source: string;
+  degraded: boolean;
+  fallbackType: string | null;
+  dataAt: string | null;
+  expiresAt: string | null;
+  expired: boolean;
+}
 
 export type BusinessIntent =
   | 'BROWSE_MOVIES'

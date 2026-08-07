@@ -14,7 +14,8 @@ import java.util.regex.Pattern;
  */
 public final class AgentCardEventValidator {
     private static final List<String> CARD_TYPES =
-            List.of("TEXT", "QUESTION", "MOVIE_CARD", "PLAN_CARD", "BUSINESS_INTENT", "PROGRESS", "ERROR");
+            List.of("TEXT", "QUESTION", "MOVIE_CARD", "PLAN_CARD", "TRAVEL_ADVICE_CARD",
+                    "BUSINESS_INTENT", "PROGRESS", "ERROR");
     private static final Pattern POSITIVE_LONG_DECIMAL = Pattern.compile("[1-9]\\d*");
 
     private AgentCardEventValidator() {
@@ -47,6 +48,7 @@ public final class AgentCardEventValidator {
             case "QUESTION" -> question(payload);
             case "MOVIE_CARD" -> movieCard(payload);
             case "PLAN_CARD" -> planCard(event, payload);
+            case "TRAVEL_ADVICE_CARD" -> travelAdviceCard(payload);
             case "BUSINESS_INTENT" -> businessIntent(event, payload);
             case "PROGRESS" -> required(payload, "stage") && required(payload, "status")
                     ? render(type) : rejected("PROGRESS 缺少 stage 或 status");
@@ -97,6 +99,61 @@ public final class AgentCardEventValidator {
                 && validPositiveLongDecimal(businessRef, "movieId")
                 && validPositiveLongDecimal(businessRef, "cinemaId")
                 ? render("BUSINESS_INTENT") : rejected("SELECT_SEATS 卡片字段无效");
+    }
+
+    private static ValidationResult travelAdviceCard(JsonNode payload) {
+        if (!validPositiveLongDecimal(payload, "taskId") || !required(payload, "taskStatus")
+                || !payload.path("available").isBoolean() || !payload.path("advice").isArray()
+                || !required(payload, "source")
+                || !payload.path("degraded").isBoolean() || !payload.path("expired").isBoolean()
+                || !hasNullableText(payload, "fallbackType") || !hasNullableTime(payload, "dataAt")
+                || !hasNullableTime(payload, "expiresAt") || !onlyFields(payload,
+                        List.of("type", "taskId", "taskStatus", "available", "weather", "advice", "degraded",
+                                "fallbackType", "dataAt", "expiresAt", "expired", "source"))) {
+            return rejected("TRAVEL_ADVICE_CARD 字段无效");
+        }
+        if (!validWeather(payload.path("weather")) || !validAdvice(payload.path("advice"))) {
+            return rejected("TRAVEL_ADVICE_CARD 展示摘要无效");
+        }
+        boolean available = payload.path("available").asBoolean();
+        if (!available && (!payload.path("weather").isNull() || !payload.path("advice").isEmpty()
+                || payload.path("degraded").asBoolean() || !payload.path("fallbackType").isNull()
+                || !payload.path("dataAt").isNull() || !payload.path("expiresAt").isNull())) {
+            return rejected("无建议卡片包含快照字段");
+        }
+        if (payload.path("degraded").asBoolean() != !payload.path("fallbackType").isNull()) {
+            return rejected("降级字段不一致");
+        }
+        return render("TRAVEL_ADVICE_CARD");
+    }
+
+    private static boolean validWeather(JsonNode weather) {
+        return weather.isNull() || (isObject(weather) && onlyFields(weather, List.of("area", "condition", "risk"))
+                && hasNullableText(weather, "area") && hasNullableText(weather, "condition")
+                && hasNullableText(weather, "risk"));
+    }
+
+    private static boolean validAdvice(JsonNode advice) {
+        if (!advice.isArray()) {
+            return false;
+        }
+        for (JsonNode item : advice) {
+            if (!isObject(item) || !onlyFields(item, List.of("type", "text")) || !required(item, "type")
+                    || !required(item, "text")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean onlyFields(JsonNode node, List<String> allowed) {
+        var fields = node.fieldNames();
+        while (fields.hasNext()) {
+            if (!allowed.contains(fields.next())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean validPositiveLongDecimal(JsonNode node, String field) {
