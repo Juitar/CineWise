@@ -47,6 +47,7 @@ import com.miaoyu.ticket.recommendation.application.FixedRecommendationCatalog;
 import com.miaoyu.ticket.recommendation.application.FixedRecommendationQueryService;
 import com.miaoyu.ticket.recommendation.domain.RecommendationEvidence;
 import com.miaoyu.ticket.recommendation.domain.RecommendationPlan;
+import com.miaoyu.ticket.recommendation.domain.RecommendationPlan.PlanType;
 import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
 import com.miaoyu.ticket.recommendation.domain.PurchaseCandidateValidator.PurchaseCandidate;
 import com.miaoyu.ticket.agent.infrastructure.model.MockModelGateway;
@@ -176,7 +177,7 @@ class MinimalReadOnlyAgentServiceTest {
     }
 
     @Test
-    void shouldCallRealDToolAndReturnPurchasePlanCard() {
+    void shouldMapMockedRecommendationToolResultToPurchasePlanCard() {
         PurchaseCandidate candidate = new PurchaseCandidate(
                 "301",
                 "101",
@@ -185,7 +186,10 @@ class MinimalReadOnlyAgentServiceTest {
                 NOW.plusSeconds(300),
                 NOW.plusSeconds(1_800),
                 "TICKETING:MOCK");
-        RankMoviePlanTool tool = realTool(List.of(candidate));
+        RankMoviePlanTool tool = recommendationTool(recommendationResult(List.of(new RecommendationPlan(
+                PlanType.COMPREHENSIVE, candidate.movieId(), candidate.cinemaId(), candidate.showId(),
+                new java.math.BigDecimal(candidate.price()), candidate.startTime(), 1.0D, List.of(), List.of(),
+                candidate.source(), NOW, NOW.plusSeconds(1_800), true)), List.of(), false));
 
         MinimalReadOnlyAgentResult result = service(tool).run(request(completeSlots()));
 
@@ -209,7 +213,8 @@ class MinimalReadOnlyAgentServiceTest {
 
     @Test
     void shouldKeepNoShowtimeAsSuccessfulMovieCardWithoutInventedPurchaseFacts() {
-        MinimalReadOnlyAgentResult result = service(realTool(List.of())).run(request(completeSlots()));
+        MinimalReadOnlyAgentResult result = service(recommendationTool(
+                recommendationResult(List.of(), List.of("SHOWTIME"), true))).run(request(completeSlots()));
 
         assertThat(result.reply().messageType()).isEqualTo(AgentReplyMessageType.MOVIE_CARD);
         RecommendationReplyFacts facts = (RecommendationReplyFacts) result.reply().payload();
@@ -416,6 +421,21 @@ class MinimalReadOnlyAgentServiceTest {
                         "fixed-rec-v1", "FIXED_RECOMMENDATION", ContentSourceType.MOCK, 360L),
                 query -> candidates,
                 Clock.fixed(NOW, ZoneOffset.UTC)));
+    }
+
+    private static RankMoviePlanTool recommendationTool(RecommendationPlanResult result) {
+        RankMoviePlanTool tool = mock(RankMoviePlanTool.class);
+        when(tool.executeRecommendationPlan(any(ToolContext.class), any(RankMoviePlanCommand.class)))
+                .thenReturn(new ToolResult<>(ToolStatus.SUCCESS, result, null, false, false, "RENDER_RESULT",
+                        result.degraded(), result.degraded() ? "SHOWTIME_UNAVAILABLE" : null, 1L,
+                        result.dataAt(), result.expiresAt()));
+        return tool;
+    }
+
+    private static RecommendationPlanResult recommendationResult(
+            List<RecommendationPlan> plans, List<String> missingFactors, boolean degraded) {
+        return new RecommendationPlanResult("1.0", "fixture", plans, missingFactors, null, false,
+                "TICKETING:MOCK", NOW, NOW.plusSeconds(1_800), degraded);
     }
 
     private static ToolResult<RecommendationPlanResult> retryableFailure() {

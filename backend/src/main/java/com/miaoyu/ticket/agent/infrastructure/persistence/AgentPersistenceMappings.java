@@ -111,12 +111,32 @@ final class AgentPersistenceMappings {
 
     static AgentRuntimeEvent toDomain(AgentRuntimeEventEntity entity) {
         return new AgentRuntimeEvent(entity.eventId(), entity.sessionId(), entity.runId(),
-                AgentEventType.valueOf(entity.eventType().replace('.', '_').toUpperCase()),
+                toDomainEventType(entity.eventType(), entity.payloadJson()),
                 new AgentStoredJson(entity.payloadJson()), entity.expireAt(), entity.createTime());
     }
 
     static AgentRuntimeEventEntity toEntity(long eventId, AgentRuntimeEventDraft draft) {
-        return new AgentRuntimeEventEntity(eventId, draft.sessionId(), draft.runId(), draft.type().wireValue(),
+        return new AgentRuntimeEventEntity(eventId, draft.sessionId(), draft.runId(), persistedEventType(draft.type()),
                 draft.payload().value(), draft.expireAt(), draft.createTime());
+    }
+
+    /** V009 的数据库白名单使用 tool.result；公开 SSE 仍按受控载荷还原完成或失败事件。 */
+    private static String persistedEventType(AgentEventType type) {
+        return type == AgentEventType.TOOL_COMPLETE || type == AgentEventType.TOOL_ERROR
+                ? AgentEventType.TOOL_RESULT.wireValue() : type.wireValue();
+    }
+
+    private static AgentEventType toDomainEventType(String eventType, String payloadJson) {
+        AgentEventType storedType = AgentEventType.valueOf(eventType.replace('.', '_').toUpperCase());
+        if (storedType != AgentEventType.TOOL_RESULT) {
+            return storedType;
+        }
+        if (payloadJson.contains("\"errorCode\"")) {
+            return AgentEventType.TOOL_ERROR;
+        }
+        if (payloadJson.contains("\"degraded\"")) {
+            return AgentEventType.TOOL_COMPLETE;
+        }
+        return AgentEventType.TOOL_RESULT;
     }
 }
