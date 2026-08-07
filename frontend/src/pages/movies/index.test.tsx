@@ -234,7 +234,7 @@ describe('MoviesPage', () => {
     expect(retry).toHaveBeenCalledOnce();
   });
 
-  it('Mock、降级和过期来源说明在公共状态接入后仍保留', () => {
+  it('Mock 和降级来源说明在公共状态接入后仍保留且不单独显示过期提示', () => {
     pageMocks.useMovieList.mockReturnValue(
       movieListState({
         data: {
@@ -245,7 +245,7 @@ describe('MoviesPage', () => {
     );
     render(<MoviesPage />);
 
-    expect(screen.getByText('数据已过期，仅供参考')).toBeInTheDocument();
+    expect(screen.queryByText('数据已过期，仅供参考')).not.toBeInTheDocument();
     expect(screen.getByText('当前为降级数据')).toBeInTheDocument();
     expect(screen.getByText('演示数据')).toBeInTheDocument();
   });
