@@ -77,7 +77,8 @@ public class DistanceContextService {
         long userId = currentUserAccessor.requireCurrentUserId();
         Context expected = contexts.get(contextId);
         while (expected != null) {
-            if (expected.userId() != userId || !expected.runId().equals(runId)) {
+            if (expected.userId() != userId || !expected.runId().equals(runId)
+                    || expected.expiresAt().isBefore(clock.instant())) {
                 return CleanupResult.NOT_FOUND;
             }
             if (contexts.remove(contextId, expected)) {

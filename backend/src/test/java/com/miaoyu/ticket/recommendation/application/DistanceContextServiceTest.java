@@ -59,7 +59,7 @@ class DistanceContextServiceTest {
     }
 
     @Test
-    void discardsOnlyTheMatchingUserRunContext() {
+    void cleansOnlyTheMatchingUserRunContextAndTreatsExpiredOrRepeatedCleanupAsNotFound() {
         CurrentUserAccessor users = Mockito.mock(CurrentUserAccessor.class);
         when(users.requireCurrentUserId()).thenReturn(7L);
         DistanceContextService service = new DistanceContextService(users,
@@ -70,7 +70,16 @@ class DistanceContextServiceTest {
                 .isEqualTo(DistanceContextService.CleanupResult.NOT_FOUND);
         assertThat(service.cleanup(context.distanceContextId(), "run-1"))
                 .isEqualTo(DistanceContextService.CleanupResult.REMOVED);
+        assertThat(service.cleanup(context.distanceContextId(), "run-1"))
+                .isEqualTo(DistanceContextService.CleanupResult.NOT_FOUND);
         assertThat(service.consume(context.distanceContextId(), "run-1")).isNull();
+
+        MutableClock clock = new MutableClock(Instant.parse("2026-08-06T10:00:00Z"));
+        DistanceContextService expiringService = new DistanceContextService(users, clock);
+        var expiredContext = expiringService.createForRun("run-expired");
+        clock.advance(Duration.ofSeconds(301));
+        assertThat(expiringService.cleanup(expiredContext.distanceContextId(), "run-expired"))
+                .isEqualTo(DistanceContextService.CleanupResult.NOT_FOUND);
     }
 
     /** 让同一测试同时覆盖创建时刻和过期后的上传，避免依赖真实系统时间。 */

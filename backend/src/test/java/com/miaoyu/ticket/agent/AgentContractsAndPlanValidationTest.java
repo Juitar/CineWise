@@ -74,6 +74,20 @@ class AgentContractsAndPlanValidationTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> new ToolContext("run", "node", "tool", List.of(), 0L, "trace", null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> new ToolContext(
+                "run", "node", "tool", List.of(), 100L, "trace", null, null, null,
+                "b7c4ab55-3c3a-4a45-9f0f-76d11a1585d3", null));
+        assertThrows(IllegalArgumentException.class, () -> new ToolContext(
+                "run", "node", "tool", List.of(), 100L, "trace", null, null, null,
+                null, "NEAREST"));
+        assertThrows(IllegalArgumentException.class, () -> new ToolContext(
+                "run", "node", "tool", List.of(), 100L, "trace", null, null, null,
+                "not-a-uuid", "NEAREST"));
+        assertThrows(IllegalArgumentException.class, () -> new ToolContext(
+                "run", "node", "tool", List.of(), 100L, "trace", null, null, null,
+                "b7c4ab55-3c3a-4a45-9f0f-76d11a1585d3", "NORMAL"));
+        new ToolContext("run", "node", "tool", List.of(), 100L, "trace", null, null, null,
+                "b7c4ab55-3c3a-4a45-9f0f-76d11a1585d3", "NEAREST");
         ToolContext readContext = new ToolContext("run", "node", "tool", List.of(), 100L, "trace", null, null, null);
         ToolDefinition writeTool = writeTool();
         assertThrows(IllegalArgumentException.class, () -> writeTool.validateContext(readContext));
