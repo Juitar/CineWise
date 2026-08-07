@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.miaoyu.ticket.common.error.BusinessException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,8 +45,8 @@ class JdbcLiveDemoPurchaseCatalogAdapterTest {
         assertThat(result.source()).isEqualTo("NETSTART_MAOYAN");
         assertThat(result.movies()).extracting(ref -> ref.movieId()).containsExactly(1L, 2L, 3L);
         assertThat(result.cinemas()).extracting(ref -> ref.cinemaId()).containsExactly(11L, 12L);
-        assertThat(result.dataAt().toLocalDateTime()).isEqualTo("2026-08-07T08:00");
-        assertThat(result.expiresAt().toLocalDateTime()).isEqualTo("2026-08-08T08:00");
+        assertThat(result.dataAt().toLocalDateTime()).isEqualTo(LocalDateTime.of(2026, 8, 7, 8, 0));
+        assertThat(result.expiresAt().toLocalDateTime()).isEqualTo(LocalDateTime.of(2026, 8, 8, 8, 0));
     }
 
     @Test
