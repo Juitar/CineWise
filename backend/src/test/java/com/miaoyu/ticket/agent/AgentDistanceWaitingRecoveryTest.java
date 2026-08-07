@@ -74,7 +74,8 @@ class AgentDistanceWaitingRecoveryTest {
 
     private static Fixture fixture() {
         CurrentUserAccessor users = Mockito.mock(CurrentUserAccessor.class);
-        AgentDistanceRunInitializationService initialization = Mockito.mock(AgentDistanceRunInitializationService.class);
+        AgentDistanceRunInitializationService initialization =
+                Mockito.mock(AgentDistanceRunInitializationService.class);
         AgentDistanceContextApplicationService contexts = Mockito.mock(AgentDistanceContextApplicationService.class);
         AgentRuntimeQueryService query = Mockito.mock(AgentRuntimeQueryService.class);
         AgentRunRepository runs = Mockito.mock(AgentRunRepository.class);
