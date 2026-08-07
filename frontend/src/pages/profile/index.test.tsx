@@ -56,7 +56,7 @@ describe('ProfilePage', () => {
     expect(screen.getByRole('link', { name: '查看隐私说明' })).toHaveAttribute('href', '/privacy');
   });
 
-  it('显示可进入真实订单列表的入口，不展示未接入的记录和画像数据', () => {
+  it('显示进入订单二级页面的入口，也不展示未接入的记录和画像数据', () => {
     render(<ProfilePage />);
 
     expect(screen.getByRole('link', { name: '我的订单' })).toHaveAttribute('href', '/orders');
