@@ -4,6 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miaoyu.ticket.agent.api.AgentCardPayloadResponse;
+import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
+import com.miaoyu.ticket.agent.application.persistence.AgentPersistenceJsonFactory;
+import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
+import com.miaoyu.ticket.agent.application.reply.SelectSeatsReplyFacts;
 import java.io.InputStream;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -96,6 +101,48 @@ class AgentCFixtureContractTest {
         assertThat(waiting.path("data").path("status").asText()).isEqualTo("WAITING_LOCATION");
         assertThat(waiting.path("data").path("lastEventId").isTextual()).isTrue();
         assertThat(waiting.toString()).doesNotContain("distanceContextId", "latitude", "longitude", "address");
+    }
+
+    @Test
+    void shouldKeepQuestionPlanIntentAndConfirmationContractsDirectlyRenderable() throws Exception {
+        JsonNode question = fixture("question-card.json");
+        JsonNode plan = fixture("plan-card.json");
+        JsonNode businessIntent = fixture("business-intent-card.json");
+        JsonNode confirmation = fixture("order-confirm-card.json");
+        JsonNode confirmationApi = fixture("confirmation-api-fixtures.json");
+
+        assertThat(question.path("eventType").asText()).isEqualTo("card");
+        assertThat(question.path("payload").path("type").asText()).isEqualTo("QUESTION");
+        assertThat(question.path("payload").path("input").path("name").isTextual()).isTrue();
+        assertThat(plan.path("payload").path("type").asText()).isEqualTo("PLAN_CARD");
+        assertThat(plan.path("payload").path("plans").isArray()).isTrue();
+        assertThat(businessIntent.path("payload").path("type").asText()).isEqualTo("BUSINESS_INTENT");
+        assertThat(businessIntent.path("payload").path("payload").path("businessRef").path("showId").isTextual())
+                .isTrue();
+        AgentPersistenceJsonFactory factory = new AgentPersistenceJsonFactory(objectMapper);
+        JsonNode productionPayload = objectMapper.readTree(factory.cardPayload(new ReplyGenerationResponse(
+                "前往选座", AgentReplyMessageType.SELECT_SEATS,
+                new SelectSeatsReplyFacts("3001", "1001", "2001"))).value());
+        assertThat(businessIntent.path("payload")).isEqualTo(productionPayload);
+        assertThat(confirmation.path("payload").path("type").asText()).isEqualTo("PLAN_CARD");
+        assertThat(confirmation.path("payload").path("actionId").isTextual()).isTrue();
+        assertThat(confirmation.path("payload").path("status").isTextual()).isTrue();
+        assertThat(confirmationApi.path("success").path("data").path("runId").isTextual()).isTrue();
+        assertThat(confirmationApi.path("resultUnknown").path("data").path("status").asText())
+                .isEqualTo("RESULT_UNKNOWN");
+    }
+
+    @Test
+    void shouldMapCardFixturesToTheFormalPayloadDtosWithoutChangingTheirJson() throws Exception {
+        for (String fixtureName : List.of("question-card.json", "plan-card.json", "business-intent-card.json",
+                "order-confirm-card.json")) {
+            JsonNode payload = fixture(fixtureName).path("payload");
+            AgentCardPayloadResponse response = AgentCardPayloadResponse.from(payload);
+
+            assertThat(response).isNotInstanceOf(AgentCardPayloadResponse.Unknown.class);
+            JsonNode serialized = objectMapper.valueToTree(response);
+            assertThat(serialized).isEqualTo(payload);
+        }
     }
 
     private JsonNode fixture(String fixtureName) throws Exception {

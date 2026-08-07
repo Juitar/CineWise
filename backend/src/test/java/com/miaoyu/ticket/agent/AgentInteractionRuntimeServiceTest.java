@@ -46,7 +46,8 @@ class AgentInteractionRuntimeServiceTest {
         AgentRunCancellationService runCancellationService = mock(AgentRunCancellationService.class);
         AgentConfirmationService confirmationService = mock(AgentConfirmationService.class);
         AgentInteractionRuntimeService service = new AgentInteractionRuntimeService(
-                submissionService, replayService, queryService, sessionCreationService, sessionManagementService,
+                submissionService, replayService, queryService,
+                sessionCreationService, sessionManagementService,
                 runCancellationService, confirmationService, new ObjectMapper());
         LocalDateTime time = LocalDateTime.of(2026, 8, 5, 11, 20);
         AgentRuntimeEvent error = new AgentRuntimeEvent(8L, "session-1", "run-1", AgentEventType.MESSAGE_ERROR,
@@ -78,7 +79,8 @@ class AgentInteractionRuntimeServiceTest {
         AgentRunCancellationService runCancellationService = mock(AgentRunCancellationService.class);
         AgentConfirmationService confirmationService = mock(AgentConfirmationService.class);
         AgentInteractionRuntimeService service = new AgentInteractionRuntimeService(
-                submissionService, replayService, queryService, sessionCreationService, sessionManagementService,
+                submissionService, replayService, queryService,
+                sessionCreationService, sessionManagementService,
                 runCancellationService, confirmationService, new ObjectMapper());
         LocalDateTime time = LocalDateTime.of(2026, 8, 5, 11, 20);
         AgentRuntimeEvent card = new AgentRuntimeEvent(8L, "session-1", "run-1", AgentEventType.CARD,
@@ -112,7 +114,8 @@ class AgentInteractionRuntimeServiceTest {
         AgentRunCancellationService runCancellationService = mock(AgentRunCancellationService.class);
         AgentConfirmationService confirmationService = mock(AgentConfirmationService.class);
         AgentInteractionRuntimeService service = new AgentInteractionRuntimeService(
-                submissionService, replayService, queryService, sessionCreationService, sessionManagementService,
+                submissionService, replayService, queryService,
+                sessionCreationService, sessionManagementService,
                 runCancellationService, confirmationService, new ObjectMapper());
         LocalDateTime time = LocalDateTime.of(2026, 8, 5, 11, 20);
         AgentRuntimeEvent card = new AgentRuntimeEvent(8L, "session-1", "run-1", AgentEventType.CARD,
@@ -153,7 +156,8 @@ class AgentInteractionRuntimeServiceTest {
         AgentRunCancellationService runCancellationService = mock(AgentRunCancellationService.class);
         AgentConfirmationService confirmationService = mock(AgentConfirmationService.class);
         AgentInteractionRuntimeService service = new AgentInteractionRuntimeService(
-                submissionService, replayService, queryService, sessionCreationService, sessionManagementService,
+                submissionService, replayService, queryService,
+                sessionCreationService, sessionManagementService,
                 runCancellationService, confirmationService, new ObjectMapper());
         LocalDateTime time = LocalDateTime.of(2026, 8, 5, 11, 20);
         AgentRuntimeEvent card = new AgentRuntimeEvent(8L, "session-1", "run-1", AgentEventType.CARD,
