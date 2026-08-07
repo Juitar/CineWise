@@ -490,6 +490,32 @@
   gap: 20px;
 }
 
+.home-agent-entry-copy {
+  padding: 22px;
+  margin: auto 0;
+  background: rgba(255, 255, 255, 88%);
+  border: 1px solid rgba(108, 92, 231, 14%);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(108, 92, 231, 8%);
+}
+
+.home-agent-entry-copy h3,
+.home-agent-entry-copy p {
+  margin: 0;
+}
+
+.home-agent-entry-copy h3 {
+  color: #312e81;
+  font-size: 18px;
+}
+
+.home-agent-entry-copy p {
+  margin-top: 12px;
+  color: #5b6475;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
 /* 消息气泡通用 */
 .home-agent-message {
   display: flex;

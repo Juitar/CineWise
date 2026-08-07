@@ -25,7 +25,6 @@ import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import type { CinemaSummary, ContentFreshness, MovieSummary } from '../../shared/types/api';
 import { AgentCard } from './AgentCard';
 import './index.css';
-import { PlanRecommendation } from './PlanRecommendation';
 
 const MOVIE_SKELETON_KEYS = ['movie-loading-1', 'movie-loading-2', 'movie-loading-3'];
 const CINEMA_SKELETON_KEYS = ['cinema-loading-1', 'cinema-loading-2', 'cinema-loading-3'];
@@ -187,7 +186,6 @@ function HomeCinemaCard({ cinema }: { cinema: CinemaSummary }) {
 export default function HomePage() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 1023px)');
-  const [showPlans, setShowPlans] = useState(false);
   const [mobileAgentDraft, setMobileAgentDraft] = useState('');
   const movies = useMovieList({ page: 1, size: 5 });
   const cinemas = useCinemaList({ location: DEFAULT_CITY_CODE, page: 1, size: 3 });
@@ -243,150 +241,146 @@ export default function HomePage() {
       <div className="home-page-main">
         <section className="home-page-content">
           <div className="home-main-content">
-            {showPlans ? (
-              <PlanRecommendation onBack={() => setShowPlans(false)} />
-            ) : (
-              <>
-                <section className="home-section" aria-labelledby="home-movies-title">
-                  <div className="section-header">
-                    <div>
-                      <h2 className="home-section-title" id="home-movies-title">
-                        正在热映
-                      </h2>
-                      <p className="home-section-description">仅展示内容服务返回的影片基础资料</p>
-                    </div>
-                    <Link className="section-link" to="/movies">
-                      查看全部影片
-                    </Link>
+            <>
+              <section className="home-section" aria-labelledby="home-movies-title">
+                <div className="section-header">
+                  <div>
+                    <h2 className="home-section-title" id="home-movies-title">
+                      正在热映
+                    </h2>
+                    <p className="home-section-description">仅展示内容服务返回的影片基础资料</p>
                   </div>
-
-                  {movies.data ? <FreshnessNotice freshness={movies.data} /> : null}
-                  {movies.isOfflineSnapshot ? (
-                    <HomeOfflineNotice
-                      isMobile={isMobile}
-                      message="当前已离线，正在显示本页面内存中的影片只读快照"
-                    />
-                  ) : null}
-                  {movies.error ? (
-                    <HomeErrorState
-                      description={
-                        movies.error.traceId ? `问题编号：${movies.error.traceId}` : undefined
-                      }
-                      isMobile={isMobile}
-                      onRetry={movies.retry}
-                      title={movies.data ? '影片更新失败，已保留上次结果' : '影片加载失败'}
-                    />
-                  ) : null}
-                  {movies.isRefreshing ? (
-                    <div className="home-refreshing" role="status">
-                      正在更新影片…
-                    </div>
-                  ) : null}
-                  {movies.isLoading ? (
-                    <div className="movies-list" aria-label="首页影片加载中">
-                      {MOVIE_SKELETON_KEYS.map((key) => (
-                        <div className="movie-card home-card-skeleton" key={key}>
-                          <HomeLoadingCard isMobile={isMobile} kind="movie" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                  {!movies.isLoading && !movies.error && movies.data?.records.length === 0 ? (
-                    <HomeEmptyState description="暂无可展示的影片" isMobile={isMobile} />
-                  ) : null}
-                  {movies.data && movies.data.records.length > 0 ? (
-                    <div className="movies-list" aria-live="polite">
-                      {movies.data.records.map((movie) => (
-                        <HomeMovieCard key={movie.movieId} movie={movie} />
-                      ))}
-                    </div>
-                  ) : null}
-                </section>
-
-                <section className="home-section" aria-labelledby="home-cinemas-title">
-                  <div className="section-header">
-                    <div>
-                      <h2 className="home-section-title" id="home-cinemas-title">
-                        {DEFAULT_CITY_NAME}影院
-                      </h2>
-                      <p className="home-section-description">不获取位置，不展示距离或距离排序</p>
-                    </div>
-                    <Link className="section-link" to="/cinemas">
-                      查看全部影院
-                    </Link>
-                  </div>
-
-                  {cinemas.data ? <FreshnessNotice freshness={cinemas.data} /> : null}
-                  {cinemas.isOfflineSnapshot ? (
-                    <HomeOfflineNotice
-                      isMobile={isMobile}
-                      message="当前已离线，正在显示本页面内存中的影院只读快照"
-                    />
-                  ) : null}
-                  {cinemas.error ? (
-                    <HomeErrorState
-                      description={
-                        cinemas.error.traceId ? `问题编号：${cinemas.error.traceId}` : undefined
-                      }
-                      isMobile={isMobile}
-                      onRetry={cinemas.retry}
-                      title={cinemas.data ? '影院更新失败，已保留上次结果' : '影院加载失败'}
-                    />
-                  ) : null}
-                  {cinemas.isRefreshing ? (
-                    <div className="home-refreshing" role="status">
-                      正在更新影院…
-                    </div>
-                  ) : null}
-                  {cinemas.isLoading ? (
-                    <div className="cinemas-list" aria-label="首页影院加载中">
-                      {CINEMA_SKELETON_KEYS.map((key) => (
-                        <div className="cinema-card home-card-skeleton" key={key}>
-                          <HomeLoadingCard isMobile={isMobile} kind="cinema" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                  {!cinemas.isLoading && !cinemas.error && cinemas.data?.records.length === 0 ? (
-                    <HomeEmptyState description="长沙暂无可展示的影院" isMobile={isMobile} />
-                  ) : null}
-                  {cinemas.data && cinemas.data.records.length > 0 ? (
-                    <div className="cinemas-list" aria-live="polite">
-                      {cinemas.data.records.map((cinema) => (
-                        <HomeCinemaCard cinema={cinema} key={cinema.cinemaId} />
-                      ))}
-                    </div>
-                  ) : null}
-                </section>
-
-                <div className="personalized-banner">
-                  <div className="personalized-icon-wrap">
-                    <RobotIcon size={24} />
-                  </div>
-                  <div className="personalized-content">
-                    <div className="personalized-title">想要更精准的推荐？</div>
-                    <div className="personalized-desc">
-                      开启后，AI将结合路线、出发时间与附近美食等信息，为你提供个性化观影方案
-                    </div>
-                  </div>
-                  {isMobile ? (
-                    <MobileButton className="personalized-btn" color="primary" size="small">
-                      开启个性化服务
-                    </MobileButton>
-                  ) : (
-                    <DesktopButton className="personalized-btn" type="primary">
-                      开启个性化服务
-                    </DesktopButton>
-                  )}
+                  <Link className="section-link" to="/movies">
+                    查看全部影片
+                  </Link>
                 </div>
-              </>
-            )}
+
+                {movies.data ? <FreshnessNotice freshness={movies.data} /> : null}
+                {movies.isOfflineSnapshot ? (
+                  <HomeOfflineNotice
+                    isMobile={isMobile}
+                    message="当前已离线，正在显示本页面内存中的影片只读快照"
+                  />
+                ) : null}
+                {movies.error ? (
+                  <HomeErrorState
+                    description={
+                      movies.error.traceId ? `问题编号：${movies.error.traceId}` : undefined
+                    }
+                    isMobile={isMobile}
+                    onRetry={movies.retry}
+                    title={movies.data ? '影片更新失败，已保留上次结果' : '影片加载失败'}
+                  />
+                ) : null}
+                {movies.isRefreshing ? (
+                  <div className="home-refreshing" role="status">
+                    正在更新影片…
+                  </div>
+                ) : null}
+                {movies.isLoading ? (
+                  <div className="movies-list" aria-label="首页影片加载中">
+                    {MOVIE_SKELETON_KEYS.map((key) => (
+                      <div className="movie-card home-card-skeleton" key={key}>
+                        <HomeLoadingCard isMobile={isMobile} kind="movie" />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {!movies.isLoading && !movies.error && movies.data?.records.length === 0 ? (
+                  <HomeEmptyState description="暂无可展示的影片" isMobile={isMobile} />
+                ) : null}
+                {movies.data && movies.data.records.length > 0 ? (
+                  <div className="movies-list" aria-live="polite">
+                    {movies.data.records.map((movie) => (
+                      <HomeMovieCard key={movie.movieId} movie={movie} />
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+
+              <section className="home-section" aria-labelledby="home-cinemas-title">
+                <div className="section-header">
+                  <div>
+                    <h2 className="home-section-title" id="home-cinemas-title">
+                      {DEFAULT_CITY_NAME}影院
+                    </h2>
+                    <p className="home-section-description">不获取位置，不展示距离或距离排序</p>
+                  </div>
+                  <Link className="section-link" to="/cinemas">
+                    查看全部影院
+                  </Link>
+                </div>
+
+                {cinemas.data ? <FreshnessNotice freshness={cinemas.data} /> : null}
+                {cinemas.isOfflineSnapshot ? (
+                  <HomeOfflineNotice
+                    isMobile={isMobile}
+                    message="当前已离线，正在显示本页面内存中的影院只读快照"
+                  />
+                ) : null}
+                {cinemas.error ? (
+                  <HomeErrorState
+                    description={
+                      cinemas.error.traceId ? `问题编号：${cinemas.error.traceId}` : undefined
+                    }
+                    isMobile={isMobile}
+                    onRetry={cinemas.retry}
+                    title={cinemas.data ? '影院更新失败，已保留上次结果' : '影院加载失败'}
+                  />
+                ) : null}
+                {cinemas.isRefreshing ? (
+                  <div className="home-refreshing" role="status">
+                    正在更新影院…
+                  </div>
+                ) : null}
+                {cinemas.isLoading ? (
+                  <div className="cinemas-list" aria-label="首页影院加载中">
+                    {CINEMA_SKELETON_KEYS.map((key) => (
+                      <div className="cinema-card home-card-skeleton" key={key}>
+                        <HomeLoadingCard isMobile={isMobile} kind="cinema" />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {!cinemas.isLoading && !cinemas.error && cinemas.data?.records.length === 0 ? (
+                  <HomeEmptyState description="长沙暂无可展示的影院" isMobile={isMobile} />
+                ) : null}
+                {cinemas.data && cinemas.data.records.length > 0 ? (
+                  <div className="cinemas-list" aria-live="polite">
+                    {cinemas.data.records.map((cinema) => (
+                      <HomeCinemaCard cinema={cinema} key={cinema.cinemaId} />
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+
+              <div className="personalized-banner">
+                <div className="personalized-icon-wrap">
+                  <RobotIcon size={24} />
+                </div>
+                <div className="personalized-content">
+                  <div className="personalized-title">想要更精准的推荐？</div>
+                  <div className="personalized-desc">
+                    开启后，AI将结合路线、出发时间与附近美食等信息，为你提供个性化观影方案
+                  </div>
+                </div>
+                {isMobile ? (
+                  <MobileButton className="personalized-btn" color="primary" size="small">
+                    开启个性化服务
+                  </MobileButton>
+                ) : (
+                  <DesktopButton className="personalized-btn" type="primary">
+                    开启个性化服务
+                  </DesktopButton>
+                )}
+              </div>
+            </>
           </div>
         </section>
 
         {!isMobile && (
           <aside className="home-page-agent-sidebar">
-            <AgentCard onSubmit={openAssistant} onViewPlan={() => setShowPlans(true)} />
+            <AgentCard onSubmit={openAssistant} />
           </aside>
         )}
       </div>
