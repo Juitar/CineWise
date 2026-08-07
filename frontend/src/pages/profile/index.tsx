@@ -287,8 +287,12 @@ export default function ProfilePage() {
             {profile.tags.length > 0 ? (
               <ul className="profile-tag-list">
                 {profile.tags.map((tag) => {
-                  const canChangePolarity = tag.source === 'MANUAL' && tag.status !== 'EXPIRED';
-                  const canChangeStatus = tag.status === 'ACTIVE' || tag.status === 'DISABLED';
+                  // D 的更新接口只允许 ACTIVE 的手动标签修改倾向；已停用标签必须先恢复。
+                  const canChangePolarity = tag.source === 'MANUAL' && tag.status === 'ACTIVE';
+                  // CONVERSATION、BEHAVIOR 标签由受控服务维护，用户不能从个人中心改变其状态。
+                  const canChangeStatus =
+                    tag.source === 'MANUAL' &&
+                    (tag.status === 'ACTIVE' || tag.status === 'DISABLED');
                   return (
                     <li className="profile-tag-item" key={tag.id}>
                       <div className="profile-tag-summary">

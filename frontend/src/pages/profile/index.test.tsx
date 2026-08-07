@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { Modal } from 'antd';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -234,5 +234,85 @@ describe('ProfilePage', () => {
       expect.objectContaining({ title: '确认删除画像标签', okText: '删除', cancelText: '取消' }),
     );
     vi.restoreAllMocks();
+  });
+
+  it('只向可操作的手动标签展示倾向和状态操作', () => {
+    mocks.profile.consentEnabled = true;
+    mocks.profile.notice = null;
+    mocks.profile.profile = {
+      preference: { enabled: true, updatedAt: '2026-08-07T00:00:00Z', version: 3 },
+      tags: [
+        {
+          confidence: 1,
+          expiresAt: null,
+          id: '1001',
+          polarity: 'LIKE',
+          source: 'MANUAL',
+          status: 'DISABLED',
+          type: 'MOVIE_GENRE',
+          updatedAt: '2026-08-07T00:00:00Z',
+          value: '科幻',
+          version: 0,
+          weight: 1,
+        },
+        {
+          confidence: 0.8,
+          expiresAt: null,
+          id: '1002',
+          polarity: 'LIKE',
+          source: 'CONVERSATION',
+          status: 'ACTIVE',
+          type: 'TIME',
+          updatedAt: '2026-08-07T00:00:00Z',
+          value: '晚上',
+          version: 0,
+          weight: 0.8,
+        },
+        {
+          confidence: 0.5,
+          expiresAt: '2026-09-01T00:00:00Z',
+          id: '1003',
+          polarity: 'DISLIKE',
+          source: 'BEHAVIOR',
+          status: 'DISABLED',
+          type: 'PRICE',
+          updatedAt: '2026-08-07T00:00:00Z',
+          value: '¥30 以下',
+          version: 0,
+          weight: 0.5,
+        },
+      ],
+      total: 3,
+    };
+    mocks.profile.state = 'ready';
+    render(<ProfilePage />);
+
+    const manualDisabledRow = screen
+      .getByText('科幻', { selector: 'strong' })
+      .closest('.profile-tag-item');
+    const conversationRow = screen
+      .getByText('晚上', { selector: 'strong' })
+      .closest('.profile-tag-item');
+    const behaviorRow = screen
+      .getByText('¥30 以下', { selector: 'strong' })
+      .closest('.profile-tag-item');
+    expect(manualDisabledRow).not.toBeNull();
+    expect(conversationRow).not.toBeNull();
+    expect(behaviorRow).not.toBeNull();
+
+    expect(
+      within(manualDisabledRow as HTMLElement).getByRole('button', { name: '恢复' }),
+    ).toBeInTheDocument();
+    expect(
+      within(manualDisabledRow as HTMLElement).queryByText('修改倾向'),
+    ).not.toBeInTheDocument();
+    expect(within(conversationRow as HTMLElement).queryByText('修改倾向')).not.toBeInTheDocument();
+    expect(
+      within(conversationRow as HTMLElement).queryByRole('button', { name: '停用' }),
+    ).not.toBeInTheDocument();
+    expect(within(behaviorRow as HTMLElement).queryByText('修改倾向')).not.toBeInTheDocument();
+    expect(
+      within(behaviorRow as HTMLElement).queryByRole('button', { name: '恢复' }),
+    ).not.toBeInTheDocument();
   });
 });
