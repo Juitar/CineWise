@@ -13,6 +13,7 @@ import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardItem;
 import com.miaoyu.ticket.agent.application.reply.RelaxationSuggestionFacts;
 import com.miaoyu.ticket.agent.application.reply.SelectSeatsReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.QuestionReplyFacts;
+import com.miaoyu.ticket.agent.application.reply.TravelAdviceCardFacts;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -79,5 +80,27 @@ class AgentPersistenceJsonFactoryTest {
                 .isEqualTo("10001");
         assertThat(payload.path("payload").path("businessRef").path("cinemaId").asText())
                 .isEqualTo("20001");
+    }
+
+    @Test
+    void shouldBuildTravelAdviceCardWithoutInternalJsonOrLocation() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        AgentPersistenceJsonFactory factory = new AgentPersistenceJsonFactory(mapper);
+        Instant dataAt = Instant.parse("2026-08-07T02:00:00Z");
+        TravelAdviceCardFacts facts = new TravelAdviceCardFacts("90001", "READY", true,
+                new TravelAdviceCardFacts.Weather("长沙", "小雨", "注意路面湿滑"),
+                List.of(new TravelAdviceCardFacts.Advice("TRANSPORT", "建议提前出发")), "snapshot", true,
+                "WEATHER_UNAVAILABLE", dataAt, dataAt.plusSeconds(300), false);
+
+        JsonNode payload = mapper.readTree(factory.cardPayload(new ReplyGenerationResponse(
+                "已查询到出行建议。", AgentReplyMessageType.TRAVEL_ADVICE_CARD, facts)).value());
+
+        assertThat(payload.path("type").asText()).isEqualTo("TRAVEL_ADVICE_CARD");
+        assertThat(payload.path("source").asText()).isEqualTo("snapshot");
+        assertThat(payload.path("advice")).hasSize(1);
+        assertThat(payload.toString()).doesNotContain("weatherJson", "adviceJson", "userId", "latitude",
+                "longitude", "polyline", "waypoints");
+        assertThat(AgentCardPayloadResponse.from(payload))
+                .isInstanceOf(AgentCardPayloadResponse.TravelAdviceCard.class);
     }
 }

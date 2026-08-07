@@ -8,6 +8,7 @@ import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.error.ErrorCode;
 import com.miaoyu.ticket.content.application.ContentPurchaseQueryPort;
 import com.miaoyu.ticket.content.application.ContentSeedCatalog;
+import com.miaoyu.ticket.content.application.ContentSummaryQueryPort;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -64,6 +65,11 @@ class AvailableMoviesUnavailableIntegrationTest {
                 @Override
                 public Optional<ContentSeedCatalog> findChangshaLivePurchaseCatalog() {
                     return Optional.empty();
+                }
+
+                @Override
+                public DemoPurchaseCatalog findLiveDemoPurchaseCatalog(String cityCode) {
+                    throw new BusinessException(ContentSummaryQueryPort.ContentSummaryErrorCode.DATA_UNAVAILABLE);
                 }
             };
         }

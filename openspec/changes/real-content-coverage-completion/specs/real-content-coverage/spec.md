@@ -245,6 +245,33 @@ POST 响应和按请求查询统一返回 `syncId/clientRequestId/cityName/statu
 - **THEN** D 返回 `303007`
 - **AND** A 只隔离未来真实排期候选，不修改已有 Mock 场次、座位、订单或电子票
 
+### Requirement: A 必须通过真实演示目录取得排期引用
+
+D SHALL 在 `ContentPurchaseQueryPort` 提供 `findLiveDemoPurchaseCatalog(cityCode)`。它返回 `DemoPurchaseCatalog(movies, cinemas, source, dataAt, expiresAt)`，仅供 A 在 dev/demo 为真实影院创建本地 `demo-seed` 排期。A 不得读取 D 的表、Mapper、Repository、缓存、Provider 或 Controller，也不得将目录资料当作真实票价、座位、场次、订单或支付事实。
+
+`cityCode` 必须为六位正行政区划编码，否则返回 `100001`。`movies` 和 `cinemas` 两个 List 均不可为 `null`，构造时按本地 ID 升序去重；同一本地 ID 或来源 ID 映射到不同引用时拒绝目录。每个本地 ID 为正，来源 ID 非空，影片 `durationMinutes` 为正。目录只接受未删除且 `expiresAt > now` 的 `LIVE/NETSTART_MAOYAN` 资料；到期时间等于当前时刻也必须排除。本期若出现多个实际来源，D 拒绝构造目录，不以 `MIXED` 掩盖来源差异。影片最多三部，影院返回指定城市全部合格记录。目录无合格影院或影片时正常返回两个空列表；内容存储不可读时返回 `303004`，不得伪装成空目录。`dataAt` 和 `expiresAt` 分别取返回记录中最早的资料时间和最早的到期时间。
+
+#### Scenario: 长沙真实目录可用于本地 Mock 排期
+
+- **GIVEN** 长沙存在两家未过期 `LIVE/NETSTART_MAOYAN` 影院和四部合格影片
+- **WHEN** A 调用 `findLiveDemoPurchaseCatalog("430100")`
+- **THEN** D 返回两家影院和本地 ID 最小的三部影片，均按本地 ID 升序
+- **AND** `source` 为 `NETSTART_MAOYAN`，`expiresAt` 不晚于任一返回记录的到期时间
+
+#### Scenario: 内容目录没有可用真实资料
+
+- **GIVEN** 指定城市没有合格真实影院，或没有合格真实影片
+- **WHEN** A 查询演示目录
+- **THEN** D 返回 movies 和 cinemas 均为空的正常目录
+- **AND** 不返回固定 Demo 内容
+
+#### Scenario: 内容目录存储不可读
+
+- **GIVEN** 读取真实影片或影院目录失败
+- **WHEN** A 查询演示目录
+- **THEN** D 返回 `303004`
+- **AND** A 可以与正常空目录区分
+
 ### Requirement: 真实内容迁移必须保持历史内容与同步记录兼容
 
 系统 MUST 保持 V014 前的影片、影院和同步记录可读取，并且不得通过后续代码或 SQL 修改已执行的 V014。V014 已在 V013 之后完成 A 静态复核、MySQL 8.4.11 空库验证和共享 `cinewise` 发布。迁移仅新增 `movie` 的可空资料字段、`content_identity_mapping`、`cinema.city_name/provider_city_id` 和 `data_sync_log.city_name/provider_city_id/failure_category/lease_owner/lease_until`，未修改 V001～V013、未建立物理外键、未写入演示种子或按地址、名称、区域、坐标猜测历史城市/身份。已执行 V014 SQL 自发布起冻结，后续调整必须使用更高版本的前向迁移。

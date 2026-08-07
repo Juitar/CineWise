@@ -54,14 +54,9 @@ describe('stream.reset 恢复', () => {
         {
           ...planCard,
           eventId: '42',
-          eventType: 'card',
           sessionId: 'session-example-1',
           runId: 'run-example-1',
           occurredAt: '2026-08-05T10:00:02+08:00',
-          planId: 'plan-example-1',
-          planVersion: 1,
-          nodeId: 'render-plan',
-          displayText: '推荐方案',
         },
       ],
     });

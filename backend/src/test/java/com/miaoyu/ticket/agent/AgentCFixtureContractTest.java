@@ -135,13 +135,27 @@ class AgentCFixtureContractTest {
     @Test
     void shouldMapCardFixturesToTheFormalPayloadDtosWithoutChangingTheirJson() throws Exception {
         for (String fixtureName : List.of("question-card.json", "plan-card.json", "business-intent-card.json",
-                "order-confirm-card.json")) {
+                "order-confirm-card.json", "travel-advice-card.json", "travel-advice-unavailable-card.json",
+                "travel-advice-degraded-expired-card.json")) {
             JsonNode payload = fixture(fixtureName).path("payload");
             AgentCardPayloadResponse response = AgentCardPayloadResponse.from(payload);
 
             assertThat(response).isNotInstanceOf(AgentCardPayloadResponse.Unknown.class);
             JsonNode serialized = objectMapper.valueToTree(response);
             assertThat(serialized).isEqualTo(payload);
+        }
+    }
+
+    @Test
+    void shouldKeepTravelAdviceFixturesSafeAndDirectlyRenderable() throws Exception {
+        for (String fixtureName : List.of("travel-advice-card.json", "travel-advice-unavailable-card.json",
+                "travel-advice-degraded-expired-card.json")) {
+            JsonNode payload = fixture(fixtureName).path("payload");
+            assertThat(payload.path("type").asText()).isEqualTo("TRAVEL_ADVICE_CARD");
+            assertThat(payload.path("taskId").asText()).matches("^[1-9][0-9]*$");
+            assertThat(payload.path("weatherJson").isMissingNode()).isTrue();
+            assertThat(payload.path("adviceJson").isMissingNode()).isTrue();
+            assertThat(payload.toString()).doesNotContain("userId", "latitude", "longitude", "polyline", "waypoints");
         }
     }
 

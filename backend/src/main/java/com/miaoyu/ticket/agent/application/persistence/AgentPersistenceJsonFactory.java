@@ -7,6 +7,7 @@ import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFacts;
 import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardItem;
 import com.miaoyu.ticket.agent.application.reply.SelectSeatsReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.QuestionReplyFacts;
+import com.miaoyu.ticket.agent.application.reply.TravelAdviceCardFacts;
 import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.agent.domain.plan.ExecutionPlanNode;
@@ -93,6 +94,22 @@ public class AgentPersistenceJsonFactory {
                                     "showId", facts.showId(),
                                     "movieId", facts.movieId(),
                                     "cinemaId", facts.cinemaId()))));
+        }
+        if (reply.payload() instanceof TravelAdviceCardFacts facts) {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("type", "TRAVEL_ADVICE_CARD");
+            payload.put("taskId", facts.taskId());
+            payload.put("taskStatus", facts.taskStatus());
+            payload.put("available", facts.available());
+            payload.put("weather", facts.weather());
+            payload.put("advice", facts.advice());
+            payload.put("source", facts.source());
+            payload.put("degraded", facts.degraded());
+            payload.put("fallbackType", facts.fallbackType());
+            payload.put("dataAt", facts.dataAt() == null ? null : facts.dataAt().toString());
+            payload.put("expiresAt", facts.expiresAt() == null ? null : facts.expiresAt().toString());
+            payload.put("expired", facts.expired());
+            return write(payload);
         }
         if (!(reply.payload() instanceof RecommendationPlanCardFacts facts)) {
             throw new IllegalArgumentException("只有完整推荐或选座回复可以生成卡片事件");

@@ -2,6 +2,7 @@ package com.miaoyu.ticket.content.application;
 
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.common.error.CommonErrorCode;
 import com.miaoyu.ticket.common.error.ErrorCode;
 import com.miaoyu.ticket.content.domain.ContentItem;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
@@ -44,6 +45,7 @@ public class ContentQueryService implements ContentPurchaseQueryPort {
     private final ContentProperties properties;
     private final Clock clock;
     private final ContentLocalMovieCatalogPort localMovieCatalogPort;
+    private final LiveDemoPurchaseCatalogQueryPort liveDemoPurchaseCatalogQueryPort;
 
     /** 端口均在 Application 边界注入，查询服务不接触 Redis、JDBC 或 JSON 实现。 */
     /** 缓存、快照和 Demo 的先后关系只在本服务维护，调用方不能跳过其中任意一层。 */
@@ -52,13 +54,15 @@ public class ContentQueryService implements ContentPurchaseQueryPort {
     @org.springframework.beans.factory.annotation.Autowired
     public ContentQueryService(ContentCachePort cachePort, ContentSnapshotPort snapshotPort,
                                ContentProvider demoProvider, ContentProperties properties, Clock clock,
-                               ContentLocalMovieCatalogPort localMovieCatalogPort) {
+                               ContentLocalMovieCatalogPort localMovieCatalogPort,
+                               LiveDemoPurchaseCatalogQueryPort liveDemoPurchaseCatalogQueryPort) {
         this.cachePort = cachePort;
         this.snapshotPort = snapshotPort;
         this.demoProvider = demoProvider;
         this.properties = properties;
         this.clock = clock;
         this.localMovieCatalogPort = localMovieCatalogPort;
+        this.liveDemoPurchaseCatalogQueryPort = liveDemoPurchaseCatalogQueryPort;
     }
 
     /** 单元测试夹具没有真实数据库目录时仍可使用原有缓存/快照/Demo 查询。 */
@@ -70,6 +74,7 @@ public class ContentQueryService implements ContentPurchaseQueryPort {
         this.properties = properties;
         this.clock = clock;
         this.localMovieCatalogPort = null;
+        this.liveDemoPurchaseCatalogQueryPort = null;
     }
 
     /** 影片列表优先读取本地完整目录；本地端口缺失仅用于旧单元测试夹具兼容。 */
@@ -231,6 +236,17 @@ public class ContentQueryService implements ContentPurchaseQueryPort {
         return cinemas.isEmpty() || movies.isEmpty()
                 ? Optional.empty()
                 : Optional.of(new ContentSeedCatalog(movies, cinemas));
+    }
+
+    @Override
+    public DemoPurchaseCatalog findLiveDemoPurchaseCatalog(String cityCode) {
+        if (cityCode == null || !cityCode.matches("[1-9][0-9]{5}")) {
+            throw new BusinessException(CommonErrorCode.INVALID_PARAMETER);
+        }
+        if (liveDemoPurchaseCatalogQueryPort == null) {
+            throw new BusinessException(ContentErrorCode.DATA_UNAVAILABLE);
+        }
+        return liveDemoPurchaseCatalogQueryPort.findLiveCatalog(cityCode);
     }
 
     private java.util.Optional<ContentResult<List<? extends ContentItem>>> findFromSnapshot(ContentQuery query) {

@@ -7,11 +7,14 @@ import com.miaoyu.ticket.agent.application.reply.QuestionReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFacts;
 import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFactsMapper;
 import com.miaoyu.ticket.agent.application.reply.SelectSeatsReplyFacts;
+import com.miaoyu.ticket.agent.application.reply.TravelAdviceCardFacts;
+import com.miaoyu.ticket.agent.application.reply.TravelAdviceCardFactsMapper;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
 import com.miaoyu.ticket.recommendation.domain.RecommendationPlanResult;
 import com.miaoyu.ticket.ticketing.api.QueryShowsTool;
 import com.miaoyu.ticket.ticketing.api.QueryShowsToolResult;
+import com.miaoyu.ticket.travel.api.TravelAdviceToolResult;
 import java.time.Instant;
 import java.util.List;
 
@@ -46,6 +49,13 @@ public final class AgentRunReplyFactory {
         if (selectSeats != null) {
             return new com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse(
                     "已确认场次，请前往选座。", AgentReplyMessageType.SELECT_SEATS, selectSeats);
+        }
+        ToolResult<TravelAdviceToolResult> travelAdvice = lastSuccessfulTravelAdvice(result);
+        if (travelAdvice != null) {
+            TravelAdviceCardFacts facts = TravelAdviceCardFactsMapper.from(travelAdvice);
+            String text = facts.available() ? "已查询到出行建议。" : "该出行任务暂未生成建议。";
+            return new com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse(
+                    text, AgentReplyMessageType.TRAVEL_ADVICE_CARD, facts);
         }
         ToolResult<RecommendationPlanResult> recommendation = lastSuccessfulRecommendation(result);
         if (recommendation != null) {
@@ -120,6 +130,17 @@ public final class AgentRunReplyFactory {
             ToolResult<?> item = result.toolResults().get(index).result();
             if (item.status() == ToolStatus.FAILED) {
                 return item;
+            }
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ToolResult<TravelAdviceToolResult> lastSuccessfulTravelAdvice(MultiToolSupervisorResult result) {
+        for (int index = result.toolResults().size() - 1; index >= 0; index--) {
+            ToolResult<?> item = result.toolResults().get(index).result();
+            if (item.status() == ToolStatus.SUCCESS && item.data() instanceof TravelAdviceToolResult) {
+                return (ToolResult<TravelAdviceToolResult>) item;
             }
         }
         return null;

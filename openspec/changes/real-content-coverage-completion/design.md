@@ -100,6 +100,12 @@ B 的对话地点信息只作为该次 D 城市解析调用的内存参数，调
 
 `movie_tag`、`recommendation_record` 不属于本次真实内容覆盖范围。推荐历史的输入快照、候选快照、结果快照、用户隐私、唯一键、CHECK、保留期和清理机制必须在独立推荐历史 change 完整确认后，才可以提出新迁移。
 
+### 6.2 真实演示目录只提供 A 的最小排期引用
+
+`ContentPurchaseQueryPort.findLiveDemoPurchaseCatalog(cityCode)` 是 A 唯一可读取真实影院演示目录的同进程 Application API。D 在内部通过 JDBC Adapter 同时读取 `movie` 和指定 `city_code` 的 `cinema`，筛选 `source_type=LIVE`、`source=NETSTART_MAOYAN`、未逻辑删除、来源 ID 非空、正本地 ID、未过期，影片额外要求正时长。Adapter 按本地 ID 升序读出全部影院和最多三部影片；由于 SQL 只接受单一常量来源，本期遇到其他来源只排除，不构造 `MIXED` 目录。
+
+电影或影院任一侧没有合格记录时，返回两个空列表，避免 A 用不完整目录写出只含影院或只含影片的 Mock 排期。读取故障统一转为 `303004`；`cityCode` 在 Application 层按六位正行政区划编码校验，非法值为 `100001`。目录 `dataAt/expiresAt` 取所有返回记录的最早值，确保 A 不会把一部分已经到期的资料继续当成有效目录。这个目录不走普通内容查询的缓存、快照或 Demo 回退，也不调用 Provider。
+
 ### 7. 管理同步为按城市执行的受控写操作
 
 来源状态是管理员只读接口。管理员手动同步提交稳定 `clientRequestId` 和城市名，D 必须先在本地城市目录中解析 `ci`，再同步该城市资料；不接受地点原文、任意 `ci` 或任意 Provider URL。同步开始先持久化 `PENDING` 记录，以 `(provider, request_id)` 唯一键阻止重复请求；获得租约的实例再条件更新为 `RUNNING` 并调用 Provider。网络响应未知时只能按原 `clientRequestId` 查询，不得重新调用 Provider。

@@ -146,14 +146,16 @@
 
 .agent-message-item--card-placeholder,
 .agent-message-item--movie-card,
-.agent-message-item--plan-card {
+.agent-message-item--plan-card,
+.agent-message-item--travel-advice-card {
   border: 1px solid #d9deea;
   background: #fbfcff;
 }
 
 .agent-message-item--card-placeholder strong,
 .agent-message-item--movie-card strong,
-.agent-message-item--plan-card strong {
+.agent-message-item--plan-card strong,
+.agent-message-item--travel-advice-card strong {
   display: block;
   margin-bottom: 5px;
 }

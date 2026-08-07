@@ -10,6 +10,7 @@ import com.miaoyu.ticket.agent.application.reply.ProgressReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.QuestionReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFacts;
 import com.miaoyu.ticket.agent.application.reply.RecommendationReplyFacts;
+import com.miaoyu.ticket.agent.application.reply.TravelAdviceCardFacts;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlan;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlanNode;
 import com.miaoyu.ticket.agent.domain.plan.FailurePolicy;
@@ -80,6 +81,7 @@ public final class MockModelGateway implements ModelGateway {
         String text = switch (replyRequest.requestedType()) {
             case QUESTION -> questionText((QuestionReplyFacts) replyRequest.payload());
             case PLAN_CARD -> recommendationPlanText((RecommendationPlanCardFacts) replyRequest.payload());
+            case TRAVEL_ADVICE_CARD -> travelAdviceText((TravelAdviceCardFacts) replyRequest.payload());
             case MOVIE_CARD -> recommendationText((RecommendationReplyFacts) replyRequest.payload(), false);
             case SELECT_SEATS -> "请在选座页面选择座位。";
             case PROGRESS -> progressText((ProgressReplyFacts) replyRequest.payload());
@@ -208,6 +210,10 @@ public final class MockModelGateway implements ModelGateway {
         return facts.plans().isEmpty()
                 ? "当前条件下暂无可购方案。"
                 : "已找到 " + facts.plans().size() + " 个可购方案。";
+    }
+
+    private static String travelAdviceText(TravelAdviceCardFacts facts) {
+        return facts.available() ? "已查询到出行建议。" : "该出行任务暂未生成建议。";
     }
 
     private static String progressText(ProgressReplyFacts facts) {

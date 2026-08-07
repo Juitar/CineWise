@@ -224,6 +224,27 @@ function BusinessIntentCard({ item }: { item: AgentDisplayItem }) {
   );
 }
 
+function TravelAdviceCard({ item }: { item: AgentDisplayItem }) {
+  return (
+    <>
+      <div className="agent-card-heading">
+        <Tag color="cyan">出行建议</Tag>
+        <strong>{item.title}</strong>
+      </div>
+      <p className="agent-card-text">{item.text}</p>
+      <CardFields fields={item.fields} />
+      {item.travelTaskId && (
+        <Link
+          className="agent-card-primary-link"
+          to={`/travel/${encodeURIComponent(item.travelTaskId)}`}
+        >
+          查看出行建议详情
+        </Link>
+      )}
+    </>
+  );
+}
+
 function ProgressCard({ item }: { item: AgentDisplayItem }) {
   return (
     <>
@@ -307,6 +328,9 @@ export function AgentDisplayItemView({
       break;
     case 'plan-card':
       content = item.confirmation ? <RecommendationCard item={item} /> : <PlanCard item={item} />;
+      break;
+    case 'travel-advice-card':
+      content = <TravelAdviceCard item={item} />;
       break;
     case 'business-intent':
       content = <BusinessIntentCard item={item} />;
