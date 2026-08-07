@@ -1,4 +1,16 @@
+import { Button } from 'antd';
 import React from 'react';
+
+import {
+  CheckIcon,
+  CinemaIcon,
+  ClockIcon,
+  MapPinIcon,
+  PeopleIcon,
+  RefreshIcon,
+  TargetIcon,
+  WalletIcon,
+} from '../../shared/components/icons/layout-icons';
 import './PlanRecommendation.css';
 
 interface PlanRecommendationProps {
@@ -9,14 +21,14 @@ export const PlanRecommendation: React.FC<PlanRecommendationProps> = ({ onBack }
   return (
     <div className="plan-recommendation-container">
       <div className="plan-header-row">
-        <button type="button" className="back-to-home-btn" onClick={onBack}>
+        <Button className="back-to-home-btn" onClick={onBack}>
           返回首页
-        </button>
+        </Button>
         <h2 className="plan-main-title">为你生成 3 个观影方案</h2>
         <div className="plan-subtitle">静态演示数据：路线、距离和美食信息尚未实时校验</div>
-        <button type="button" className="refresh-plan-btn">
-          <span className="refresh-icon">🔄</span> 换一批
-        </button>
+        <Button className="refresh-plan-btn" icon={<RefreshIcon size={16} />}>
+          换一批
+        </Button>
       </div>
 
       <div className="plan-cards-list">
@@ -25,7 +37,9 @@ export const PlanRecommendation: React.FC<PlanRecommendationProps> = ({ onBack }
           <div className="plan-badge-col">
             <div className="plan-badge-title">方案 A</div>
             <div className="plan-badge-desc">首选推荐</div>
-            <div className="plan-radio-circle checked">✓</div>
+            <div className="plan-radio-circle checked">
+              <CheckIcon size={16} />
+            </div>
           </div>
 
           <div className="plan-movie-col">
@@ -36,7 +50,7 @@ export const PlanRecommendation: React.FC<PlanRecommendationProps> = ({ onBack }
               </div>
               <div className="plan-movie-tags">温情 / 剧情 | 口碑佳</div>
               <div className="plan-cinema-name">
-                <span className="icon">🏛️</span> 杭州UME影城 (西湖店)
+                <CinemaIcon className="icon" size={16} /> 杭州UME影城 (西湖店)
               </div>
               <div className="plan-cinema-tags">
                 <span className="ctag">激光厅</span>
@@ -107,7 +121,7 @@ export const PlanRecommendation: React.FC<PlanRecommendationProps> = ({ onBack }
               </div>
               <div className="plan-movie-tags">喜剧 | 合家欢</div>
               <div className="plan-cinema-name">
-                <span className="icon">🏛️</span> 星聚影城 (城西银泰店)
+                <CinemaIcon className="icon" size={16} /> 星聚影城 (城西银泰店)
               </div>
               <div className="plan-cinema-tags">
                 <span className="ctag">杜比全景声</span>
@@ -208,24 +222,24 @@ export const PlanRecommendation: React.FC<PlanRecommendationProps> = ({ onBack }
         <div className="pref-title">你的观影偏好</div>
         <div className="pref-items">
           <span className="pref-item">
-            <span className="icon">🎯</span> 偏好类型: 剧情/温情/喜剧
+            <TargetIcon className="icon" size={16} /> 偏好类型: 剧情/温情/喜剧
           </span>
           <span className="pref-item">
-            <span className="icon">📍</span> 可接受距离: ≤ 3 km
+            <MapPinIcon className="icon" size={16} /> 可接受距离: ≤ 3 km
           </span>
           <span className="pref-item">
-            <span className="icon">💰</span> 预算范围: ≤ ¥150/人
+            <WalletIcon className="icon" size={16} /> 预算范围: ≤ ¥150/人
           </span>
           <span className="pref-item">
-            <span className="icon">🕒</span> 观影时间: 今天 19:00 以后
+            <ClockIcon className="icon" size={16} /> 观影时间: 今天 19:00 以后
           </span>
           <span className="pref-item">
-            <span className="icon">👥</span> 结伴人数: 2人
+            <PeopleIcon className="icon" size={16} /> 结伴人数: 2人
           </span>
         </div>
-        <button type="button" className="edit-pref-btn">
+        <Button className="edit-pref-btn" type="text">
           调整偏好
-        </button>
+        </Button>
       </div>
     </div>
   );

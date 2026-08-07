@@ -8,10 +8,10 @@ import {
   CinemaIllustrationSVG,
   EyeIcon,
   EyeInvisibleIcon,
-  HomeIcon,
   LockIcon,
   MailIcon,
 } from '../../../shared/components/icons';
+import { HomeIcon } from '../../../shared/components/icons/layout-icons';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import '../../login/index.css';
 import './index.css';

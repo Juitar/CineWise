@@ -2,7 +2,12 @@ import { Menu } from 'antd';
 import React from 'react';
 import { Link, useLocation } from 'umi';
 import { BrandLogoIcon } from '../../shared/components/icons';
-import { FilmIcon, MapPinIcon, UserIcon } from '../../shared/components/icons/layout-icons';
+import {
+  FilmIcon,
+  HomeIcon,
+  MapPinIcon,
+  UserIcon,
+} from '../../shared/components/icons/layout-icons';
 
 export const DesktopSidebar: React.FC = () => {
   const location = useLocation();
@@ -32,7 +37,7 @@ export const DesktopSidebar: React.FC = () => {
           items={[
             {
               key: 'home',
-              icon: <FilmIcon size={18} />,
+              icon: <HomeIcon size={18} />,
               label: <Link to="/">首页</Link>,
             },
             {

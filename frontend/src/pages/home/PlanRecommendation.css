@@ -153,10 +153,19 @@
 }
 
 .plan-cinema-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 14px;
   color: #1f2329;
   font-weight: 500;
   margin-top: 4px;
+}
+
+.plan-cinema-name .icon,
+.pref-item .icon {
+  flex-shrink: 0;
+  color: #635bff;
 }
 
 .plan-cinema-tags {

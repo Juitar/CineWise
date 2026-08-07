@@ -8,10 +8,10 @@ import { useAuth } from '../../shared/auth/AuthProvider';
 import {
   BrandLogoIcon,
   CinemaIllustrationSVG,
-  HomeIcon,
   LockIcon,
   MailIcon,
 } from '../../shared/components/icons';
+import { HomeIcon } from '../../shared/components/icons/layout-icons';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import '../login/index.css';
 import './index.css';

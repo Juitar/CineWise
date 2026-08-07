@@ -1,4 +1,16 @@
-import { Alert, Button, Empty, Skeleton } from 'antd';
+import {
+  Alert as DesktopAlert,
+  Button as DesktopButton,
+  Empty as DesktopEmpty,
+  Skeleton as DesktopSkeleton,
+} from 'antd';
+import {
+  Button as MobileButton,
+  Empty as MobileEmpty,
+  ErrorBlock as MobileErrorBlock,
+  Input as MobileInput,
+  Skeleton as MobileSkeleton,
+} from 'antd-mobile';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'umi';
 
@@ -19,6 +31,87 @@ const MOVIE_SKELETON_KEYS = ['movie-loading-1', 'movie-loading-2', 'movie-loadin
 const CINEMA_SKELETON_KEYS = ['cinema-loading-1', 'cinema-loading-2', 'cinema-loading-3'];
 const DEFAULT_CITY_NAME = '长沙';
 const DEFAULT_CITY_CODE = '430100';
+
+function HomeOfflineNotice({ isMobile, message }: { isMobile: boolean; message: string }) {
+  if (isMobile) {
+    return (
+      <div className="home-mobile-notice" role="status">
+        {message}
+      </div>
+    );
+  }
+  return <DesktopAlert message={message} showIcon type="warning" />;
+}
+
+function HomeErrorState({
+  description,
+  isMobile,
+  onRetry,
+  title,
+}: {
+  description?: string;
+  isMobile: boolean;
+  onRetry: () => void;
+  title: string;
+}) {
+  if (isMobile) {
+    return (
+      <MobileErrorBlock
+        className="home-mobile-error"
+        description={description}
+        status="disconnected"
+        title={title}
+      >
+        <MobileButton color="primary" fill="outline" onClick={onRetry} size="small">
+          重试
+        </MobileButton>
+      </MobileErrorBlock>
+    );
+  }
+  return (
+    <DesktopAlert
+      action={
+        <DesktopButton size="small" onClick={onRetry}>
+          重试
+        </DesktopButton>
+      }
+      description={description}
+      message={title}
+      showIcon
+      type="error"
+    />
+  );
+}
+
+function HomeEmptyState({ description, isMobile }: { description: string; isMobile: boolean }) {
+  return isMobile ? (
+    <MobileEmpty className="home-mobile-empty" description={description} />
+  ) : (
+    <DesktopEmpty description={description} />
+  );
+}
+
+function HomeLoadingCard({ isMobile, kind }: { isMobile: boolean; kind: 'movie' | 'cinema' }) {
+  if (isMobile) {
+    return (
+      <div className="home-card-skeleton-mobile">
+        {kind === 'movie' ? <MobileSkeleton animated className="home-poster-skeleton" /> : null}
+        <div className="home-skeleton-copy">
+          <MobileSkeleton.Title animated />
+          <MobileSkeleton.Paragraph animated lineCount={kind === 'movie' ? 2 : 3} />
+        </div>
+      </div>
+    );
+  }
+  return kind === 'movie' ? (
+    <>
+      <DesktopSkeleton.Image active />
+      <DesktopSkeleton active paragraph={{ rows: 2 }} title={false} />
+    </>
+  ) : (
+    <DesktopSkeleton active paragraph={{ rows: 3 }} title={{ width: '65%' }} />
+  );
+}
 
 function FreshnessNotice({ freshness }: { freshness: ContentFreshness }) {
   const notices = getFreshnessNotices(freshness);
@@ -121,22 +214,27 @@ export default function HomePage() {
             </div>
 
             <div className="home-mobile-agent-input-container">
-              <input
+              <label className="visually-hidden" htmlFor="home-mobile-agent-input">
+                首页 Agent 输入
+              </label>
+              <MobileInput
                 className="home-mobile-agent-input"
-                aria-label="首页 Agent 输入"
+                id="home-mobile-agent-input"
                 maxLength={2000}
                 value={mobileAgentDraft}
-                onChange={(event) => setMobileAgentDraft(event.target.value)}
+                onChange={setMobileAgentDraft}
                 placeholder="例如：周末有什么好看的动作片？"
               />
-              <button
+              <MobileButton
                 type="button"
                 className="home-mobile-agent-send-btn"
+                color="primary"
+                shape="rounded"
                 disabled={!mobileAgentDraft.trim()}
                 onClick={() => openAssistant(mobileAgentDraft)}
               >
                 发送
-              </button>
+              </MobileButton>
             </div>
           </div>
         </div>
@@ -164,25 +262,19 @@ export default function HomePage() {
 
                   {movies.data ? <FreshnessNotice freshness={movies.data} /> : null}
                   {movies.isOfflineSnapshot ? (
-                    <Alert
+                    <HomeOfflineNotice
+                      isMobile={isMobile}
                       message="当前已离线，正在显示本页面内存中的影片只读快照"
-                      showIcon
-                      type="warning"
                     />
                   ) : null}
                   {movies.error ? (
-                    <Alert
-                      action={
-                        <Button size="small" onClick={movies.retry}>
-                          重试
-                        </Button>
-                      }
+                    <HomeErrorState
                       description={
                         movies.error.traceId ? `问题编号：${movies.error.traceId}` : undefined
                       }
-                      message={movies.data ? '影片更新失败，已保留上次结果' : '影片加载失败'}
-                      showIcon
-                      type="error"
+                      isMobile={isMobile}
+                      onRetry={movies.retry}
+                      title={movies.data ? '影片更新失败，已保留上次结果' : '影片加载失败'}
                     />
                   ) : null}
                   {movies.isRefreshing ? (
@@ -194,14 +286,13 @@ export default function HomePage() {
                     <div className="movies-list" aria-label="首页影片加载中">
                       {MOVIE_SKELETON_KEYS.map((key) => (
                         <div className="movie-card home-card-skeleton" key={key}>
-                          <Skeleton.Image active />
-                          <Skeleton active paragraph={{ rows: 2 }} title={false} />
+                          <HomeLoadingCard isMobile={isMobile} kind="movie" />
                         </div>
                       ))}
                     </div>
                   ) : null}
                   {!movies.isLoading && !movies.error && movies.data?.records.length === 0 ? (
-                    <Empty description="暂无可展示的影片" />
+                    <HomeEmptyState description="暂无可展示的影片" isMobile={isMobile} />
                   ) : null}
                   {movies.data && movies.data.records.length > 0 ? (
                     <div className="movies-list" aria-live="polite">
@@ -227,25 +318,19 @@ export default function HomePage() {
 
                   {cinemas.data ? <FreshnessNotice freshness={cinemas.data} /> : null}
                   {cinemas.isOfflineSnapshot ? (
-                    <Alert
+                    <HomeOfflineNotice
+                      isMobile={isMobile}
                       message="当前已离线，正在显示本页面内存中的影院只读快照"
-                      showIcon
-                      type="warning"
                     />
                   ) : null}
                   {cinemas.error ? (
-                    <Alert
-                      action={
-                        <Button size="small" onClick={cinemas.retry}>
-                          重试
-                        </Button>
-                      }
+                    <HomeErrorState
                       description={
                         cinemas.error.traceId ? `问题编号：${cinemas.error.traceId}` : undefined
                       }
-                      message={cinemas.data ? '影院更新失败，已保留上次结果' : '影院加载失败'}
-                      showIcon
-                      type="error"
+                      isMobile={isMobile}
+                      onRetry={cinemas.retry}
+                      title={cinemas.data ? '影院更新失败，已保留上次结果' : '影院加载失败'}
                     />
                   ) : null}
                   {cinemas.isRefreshing ? (
@@ -257,13 +342,13 @@ export default function HomePage() {
                     <div className="cinemas-list" aria-label="首页影院加载中">
                       {CINEMA_SKELETON_KEYS.map((key) => (
                         <div className="cinema-card home-card-skeleton" key={key}>
-                          <Skeleton active paragraph={{ rows: 3 }} title={{ width: '65%' }} />
+                          <HomeLoadingCard isMobile={isMobile} kind="cinema" />
                         </div>
                       ))}
                     </div>
                   ) : null}
                   {!cinemas.isLoading && !cinemas.error && cinemas.data?.records.length === 0 ? (
-                    <Empty description="长沙暂无可展示的影院" />
+                    <HomeEmptyState description="长沙暂无可展示的影院" isMobile={isMobile} />
                   ) : null}
                   {cinemas.data && cinemas.data.records.length > 0 ? (
                     <div className="cinemas-list" aria-live="polite">
@@ -284,9 +369,15 @@ export default function HomePage() {
                       开启后，AI将结合路线、出发时间与附近美食等信息，为你提供个性化观影方案
                     </div>
                   </div>
-                  <button type="button" className="personalized-btn">
-                    开启个性化服务
-                  </button>
+                  {isMobile ? (
+                    <MobileButton className="personalized-btn" color="primary" size="small">
+                      开启个性化服务
+                    </MobileButton>
+                  ) : (
+                    <DesktopButton className="personalized-btn" type="primary">
+                      开启个性化服务
+                    </DesktopButton>
+                  )}
                 </div>
               </>
             )}

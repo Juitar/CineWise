@@ -149,10 +149,11 @@ describe('HomePage', () => {
   it('影片和影院首次加载时分别显示骨架状态', () => {
     pageMocks.useMovieList.mockReturnValue(movieState({ data: null, isLoading: true }));
     pageMocks.useCinemaList.mockReturnValue(cinemaState({ data: null, isLoading: true }));
-    render(<HomePage />);
+    const { container } = render(<HomePage />);
 
     expect(screen.getByLabelText('首页影片加载中')).toBeInTheDocument();
     expect(screen.getByLabelText('首页影院加载中')).toBeInTheDocument();
+    expect(container.querySelector('.adm-skeleton')).toBeInTheDocument();
   });
 
   it('保留旧影片时展示刷新和离线只读快照状态', () => {
@@ -184,10 +185,11 @@ describe('HomePage', () => {
     pageMocks.useCinemaList.mockReturnValue(
       cinemaState({ data: { ...cinemaResponse, records: [], total: 0 } }),
     );
-    render(<HomePage />);
+    const { container } = render(<HomePage />);
 
     expect(screen.getByText('暂无可展示的影片')).toBeInTheDocument();
     expect(screen.getByText('长沙暂无可展示的影院')).toBeInTheDocument();
+    expect(container.querySelectorAll('.adm-empty')).toHaveLength(2);
   });
 
   it('网络失败时显示问题编号并可分别重试', () => {
@@ -213,12 +215,13 @@ describe('HomePage', () => {
         retry: retryCinemas,
       }),
     );
-    render(<HomePage />);
+    const { container } = render(<HomePage />);
 
     expect(screen.getByText('影片加载失败')).toBeInTheDocument();
     expect(screen.getByText('影院加载失败')).toBeInTheDocument();
     expect(screen.getByText('问题编号：trace-home-movies')).toBeInTheDocument();
     expect(screen.getByText('问题编号：trace-home-cinemas')).toBeInTheDocument();
+    expect(container.querySelectorAll('.adm-error-block')).toHaveLength(2);
     const retryButtons = screen.getAllByRole('button', { name: /重\s*试/ });
     fireEvent.click(retryButtons[0]);
     fireEvent.click(retryButtons[1]);
@@ -265,11 +268,28 @@ describe('HomePage', () => {
   });
 
   it('首页 Agent 输入只保存内存草稿并跳转受保护工作区', () => {
-    render(<HomePage />);
-    fireEvent.change(screen.getByLabelText('首页 Agent 输入'), {
+    const { container } = render(<HomePage />);
+    const agentInput = screen.getByLabelText('首页 Agent 输入');
+    expect(agentInput).toHaveClass('adm-input-element');
+    expect(container.querySelector('.home-mobile-agent-input')).toHaveClass('adm-input');
+    expect(container.querySelector('.home-mobile-agent-send-btn')).toHaveClass('adm-button');
+    fireEvent.change(agentInput, {
       target: { value: '推荐一部电影' },
     });
     fireEvent.click(screen.getByRole('button', { name: '发送' }));
     expect(pageMocks.navigate).toHaveBeenCalledWith('/assistant');
+  });
+
+  it('PC 首页继续使用 Ant Design 的加载、错误和空态组件', () => {
+    pageMocks.isMobile = false;
+    pageMocks.useMovieList.mockReturnValue(movieState({ data: null, isLoading: true }));
+    pageMocks.useCinemaList.mockReturnValue(
+      cinemaState({ data: { ...cinemaResponse, records: [], total: 0 } }),
+    );
+    const { container } = render(<HomePage />);
+
+    expect(container.querySelector('.ant-skeleton')).toBeInTheDocument();
+    expect(container.querySelector('.ant-empty')).toBeInTheDocument();
+    expect(container.querySelector('.adm-skeleton')).not.toBeInTheDocument();
   });
 });
