@@ -27,7 +27,14 @@ export interface AgentDisplayItem {
   text: string;
   title?: string;
   fields?: readonly { label: string; value: string }[];
-  options?: readonly string[];
+  question?: {
+    questionId: string;
+    options: readonly { optionId: string; label: string; value: string }[];
+    allowFreeText: boolean;
+    expiresAt: string;
+  };
+  plans?: readonly AgentPlanDisplay[];
+  relaxationSuggestion?: string;
   selectSeatsPath?: string;
   confirmation?: {
     actionId: string;
@@ -35,6 +42,24 @@ export interface AgentDisplayItem {
     status: AgentConfirmationStatus;
     submitting: boolean;
   };
+}
+
+export interface AgentPlanDisplay {
+  showId: string;
+  planType: string;
+  movieName: string;
+  cinemaName: string;
+  price: string;
+  currency: string;
+  startTime: string;
+  rating: string | null;
+  reasons: readonly string[];
+  source: string;
+  dataAt: string;
+  expiresAt: string;
+  expired: boolean;
+  purchaseEligible: boolean;
+  distanceMeters: number | null;
 }
 
 /** 仅使用已校验的场次、影片和影院 ID 构造选座地址，不补齐其他业务参数。 */
@@ -167,30 +192,17 @@ function candidateFields(event: AgentEvent, collection: 'movies' | 'plans') {
     const prefix = collection === 'movies' ? `影片 ${index + 1}` : `方案 ${index + 1}`;
     const fields: Array<{ label: string; value: string }> = [];
     const entries = [
-      ['方案类型', candidate.planType],
-      ['片名', candidate.movieName ?? candidate.title],
+      ['片名', candidate.title],
       ['影片 ID', candidate.movieId],
-      ['影院', candidate.cinemaName],
       ['影院 ID', candidate.cinemaId],
       ['场次 ID', candidate.showId],
+      ['价格', candidate.price],
       ['开场时间', candidate.startTime],
       ['来源', candidate.source],
     ] as const;
     entries.forEach(([label, value]) => {
       if (typeof value === 'string' && value) fields.push({ label: `${prefix} · ${label}`, value });
     });
-    if (typeof candidate.price === 'string' && candidate.price) {
-      const currency = typeof candidate.currency === 'string' ? ` ${candidate.currency}` : '';
-      fields.push({ label: `${prefix} · 价格`, value: `${candidate.price}${currency}` });
-    }
-    if (Array.isArray(candidate.reasons) && candidate.reasons.length > 0) {
-      fields.push({
-        label: `${prefix} · 推荐理由`,
-        value: candidate.reasons
-          .filter((reason): reason is string => typeof reason === 'string')
-          .join('；'),
-      });
-    }
     if (candidate.expired === true) fields.push({ label: `${prefix} · 状态`, value: '已过期' });
     if (candidate.purchaseEligible === false) {
       fields.push({ label: `${prefix} · 可购状态`, value: '当前不可购' });
@@ -228,7 +240,16 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
       title: event.payload.message as string,
       text: locationState ?? (event.payload.message as string),
       fields: locationState ? [{ label: '位置授权', value: locationState }] : undefined,
-      options: options.map((option) => option.label as string),
+      question: {
+        questionId: event.payload.questionId as string,
+        options: options.map((option) => ({
+          optionId: option.optionId as string,
+          label: option.label as string,
+          value: option.value as string,
+        })),
+        allowFreeText: event.payload.allowFreeText as boolean,
+        expiresAt: event.payload.expiresAt as string,
+      },
     };
   }
   if (type === 'BUSINESS_INTENT') {
@@ -266,6 +287,27 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
     return { key, kind: 'error', text: event.displayText || '本次请求未完成' };
   }
   const isPlan = type === 'PLAN_CARD';
+  const plans = isPlan
+    ? (event.payload.plans as readonly Record<string, unknown>[]).slice(0, 3).map((plan) => ({
+        showId: plan.showId as string,
+        planType: plan.planType as string,
+        movieName: plan.movieName as string,
+        cinemaName: plan.cinemaName as string,
+        price: plan.price as string,
+        currency: plan.currency as string,
+        startTime: plan.startTime as string,
+        rating: plan.rating as string | null,
+        reasons: plan.reasons as readonly string[],
+        source: plan.source as string,
+        dataAt: plan.dataAt as string,
+        expiresAt: plan.expiresAt as string,
+        expired: plan.expired as boolean,
+        purchaseEligible: plan.purchaseEligible as boolean,
+        distanceMeters: plan.distanceMeters as number | null,
+      }))
+    : undefined;
+  const relaxation = event.payload.relaxationSuggestion as
+    Readonly<Record<string, unknown>> | null | undefined;
   return {
     key,
     kind: isPlan ? 'plan-card' : 'movie-card',
@@ -274,7 +316,12 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
       event.payload.degraded === true
         ? '当前结果为降级数据，请注意来源和有效时间'
         : '以下内容来自服务端卡片数据',
-    fields: [...candidateFields(event, isPlan ? 'plans' : 'movies'), ...cardStatusFields(event)],
+    plans,
+    relaxationSuggestion:
+      relaxation && typeof relaxation.message === 'string' ? relaxation.message : undefined,
+    fields: isPlan
+      ? cardStatusFields(event)
+      : [...candidateFields(event, 'movies'), ...cardStatusFields(event)],
   };
 }
 

@@ -321,12 +321,9 @@ function validatePlanCard(payload: Record<string, unknown>): void {
   boolean(payload.expired);
 }
 
-function validateRecommendationItem(value: unknown, type: 'MOVIE_CARD' | 'PLAN_CARD'): void {
+function validateMovieRecommendationItem(value: unknown): void {
   const item = record(value);
   businessId(item.movieId);
-  if (type === 'PLAN_CARD') {
-    businessId(item.cinemaId);
-  }
   optionalText(item, 'title');
   optionalBusinessId(item, 'cinemaId');
   optionalBusinessId(item, 'showId');
@@ -347,14 +344,12 @@ function validateQuestion(payload: Record<string, unknown>): void {
     text(current.label);
     text(current.value);
   });
-  const allowFreeText = boolean(payload.allowFreeText);
+  boolean(payload.allowFreeText);
   boolean(payload.requiresConfirmation);
   dateText(payload.expiresAt);
-  if (allowFreeText) {
-    const input = record(payload.input);
-    text(input.name);
-    text(input.type);
-  }
+  const input = record(payload.input);
+  text(input.name);
+  text(input.type);
   if (payload.questionKind === 'LOCATION_PERMISSION') {
     const authorization = record(payload.locationAuthorization);
     if (authorization.permission !== 'DEVICE_LOCATION') throw new AgentContractError();
@@ -380,8 +375,7 @@ function validateRecommendation(
     return;
   }
   text(payload.title);
-  const candidates = array(type === 'MOVIE_CARD' ? payload.movies : payload.plans);
-  candidates.forEach((item) => validateRecommendationItem(item, type));
+  array(payload.movies).forEach(validateMovieRecommendationItem);
   text(payload.source);
   dateText(payload.dataAt);
   dateText(payload.expiresAt);

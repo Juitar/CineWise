@@ -87,7 +87,7 @@ describe('Agent 事件投影', () => {
     expect(JSON.stringify(failed.projection)).not.toContain('RUN_FAILED');
   });
 
-  it('正常 PLAN_CARD 展示最新固定夹具的安全推荐摘要', () => {
+  it('正常 PLAN_CARD 投影正式方案字段且不展示业务 ID', () => {
     const result = consumeAgentEvent(
       createAgentProjection('session-example-1'),
       parseAgentEvent(planCard),
@@ -96,17 +96,17 @@ describe('Agent 事件投影', () => {
     expect(result.projection.items[0]).toEqual(
       expect.objectContaining({ kind: 'plan-card', title: '推荐场次' }),
     );
-    expect(result.projection.items[0].fields).toEqual(
-      expect.arrayContaining([
-        { label: '方案 1 · 影片 ID', value: '1001' },
-        { label: '方案 1 · 片名', value: '示例影片' },
-        { label: '方案 1 · 影院 ID', value: '2001' },
-        { label: '方案 1 · 影院', value: '示例影院' },
-        { label: '方案 1 · 场次 ID', value: '3001' },
-        { label: '方案 1 · 价格', value: '68.00 CNY' },
-        { label: '方案 1 · 开场时间', value: '2026-08-05T11:00:00Z' },
-        { label: '方案 1 · 推荐理由', value: '匹配条件' },
-      ]),
+    expect(result.projection.items[0].plans).toEqual([
+      expect.objectContaining({
+        showId: '3001',
+        movieName: '示例影片',
+        cinemaName: '示例影院',
+        price: '68.00',
+        reasons: ['匹配条件'],
+      }),
+    ]);
+    expect(result.projection.items[0].fields).not.toContainEqual(
+      expect.objectContaining({ label: expect.stringMatching(/ID/) }),
     );
     expect(JSON.stringify(result.projection)).not.toMatch(
       /score|internalEvidence|rawToolArguments/,
@@ -154,7 +154,9 @@ describe('Agent 事件投影', () => {
       expect.objectContaining({
         kind: 'question',
         text: '想在哪天观看？',
-        options: ['今天'],
+        question: expect.objectContaining({
+          options: [{ optionId: 'today', label: '今天', value: '2026-08-05' }],
+        }),
       }),
     );
     const progress = consumeAgentEvent(question.projection, parseAgentEvent(progressCard));

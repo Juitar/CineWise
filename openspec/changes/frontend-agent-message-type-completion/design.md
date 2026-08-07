@@ -6,19 +6,19 @@
 
 ## 旧名称到最新协议的映射
 
-| PRD 名称 | 最新协议 | 当前处理 |
-| --- | --- | --- |
-| `TEXT` | `TEXT` | PR #156 已实现类型化展示 |
-| `QUESTION` | `QUESTION` | PR #156 已实现只读安全展示 |
-| `MOVIE_CARD` | `MOVIE_CARD` | PR #156 已实现类型化展示 |
-| `PLAN_CARD` | `PLAN_CARD` | PR #156 已实现推荐与统一确认展示 |
-| `TRAVEL_ADVICE_CARD` | 无正式 B 类型 | 等 B 提供正式协议 |
-| `ROUTE_CARD` | 无正式 B 类型 | 等 B 提供正式协议 |
-| `BUSINESS_INTENT` | `BUSINESS_INTENT` | PR #156 已实现安全业务入口 |
-| `ORDER_CONFIRM` | `PLAN_CARD + actionId + actionType=CREATE_ORDER` | 已由统一确认卡覆盖，不新增枚举 |
-| `REFUND_CONFIRM` | 无正式 B 退票 action | 等 B 决定统一确认卡协议并提供夹具 |
-| `PROGRESS` | `PROGRESS` | PR #156 已实现类型化展示 |
-| `ERROR` | `ERROR` | PR #156 已实现安全错误展示 |
+| PRD 名称             | 最新协议                                         | 当前处理                                       |
+| -------------------- | ------------------------------------------------ | ---------------------------------------------- |
+| `TEXT`               | `TEXT`                                           | PR #156 已实现类型化展示                       |
+| `QUESTION`           | `QUESTION`                                       | PR #172 已实现交互卡片                         |
+| `MOVIE_CARD`         | `MOVIE_CARD`                                     | PR #156 已实现类型化展示                       |
+| `PLAN_CARD`          | `PLAN_CARD`                                      | PR #172 已实现方案卡；统一确认继续复用现有分支 |
+| `TRAVEL_ADVICE_CARD` | 无正式 B 类型                                    | 等 B 提供正式协议                              |
+| `ROUTE_CARD`         | 无正式 B 类型                                    | 等 B 提供正式协议                              |
+| `BUSINESS_INTENT`    | `BUSINESS_INTENT`                                | PR #156 已实现安全业务入口                     |
+| `ORDER_CONFIRM`      | `PLAN_CARD + actionId + actionType=CREATE_ORDER` | 已由统一确认卡覆盖，不新增枚举                 |
+| `REFUND_CONFIRM`     | 无正式 B 退票 action                             | 等 B 决定统一确认卡协议并提供夹具              |
+| `PROGRESS`           | `PROGRESS`                                       | PR #156 已实现类型化展示                       |
+| `ERROR`              | `ERROR`                                          | PR #156 已实现安全错误展示                     |
 
 ## 当前正式协议
 
@@ -61,11 +61,11 @@ B 需要同时提供正式类型、固定字段、固定夹具和 SSE 映射。�
 
 本地浏览器测试使用固定 HTTP 响应验证前端恢复流程，不代替真实 Cookie 和发布代理联调。当前独立 worktree 没有 `.env`、演示账号或可登录联调入口，因此真实代理联调继续由 `frontend-agent-readonly-workspace` 的任务 5.5 记录，不能在本 change 冒充完成。
 
-## PR #160 推荐卡同步
+## PR #160 推荐协议与 PR #172 交互卡同步
 
 最新 B `AgentCardPayloadResponse.PlanCard` 和固定 `plan-card.json` 已正式提供 `schemaVersion`、`algorithmVersion`、`plans`、`missingFactors`、`relaxationSuggestion`、`usedProfile`、`source`、`dataAt`、`expiresAt`、`degraded` 和 `expired`。每个方案项正式提供影片/影院/场次引用、影片名、影院名、价格、币种、开场时间、评分、排序分、推荐理由、来源、时效、可购状态和可选距离摘要。
 
-C 对普通 `PLAN_CARD` 使用字段白名单严格校验：正式字段必须全部出现，允许为空的字段只能为协议声明的 null，未声明字段直接拒绝。安全投影只展示影片名、影院名、现有业务 ID、价格与币种、开场时间、推荐理由、来源、时效和可购/过期状态；不显示排序分、内部证据、工具参数、精确位置或模型推理。
+C 对普通 `PLAN_CARD` 使用字段白名单严格校验：正式字段必须全部出现，允许为空的字段只能为协议声明的 null，未声明字段直接拒绝。PR #172 的组件继续只接收安全投影；页面展示影片名、影院名、价格与币种、开场时间、推荐理由、来源、时效和可购/过期状态，不展示业务 ID、排序分、内部证据、工具参数、精确位置或模型推理。
 
 确认卡仍走现有 `PLAN_CARD + actionId + CREATE_ORDER` 分支，不套用普通推荐卡字段要求。旧 B 夹具不再作为普通 `PLAN_CARD` 的兼容输入。
 

@@ -350,7 +350,7 @@ test('移动端使用同一类型化确认卡且操作区不溢出', async ({ pa
 
   const card = page.locator('[data-agent-card-kind="plan-card"]');
   await expect(card).toBeVisible();
-  await expect(card.getByText('观影方案')).toBeVisible();
+  await expect(card.getByText('操作确认')).toBeVisible();
   await expect(card.getByRole('button', { name: '确认操作' })).toBeVisible();
   await expect(card.getByRole('button', { name: '拒绝操作' })).toBeVisible();
   await expect(page.getByText('action-e2e-1')).toHaveCount(0);

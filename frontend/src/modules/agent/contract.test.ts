@@ -9,6 +9,7 @@ import sessionList from '../../../../backend/src/test/resources/fixtures/agent/c
 import confirmationFixtures from '../../../../backend/src/test/resources/fixtures/agent/c/confirmation-api-fixtures.json';
 import orderConfirmCard from '../../../../backend/src/test/resources/fixtures/agent/c/order-confirm-card.json';
 import planCard from '../../../../backend/src/test/resources/fixtures/agent/c/plan-card.json';
+import questionCard from '../../../../backend/src/test/resources/fixtures/agent/c/question-card.json';
 import {
   AgentContractError,
   parseAgentEvent,
@@ -41,8 +42,12 @@ describe('Agent DTO 和事件校验', () => {
     });
   });
 
-  it('严格消费最新 PLAN_CARD 固定夹具', () => {
+  it('直接校验 B 正式问题卡和方案卡夹具', () => {
+    expect(validateAgentCardEvent(parseAgentEvent(questionCard)).decision).toBe('render');
     expect(validateAgentCardEvent(parseAgentEvent(planCard)).decision).toBe('render');
+  });
+
+  it('严格拒绝方案卡缺字段、未知字段和原始工具参数', () => {
     expect(
       validateAgentCardEvent(
         parseAgentEvent({
@@ -70,6 +75,25 @@ describe('Agent DTO 和事件校验', () => {
         }),
       ).decision,
     ).toBe('reject');
+  });
+
+  it('正式方案缺少影片名或问题选项值时拒绝渲染', () => {
+    const invalidPlan = {
+      ...planCard,
+      payload: {
+        ...planCard.payload,
+        plans: [{ ...planCard.payload.plans[0], movieName: undefined }],
+      },
+    };
+    const invalidQuestion = {
+      ...questionCard,
+      payload: {
+        ...questionCard.payload,
+        options: [{ ...questionCard.payload.options[0], value: undefined }],
+      },
+    };
+    expect(validateAgentCardEvent(parseAgentEvent(invalidPlan)).decision).toBe('reject');
+    expect(validateAgentCardEvent(parseAgentEvent(invalidQuestion)).decision).toBe('reject');
   });
 
   it('合法事件忽略未知顶层字段但不把它带入投影', () => {
