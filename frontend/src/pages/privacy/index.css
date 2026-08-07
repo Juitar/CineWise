@@ -32,9 +32,16 @@
 }
 
 .privacy-back-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   margin-top: 32px;
+  padding: 0;
+  border: 0;
   color: #635bff;
+  font: inherit;
+  background: transparent;
+  cursor: pointer;
 }
 
 @media (max-width: 767px) {

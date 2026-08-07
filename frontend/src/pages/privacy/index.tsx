@@ -1,8 +1,10 @@
-import { Link } from 'umi';
+import { useNavigate } from 'umi';
 
 import './index.css';
 
 export default function PrivacyPage() {
+  const navigate = useNavigate();
+
   return (
     <main className="privacy-page">
       <article className="privacy-card">
@@ -24,9 +26,9 @@ export default function PrivacyPage() {
           <h2>你的选择</h2>
           <p>注册同意框默认不勾选。不同意不会阻止你浏览公开影片和影院信息。</p>
         </section>
-        <Link className="privacy-back-link" to="/register">
-          返回注册页
-        </Link>
+        <button className="privacy-back-link" type="button" onClick={() => navigate(-1)}>
+          返回
+        </button>
       </article>
     </main>
   );

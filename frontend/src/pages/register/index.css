@@ -112,6 +112,15 @@
 }
 
 @media (max-width: 1023px) {
+  .register-page-container .login-header {
+    justify-content: space-between;
+  }
+
+  .register-page-container .login-header-back {
+    display: flex;
+    height: 44px;
+  }
+
   .register-page-container .login-form-section {
     padding: 28px 24px 40px;
   }

@@ -371,7 +371,7 @@
     justify-content: center;
   }
 
-  .login-header-back {
+  .login-page-container:not(.register-page-container) .login-header-back {
     display: none;
   }
 
