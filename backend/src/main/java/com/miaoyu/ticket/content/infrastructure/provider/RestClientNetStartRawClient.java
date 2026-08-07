@@ -35,6 +35,14 @@ final class RestClientNetStartRawClient implements NetStartRawClient {
                 .retrieve().body(JsonNode.class);
     }
 
+    /** 详情接口返回 data.lng/data.lat，不能把它与搜索接口的列表结构混用。 */
+    @Override
+    public JsonNode fetchCinemaDetail(long cinemaId) {
+        return restClient.get().uri(uri -> uri.path("/cinema/detail")
+                .queryParam("cinemaId", cinemaId).build())
+                .retrieve().body(JsonNode.class);
+    }
+
     /** 第三方城市 ID 只能存在于 HTTP 边界，公开 DTO、快照和 URL 始终使用标准行政代码。 */
     static String providerCityId(String cityCode) {
         if (CHANGSHA_CITY_CODE.equals(cityCode)) {

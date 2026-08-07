@@ -147,6 +147,93 @@ class NetStartContentProviderTest {
     }
 
     @Test
+    void givenCinemaSearchWithoutCoordinates_whenDetailProvidesCoordinates_thenItEnrichesTheCinema() {
+        AtomicInteger detailCalls = new AtomicInteger();
+        NetStartRawClient client = new NetStartRawClient() {
+            @Override
+            public com.fasterxml.jackson.databind.JsonNode fetch(ContentQuery query) {
+                return json("""
+                        [{"id":40843,"info":{"name":"测试影院","address":"雨花区测试路"}}]
+                        """);
+            }
+
+            @Override
+            public com.fasterxml.jackson.databind.JsonNode fetchCinemaDetail(long cinemaId) {
+                detailCalls.incrementAndGet();
+                assertThat(cinemaId).isEqualTo(40843L);
+                return json("""
+                        {"data":{"cinemaId":40843,"nm":"测试影院","addr":"雨花区测试路",
+                        "lng":113.016136,"lat":28.109451}}
+                        """);
+            }
+        };
+
+        var batch = provider(client).fetchCityCinemas("430100");
+        CinemaContent cinema = (CinemaContent) batch.contents().getFirst().result().data().getFirst();
+
+        assertThat(detailCalls).hasValue(1);
+        assertThat(batch.outcome()).isEqualTo(
+                com.miaoyu.ticket.content.application.LiveContentSyncPort.Outcome.SUCCESS);
+        assertThat(cinema.longitude()).isEqualByComparingTo("113.016136");
+        assertThat(cinema.latitude()).isEqualByComparingTo("28.109451");
+    }
+
+    @Test
+    void givenCinemaDetailFailure_whenSearchHasNoCoordinates_thenItKeepsTheCinemaWithoutCoordinates() {
+        AtomicInteger detailCalls = new AtomicInteger();
+        NetStartRawClient client = new NetStartRawClient() {
+            @Override
+            public com.fasterxml.jackson.databind.JsonNode fetch(ContentQuery query) {
+                return json("""
+                        [{"id":40843,"info":{"name":"测试影院","address":"雨花区测试路"}}]
+                        """);
+            }
+
+            @Override
+            public com.fasterxml.jackson.databind.JsonNode fetchCinemaDetail(long cinemaId) {
+                detailCalls.incrementAndGet();
+                throw new ResourceAccessException("offline");
+            }
+        };
+
+        CinemaContent cinema = (CinemaContent) provider(client).query(
+                new ContentQuery(ContentResourceType.CINEMA, null, "430100", "影院"))
+                .orElseThrow().data().getFirst();
+
+        // 详情网络失败可短重试一次，但搜索结果仍能继续参与后续同步。
+        assertThat(detailCalls).hasValue(2);
+        assertThat(cinema.longitude()).isNull();
+        assertThat(cinema.latitude()).isNull();
+    }
+
+    @Test
+    void givenCinemaSearchAlreadyHasCoordinates_whenQuery_thenItDoesNotRequestDetailAgain() {
+        AtomicInteger detailCalls = new AtomicInteger();
+        NetStartRawClient client = new NetStartRawClient() {
+            @Override
+            public com.fasterxml.jackson.databind.JsonNode fetch(ContentQuery query) {
+                return json("""
+                        [{"id":40843,"lng":113.016136,"lat":28.109451,
+                        "info":{"name":"测试影院","address":"雨花区测试路"}}]
+                        """);
+            }
+
+            @Override
+            public com.fasterxml.jackson.databind.JsonNode fetchCinemaDetail(long cinemaId) {
+                detailCalls.incrementAndGet();
+                return null;
+            }
+        };
+
+        CinemaContent cinema = (CinemaContent) provider(client).query(
+                new ContentQuery(ContentResourceType.CINEMA, null, "430100", "影院"))
+                .orElseThrow().data().getFirst();
+
+        assertThat(detailCalls).hasValue(0);
+        assertThat(cinema.longitude()).isEqualByComparingTo("113.016136");
+    }
+
+    @Test
     void givenConnectionFailure_whenQuery_thenItRetriesOnceAndReturnsTheSecondQualifiedResponse()
             throws Exception {
         AtomicInteger calls = new AtomicInteger();
