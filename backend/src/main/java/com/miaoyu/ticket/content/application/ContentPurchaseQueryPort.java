@@ -71,7 +71,8 @@ public interface ContentPurchaseQueryPort {
     record CinemaRef(long cinemaId, String sourceCinemaId) {
         public CinemaRef {
             if (cinemaId <= 0 || sourceCinemaId == null || sourceCinemaId.isBlank()) {
-                throw new IllegalArgumentException("CinemaRef must contain a positive ID and source ID");
+                throw new IllegalArgumentException(
+                        "CinemaRef must contain a positive ID and source ID");
             }
             sourceCinemaId = sourceCinemaId.trim();
         }

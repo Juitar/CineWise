@@ -23,9 +23,11 @@ class JdbcLiveDemoPurchaseCatalogAdapterTest {
         jdbc.execute("DROP TABLE IF EXISTS movie");
         jdbc.execute("DROP TABLE IF EXISTS cinema");
         jdbc.execute("CREATE TABLE movie (id BIGINT, source_movie_id VARCHAR(128), duration_minutes INT, "
-                + "source_type VARCHAR(16), source VARCHAR(64), data_time TIMESTAMP, expires_at TIMESTAMP, deleted_at TIMESTAMP)");
+                + "source_type VARCHAR(16), source VARCHAR(64), data_time TIMESTAMP, "
+                + "expires_at TIMESTAMP, deleted_at TIMESTAMP)");
         jdbc.execute("CREATE TABLE cinema (id BIGINT, source_cinema_id VARCHAR(128), city_code VARCHAR(32), "
-                + "source_type VARCHAR(16), source VARCHAR(64), data_time TIMESTAMP, expires_at TIMESTAMP, deleted_at TIMESTAMP)");
+                + "source_type VARCHAR(16), source VARCHAR(64), data_time TIMESTAMP, "
+                + "expires_at TIMESTAMP, deleted_at TIMESTAMP)");
     }
 
     @Test
@@ -48,7 +50,8 @@ class JdbcLiveDemoPurchaseCatalogAdapterTest {
 
     @Test
     void givenExpiredOrDemoOnlyContent_whenQuerying_thenItReturnsEmptyCatalog() {
-        jdbc.update("INSERT INTO movie VALUES (1, 'demo', 100, 'MOCK', 'DEMO_CONTENT', TIMESTAMP '2026-08-07 08:00:00', TIMESTAMP '2026-08-08 08:00:00', NULL)");
+        jdbc.update("INSERT INTO movie VALUES (1, 'demo', 100, 'MOCK', 'DEMO_CONTENT', "
+                + "TIMESTAMP '2026-08-07 08:00:00', TIMESTAMP '2026-08-08 08:00:00', NULL)");
         insertCinema(1, "old", "2026-08-06 08:00:00", "2026-08-06 09:00:00");
 
         var result = adapter.findLiveCatalog("430100");
