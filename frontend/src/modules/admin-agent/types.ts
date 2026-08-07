@@ -1,4 +1,5 @@
-export type AdminAgentRunStatus = 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+export type AdminAgentRunStatus =
+  'WAITING_LOCATION' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
 export interface AdminAgentRunListQuery {
   status?: AdminAgentRunStatus;
@@ -11,10 +12,11 @@ export interface AdminAgentRunListQuery {
 
 export interface AdminAgentRunSummary {
   runId: string;
+  sessionId: string | null;
   userDisplay: string;
   status: AdminAgentRunStatus | string;
-  planId: string;
-  planVersion: number;
+  planId: string | null;
+  planVersion: number | null;
   nodeCount: number;
   completedNodeCount: number;
   failedNodeCount: number;
@@ -28,10 +30,10 @@ export interface AdminAgentRunSummary {
 export interface AdminAgentRunNode {
   nodeId: string;
   nodeType: string;
-  targetName: string;
+  targetName: string | null;
   status: string;
   attemptCount: number;
-  startedAt: string;
+  startedAt: string | null;
   finishedAt: string | null;
   durationMs: number | null;
   toolStatus: string | null;

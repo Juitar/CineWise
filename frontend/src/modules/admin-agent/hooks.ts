@@ -46,6 +46,10 @@ export function useAdminAgentRuns(query: AdminAgentRunListQuery): AdminAgentRuns
       .catch((requestError: unknown) => {
         const apiError = toAdminAgentApiError(requestError);
         if (apiError.kind !== 'CANCELLED' && requestSequence.current === currentSequence) {
+          // 身份或角色失效后不能继续保留管理数据，避免页面短暂展示旧轨迹。
+          if (apiError.status === 401 || apiError.status === 403) {
+            setData(null);
+          }
           setError(apiError);
         }
       })
