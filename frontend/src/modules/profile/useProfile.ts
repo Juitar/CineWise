@@ -2,10 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ApiError } from '../../shared/api/ApiError';
 import {
+  createMyTag,
+  deleteMyTag,
   getMyProfile,
   grantProfileDataConsent,
   updateMyPersonalization,
+  updateMyTag,
   withdrawProfileDataConsent,
+  type CreateProfileTagRequest,
+  type UpdateProfileTagRequest,
   type ProfilePage,
 } from './api';
 
@@ -133,6 +138,119 @@ export function useProfile(privacyPolicyVersion: string) {
     [clearForConsent, load, profile],
   );
 
+  const handleTagWriteError = useCallback(
+    async (error: unknown) => {
+      if (error instanceof ApiError && error.code === CONSENT_REQUIRED_CODE) {
+        clearForConsent();
+        return;
+      }
+      if (error instanceof ApiError && error.code === VERSION_CONFLICT_CODE) {
+        await load();
+        setNotice('画像状态已更新，请重新确认标签操作');
+        return;
+      }
+      if (error instanceof ApiError && error.code === 202003) {
+        await load();
+        setNotice('标签已不存在，已刷新标签列表');
+        return;
+      }
+      if (error instanceof ApiError && error.code === 202005) {
+        setNotice('幂等键已用于其他请求内容，请刷新后重新操作');
+        return;
+      }
+      if (error instanceof ApiError && error.status === 401) {
+        setNotice('登录状态已失效，请重新登录');
+        return;
+      }
+      if (error instanceof ApiError && error.status === 403) {
+        setNotice('当前账号无权修改画像标签');
+        return;
+      }
+      if (error instanceof ApiError && error.status === 404) {
+        await load();
+        setNotice('标签已不存在，已刷新标签列表');
+        return;
+      }
+      if (error instanceof ApiError && error.status === 422) {
+        setNotice('画像标签参数不正确');
+        return;
+      }
+      if (error instanceof ApiError && error.isResultUnknown) {
+        setNotice('请求结果暂时无法确认，请刷新页面后查看当前标签');
+        return;
+      }
+      if (error instanceof ApiError && (error.status ?? 0) >= 500) {
+        setNotice('画像标签暂时无法保存');
+        return;
+      }
+      setNotice('画像标签操作未完成，请稍后重试');
+    },
+    [clearForConsent, load],
+  );
+
+  const createTag = useCallback(
+    async (request: CreateProfileTagRequest) => {
+      if (!profile || savingRef.current || consentSavingRef.current) {
+        return;
+      }
+      savingRef.current = true;
+      setSaving(true);
+      try {
+        await createMyTag(request, profile.preference.version, crypto.randomUUID());
+        await load();
+        setNotice(null);
+      } catch (error) {
+        await handleTagWriteError(error);
+      } finally {
+        savingRef.current = false;
+        setSaving(false);
+      }
+    },
+    [handleTagWriteError, load, profile],
+  );
+
+  const updateTag = useCallback(
+    async (tagId: string, request: UpdateProfileTagRequest) => {
+      if (!profile || savingRef.current || consentSavingRef.current) {
+        return;
+      }
+      savingRef.current = true;
+      setSaving(true);
+      try {
+        await updateMyTag(tagId, request, profile.preference.version, crypto.randomUUID());
+        await load();
+        setNotice(null);
+      } catch (error) {
+        await handleTagWriteError(error);
+      } finally {
+        savingRef.current = false;
+        setSaving(false);
+      }
+    },
+    [handleTagWriteError, load, profile],
+  );
+
+  const deleteTag = useCallback(
+    async (tagId: string) => {
+      if (!profile || savingRef.current || consentSavingRef.current) {
+        return;
+      }
+      savingRef.current = true;
+      setSaving(true);
+      try {
+        await deleteMyTag(tagId, profile.preference.version, crypto.randomUUID());
+        await load();
+        setNotice(null);
+      } catch (error) {
+        await handleTagWriteError(error);
+      } finally {
+        savingRef.current = false;
+        setSaving(false);
+      }
+    },
+    [handleTagWriteError, load, profile],
+  );
+
   const setConsentEnabled = useCallback(
     async (enabled: boolean) => {
       const currentStateAllowsWrite =
@@ -186,8 +304,11 @@ export function useProfile(privacyPolicyVersion: string) {
     notice,
     profile,
     saving,
+    createTag,
+    deleteTag,
     setConsentEnabled,
     setEnabled,
+    updateTag,
     state,
   };
 }

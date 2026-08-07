@@ -6,16 +6,22 @@ import type { ProfilePage } from './api';
 import { useProfile } from './useProfile';
 
 const mocks = vi.hoisted(() => ({
+  createMyTag: vi.fn(),
+  deleteMyTag: vi.fn(),
   getMyProfile: vi.fn(),
   grantProfileDataConsent: vi.fn(),
   updateMyPersonalization: vi.fn(),
+  updateMyTag: vi.fn(),
   withdrawProfileDataConsent: vi.fn(),
 }));
 
 vi.mock('./api', () => ({
+  createMyTag: mocks.createMyTag,
+  deleteMyTag: mocks.deleteMyTag,
   getMyProfile: mocks.getMyProfile,
   grantProfileDataConsent: mocks.grantProfileDataConsent,
   updateMyPersonalization: mocks.updateMyPersonalization,
+  updateMyTag: mocks.updateMyTag,
   withdrawProfileDataConsent: mocks.withdrawProfileDataConsent,
 }));
 
@@ -41,9 +47,12 @@ const profile: ProfilePage = {
 
 describe('useProfile', () => {
   beforeEach(() => {
+    mocks.createMyTag.mockReset();
+    mocks.deleteMyTag.mockReset();
     mocks.getMyProfile.mockReset();
     mocks.grantProfileDataConsent.mockReset();
     mocks.updateMyPersonalization.mockReset();
+    mocks.updateMyTag.mockReset();
     mocks.withdrawProfileDataConsent.mockReset();
   });
 
@@ -322,5 +331,122 @@ describe('useProfile', () => {
       await withdrawalRequest;
     });
     expect(result.current.state).toBe('consent-required');
+  });
+
+  it('新增、修改、删除标签成功后都重新读取服务端画像', async () => {
+    const latest = { ...profile, preference: { ...profile.preference, version: 6 } };
+    mocks.getMyProfile.mockResolvedValueOnce(profile).mockResolvedValue(latest);
+    mocks.createMyTag.mockResolvedValue(profile.tags[0]);
+    mocks.updateMyTag.mockResolvedValue(profile.tags[0]);
+    mocks.deleteMyTag.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useProfile('2026-08-03'));
+    await waitFor(() => expect(result.current.state).toBe('ready'));
+
+    await act(async () => {
+      await result.current.createTag({
+        type: 'MOVIE_GENRE',
+        value: '科幻',
+        polarity: 'LIKE',
+        weight: 1,
+      });
+      await result.current.updateTag('1001', { polarity: 'DISLIKE' });
+      await result.current.deleteTag('1001');
+    });
+
+    expect(mocks.createMyTag).toHaveBeenCalledWith(
+      { type: 'MOVIE_GENRE', value: '科幻', polarity: 'LIKE', weight: 1 },
+      3,
+      expect.any(String),
+    );
+    expect(mocks.updateMyTag).toHaveBeenCalledWith(
+      '1001',
+      { polarity: 'DISLIKE' },
+      3,
+      expect.any(String),
+    );
+    expect(mocks.deleteMyTag).toHaveBeenCalledWith('1001', 3, expect.any(String));
+    expect(mocks.getMyProfile).toHaveBeenCalledTimes(4);
+  });
+
+  it.each([
+    [202002, '画像状态已更新，请重新确认标签操作'],
+    [202003, '标签已不存在，已刷新标签列表'],
+  ])('标签写入返回 %s 时重新读取并提示', async (code, message) => {
+    mocks.getMyProfile.mockResolvedValue(profile);
+    mocks.createMyTag.mockRejectedValue(
+      new ApiError('标签写入失败', { code, kind: 'HTTP', status: 409 }),
+    );
+    const { result } = renderHook(() => useProfile('2026-08-03'));
+    await waitFor(() => expect(result.current.state).toBe('ready'));
+
+    await act(async () => {
+      await result.current.createTag({
+        type: 'MOVIE_GENRE',
+        value: '科幻',
+        polarity: 'LIKE',
+        weight: 1,
+      });
+    });
+
+    expect(mocks.createMyTag).toHaveBeenCalledOnce();
+    expect(mocks.getMyProfile).toHaveBeenCalledTimes(2);
+    expect(result.current.notice).toBe(message);
+  });
+
+  it('标签写入返回 202004 时清空画像状态', async () => {
+    mocks.getMyProfile.mockResolvedValue(profile);
+    mocks.createMyTag.mockRejectedValue(
+      new ApiError('请先同意', { code: 202004, kind: 'HTTP', status: 403 }),
+    );
+    const { result } = renderHook(() => useProfile('2026-08-03'));
+    await waitFor(() => expect(result.current.state).toBe('ready'));
+
+    await act(async () => {
+      await result.current.createTag({
+        type: 'MOVIE_GENRE',
+        value: '科幻',
+        polarity: 'LIKE',
+        weight: 1,
+      });
+    });
+
+    expect(result.current.state).toBe('consent-required');
+    expect(result.current.profile).toBeNull();
+    expect(result.current.notice).toBe('未开启画像数据使用');
+  });
+
+  it('标签保存期间阻止重复提交', async () => {
+    let completeCreate: (() => void) | undefined;
+    mocks.getMyProfile.mockResolvedValue(profile);
+    mocks.createMyTag.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          completeCreate = () => resolve(profile.tags[0]);
+        }),
+    );
+    const { result } = renderHook(() => useProfile('2026-08-03'));
+    await waitFor(() => expect(result.current.state).toBe('ready'));
+
+    let firstRequest: Promise<void> | undefined;
+    act(() => {
+      firstRequest = result.current.createTag({
+        type: 'MOVIE_GENRE',
+        value: '科幻',
+        polarity: 'LIKE',
+        weight: 1,
+      });
+      void result.current.createTag({
+        type: 'MOVIE_GENRE',
+        value: '喜剧',
+        polarity: 'LIKE',
+        weight: 1,
+      });
+    });
+
+    expect(mocks.createMyTag).toHaveBeenCalledOnce();
+    await act(async () => {
+      completeCreate?.();
+      await firstRequest;
+    });
   });
 });

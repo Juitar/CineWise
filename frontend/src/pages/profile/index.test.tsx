@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { Modal } from 'antd';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,12 +25,15 @@ const mocks = vi.hoisted(() => ({
     consentSaving: false,
     consentStateKnown: true,
     load: vi.fn(),
+    createTag: vi.fn(),
+    deleteTag: vi.fn(),
     notice: '未开启画像数据使用' as string | null,
     profile: null as ProfilePageData | null,
     saving: false,
     setConsentEnabled: vi.fn(),
     setEnabled: vi.fn(),
     state: 'consent-required',
+    updateTag: vi.fn(),
   },
 }));
 
@@ -65,7 +69,10 @@ describe('ProfilePage', () => {
     mocks.profile.profile = null;
     mocks.profile.saving = false;
     mocks.profile.setConsentEnabled.mockReset().mockResolvedValue(undefined);
+    mocks.profile.createTag.mockReset().mockResolvedValue(undefined);
+    mocks.profile.deleteTag.mockReset().mockResolvedValue(undefined);
     mocks.profile.setEnabled.mockReset().mockResolvedValue(undefined);
+    mocks.profile.updateTag.mockReset().mockResolvedValue(undefined);
     mocks.profile.state = 'consent-required';
   });
 
@@ -151,5 +158,81 @@ describe('ProfilePage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('暂时无法读取个人资料');
     expect(screen.queryByRole('link', { name: '我的订单' })).not.toBeInTheDocument();
     expect(screen.queryByText('演示用户')).not.toBeInTheDocument();
+  });
+
+  it('可以选择六种标签类型和电影类型值并添加标签', () => {
+    mocks.profile.consentEnabled = true;
+    mocks.profile.notice = null;
+    mocks.profile.profile = {
+      preference: { enabled: true, updatedAt: '2026-08-07T00:00:00Z', version: 3 },
+      tags: [],
+      total: 0,
+    };
+    mocks.profile.state = 'ready';
+    render(<ProfilePage />);
+
+    expect(screen.getByRole('option', { name: '电影类型' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '观影时段' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '影院' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '影厅' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '价格区间' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '座位偏好' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('标签值'), { target: { value: '科幻' } });
+    fireEvent.submit(screen.getByRole('button', { name: '添加标签' }));
+
+    expect(mocks.profile.createTag).toHaveBeenCalledWith({
+      type: 'MOVIE_GENRE',
+      value: '科幻',
+      polarity: 'LIKE',
+      weight: 1,
+    });
+  });
+
+  it('可以修改倾向、停用和删除本人手动标签', () => {
+    mocks.profile.consentEnabled = true;
+    mocks.profile.notice = null;
+    mocks.profile.profile = {
+      preference: { enabled: true, updatedAt: '2026-08-07T00:00:00Z', version: 3 },
+      tags: [
+        {
+          confidence: 1,
+          expiresAt: null,
+          id: '1001',
+          polarity: 'LIKE',
+          source: 'MANUAL',
+          status: 'ACTIVE',
+          type: 'MOVIE_GENRE',
+          updatedAt: '2026-08-07T00:00:00Z',
+          value: '科幻',
+          version: 0,
+          weight: 1,
+        },
+      ],
+      total: 1,
+    };
+    mocks.profile.state = 'ready';
+    const confirm = vi.spyOn(Modal, 'confirm').mockImplementation((config) => {
+      void config.onOk?.();
+      return { destroy: vi.fn(), update: vi.fn() };
+    });
+    render(<ProfilePage />);
+
+    fireEvent.change(screen.getByRole('combobox', { name: '修改科幻倾向' }), {
+      target: { value: 'DISLIKE' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '停用' }));
+    fireEvent.click(screen.getByRole('button', { name: '删除' }));
+
+    expect(mocks.profile.updateTag).toHaveBeenNthCalledWith(1, '1001', {
+      polarity: 'DISLIKE',
+      weight: 1,
+    });
+    expect(mocks.profile.updateTag).toHaveBeenNthCalledWith(2, '1001', { status: 'DISABLED' });
+    expect(mocks.profile.deleteTag).toHaveBeenCalledWith('1001');
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '确认删除画像标签', okText: '删除', cancelText: '取消' }),
+    );
+    vi.restoreAllMocks();
   });
 });

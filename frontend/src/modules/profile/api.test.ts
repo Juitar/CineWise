@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  createMyTag,
+  deleteMyTag,
   getMyProfile,
   grantProfileDataConsent,
+  updateMyTag,
   updateMyPersonalization,
   withdrawProfileDataConsent,
 } from './api';
@@ -22,6 +25,7 @@ describe('profile api', () => {
     await getMyProfile();
 
     expect(mocks.apiRequest).toHaveBeenCalledWith('/api/v1/profile/me/tags', {
+      cache: 'no-store',
       query: { page: 1, size: 100 },
       signal: undefined,
     });
@@ -56,6 +60,40 @@ describe('profile api', () => {
     await withdrawProfileDataConsent();
 
     expect(mocks.apiRequest).toHaveBeenCalledWith('/api/v1/auth/profile-data-consent', {
+      method: 'DELETE',
+    });
+  });
+
+  it('新增标签时携带请求体、画像版本和幂等键', async () => {
+    mocks.apiRequest.mockResolvedValue({ id: '1001' });
+
+    await createMyTag(
+      { type: 'MOVIE_GENRE', value: '科幻', polarity: 'LIKE', weight: 1 },
+      3,
+      'request-create',
+    );
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith('/api/v1/profile/me/tags', {
+      body: { type: 'MOVIE_GENRE', value: '科幻', polarity: 'LIKE', weight: 1 },
+      headers: { 'Idempotency-Key': 'request-create', 'If-Match': '3' },
+      method: 'POST',
+    });
+  });
+
+  it('更新和删除标签使用标签 ID 和画像版本', async () => {
+    mocks.apiRequest.mockResolvedValue({ id: '1001' });
+
+    await updateMyTag('1001', { polarity: 'DISLIKE' }, 4, 'request-update');
+    await deleteMyTag('1001', 5, 'request-delete');
+
+    expect(mocks.apiRequest).toHaveBeenNthCalledWith(1, '/api/v1/profile/me/tags/1001', {
+      body: { polarity: 'DISLIKE' },
+      headers: { 'Idempotency-Key': 'request-update', 'If-Match': '4' },
+      method: 'PUT',
+    });
+    expect(mocks.apiRequest).toHaveBeenNthCalledWith(2, '/api/v1/profile/me/tags/1001', {
+      allowEmptyResponse: true,
+      headers: { 'Idempotency-Key': 'request-delete', 'If-Match': '5' },
       method: 'DELETE',
     });
   });
