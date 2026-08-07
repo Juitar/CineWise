@@ -103,22 +103,22 @@ describe('用户端订单导航', () => {
     expect(screen.getByTestId('film-icon')).toBeInTheDocument();
   });
 
-  it('桌面侧边栏不显示订单入口，用户菜单仍可进入订单列表', () => {
+  it('桌面侧边栏和用户菜单均不显示订单入口', () => {
     const { unmount } = render(<DesktopSidebar />);
     expect(screen.queryByRole('link', { name: '我的订单' })).not.toBeInTheDocument();
     unmount();
 
     render(<DesktopTopBar />);
-    expect(screen.getByRole('link', { name: '我的订单' })).toHaveAttribute('href', '/orders');
+    expect(screen.queryByRole('link', { name: '我的订单' })).not.toBeInTheDocument();
   });
 
-  it('移动端底部导航为已登录用户显示订单入口', () => {
+  it('移动端底部导航不显示订单入口', () => {
     render(<MobileTabBar />);
 
-    expect(screen.getByRole('button', { name: '订单' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '订单' })).not.toBeInTheDocument();
   });
 
-  it('未登录用户看不到桌面和移动端的订单操作', () => {
+  it('未登录用户也看不到公共导航中的订单操作', () => {
     mocks.auth.currentUser = null;
     mocks.auth.status = 'anonymous';
 

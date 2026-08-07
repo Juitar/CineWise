@@ -1,1 +1,1 @@
-{ "code": 0, "message": "success", "data": { "available": false, "taskId": "90003", "taskStatus": "PENDING", "weather": null, "advice": [], "source": null, "dataAt": null, "expiresAt": null, "isExpired": false, "degraded": false, "fallbackType": null } }
+{ "code": 0, "message": "success", "traceId": "33333333333333333333333333333333", "data": { "available": false, "taskId": "90003", "taskStatus": "PENDING", "weather": null, "advice": [], "source": null, "dataAt": null, "expiresAt": null, "isExpired": false, "degraded": false, "fallbackType": null } }

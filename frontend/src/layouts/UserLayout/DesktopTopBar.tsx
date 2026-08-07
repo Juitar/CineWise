@@ -16,10 +16,6 @@ export const DesktopTopBar: React.FC = () => {
       label: <Link to="/profile">个人中心</Link>,
     },
     {
-      key: 'orders',
-      label: <Link to="/orders">我的订单</Link>,
-    },
-    {
       type: 'divider',
     },
     {

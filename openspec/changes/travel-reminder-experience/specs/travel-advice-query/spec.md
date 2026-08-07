@@ -1,12 +1,12 @@
 ## Purpose
 
-为已支付用户提供可追溯的天气和通用交通建议，并在用户主动操作时安全提供一条基础路线和影院周边餐饮候选，外部服务不可用时不影响购票主流程。
+为已支付用户提供可追溯的天气和通用交通建议，并在用户主动操作时安全提供一条基础路线；外部服务不可用时不影响购票主流程。
 
 ## ADDED Requirements
 
 ### Requirement: 动态出行数据必须标明来源、时效和降级
 
-系统 SHALL 为天气、路线和餐饮响应提供 `source`、`dataTime`、`expiresAt`、`isExpired`、`degraded` 和 `fallbackType`。外部 Provider 未确定、超时或失败时 MUST 使用有效缓存或版本化 Demo 数据；没有可用数据时 MUST 明确省略该事实，不得冒充实时结果。
+系统 SHALL 为天气和路线响应提供 `source`、`dataTime`、`expiresAt`、`isExpired`、`degraded` 和 `fallbackType`。天气 Provider 未确定、超时或失败时 MUST 使用有效缓存或版本化 Demo 数据；路线 Provider 未配置、超时或失败时只能返回明确标记的版本化 Demo 路线或 `307001`，不得冒充实时结果。
 
 #### Scenario: 返回 Demo 天气
 - **GIVEN** 真实天气 Provider 不可用且版本化 Demo 数据可用
@@ -22,7 +22,7 @@
 
 ### Requirement: 已配置时按影院区域查询高德实时天气
 
-系统 SHALL 在配置有效的高德 Web 服务 `key` 且影院区域存在已登记行政区码时，调用高德天气查询接口获取实况天气。调用参数 MUST 使用影院区域对应的行政区码，不得使用用户精确位置、用户地址或路线数据；密钥不得写入日志、快照或响应。成功结果 MUST 标记 `source=AMAP_WEATHER`、`degraded=false`，并根据天气状况返回出行提醒建议。
+系统 SHALL 在配置有效的高德 Web 服务 `key` 且影院存在已登记行政区码时，调用高德天气查询接口获取实况天气。行政区码优先使用本地影院区域配置，其次使用本地影院城市和行政区码配置；不得根据模糊影院地址、用户精确位置、用户地址或路线数据猜测。密钥不得写入日志、快照或响应。成功结果 MUST 标记 `source=AMAP_WEATHER`、`degraded=false`，并根据天气状况返回出行提醒建议。
 
 #### Scenario: 高德实况天气查询成功
 - **GIVEN** 高德天气开关已开启、`key` 已配置，且影院区域有对应行政区码
@@ -31,9 +31,9 @@
 - **AND** 返回的 `source` 为 `AMAP_WEATHER`，`degraded=false`
 
 #### Scenario: 高德配置或查询不可用
-- **GIVEN** 高德 `key` 缺失、影院区域没有行政区码，或高德接口返回失败结果
+- **GIVEN** 高德 `key` 缺失、影院没有行政区码映射，或高德接口返回失败结果
 - **WHEN** 系统查询天气建议
-- **THEN** 系统继续按有效缓存、版本化 Demo、明确不可用的顺序返回
+- **THEN** 系统继续按有效缓存、版本化 Demo、明确不可用的顺序返回，并保留通用交通建议
 - **AND** 系统不把 Demo 或缓存数据标记为高德实时天气
 
 ### Requirement: 出行建议查询必须返回类型化页面数据
@@ -97,9 +97,9 @@ D SHALL 提供固定夹具和 OpenAPI 示例，覆盖正常天气、天气不可
 - **THEN** 页面只读取类型化 `weather`、`advice` 和来源时效字段
 - **AND** 页面不解析 `weatherJson`、`adviceJson`，也不读取 D 的数据库或内部类
 
-### Requirement: 基础路线只能由用户主动发起且不保存精确位置
+### Requirement: 高德真实路线只能由用户主动发起且不保存精确位置
 
-系统 SHALL 仅在用户主动请求并确认第三方位置共享说明后，使用一次性设备位置或手动地点生成一条基础路线、预计耗时和预计出发时间。精确起点、路线折线和途经点 MUST 不写入 MySQL、Redis、日志、画像、建议快照、URL 或 Agent 轨迹，且不持续定位。
+系统 SHALL 仅在用户主动请求并确认第三方位置共享说明后，使用一次性设备位置或手动地点调用高德真实路线 Provider。设备位置必须已经由 C 完成授权；用户拒绝定位、定位超时或定位不可用时，只能由用户主动提交手动地点。请求使用一次性起点、影院终点和 `travelMode`；连接超时为 2 秒、读取超时为 5 秒。成功响应必须返回 `travelMode`、`durationMinutes`、`suggestedDepartureAt`、`source=AMAP_ROUTE`、`dataTime`、`expiresAt`、`degraded=false`。精确起点、路线折线和途经点 MUST 不写入 MySQL、Redis、日志、画像、建议快照、URL 或 Agent 轨迹，且不持续定位。
 
 #### Scenario: 用户拒绝定位后使用手动地点
 - **GIVEN** 浏览器定位被拒绝、超时或不可用
@@ -107,27 +107,17 @@ D SHALL 提供固定夹具和 OpenAPI 示例，覆盖正常天气、天气不可
 - **THEN** 系统仅使用该次请求的地点生成基础路线
 - **AND** 请求结束后不保留该地点
 
-#### Scenario: 路线服务失败
+#### Scenario: 高德路线成功
+- **GIVEN** 用户主动请求、已确认位置共享、定位已授权或已提交手动地点，且高德路线配置和影院终点可用
+- **WHEN** D 查询高德真实路线
+- **THEN** 返回 `source=AMAP_ROUTE`、`degraded=false` 和路线摘要
+- **AND** C 仅在页面内存中使用本次响应的路线折线渲染地图
+
+#### Scenario: 高德路线未配置、超时或失败
 - **GIVEN** 用户已主动请求路线
-- **WHEN** 路线 Provider 或地图渲染失败
-- **THEN** 系统返回路线服务暂不可用
-- **AND** 继续展示影院地址和通用交通建议，且不生成文字路线替代结果
-
-### Requirement: 简单周边餐饮查询必须受半径和业务范围限制
-
-系统 SHALL 仅在用户主动查询时，按影院位置和受控 `radiusMeters` 返回基础餐饮 POI；未指定半径时使用服务端默认值，超出允许范围时返回稳定参数错误。结果 MUST 稳定排序并标明营业状态已知性、来源和时效。
-
-#### Scenario: 餐饮半径越界
-- **GIVEN** 用户提交的半径超出服务端允许范围
-- **WHEN** 系统查询周边餐饮
-- **THEN** 系统返回 `107003`
-- **AND** 不调用 Provider、不修改任务或建议
-
-#### Scenario: 餐饮结果为空或 Provider 超时
-- **GIVEN** 查询没有候选或 Provider 不可用
-- **WHEN** 用户主动查询周边餐饮
-- **THEN** 系统返回空候选或明确降级标识
-- **AND** 不读取长期画像、不按用餐时段判断，也不执行预订、排队、点餐或支付
+- **WHEN** 路线开关关闭、Key 缺失、影院终点缺失、连接或读取超时、网络异常、高德非成功响应或返回字段不完整
+- **THEN** 有 `DEMO_ROUTE_V1` 时返回 `source=DEMO_ROUTE_V1`、`degraded=true` 和 `fallbackType=DEMO_ROUTE`
+- **AND** 无 Demo 时返回 HTTP 503/`307001`，继续展示影院地址和通用交通建议，且不生成文字路线替代结果
 
 ### Requirement: 用户刷新建议必须受任务状态和频率限制
 

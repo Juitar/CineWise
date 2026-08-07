@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.travel.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import com.miaoyu.ticket.order.event.OrderInvalidated;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -93,6 +95,31 @@ class TravelTaskApplicationServiceTest {
         assertThat(newer.orderVersion()).isEqualTo(6L);
     }
 
+    @Test
+    void givenInvalidCinemaIds_whenEnsuringPaymentTask_thenRejectEventWithoutCreatingTask() {
+        for (String cinemaId : invalidCinemaIds()) {
+            InMemoryTravelTaskRepository repository = new InMemoryTravelTaskRepository();
+            TravelTaskApplicationService service = service(repository);
+
+            assertThatIllegalArgumentException().isThrownBy(() -> service.ensureTask(
+                    paymentEvent("invalid-cinema-" + cinemaId, "90005", cinemaId)));
+
+            assertThat(repository.count()).isZero();
+        }
+    }
+
+    @Test
+    void givenInvalidCinemaIds_whenRefundArrivesFirst_thenKeepNullTombstone() {
+        for (String cinemaId : invalidCinemaIds()) {
+            InMemoryTravelTaskRepository repository = new InMemoryTravelTaskRepository();
+            TravelTaskApplicationService service = service(repository);
+
+            service.ensureTaskCancelled(invalidatedEvent("invalid-refund-" + cinemaId, "90006", 4L, cinemaId));
+
+            assertThat(repository.findByOrderId(90006L).orElseThrow().cinemaId()).isNull();
+        }
+    }
+
     private TravelTaskApplicationService service(InMemoryTravelTaskRepository repository) {
         AtomicLong ids = new AtomicLong(9_000_000L);
         BusinessIdGenerator idGenerator = ids::incrementAndGet;
@@ -108,12 +135,16 @@ class TravelTaskApplicationServiceTest {
     }
 
     private PaymentSucceededEvent paymentEvent(String eventId, String orderId) {
+        return paymentEvent(eventId, orderId, "60001");
+    }
+
+    private PaymentSucceededEvent paymentEvent(String eventId, String orderId, String cinemaId) {
         OffsetDateTime startAt = OffsetDateTime.parse("2026-08-05T19:00:00+08:00");
         return new PaymentSucceededEvent(
                 eventId,
                 orderId,
                 "80001",
-                "60001",
+                cinemaId,
                 "70001",
                 "西湖区",
                 startAt,
@@ -122,10 +153,18 @@ class TravelTaskApplicationServiceTest {
     }
 
     private OrderInvalidated invalidatedEvent(String eventId, String orderId, long orderVersion) {
+        return invalidatedEvent(eventId, orderId, orderVersion, "60001");
+    }
+
+    private OrderInvalidated invalidatedEvent(String eventId, String orderId, long orderVersion, String cinemaId) {
         return new OrderInvalidated(
-                eventId, orderId, "80001", "60001", "70001", "西湖区",
+                eventId, orderId, "80001", cinemaId, "70001", "西湖区",
                 OffsetDateTime.parse("2026-08-05T19:00:00+08:00"), orderVersion,
                 OffsetDateTime.parse("2026-08-04T08:10:00+08:00"), "REFUNDED");
+    }
+
+    private List<String> invalidCinemaIds() {
+        return List.of("044001", " 44001", "44001 ", "0", "-1", "9223372036854775808");
     }
 
     /** 用并发 Map 模拟两个唯一索引，让应用层重复恢复逻辑不依赖数据库实现细节。 */

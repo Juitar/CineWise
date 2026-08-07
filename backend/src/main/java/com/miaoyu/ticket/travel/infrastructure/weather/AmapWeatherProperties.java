@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 /**
  * 高德天气的运行配置。
@@ -22,7 +23,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties("cinewise.travel.weather.amap")
 public record AmapWeatherProperties(boolean enabled, String key, Duration cacheTtl,
-                                   Map<String, String> areaAdcodes) {
+                                   Map<String, String> areaAdcodes, Map<String, String> cityAdcodes) {
+
+    /** 保留旧构造方式，避免已有单元测试和离线夹具因为新增城市配置被迫改动。 */
+    public AmapWeatherProperties(boolean enabled, String key, Duration cacheTtl,
+                                 Map<String, String> areaAdcodes) {
+        this(enabled, key, cacheTtl, areaAdcodes, Map.of());
+    }
 
     /**
      * 启动时拒绝无效有效期和错误行政区码。
@@ -31,6 +38,7 @@ public record AmapWeatherProperties(boolean enabled, String key, Duration cacheT
      *
      * <p>行政区码固定为六位正整数，不接受影院内部 ID。</p>
      */
+    @ConstructorBinding
     public AmapWeatherProperties {
         key = key == null ? "" : key.trim();
         cacheTtl = Objects.requireNonNull(cacheTtl, "cacheTtl must not be null");
@@ -39,14 +47,14 @@ public record AmapWeatherProperties(boolean enabled, String key, Duration cacheT
         }
         Map<String, String> normalized = new LinkedHashMap<>();
         Objects.requireNonNull(areaAdcodes, "areaAdcodes must not be null").forEach((area, adcode) -> {
-            String normalizedArea = requireText(area, "area");
-            String normalizedAdcode = requireText(adcode, "adcode");
-            if (!normalizedAdcode.matches("[1-9][0-9]{5}")) {
-                throw new IllegalArgumentException("adcode must be a six digit administrative code");
-            }
-            normalized.put(normalizedArea, normalizedAdcode);
+            normalized.put(requireText(area, "area"), requireAdcode(adcode));
         });
         areaAdcodes = Map.copyOf(normalized);
+        Map<String, String> normalizedCities = new LinkedHashMap<>();
+        cityAdcodes = cityAdcodes == null ? Map.of() : cityAdcodes;
+        cityAdcodes.forEach((city, adcode) ->
+                normalizedCities.put(requireText(city, "city"), requireAdcode(adcode)));
+        cityAdcodes = Map.copyOf(normalizedCities);
     }
 
     /**
@@ -55,7 +63,24 @@ public record AmapWeatherProperties(boolean enabled, String key, Duration cacheT
      * <p>调用方会回退到 Demo 或不可用结果。</p>
      */
     public String findAdcode(String cinemaArea) {
-        return cinemaArea == null ? null : areaAdcodes.get(cinemaArea.trim());
+        if (cinemaArea == null) {
+            return null;
+        }
+        String normalizedArea = cinemaArea.trim();
+        String areaCode = areaAdcodes.get(normalizedArea);
+        if (areaCode != null) {
+            return areaCode;
+        }
+        // 区域没有精确配置时，只按已登记的城市名称查找，不从地址文本推测行政区码。
+        return cityAdcodes.get(normalizedArea);
+    }
+
+    private static String requireAdcode(String adcode) {
+        String normalized = requireText(adcode, "adcode");
+        if (!normalized.matches("[1-9][0-9]{5}")) {
+            throw new IllegalArgumentException("adcode must be a six digit administrative code");
+        }
+        return normalized;
     }
 
     private static String requireText(String value, String fieldName) {

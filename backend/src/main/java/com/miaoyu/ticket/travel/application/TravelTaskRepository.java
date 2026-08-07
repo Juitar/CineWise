@@ -71,6 +71,7 @@ public interface TravelTaskRepository {
             long userId,
             long orderId,
             long showId,
+            Long cinemaId,
             String cinemaArea,
             LocalDateTime startAt,
             LocalDateTime triggerAt,
@@ -79,6 +80,17 @@ public interface TravelTaskRepository {
             TravelTaskStatus status,
             LocalDateTime closedAt,
             LocalDateTime updatedAt) {
+
+        /**
+         * 保留旧测试和历史任务构造方式；历史 V013 前的任务没有影院标识，必须显式表示为 NULL。
+         */
+        public TravelTaskSnapshot(
+                long id, String taskId, long userId, long orderId, long showId, String cinemaArea,
+                LocalDateTime startAt, LocalDateTime triggerAt, long orderVersion, long version,
+                TravelTaskStatus status, LocalDateTime closedAt, LocalDateTime updatedAt) {
+            this(id, taskId, userId, orderId, showId, null, cinemaArea, startAt, triggerAt,
+                    orderVersion, version, status, closedAt, updatedAt);
+        }
     }
 
     /**
@@ -93,6 +105,7 @@ public interface TravelTaskRepository {
             long userId,
             long orderId,
             long showId,
+            Long cinemaId,
             String cinemaArea,
             LocalDateTime startAt,
             LocalDateTime triggerAt,
@@ -108,6 +121,7 @@ public interface TravelTaskRepository {
             long userId,
             long orderId,
             long showId,
+            Long cinemaId,
             String cinemaArea,
             LocalDateTime startAt,
             LocalDateTime triggerAt,
