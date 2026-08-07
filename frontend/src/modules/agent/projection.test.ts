@@ -144,7 +144,11 @@ describe('Agent 事件投影', () => {
       parseAgentEvent(questionCard),
     );
     expect(question.projection.items[0]).toEqual(
-      expect.objectContaining({ kind: 'question', text: '想在哪天观看？' }),
+      expect.objectContaining({
+        kind: 'question',
+        text: '想在哪天观看？',
+        options: ['今天'],
+      }),
     );
     const progress = consumeAgentEvent(question.projection, parseAgentEvent(progressCard));
     const error = consumeAgentEvent(progress.projection, parseAgentEvent(errorCard));
@@ -155,6 +159,30 @@ describe('Agent 事件投影', () => {
       ]),
     );
     expect(JSON.stringify(error.projection)).not.toContain('内部详情');
+  });
+
+  it('推荐卡只投影已校验的候选标题，不带未声明字段', () => {
+    const result = consumeAgentEvent(
+      createAgentProjection('session-example-1'),
+      parseAgentEvent({
+        ...movieCard,
+        payload: {
+          ...movieCard.payload,
+          movies: [
+            {
+              ...movieCard.payload.movies[0],
+              internalToolArgs: '不应展示',
+            },
+          ],
+        },
+      }),
+    );
+    expect(result.projection.items[0].fields).toContainEqual({
+      label: '影片 1 · 片名',
+      value: '示例影片',
+    });
+    expect(JSON.stringify(result.projection.items[0])).not.toContain('internalToolArgs');
+    expect(JSON.stringify(result.projection.items[0])).not.toContain('不应展示');
   });
 
   it.each([
