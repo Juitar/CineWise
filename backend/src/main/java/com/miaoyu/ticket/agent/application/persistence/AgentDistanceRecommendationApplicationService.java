@@ -138,7 +138,12 @@ public class AgentDistanceRecommendationApplicationService {
      * 超时扫描只由已认证用户的后续查询或操作触发；查询条件和 CAS 都使用 MySQL CURRENT_TIMESTAMP(3)。
      * 这样不会在没有认证上下文的后台线程中伪造 D 工具所需的当前用户。
      */
-    private void recoverExpiredWaitingRuns() {
+    /**
+     * 在任一已认证的新请求入口前恢复本人已过期的等待运行。
+     *
+     * <p>CAS 失败时只读取当前事实，绝不重复执行同一运行。</p>
+     */
+    public void recoverExpiredWaitingRuns() {
         long userId = currentUserAccessor.requireCurrentUserId();
         runRepository.findExpiredWaitingLocationByUser(userId, 100).forEach(waiting -> {
             AgentRun running = expiredWaitingToRunning(waiting);

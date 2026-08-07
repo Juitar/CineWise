@@ -17,6 +17,7 @@ import com.miaoyu.ticket.agent.application.persistence.AgentRunResultTransaction
 import com.miaoyu.ticket.agent.application.persistence.AgentRunStaleRecoveryService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunStepRepository;
 import com.miaoyu.ticket.agent.application.confirmation.CreateOrderConfirmationActionOrchestrator;
+import com.miaoyu.ticket.agent.application.AgentDistanceRecommendationApplicationService;
 import com.miaoyu.ticket.agent.application.run.MultiToolSupervisor;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRequestHash;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
@@ -47,6 +48,8 @@ class AgentMessageSubmissionServiceTest {
         AgentMessageRepository messageRepository = mock(AgentMessageRepository.class);
         AgentRunStepRepository stepRepository = mock(AgentRunStepRepository.class);
         AgentRunStaleRecoveryService staleRecoveryService = mock(AgentRunStaleRecoveryService.class);
+        AgentDistanceRecommendationApplicationService distanceRecommendationService =
+                mock(AgentDistanceRecommendationApplicationService.class);
         when(currentUserAccessor.requireCurrentUserId())
                 .thenThrow(new BusinessException(AuthErrorCode.SESSION_INVALID));
         AgentMessageSubmissionService service = new AgentMessageSubmissionService(
@@ -58,7 +61,8 @@ class AgentMessageSubmissionServiceTest {
                 confirmationActionOrchestrator,
                 messageRepository,
                 stepRepository,
-                staleRecoveryService);
+                staleRecoveryService,
+                distanceRecommendationService);
 
         BusinessException exception = org.junit.jupiter.api.Assertions.assertThrows(
                 BusinessException.class, () -> service.submit(command()));
@@ -67,6 +71,7 @@ class AgentMessageSubmissionServiceTest {
         verify(initialRunTransaction, never()).submit(
                 org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
         verify(staleRecoveryService, never()).recoverStaleRuns();
+        verify(distanceRecommendationService, never()).recoverExpiredWaitingRuns();
     }
 
     @Test
@@ -82,6 +87,8 @@ class AgentMessageSubmissionServiceTest {
         AgentMessageRepository messageRepository = mock(AgentMessageRepository.class);
         AgentRunStepRepository stepRepository = mock(AgentRunStepRepository.class);
         AgentRunStaleRecoveryService staleRecoveryService = mock(AgentRunStaleRecoveryService.class);
+        AgentDistanceRecommendationApplicationService distanceRecommendationService =
+                mock(AgentDistanceRecommendationApplicationService.class);
         AgentRun run = run();
         when(currentUserAccessor.requireCurrentUserId()).thenReturn(7L);
         when(initialRunTransaction.submit(7L, command())).thenReturn(new AgentInitialRunResult(run, true));
@@ -96,12 +103,14 @@ class AgentMessageSubmissionServiceTest {
                 confirmationActionOrchestrator,
                 messageRepository,
                 stepRepository,
-                staleRecoveryService);
+                staleRecoveryService,
+                distanceRecommendationService);
 
         var result = service.submit(command());
 
         assertTrue(result.reused());
         verify(staleRecoveryService).recoverStaleRuns();
+        verify(distanceRecommendationService).recoverExpiredWaitingRuns();
         verify(messageRepository).findByRunIdAndUserId(100L, 7L);
         verify(multiToolSupervisor, never()).run(org.mockito.ArgumentMatchers.any());
         verify(runResultTransaction, never()).record(
