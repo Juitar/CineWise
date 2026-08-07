@@ -107,13 +107,14 @@ public class DemoContentProvider implements ContentProvider {
     /** 只替换环境相关的数据库 ID，保留 JSON 目录中受 D 管理的内容字段。 */
     private ContentItem attachActualId(ContentItem item, Map<String, Long> ids) {
         if (item instanceof MovieContent movie) {
+            // 业务 ID 仅替换环境相关的主键；目录已有的展示资料必须原样保留，避免 Demo 与真实快照字段表现不一致。
             return new MovieContent(
                     ids.get(movie.sourceMovieId()),
                     movie.sourceMovieId(),
                     movie.title(),
                     movie.genresJson(),
                     movie.durationMinutes(),
-                    movie.rating());
+                    movie.rating(), movie.posterUrl(), movie.summary(), movie.releaseDate(), movie.releaseStatus());
         }
         CinemaContent cinema = (CinemaContent) item;
         return new CinemaContent(
@@ -136,9 +137,10 @@ public class DemoContentProvider implements ContentProvider {
         return movies.stream()
                 .filter(movie -> requestedSourceId == null || requestedSourceId.equals(movie.sourceMovieId()))
                 .filter(movie -> matches(query.keyword(), movie.title(), movie.sourceMovieId()))
+                // 精确详情回退同样只替换业务 ID，不能因构造兼容对象而丢失目录版本中的资料字段。
                 .map(movie -> query.contentId() == null ? movie : new MovieContent(query.contentId(),
                         movie.sourceMovieId(), movie.title(), movie.genresJson(), movie.durationMinutes(),
-                        movie.rating()))
+                        movie.rating(), movie.posterUrl(), movie.summary(), movie.releaseDate(), movie.releaseStatus()))
                 .toList();
     }
 

@@ -322,15 +322,65 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
                 || !java.util.Objects.equals(releaseStatus, savedState.releaseStatus())) {
             return false;
         }
-        // 目录只提供上映状态和日期；两者都未变化时，已保存影片直接跳过详情请求，避免定时任务重复写入。
-        return true;
+        // 目录还会提供片名、类型和评分；这些资料变化时必须重新拉详情，不能只看上映状态。
+        String title = movie.path("nm").asText(null);
+        String genres = genresJson(movie.path("cat").asText(null));
+        java.math.BigDecimal rating = decimalValue(movie.path("sc"));
+        return sameIfKnown(savedState.title(), title)
+                && sameIfKnown(savedState.genresJson(), genres)
+                && sameIfKnown(savedState.rating(), rating);
+    }
+
+    /**
+     * 上游目录不保证每次都带齐全部展示字段。
+     * 缺少当前字段时不能把它解释成资料已删除，也不能导致每天都重复拉取同一详情。
+     */
+    private boolean sameIfKnown(Object saved, Object current) {
+        // 当前目录不带字段时只能说明本轮无法比较，不能覆盖已落库资料或触发无意义的详情刷新。
+        // 但旧记录缺字段而本轮目录已给出值时，必须拉取详情补齐，不能把历史空值当成“相同”。
+        if (current == null) {
+            return true;
+        }
+        if (saved instanceof java.math.BigDecimal savedRating
+                && current instanceof java.math.BigDecimal currentRating) {
+            // Provider 评分的尾随零不表示资料变化，例如 8.0 和 8.00 应复用已有详情。
+            return savedRating.compareTo(currentRating) == 0;
+        }
+        return java.util.Objects.equals(saved, current);
+    }
+
+    /**
+     * 目录评分只用于发现变化，不参与票务价格或推荐计算。
+     * 非法评分按未知处理，由详情映射器决定该条资料是否合格。
+     */
+    private java.math.BigDecimal decimalValue(JsonNode node) {
+        try {
+            return node.isMissingNode() || node.isNull() || node.asText().isBlank()
+                    ? null : new java.math.BigDecimal(node.asText());
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    /**
+     * 增量比较必须采用与详情 Mapper 相同的分类标准化形式。
+     * 否则仅因逗号形式不同就会反复请求详情，消耗学习来源的本地保护额度。
+     */
+    private String genresJson(String genres) {
+        if (genres == null || genres.isBlank()) {
+            return null;
+        }
+        return java.util.Arrays.stream(genres.split("[,，、/]"))
+                .map(String::trim).filter(value -> !value.isEmpty())
+                .map(value -> "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
+                .collect(java.util.stream.Collectors.joining(",", "[", "]"));
     }
 
     /**
      * 所有原始请求统一在此处消耗本地额度，并且只对连接失败或 5xx 重试一次。
      *
      * <p>请求成功只表示收到 JSON，字段质量仍由 normalizeAll 决定；不能因 HTTP 200
-     * 就把不完整数据标记为 LIVE 内容。</p>
+     * 不能把不完整数据标记为 LIVE。</p>
      *
      * <p>重试前再次检查额度，防止单个异常请求绕开限流。线程被中断时恢复中断标记，
      * 让调度器可按正常停止流程处理，而不是吞掉关闭信号。</p>
