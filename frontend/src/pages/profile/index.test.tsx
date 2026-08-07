@@ -3,6 +3,7 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CurrentUser } from '../../modules/auth/types';
+import type { ProfilePage as ProfilePageData } from '../../modules/profile/api';
 import ProfilePage from './index';
 
 const user: CurrentUser = {
@@ -19,10 +20,14 @@ const mocks = vi.hoisted(() => ({
   auth: { currentUser: null as CurrentUser | null },
   logout: { handleLogout: vi.fn(), isLoggingOut: false },
   profile: {
+    consentEnabled: false,
+    consentSaving: false,
+    consentStateKnown: true,
     load: vi.fn(),
-    notice: '未开启画像数据使用',
-    profile: null,
+    notice: '未开启画像数据使用' as string | null,
+    profile: null as ProfilePageData | null,
     saving: false,
+    setConsentEnabled: vi.fn(),
     setEnabled: vi.fn(),
     state: 'consent-required',
   },
@@ -53,6 +58,15 @@ describe('ProfilePage', () => {
     mocks.auth.currentUser = user;
     mocks.logout.handleLogout.mockReset().mockResolvedValue(undefined);
     mocks.logout.isLoggingOut = false;
+    mocks.profile.consentEnabled = false;
+    mocks.profile.consentSaving = false;
+    mocks.profile.consentStateKnown = true;
+    mocks.profile.notice = '未开启画像数据使用';
+    mocks.profile.profile = null;
+    mocks.profile.saving = false;
+    mocks.profile.setConsentEnabled.mockReset().mockResolvedValue(undefined);
+    mocks.profile.setEnabled.mockReset().mockResolvedValue(undefined);
+    mocks.profile.state = 'consent-required';
   });
 
   afterEach(cleanup);
@@ -75,8 +89,48 @@ describe('ProfilePage', () => {
     expect(screen.queryByText('我的观影记录')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'AI 观影画像' })).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('未开启画像数据使用');
-    expect(screen.queryByText('开启个性化')).not.toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: '使用用户画像' })).not.toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: '开启个性化' })).not.toBeInTheDocument();
     expect(screen.queryByText('星际穿越')).not.toBeInTheDocument();
+  });
+
+  it('已同意时区分画像数据使用和个性化两个开关', () => {
+    mocks.profile.consentEnabled = true;
+    mocks.profile.notice = null;
+    mocks.profile.profile = {
+      preference: { enabled: false, updatedAt: '2026-08-07T00:00:00Z', version: 3 },
+      tags: [],
+      total: 0,
+    };
+    mocks.profile.state = 'ready';
+    render(<ProfilePage />);
+
+    const consentToggle = screen.getByRole('switch', { name: '使用用户画像' });
+    const personalizationToggle = screen.getByRole('checkbox', { name: '开启个性化' });
+    expect(consentToggle).toBeChecked();
+    expect(personalizationToggle).not.toBeChecked();
+
+    fireEvent.click(consentToggle);
+    fireEvent.click(personalizationToggle);
+    expect(mocks.profile.setConsentEnabled).toHaveBeenCalledWith(false);
+    expect(mocks.profile.setEnabled).toHaveBeenCalledWith(true);
+  });
+
+  it('画像同意提交中禁用两个开关', () => {
+    mocks.profile.consentEnabled = true;
+    mocks.profile.consentSaving = true;
+    mocks.profile.notice = null;
+    mocks.profile.profile = {
+      preference: { enabled: true, updatedAt: '2026-08-07T00:00:00Z', version: 3 },
+      tags: [],
+      total: 0,
+    };
+    mocks.profile.state = 'ready';
+    render(<ProfilePage />);
+
+    expect(screen.getByRole('switch', { name: '使用用户画像' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: '开启个性化' })).toBeDisabled();
+    expect(screen.getByText('正在保存')).toBeInTheDocument();
   });
 
   it('通过共享退出 Hook 执行退出并显示提交中状态', () => {

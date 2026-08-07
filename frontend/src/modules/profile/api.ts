@@ -34,6 +34,21 @@ export function getMyProfile(signal?: AbortSignal): Promise<ProfilePage> {
   });
 }
 
+/** 作出独立的画像数据使用同意；注册隐私同意和个性化开关不能替代该请求。 */
+export function grantProfileDataConsent(privacyPolicyVersion: string): Promise<void> {
+  return apiRequest<void>('/api/v1/auth/profile-data-consent', {
+    body: { privacyPolicyVersion },
+    method: 'PUT',
+  });
+}
+
+/** 撤回画像数据使用同意；成功后调用方必须立即清除页面内存画像。 */
+export function withdrawProfileDataConsent(): Promise<void> {
+  return apiRequest<void>('/api/v1/auth/profile-data-consent', {
+    method: 'DELETE',
+  });
+}
+
 /** 写操作使用当前画像版本和单次幂等键，网络失败时不自动重发。 */
 export function updateMyPersonalization(
   enabled: boolean,

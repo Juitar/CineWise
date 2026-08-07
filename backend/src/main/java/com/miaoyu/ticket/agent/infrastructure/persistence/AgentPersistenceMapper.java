@@ -1,5 +1,6 @@
 package com.miaoyu.ticket.agent.infrastructure.persistence;
 
+import com.miaoyu.ticket.agent.application.audit.AdminAgentRunQueryRepository.Criteria;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.annotations.Insert;
@@ -81,6 +82,9 @@ public interface AgentPersistenceMapper {
     int updateSessionSlotSnapshot(@Param("sessionId") long sessionId, @Param("userId") long userId,
             @Param("expectedVersion") long expectedVersion, @Param("slotSnapshotJson") String slotSnapshotJson);
 
+    @Select("SELECT " + SESSION_COLUMNS + " FROM agent_session WHERE id = #{id} LIMIT 1")
+    AgentSessionEntity findSessionById(@Param("id") long id);
+
     @Select("SELECT " + SESSION_COLUMNS + " FROM agent_session WHERE user_id = #{userId} AND status = 'ACTIVE'"
             + " ORDER BY update_time DESC, id DESC LIMIT #{limit} OFFSET #{offset}")
     List<AgentSessionEntity> findActiveSessionsByUserId(
@@ -159,6 +163,36 @@ public interface AgentPersistenceMapper {
 
     @Select("SELECT " + RUN_COLUMNS + " FROM agent_run WHERE run_id = #{runId} AND user_id = #{userId} LIMIT 1")
     AgentRunEntity findRunByRunIdAndUserId(@Param("runId") String runId, @Param("userId") long userId);
+
+    @Select("SELECT " + RUN_COLUMNS + " FROM agent_run WHERE run_id = #{runId} LIMIT 1")
+    AgentRunEntity findAdminRunByRunId(@Param("runId") String runId);
+
+    @Select({"<script>", "SELECT COUNT(*) FROM agent_run WHERE 1 = 1",
+            "<if test='criteria.status != null'> AND status = #{criteria.status}</if>",
+            "<if test='criteria.userIds != null'> AND user_id IN",
+            "<foreach item='userId' collection='criteria.userIds' open='(' separator=',' close=')'>",
+            "#{userId}</foreach></if>",
+            "<if test='criteria.startedFrom != null'> AND started_at &gt;= #{criteria.startedFrom}</if>",
+            "<if test='criteria.startedTo != null'> AND started_at &lt; #{criteria.startedTo}</if>", "</script>"})
+    long countAdminRuns(@Param("criteria") Criteria criteria);
+
+    @Select({"<script>", "SELECT " + RUN_COLUMNS + " FROM agent_run WHERE 1 = 1",
+            "<if test='criteria.status != null'> AND status = #{criteria.status}</if>",
+            "<if test='criteria.userIds != null'> AND user_id IN",
+            "<foreach item='userId' collection='criteria.userIds' open='(' separator=',' close=')'>",
+            "#{userId}</foreach></if>",
+            "<if test='criteria.startedFrom != null'> AND started_at &gt;= #{criteria.startedFrom}</if>",
+            "<if test='criteria.startedTo != null'> AND started_at &lt; #{criteria.startedTo}</if>",
+            " ORDER BY started_at DESC, id DESC LIMIT #{criteria.size} OFFSET #{criteria.offset}", "</script>"})
+    List<AgentRunEntity> findAdminRunPage(@Param("criteria") Criteria criteria);
+
+    @Select({"<script>", "SELECT run_id AS runId, COUNT(*) AS nodeCount,",
+            "SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) AS completedNodeCount,",
+            "SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) AS failedNodeCount",
+            "FROM agent_run_step WHERE run_id IN",
+            "<foreach item='runId' collection='runIds' open='(' separator=',' close=')'>",
+            "#{runId}</foreach> GROUP BY run_id", "</script>"})
+    List<AdminAgentRunStepStatsRow> findAdminRunStepStatsByRunIds(@Param("runIds") List<Long> runIds);
 
     @Select("SELECT " + RUN_COLUMNS + " FROM agent_run WHERE user_id = #{userId} AND session_id = #{sessionId}"
             + " AND client_request_id = #{clientRequestId} LIMIT 1")
