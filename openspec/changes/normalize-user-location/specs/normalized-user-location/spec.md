@@ -21,7 +21,7 @@
 #### Scenario: 浏览器坐标超过 6 位小数
 
 - **WHEN** C 将 `position.coords.longitude/latitude` 的原始数值提交给 D，且任一坐标超过 6 位小数
-- **THEN** `BrowserUserLocationAdapter` MUST 按 `HALF_UP` 统一四舍五入到 6 位小数后再校验范围；C 不得自行截断，也不得把原始坐标写入 URL、存储、日志、Mock 或 Agent/SSE 消息
+- **THEN** `BrowserUserLocationAdapter` MUST 先校验原始经度位于 `[-180, 180]`、原始纬度位于 `[-90, 90]`，原始值合法后再按 `HALF_UP` 统一四舍五入到 6 位小数并构造坐标；C 不得自行截断，也不得把原始坐标写入 URL、存储、日志、Mock 或 Agent/SSE 消息
 
 ### Requirement: 地点文本必须经地理编码并保留粒度
 
