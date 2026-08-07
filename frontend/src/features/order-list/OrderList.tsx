@@ -1,7 +1,7 @@
 import React from 'react';
 import dayjs from 'dayjs';
-import { Spin, Alert, Empty, Tabs, Pagination, Button, Tag, DatePicker } from 'antd';
-import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
+import { Alert, Button, DatePicker, Empty, Pagination, Skeleton, Tabs, Tag } from 'antd';
+import { Button as MobileButton, ErrorBlock, Skeleton as MobileSkeleton } from 'antd-mobile';
 import { ORDER_STATUS_LABELS } from '../../modules/order/status-presentation';
 import type { OrderStatus } from '../../modules/order/types';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
@@ -39,6 +39,8 @@ export interface OrderListProps {
   onPageChange?: (page: number) => void;
   onOrderClick?: (orderNo: string) => void;
 }
+
+const ORDER_SKELETON_KEYS = ['order-loading-1', 'order-loading-2', 'order-loading-3'];
 
 /**
  * 个人订单列表展示组件
@@ -131,14 +133,24 @@ export const OrderList: React.FC<OrderListProps> = ({
       </div>
 
       {loading ? (
-        <div className="order-list-loading">
+        <div className="order-list-loading" aria-label="正在载入订单列表">
           {isMobile ? (
-            <div className="mobile-loading-wrapper">
-              <SpinLoading color="primary" />
-              <span>正在载入订单列表...</span>
+            <div className="order-list-mobile-skeleton" aria-hidden="true">
+              {ORDER_SKELETON_KEYS.map((skeletonKey) => (
+                <div key={skeletonKey} className="order-card-skeleton">
+                  <MobileSkeleton.Title animated />
+                  <MobileSkeleton.Paragraph animated lineCount={3} />
+                </div>
+              ))}
             </div>
           ) : (
-            <Spin tip="正在载入订单列表..." />
+            <div className="order-list-skeleton" aria-hidden="true">
+              {ORDER_SKELETON_KEYS.map((skeletonKey) => (
+                <div key={skeletonKey} className="order-card-skeleton">
+                  <Skeleton active title={{ width: '38%' }} paragraph={{ rows: 3 }} />
+                </div>
+              ))}
+            </div>
           )}
         </div>
       ) : error ? (

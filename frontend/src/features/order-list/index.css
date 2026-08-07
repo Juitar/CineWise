@@ -56,6 +56,27 @@
   justify-content: center;
 }
 
+.order-list-skeleton {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 16px;
+}
+
+.order-list-mobile-skeleton {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 16px;
+}
+
+.order-card-skeleton {
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-surface);
+}
+
 .order-card-list {
   display: flex;
   flex-direction: column;

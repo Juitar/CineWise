@@ -74,12 +74,19 @@ describe('OrderList 组件', () => {
     expect(handleClick).toHaveBeenCalledWith('202608050001');
   });
 
-  it('在移动端视图渲染 ErrorBlock 和 SpinLoading', () => {
+  it('在移动端视图渲染订单骨架屏和 ErrorBlock', () => {
     setMobileView(true);
     const { container, rerender } = render(<OrderList orders={[]} loading={true} />);
-    expect(container.querySelector('.adm-spin-loading')).toBeInTheDocument();
+    expect(container.querySelector('.adm-skeleton')).toBeInTheDocument();
 
     rerender(<OrderList orders={[]} loading={false} error="测试错误" />);
     expect(container.querySelector('.adm-error-block')).toBeInTheDocument();
+  });
+
+  it('在桌面端加载订单时渲染骨架屏', () => {
+    setMobileView(false);
+    const { container } = render(<OrderList orders={[]} loading={true} />);
+    expect(container.querySelectorAll('.order-card-skeleton')).toHaveLength(3);
+    expect(container.querySelector('.ant-skeleton')).toBeInTheDocument();
   });
 });
