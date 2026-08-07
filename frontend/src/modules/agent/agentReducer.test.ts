@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import planCard from './fixtures/plan-card.json';
+import planCard from '../../../../backend/src/test/resources/fixtures/agent/c/plan-card.json';
 import selectSeatsCard from './fixtures/select-seats-card.json';
 import streamReset from './fixtures/stream-reset.json';
 import toolComplete from './fixtures/tool-complete-degraded.json';
@@ -218,9 +218,16 @@ describe('Agent reducer 新 SSE 协议', () => {
   });
 
   it('重复事件和旧计划迟到事件不推进游标', () => {
-    const first = consumeAgentEvent(createAgentProjection('session-1'), parseAgentEvent(planCard));
+    const currentPlan = parseAgentEvent({
+      ...planCard,
+      eventId: '44',
+      sessionId: 'session-1',
+      runId: 'run-1',
+      planVersion: 2,
+    });
+    const first = consumeAgentEvent(createAgentProjection('session-1'), currentPlan);
     expect(first.outcome).toBe('applied');
-    const duplicate = consumeAgentEvent(first.projection, parseAgentEvent(planCard));
+    const duplicate = consumeAgentEvent(first.projection, currentPlan);
     expect(duplicate.outcome).toBe('ignored');
     const stale = consumeAgentEvent(
       first.projection,

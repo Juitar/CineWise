@@ -167,17 +167,30 @@ function candidateFields(event: AgentEvent, collection: 'movies' | 'plans') {
     const prefix = collection === 'movies' ? `影片 ${index + 1}` : `方案 ${index + 1}`;
     const fields: Array<{ label: string; value: string }> = [];
     const entries = [
-      ['片名', candidate.title],
+      ['方案类型', candidate.planType],
+      ['片名', candidate.movieName ?? candidate.title],
       ['影片 ID', candidate.movieId],
+      ['影院', candidate.cinemaName],
       ['影院 ID', candidate.cinemaId],
       ['场次 ID', candidate.showId],
-      ['价格', candidate.price],
       ['开场时间', candidate.startTime],
       ['来源', candidate.source],
     ] as const;
     entries.forEach(([label, value]) => {
       if (typeof value === 'string' && value) fields.push({ label: `${prefix} · ${label}`, value });
     });
+    if (typeof candidate.price === 'string' && candidate.price) {
+      const currency = typeof candidate.currency === 'string' ? ` ${candidate.currency}` : '';
+      fields.push({ label: `${prefix} · 价格`, value: `${candidate.price}${currency}` });
+    }
+    if (Array.isArray(candidate.reasons) && candidate.reasons.length > 0) {
+      fields.push({
+        label: `${prefix} · 推荐理由`,
+        value: candidate.reasons
+          .filter((reason): reason is string => typeof reason === 'string')
+          .join('；'),
+      });
+    }
     if (candidate.expired === true) fields.push({ label: `${prefix} · 状态`, value: '已过期' });
     if (candidate.purchaseEligible === false) {
       fields.push({ label: `${prefix} · 可购状态`, value: '当前不可购' });

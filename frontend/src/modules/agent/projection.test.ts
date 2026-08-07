@@ -87,23 +87,30 @@ describe('Agent 事件投影', () => {
     expect(JSON.stringify(failed.projection)).not.toContain('RUN_FAILED');
   });
 
-  it('正常 PLAN_CARD 展示服务端给出的字符串 ID，不补造价格和时间', () => {
+  it('正常 PLAN_CARD 展示最新固定夹具的安全推荐摘要', () => {
     const result = consumeAgentEvent(
       createAgentProjection('session-example-1'),
       parseAgentEvent(planCard),
     );
     expect(result.outcome).toBe('applied');
     expect(result.projection.items[0]).toEqual(
-      expect.objectContaining({ kind: 'plan-card', title: '推荐方案' }),
+      expect.objectContaining({ kind: 'plan-card', title: '推荐场次' }),
     );
     expect(result.projection.items[0].fields).toEqual(
       expect.arrayContaining([
         { label: '方案 1 · 影片 ID', value: '1001' },
+        { label: '方案 1 · 片名', value: '示例影片' },
         { label: '方案 1 · 影院 ID', value: '2001' },
+        { label: '方案 1 · 影院', value: '示例影院' },
         { label: '方案 1 · 场次 ID', value: '3001' },
+        { label: '方案 1 · 价格', value: '68.00 CNY' },
+        { label: '方案 1 · 开场时间', value: '2026-08-05T11:00:00Z' },
+        { label: '方案 1 · 推荐理由', value: '匹配条件' },
       ]),
     );
-    expect(JSON.stringify(result.projection)).not.toMatch(/价格|开场时间/);
+    expect(JSON.stringify(result.projection)).not.toMatch(
+      /score|internalEvidence|rawToolArguments/,
+    );
   });
 
   it('TEXT 使用纯文本投影，过期空方案卡仍明确显示过期且不生成业务按钮', () => {

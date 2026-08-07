@@ -8,6 +8,7 @@ import sessionCreated from '../../../../backend/src/test/resources/fixtures/agen
 import sessionList from '../../../../backend/src/test/resources/fixtures/agent/c/session-list.json';
 import confirmationFixtures from '../../../../backend/src/test/resources/fixtures/agent/c/confirmation-api-fixtures.json';
 import orderConfirmCard from '../../../../backend/src/test/resources/fixtures/agent/c/order-confirm-card.json';
+import planCard from '../../../../backend/src/test/resources/fixtures/agent/c/plan-card.json';
 import {
   AgentContractError,
   parseAgentEvent,
@@ -38,6 +39,37 @@ describe('Agent DTO 和事件校验', () => {
       actionId: 'action-1',
       status: 'SUCCEEDED',
     });
+  });
+
+  it('严格消费最新 PLAN_CARD 固定夹具', () => {
+    expect(validateAgentCardEvent(parseAgentEvent(planCard)).decision).toBe('render');
+    expect(
+      validateAgentCardEvent(
+        parseAgentEvent({
+          ...planCard,
+          payload: { ...planCard.payload, schemaVersion: undefined },
+        }),
+      ).decision,
+    ).toBe('reject');
+    expect(
+      validateAgentCardEvent(
+        parseAgentEvent({
+          ...planCard,
+          payload: { ...planCard.payload, internalEvidence: 'hidden' },
+        }),
+      ).decision,
+    ).toBe('reject');
+    expect(
+      validateAgentCardEvent(
+        parseAgentEvent({
+          ...planCard,
+          payload: {
+            ...planCard.payload,
+            plans: [{ ...planCard.payload.plans[0], rawToolArguments: '{}' }],
+          },
+        }),
+      ).decision,
+    ).toBe('reject');
   });
 
   it('合法事件忽略未知顶层字段但不把它带入投影', () => {
