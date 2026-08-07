@@ -81,6 +81,32 @@ class AmapWeatherProviderTest {
         assertThat(invalidReportTime.query("西湖区", REQUESTED_AT)).isEmpty();
     }
 
+    @Test
+    void givenCityMapping_whenAreaMappingMissing_thenUseRegisteredCityCode() {
+        AmapWeatherProperties properties = new AmapWeatherProperties(
+                true, "test-key", Duration.ofMinutes(15), Map.of(), Map.of("杭州市", "330100"));
+        AmapWeatherProvider provider = new AmapWeatherProvider(properties, (adcode, key) -> {
+            assertThat(adcode).isEqualTo("330100");
+            return responseUnchecked("{\"status\":\"1\",\"lives\":[{\"weather\":\"晴\","
+                    + "\"temperature\":\"25\",\"reporttime\":\"2026-08-06 14:00:00\"}]}");
+        });
+
+        assertThat(provider.query("杭州市", REQUESTED_AT)).isPresent();
+    }
+
+    @Test
+    void givenAreaAndCityMappings_whenQueryingArea_thenAreaMappingWins() {
+        AmapWeatherProperties properties = new AmapWeatherProperties(
+                true, "test-key", Duration.ofMinutes(15), Map.of("西湖区", "330106"), Map.of("西湖区", "330100"));
+        AmapWeatherProvider provider = new AmapWeatherProvider(properties, (adcode, key) -> {
+            assertThat(adcode).isEqualTo("330106");
+            return responseUnchecked("{\"status\":\"1\",\"lives\":[{\"weather\":\"晴\","
+                    + "\"temperature\":\"25\",\"reporttime\":\"2026-08-06 14:00:00\"}]}");
+        });
+
+        assertThat(provider.query("西湖区", REQUESTED_AT)).isPresent();
+    }
+
     private AmapWeatherProvider provider(AmapWeatherClient client) {
         return new AmapWeatherProvider(
                 new AmapWeatherProperties(true, "test-key", Duration.ofMinutes(15), Map.of("西湖区", "330106")),

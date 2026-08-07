@@ -6,7 +6,7 @@ import { useOrders } from '../../modules/order/transaction-hooks';
 import { useOrderContentDetails } from '../../modules/order/useOrderContentDetails';
 import { formatOrderDateTime } from '../../modules/order/formatters';
 import type { OrderStatus } from '../../modules/order/types';
-import { TransactionBackButton } from '../../features/transaction-back-button/TransactionBackButton';
+import { TransactionBreadcrumb } from '../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import { OrderContentNotice } from '../../features/order-content-notice/OrderContentNotice';
 import './index.css';
 
@@ -52,16 +52,10 @@ export default function OrdersPage() {
   return (
     <div className="orders-page-wrapper">
       <div className="orders-page-content">
-        <TransactionBackButton onBack={() => history.push('/')} label="返回首页" />
+        <TransactionBreadcrumb items={[{ label: '我的订单' }]} />
         <OrderContentNotice
           isLoading={content.isLoading}
           hasUnavailableContent={content.hasUnavailableContent}
-          movieFreshness={records
-            .map((order) => content.moviesById.get(order.movieId))
-            .filter((movie): movie is NonNullable<typeof movie> => Boolean(movie))}
-          cinemaFreshness={records
-            .map((order) => content.cinemasById.get(order.cinemaId))
-            .filter((cinema): cinema is NonNullable<typeof cinema> => Boolean(cinema))}
           onRetry={content.refresh}
         />
         <OrderList

@@ -27,7 +27,6 @@ export interface PaymentResultProps {
   onViewOrder?: () => void;
   onRetryQuery?: () => void;
   onRetryPay?: () => void;
-  onBackToHome?: () => void;
   ticketId?: string | null;
   onViewTicket?: () => void;
 }
@@ -45,7 +44,6 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
   onViewOrder,
   onRetryQuery,
   onRetryPay,
-  onBackToHome,
   ticketId,
   onViewTicket,
 }) => {
@@ -102,7 +100,6 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
             <div className="payment-result-actions">
               {ticketId && onViewTicket && renderPrimaryBtn('查看电子票', onViewTicket)}
               {renderDefaultBtn('查看订单', onViewOrder)}
-              {renderDefaultBtn('返回首页', onBackToHome)}
             </div>
           </div>
         );
@@ -150,7 +147,7 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
               该订单未在有效时间内完成付款，系统已自动释放座位。
             </p>
             <div className="payment-result-actions">
-              {renderPrimaryBtn('返回首页', onBackToHome)}
+              {renderPrimaryBtn('查看订单', onViewOrder)}
             </div>
           </div>
         );
@@ -161,7 +158,7 @@ export const PaymentResult: React.FC<PaymentResultProps> = ({
             <div className="payment-result-badge expired">订单已取消</div>
             <p className="payment-result-desc">该订单已取消，系统已释放原锁定座位。</p>
             <div className="payment-result-actions">
-              {renderPrimaryBtn('返回首页', onBackToHome)}
+              {renderPrimaryBtn('查看订单', onViewOrder)}
             </div>
           </div>
         );

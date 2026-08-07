@@ -1,0 +1,16 @@
+.transaction-breadcrumb {
+  min-height: 22px;
+  margin-bottom: 20px;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.transaction-breadcrumb a {
+  color: var(--color-primary, #1677ff);
+}
+
+.transaction-breadcrumb .current {
+  color: var(--color-text, #1f2937);
+  font-weight: 500;
+}

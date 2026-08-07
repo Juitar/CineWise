@@ -2,6 +2,9 @@ import { Alert, Button, Empty, Skeleton, Tag } from 'antd';
 import React from 'react';
 import { Link, useParams } from 'umi';
 
+import { getFreshnessNotices } from '../../modules/content/freshness';
+import { safePosterUrl } from '../../modules/content/poster';
+import { useMovieDetail } from '../../modules/content/useMovieDetail';
 import { useAvailableCinemas } from '../../modules/ticketing/useAvailableCinemas';
 import type { AvailableCinema } from '../../modules/ticketing/types';
 import './available-cinemas.css';
@@ -24,6 +27,59 @@ function errorMessage(status: number | undefined, code: number | undefined): str
   if (code === 303004) return '影片资料暂时不可用';
   if (code === 306003) return '可售场次暂时不可查询';
   return '可售影院加载失败';
+}
+
+function isBusinessId(value: string | undefined): value is string {
+  return value !== undefined && /^[1-9][0-9]*$/.test(value);
+}
+
+function MovieDetailCard() {
+  const { movieId } = useParams<{ movieId: string }>();
+  const state = useMovieDetail(isBusinessId(movieId) ? movieId : undefined);
+  const movie = state.data;
+
+  if (state.isLoading) {
+    return (
+      <div aria-label="影片详情加载中">
+        <Skeleton active avatar paragraph={{ rows: 3 }} />
+      </div>
+    );
+  }
+  if (state.error) {
+    const isNotFound = state.error.status === 404;
+    return (
+      <Alert
+        action={<Button onClick={state.retry}>重试</Button>}
+        className="available-cinemas-status"
+        description={state.error.traceId ? `问题编号：${state.error.traceId}` : undefined}
+        message={isNotFound ? '影片不存在' : '影片详情加载失败'}
+        showIcon
+        type={isNotFound ? 'warning' : 'error'}
+      />
+    );
+  }
+  if (!movie) return null;
+
+  const notices = getFreshnessNotices(movie);
+  const posterUrl = safePosterUrl(movie.posterUrl);
+  return (
+    <section className="movie-detail-card" aria-label="影片资料">
+      {posterUrl ? <img alt={`${movie.title}海报`} src={posterUrl} /> : null}
+      <div>
+        <h1>{movie.title}</h1>
+        <p>{movie.genres.length > 0 ? movie.genres.join(' / ') : '类型待更新'}</p>
+        <p>{movie.durationMinutes === null ? '时长待更新' : `${movie.durationMinutes} 分钟`}</p>
+        <p>{movie.summary || '暂无影片简介'}</p>
+        <div className="available-cinemas-notices" aria-label="影片资料来源说明">
+          {notices.map((notice) => (
+            <Tag color={notice.tone === 'warning' ? 'orange' : 'blue'} key={notice.id}>
+              {notice.text}
+            </Tag>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function CinemaCard({ cinema, movieId }: { cinema: AvailableCinema; movieId: string }) {
@@ -49,22 +105,25 @@ function CinemaCard({ cinema, movieId }: { cinema: AvailableCinema; movieId: str
           {formatDateTime(cinema.scheduleDataTime)}
         </p>
       </div>
-      <Link
-        aria-label={`选择${cinema.name}的场次`}
-        className="available-cinemas-purchase-link"
-        to={`/shows?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinema.cinemaId)}`}
-      >
-        选择影院
-      </Link>
+      {isBusinessId(movieId) && isBusinessId(cinema.cinemaId) ? (
+        <Link
+          aria-label={`选择${cinema.name}的场次`}
+          className="available-cinemas-purchase-link"
+          to={`/shows?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinema.cinemaId)}`}
+        >
+          选择影院
+        </Link>
+      ) : null}
     </article>
   );
 }
 
 export default function AvailableCinemasPage() {
   const { movieId } = useParams<{ movieId: string }>();
-  const state = useAvailableCinemas(movieId);
+  const validMovieId = isBusinessId(movieId) ? movieId : undefined;
+  const state = useAvailableCinemas(validMovieId);
 
-  if (!movieId) {
+  if (!validMovieId) {
     return <Alert showIcon message="影片地址无效" type="error" />;
   }
 
@@ -78,9 +137,11 @@ export default function AvailableCinemasPage() {
         <span>选择影院</span>
       </nav>
       <header className="available-cinemas-header">
-        <h1>选择影院</h1>
-        <p>可售场次和座位以进入下一页后的实时查询结果为准。</p>
+        <p>先确认影片资料，再选择真实影院；场次和座位以进入下一页后的实时查询结果为准。</p>
       </header>
+
+      <MovieDetailCard />
+      <h2 className="available-cinemas-title">选择影院</h2>
 
       {state.isOfflineSnapshot ? (
         <Alert
@@ -112,7 +173,7 @@ export default function AvailableCinemasPage() {
       {state.data && state.data.records.length > 0 ? (
         <div className="available-cinemas-list" aria-live="polite">
           {state.data.records.map((cinema) => (
-            <CinemaCard cinema={cinema} key={cinema.cinemaId} movieId={movieId} />
+            <CinemaCard cinema={cinema} key={cinema.cinemaId} movieId={validMovieId} />
           ))}
         </div>
       ) : null}

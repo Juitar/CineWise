@@ -1,0 +1,13 @@
+{
+  "httpStatus": 200,
+  "code": 0,
+  "message": "success",
+  "traceId": "cccccccccccccccccccccccccccccccc",
+  "data": {
+    "taskId": "90001",
+    "orderId": "80001",
+    "status": "READY",
+    "triggerAt": "2026-08-05T17:00:00+08:00",
+    "version": 2
+  }
+}
