@@ -18,4 +18,4 @@
 
 ## Owner 与验收
 
-B 负责后端 DTO、查询映射、夹具与测试；C 是接口消费者，后续负责“重新拉历史消息 → 取确认卡消息的 runId → GET /runs/{runId}”的前端实现和测试。验收时历史消息仅增加字符串 UUID `runId`，不暴露内部运行主键、userId、actionId、订单号、幂等键或完整工具参数。
+B 负责后端 DTO、查询映射、夹具与测试；C 是接口消费者，后续负责“重新拉历史消息 → 取确认卡消息的 runId → GET /runs/{runId}”的前端实现和测试。验收时历史消息顶层仅增加字符串 UUID `runId`，不新增内部运行主键、userId、actionId、订单号、幂等键或完整工具参数。既有确认卡 payload 可保留确认接口所需的 `actionId`，但不得扩充上述敏感字段。

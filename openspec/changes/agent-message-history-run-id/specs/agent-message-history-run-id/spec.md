@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: 历史消息必须返回所属运行 UUID
-系统 SHALL 在 `GET /api/v1/agent/sessions/{sessionId}/messages` 的每条 `records` 消息中增加非空字符串字段 `runId`。该字段必须是所属 `AgentRun` 的对外 UUID，不得是 `agent_run.id` 的内部 long；既有消息字段含义与 `total/page/size/records` 分页格式不得改变。响应不得新增 userId、内部运行主键、actionId、订单号、幂等键、完整工具参数或其他敏感字段。
+系统 SHALL 在 `GET /api/v1/agent/sessions/{sessionId}/messages` 的每条 `records` 消息中增加非空字符串字段 `runId`。该字段必须是所属 `AgentRun` 的对外 UUID，不得是 `agent_run.id` 的内部 long；既有消息字段含义与 `total/page/size/records` 分页格式不得改变。历史消息顶层不得新增 userId、内部运行主键、actionId、订单号、幂等键、完整工具参数或其他敏感字段；既有确认卡 payload 可保留确认接口所需的 `actionId`，但不得扩充订单号、金额、内部运行主键、userId、幂等键或工具参数。
 
 #### Scenario: C 从确认卡历史消息恢复运行
 - **WHEN** C 在确认 POST 结果未知后读取本人活动会话的历史消息
