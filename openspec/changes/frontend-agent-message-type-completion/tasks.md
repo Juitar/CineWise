@@ -6,6 +6,6 @@
 - [x] C：运行 Agent 定向测试和相关桌面/移动 Playwright；验证：Agent 定向单测 125/125、工作区 Playwright 10/10 通过。
 - [x] C：运行 `pnpm check`、OpenSpec 严格校验、后端 `verify`、`git diff --check` 和状态检查；验证：仅修改当前 OpenSpec、`PLAN_CARD` 校验与安全投影、主流程恢复测试。
 - [x] C：按 PR #160 正式 `PLAN_CARD` DTO 收紧运行时校验并扩展安全投影；验证：合法固定夹具、缺字段、未知字段和允许展示字段测试。
-- [x] C：复跑 Agent 定向测试、工作区 Playwright、`pnpm check`、后端 `verify`、OpenSpec 严格校验和 Git 检查；验证：前端 554/554、后端 860 项零失败，基于最新 `origin/dev` 全部通过。
+- [x] C：复跑 Agent 定向测试、工作区 Playwright、`pnpm check`、后端 `verify`、OpenSpec 严格校验和 Git 检查；验证：前端 568/568、后端 868 项零失败，基于最新 `origin/dev` 全部通过。
 - [x] C：合并 PR #172 后的最新 `origin/dev`，保留交互卡片并解决 `PLAN_CARD` 校验、投影、固定夹具和恢复测试冲突；验证：无未解决冲突且相关测试重新通过。
 - [x] C：按 B `QUESTION` 校验规则恢复条件化 `input` 校验；验证：`allowFreeText=false` 且无 `input` 可渲染，`allowFreeText=true` 且无 `input` 被拒绝。
