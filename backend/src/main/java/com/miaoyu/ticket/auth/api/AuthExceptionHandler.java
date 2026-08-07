@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /** 认证请求校验固定返回 101001，避免全局 100001 破坏已有模块契约。 */
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = AuthController.class)
+@RestControllerAdvice(assignableTypes = {AuthController.class, ProfileDataConsentController.class})
 public class AuthExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AuthExceptionHandler.class);

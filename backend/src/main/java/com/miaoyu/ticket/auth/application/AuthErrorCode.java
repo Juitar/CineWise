@@ -18,6 +18,9 @@ public enum AuthErrorCode implements ErrorCode {
     CSRF_INVALID(201009, "安全校验已失效，请重新操作", HttpStatus.FORBIDDEN),
     /** 有限用户ID集合无法安全表达过宽的邮箱包含匹配。 */
     USER_QUERY_TOO_BROAD(201010, "用户查询条件过宽，请补充更多关键字", HttpStatus.BAD_REQUEST),
+    PROFILE_DATA_CONSENT_CONFLICT(201011, "画像数据使用状态已更新，请刷新后重试", HttpStatus.CONFLICT),
+    PROFILE_DATA_CONSENT_RECOVERY_UNAVAILABLE(
+            201012, "撤回事件当前不可恢复或投递仍失败", HttpStatus.CONFLICT),
     MAIL_SERVICE_UNAVAILABLE(301001, "邮件服务暂不可用，请稍后重试", HttpStatus.SERVICE_UNAVAILABLE),
     /** 用户目录基础设施故障不能伪装成没有匹配用户。 */
     USER_DIRECTORY_UNAVAILABLE(301002, "用户信息查询暂不可用，请稍后重试", HttpStatus.SERVICE_UNAVAILABLE);

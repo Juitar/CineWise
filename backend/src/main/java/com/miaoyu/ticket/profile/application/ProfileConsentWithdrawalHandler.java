@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -38,7 +39,7 @@ public class ProfileConsentWithdrawalHandler {
   }
 
   @EventListener
-  @Transactional
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void handle(ProfileDataConsentWithdrawnEvent event) {
     if (event.eventId() == null || event.eventId().isBlank() || event.userId() <= 0) {
       return;
