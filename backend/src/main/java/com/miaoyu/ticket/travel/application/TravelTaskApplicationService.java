@@ -202,12 +202,11 @@ public class TravelTaskApplicationService {
         }
 
         private static long parseBusinessId(String value, String fieldName) {
+            if (value == null || !value.matches("[1-9][0-9]*")) {
+                throw new IllegalArgumentException(fieldName + " 必须是无空白和前导零的正十进制业务ID");
+            }
             try {
-                long parsed = Long.parseLong(requiredText(value, fieldName));
-                if (parsed <= 0) {
-                    throw new IllegalArgumentException(fieldName + " 必须是正整数");
-                }
-                return parsed;
+                return Long.parseLong(value);
             } catch (NumberFormatException exception) {
                 throw new IllegalArgumentException(fieldName + " 必须是十进制业务ID", exception);
             }
@@ -248,12 +247,11 @@ public class TravelTaskApplicationService {
         }
 
         private static Long parseOptionalBusinessId(String value) {
-            if (value == null || value.isBlank()) {
+            if (value == null || !value.matches("[1-9][0-9]*")) {
                 return null;
             }
             try {
-                long parsed = Long.parseLong(value.trim());
-                return parsed > 0 ? parsed : null;
+                return Long.parseLong(value);
             } catch (NumberFormatException exception) {
                 return null;
             }
