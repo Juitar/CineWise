@@ -44,6 +44,7 @@ cinewise:
     login-log-cleanup-delay-milliseconds: 86400000
   transaction:
     expiry-job-enabled: false
+    show-end-invalidation-job-enabled: false
     paid-travel-reconciliation:
       enabled: false
     refunded-travel-reconciliation:

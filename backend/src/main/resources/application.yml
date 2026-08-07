@@ -135,6 +135,10 @@ cinewise:
     expiry-job-enabled: ${ORDER_EXPIRY_JOB_ENABLED:true}
     expiry-job-delay-milliseconds: ${ORDER_EXPIRY_JOB_DELAY_MILLISECONDS:30000}
     expiry-batch-size: ${ORDER_EXPIRY_BATCH_SIZE:100}
+    # 已支付票在场次结束后仅失效电子票，不改变订单或已售座位。
+    show-end-invalidation-job-enabled: ${SHOW_END_INVALIDATION_JOB_ENABLED:true}
+    show-end-invalidation-job-delay-milliseconds: ${SHOW_END_INVALIDATION_JOB_DELAY_MILLISECONDS:60000}
+    show-end-invalidation-batch-size: ${SHOW_END_INVALIDATION_BATCH_SIZE:100}
     paid-travel-reconciliation:
       # PAID与REFUNDED补偿共同收敛进程内事件遗漏，均可由运维独立停用排障。
       enabled: ${PAID_TRAVEL_RECONCILIATION_ENABLED:true}

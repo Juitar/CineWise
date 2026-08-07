@@ -13,5 +13,8 @@ public record TicketingTransactionProperties(
         @Min(5) @Max(30) int orderPaymentMinutes,
         boolean expiryJobEnabled,
         @Min(1_000) @Max(300_000) int expiryJobDelayMilliseconds,
-        @Min(1) @Max(100) int expiryBatchSize) {
+        @Min(1) @Max(100) int expiryBatchSize,
+        boolean showEndInvalidationJobEnabled,
+        @Min(1_000) @Max(300_000) int showEndInvalidationJobDelayMilliseconds,
+        @Min(1) @Max(100) int showEndInvalidationBatchSize) {
 }

@@ -143,6 +143,15 @@ export const ElectronicTicketCard: React.FC<ElectronicTicketCardProps> = ({
             <span>已退票</span>
           </div>
         )}
+        {status === 'INVALIDATED' && (
+          <Alert
+            className="ticket-invalidated-alert"
+            type="warning"
+            showIcon
+            message="影片已结束，电子票已失效"
+            description="该电子票不可作为入场凭证使用。"
+          />
+        )}
       </div>
 
       {/* 票根视觉切割/虚线切口区 */}
