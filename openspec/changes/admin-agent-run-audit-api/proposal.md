@@ -23,4 +23,4 @@ C 已合入的管理端 `agent-logs` 页面已经固定请求路径、查询参�
 
 - Owner：B；修改 `backend/src/main/java/com/miaoyu/ticket/agent/**`、对应测试和 `backend/src/test/resources/fixtures/agent/c/**`。
 - 新增 `GET /api/v1/admin/agent-runs` 与 `GET /api/v1/admin/agent-runs/{runId}`；复用公共 `Result<T>`、`PageResult<T>`、现有 Spring Security `/api/v1/admin/**` 的 `ADMIN` 规则和 Agent 的 `206005` 404 规则。
-- C 可用当前 `frontend/src/modules/admin-agent/api.ts` 直接调用；不要求 C 修改字段或临时兼容。
+- C 可复用当前 `frontend/src/modules/admin-agent/api.ts` 的路径、参数和分页格式；`planId`、`planVersion`、节点 `targetName` 等没有安全结构化来源的字段会返回 `null`，C 需要按此更新类型、映射、占位展示和 `WAITING_LOCATION` 文案后才能完成真实 HTTP 联调。

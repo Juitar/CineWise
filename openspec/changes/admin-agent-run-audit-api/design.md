@@ -32,9 +32,9 @@ Application Service 先校验管理员；有 `userKeyword` 时调用 `UserAdminQ
 
 ### 3. DTO 是白名单投影
 
-列表与详情返回 `runId`、`sessionId`、`userDisplay`、`status`、`planId`、`planVersion`、节点计数、开始/结束时间、耗时、错误码和安全错误摘要；详情增加 `nodes`。节点只包含 `nodeId`、`nodeType`、`targetName`、状态、次数、时间、耗时、`toolStatus`、错误码、错误摘要和恢复提示。
+列表与详情返回 `runId`、`sessionId`、`userDisplay`、`status`、`planId`、`planVersion`、节点计数、开始/结束时间、耗时、错误码和安全错误摘要；详情增加 `nodes`。列表节点计数由当前页 `runId` 批量聚合 `agent_run_step.status` 得到。节点只包含 `nodeId`、`nodeType`、`targetName`、状态、次数、时间、耗时、`toolStatus`、错误码、错误摘要和恢复提示。
 
-当前 `AgentRunStep` 没有持久化 `targetName`、工具状态、错误码或错误摘要；`AgentRun` 也没有失败码/摘要。不得从 `inputRefsJson`、`slotSnapshotJson`、`dependsOnJson`、事件 payload 或确认命令提取或猜测这些字段。后端无法在不新增经过确认的安全摘要列/读取规则前满足 C 的必填字段。
+当前 `AgentRunStep` 没有持久化 `targetName`、工具状态、错误码或错误摘要；`AgentRun` 也没有失败码/摘要。不得从 `inputRefsJson`、`slotSnapshotJson`、`dependsOnJson`、事件 payload 或确认命令提取或猜测这些字段；没有结构化来源时返回 `null`。后端无法在不新增经过确认的安全摘要列/读取规则前满足 C 的必填字段。
 
 ### 4. 时间、排序和分页
 

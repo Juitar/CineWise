@@ -186,6 +186,14 @@ public interface AgentPersistenceMapper {
             " ORDER BY started_at DESC, id DESC LIMIT #{criteria.size} OFFSET #{criteria.offset}", "</script>"})
     List<AgentRunEntity> findAdminRunPage(@Param("criteria") Criteria criteria);
 
+    @Select({"<script>", "SELECT run_id AS runId, COUNT(*) AS nodeCount,",
+            "SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) AS completedNodeCount,",
+            "SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) AS failedNodeCount",
+            "FROM agent_run_step WHERE run_id IN",
+            "<foreach item='runId' collection='runIds' open='(' separator=',' close=')'>",
+            "#{runId}</foreach> GROUP BY run_id", "</script>"})
+    List<AdminAgentRunStepStatsRow> findAdminRunStepStatsByRunIds(@Param("runIds") List<Long> runIds);
+
     @Select("SELECT " + RUN_COLUMNS + " FROM agent_run WHERE user_id = #{userId} AND session_id = #{sessionId}"
             + " AND client_request_id = #{clientRequestId} LIMIT 1")
     AgentRunEntity findRunByClientRequestId(

@@ -42,7 +42,8 @@ class AdminAgentRunControllerSecurityIntegrationTest {
         mockMvc.perform(get("/api/v1/admin/agent-runs").with(authentication(auth(RoleCode.ADMIN))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.records[0].runId").value("run-1"));
         mockMvc.perform(get("/api/v1/admin/agent-runs/run-1").with(authentication(auth(RoleCode.ADMIN))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.nodes[0].targetName").value("queryShows"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.nodes[0].targetName").value("queryShows"))
+                .andExpect(jsonPath("$.data.finishedAt").value("2026-08-05T19:20:08+08:00"));
         mockMvc.perform(get("/api/v1/admin/agent-runs").with(authentication(auth(RoleCode.USER))))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value(201007));
         mockMvc.perform(get("/api/v1/admin/agent-runs/run-1").with(authentication(auth(RoleCode.USER))))

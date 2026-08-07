@@ -15,7 +15,8 @@ class AdminAgentRunFixtureTest {
         var detail = fixture("admin-agent-run-detail.json").path("data");
         assertThat(detail.path("runId").isTextual()).isTrue();
         assertThat(detail.path("sessionId").isTextual()).isTrue();
-        assertThat(detail.path("nodes").get(0).path("targetName").asText()).isEqualTo("queryShows");
+        assertThat(detail.path("nodes").get(0).path("targetName").isNull()).isTrue();
+        assertThat(detail.path("finishedAt").asText()).endsWith("+08:00");
         assertThat(detail.toString()).doesNotContain("slotSnapshot", "inputRefs", "payload", "latitude", "token");
     }
 

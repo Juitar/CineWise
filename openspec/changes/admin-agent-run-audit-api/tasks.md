@@ -15,3 +15,4 @@
 - [x] 3.2 Owner：B；新增 C 可直接使用的列表与详情固定 JSON 夹具，字段与真实 API DTO 一致；验证：`AdminAgentRunFixtureTest` 通过。
 - [x] 3.3 Owner：B；记录 `WAITING_LOCATION` 与 C 现有四状态筛选的具体差异，不修改或猜测前端映射；验证：OpenSpec design/spec 列出字段和原因。
 - [x] 3.4 Owner：B；运行 OpenSpec 严格校验、相关后端测试、最终 `backend/mvnw.cmd verify`、`git diff --check` 和状态核对；验证：最终 `verify` 退出码为 0，不提交、不推送、不归档。
+- [x] 3.5 Owner：B；根据 RC 修复当前页步骤计数、删除事件 payload 读取和伪造工具/失败字段，并修正详情夹具时区；验证：服务、Repository、Controller 序列化和夹具测试通过。

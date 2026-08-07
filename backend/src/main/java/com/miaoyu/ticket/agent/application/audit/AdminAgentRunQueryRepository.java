@@ -4,6 +4,7 @@ import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -14,6 +15,9 @@ public interface AdminAgentRunQueryRepository {
 
     List<AgentRun> findPage(Criteria criteria);
 
+    /** 批量读取当前页运行的步骤计数，不读取任何步骤 JSON 或事件内容。 */
+    Map<Long, NodeStats> findNodeStatsByRunIds(List<Long> runIds);
+
     Optional<AgentRun> findByRunId(String runId);
 
     record Criteria(
@@ -23,5 +27,9 @@ public interface AdminAgentRunQueryRepository {
             LocalDateTime startedTo,
             int offset,
             int size) {
+    }
+
+    record NodeStats(int nodeCount, int completedNodeCount, int failedNodeCount) {
+        public static final NodeStats EMPTY = new NodeStats(0, 0, 0);
     }
 }

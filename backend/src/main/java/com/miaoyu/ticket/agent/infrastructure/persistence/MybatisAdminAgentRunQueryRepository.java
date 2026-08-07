@@ -2,7 +2,9 @@ package com.miaoyu.ticket.agent.infrastructure.persistence;
 
 import com.miaoyu.ticket.agent.application.audit.AdminAgentRunQueryRepository;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
@@ -23,6 +25,18 @@ public class MybatisAdminAgentRunQueryRepository implements AdminAgentRunQueryRe
     @Override
     public List<AgentRun> findPage(Criteria criteria) {
         return mapper.findAdminRunPage(criteria).stream().map(AgentPersistenceMappings::toDomain).toList();
+    }
+
+    @Override
+    public Map<Long, NodeStats> findNodeStatsByRunIds(List<Long> runIds) {
+        if (runIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, NodeStats> stats = new LinkedHashMap<>();
+        for (AdminAgentRunStepStatsRow row : mapper.findAdminRunStepStatsByRunIds(runIds)) {
+            stats.put(row.runId(), new NodeStats(row.nodeCount(), row.completedNodeCount(), row.failedNodeCount()));
+        }
+        return Map.copyOf(stats);
     }
 
     @Override
