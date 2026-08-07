@@ -11,6 +11,7 @@
       "role": "ASSISTANT",
       "type": "TEXT",
       "text": "已生成推荐结果",
+      "runId": "52b810c5-4b03-4a41-9c36-07372f1a6f59",
       "payload": {},
       "status": "COMPLETED",
       "completedAt": "2026-08-05T10:01:00+08:00",

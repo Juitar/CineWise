@@ -12,6 +12,9 @@ public interface AgentRunRepository {
 
     Optional<AgentRun> findByClientRequestId(long userId, long sessionId, String clientRequestId);
 
+    /** 历史消息只批量读取已验证用户和会话内的运行，避免暴露消息中的内部关联 ID。 */
+    List<AgentRun> findByIdsAndUserIdAndSessionId(List<Long> runIds, long userId, long sessionId);
+
     List<AgentRun> findStaleRunningBefore(LocalDateTime cutoff, int limit);
 
     void insert(AgentRun run);

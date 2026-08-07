@@ -29,6 +29,16 @@ public class MybatisAgentRunRepository implements AgentRunRepository {
     }
 
     @Override
+    public List<AgentRun> findByIdsAndUserIdAndSessionId(List<Long> runIds, long userId, long sessionId) {
+        if (runIds.isEmpty()) {
+            return List.of();
+        }
+        return mapper.findRunsByIdsAndUserIdAndSessionId(runIds, userId, sessionId).stream()
+                .map(AgentPersistenceMappings::toDomain)
+                .toList();
+    }
+
+    @Override
     public List<AgentRun> findStaleRunningBefore(LocalDateTime cutoff, int limit) {
         return mapper.findStaleRunningBefore(cutoff, limit).stream().map(AgentPersistenceMappings::toDomain).toList();
     }

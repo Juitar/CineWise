@@ -69,7 +69,9 @@ class AgentCFixtureContractTest {
         assertThat(created.path("data").has("activeRunId")).isFalse();
         assertThat(sessions.path("data").path("records").isArray()).isTrue();
         assertThat(messages.path("data").path("records").get(0).path("messageId").isTextual()).isTrue();
-        assertThat(messages.path("data").path("records").get(0).has("runId")).isFalse();
+        assertThat(messages.path("data").path("records").get(0).path("runId").isTextual()).isTrue();
+        assertThat(messages.path("data").path("records").get(0).path("runId").asText())
+                .matches("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
         assertThat(cleared.path("data").path("cleared").isBoolean()).isTrue();
         assertThat(bulkCleared.path("data").path("clearedCount").canConvertToInt()).isTrue();
         assertThat(bulkCleared.path("data").path("skippedCount").canConvertToInt()).isTrue();
