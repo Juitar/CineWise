@@ -86,7 +86,9 @@ A 已发布的 V013 仅追加 `travel_task.cinema_id BIGINT NULL`，位于 `show
 
 ### 5.1 页面建议响应
 
-`TravelAdviceSnapshot` 内部仍可保存 `weather_json` 和 `advice_json`，但 REST 层负责转换为类型化 `TravelAdviceResponse`。对外统一使用 `weather` 对象、`advice` 数组、`source`、`dataAt`、`expiresAt`、`expired`、`degraded` 和 `fallbackType`；`dataAt` 映射内部 `data_time`，避免页面依赖表字段名。天气缺失不是接口失败：`weather=null` 时仍返回通用 `TRANSPORT` 建议和明确降级标识。旧字符串字段仅作兼容，C 页面不得消费。
+`TravelAdviceSnapshot` 内部仍可保存 `weather_json` 和 `advice_json`，但 REST 层和 Agent Tool 层分别负责转换为类型化结果。对外统一使用 `weather` 对象、`advice` 数组、`source`、`dataAt`、`expiresAt`、`expired`、`degraded` 和 `fallbackType`；`dataAt` 映射内部 `data_time`，避免调用方依赖表字段名。天气缺失不是接口失败：`weather=null` 时仍返回通用 `TRANSPORT` 建议和明确降级标识。旧字符串字段仅作 REST 兼容，C 页面和 B 的 Tool 均不得消费。
+
+`getTravelAdvice` 的唯一输入为 B 服务端确认后的 `travelTaskId` 槽位。执行适配器只接受该槽位引用，不接受模型常量或模型生成的任务号；D 仍通过 `CurrentUserAccessor` 校验任务归属。任务不存在、非本人访问和非法任务号统一返回安全的 `207001`，不暴露其他任务信息。B 的异步执行复用已有 `DelegatingSecurityContextExecutor(applicationTaskExecutor)`，D 不在 Tool 内创建线程，也不向 `ToolContext` 增加 `userId`。
 - [邮件 Provider 无法按键查询] → `UNKNOWN` 保留告警且不自动重发；演示 Mock 必须支持按 `deliveryKey` 查询。
 - [多实例定时任务重复执行] → 任务版本条件更新、通知唯一键与数据库约束共同防重，并做并发测试。
 - [位置泄露] → 路线数据不写持久化、缓存或日志，并在成功、失败和超时测试中扫描敏感字段。

@@ -17,6 +17,10 @@ import com.miaoyu.ticket.ticketing.api.QueryShowsTool;
 import com.miaoyu.ticket.ticketing.api.QueryShowsToolCommand;
 import com.miaoyu.ticket.ticketing.api.QueryShowsToolResult;
 import com.miaoyu.ticket.ticketing.application.TicketingErrorCode;
+import com.miaoyu.ticket.travel.api.GetTravelAdviceCommand;
+import com.miaoyu.ticket.travel.api.GetTravelAdviceTool;
+import com.miaoyu.ticket.travel.api.TravelAdviceToolResult;
+import com.miaoyu.ticket.travel.application.TravelErrorCode;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -32,6 +36,8 @@ public final class AgentToolDefinitions {
     public static final String QUERY_SEATS = "querySeats";
     /** D 的推荐工具属于本应用内部只读调用，最多占用三秒预算。 */
     public static final Duration RANK_MOVIE_PLAN_TIMEOUT = Duration.ofSeconds(3L);
+    /** D 的既有建议快照查询不访问外部 Provider，和推荐 Tool 共用三秒预算。 */
+    public static final Duration TRAVEL_ADVICE_TIMEOUT = Duration.ofSeconds(3L);
     /** A 的两个票务查询 Tool 共享五秒上限；具体 Adapter 只能继续缩小剩余预算。 */
     public static final Duration TICKETING_READ_TIMEOUT = Duration.ofSeconds(5L);
 
@@ -66,6 +72,24 @@ public final class AgentToolDefinitions {
                         new ToolInputDefinition("excludedGenres", List.class, false),
                         new ToolInputDefinition("maxDistanceMeters", Integer.class, false)),
                 Set.of(CommonErrorCode.INVALID_PARAMETER.code()));
+    }
+
+    /**
+     * D 的出行建议查询只接受 B 已确认的会话槽位。
+     *
+     * <p>字段名刻意使用 {@code travelTaskId}，使计划校验和卡片动作写入的槽位同名；
+     * 模型不能自由生成普通 {@code taskId} 参数。</p>
+     */
+    public static ToolDefinition getTravelAdvice() {
+        return new ToolDefinition(
+                GetTravelAdviceTool.TARGET_NAME,
+                GetTravelAdviceCommand.class,
+                TravelAdviceToolResult.class,
+                true,
+                TRAVEL_ADVICE_TIMEOUT,
+                false,
+                List.of(new ToolInputDefinition("travelTaskId", String.class, true)),
+                Set.of(CommonErrorCode.INVALID_PARAMETER.code(), TravelErrorCode.TASK_NOT_FOUND.code()));
     }
 
     /** A 的日期摘要查询仅供 Agent 追问日期，不返回座位或库存锁定事实。 */
