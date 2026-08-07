@@ -2,6 +2,7 @@ package com.miaoyu.ticket.agent.domain.tool;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /**
  * Agent 调用工具时携带的最小运行上下文。
@@ -28,7 +29,19 @@ public record ToolContext(
         String traceId,
         String clientRequestId,
         String idempotencyKey,
-        Long stateVersion) {
+        Long stateVersion,
+        String distanceContextId,
+        String distancePreference) {
+
+    private static final Pattern UUID_PATTERN = Pattern.compile(
+            "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
+
+    /** 兼容普通推荐调用方；距离字段只由可信运行上下文的新调用方填写。 */
+    public ToolContext(String runId, String nodeId, String targetName, List<String> inputRefs,
+            long deadlineMs, String traceId, String clientRequestId, String idempotencyKey, Long stateVersion) {
+        this(runId, nodeId, targetName, inputRefs, deadlineMs, traceId, clientRequestId,
+                idempotencyKey, stateVersion, null, null);
+    }
 
     public ToolContext {
         requireText(runId, "runId");
@@ -42,6 +55,7 @@ public record ToolContext(
         // 复制引用清单，防止调用方在工具执行期间追加未经计划校验的输入来源。
         inputRefs = List.copyOf(Objects.requireNonNull(inputRefs, "inputRefs 不能为空"));
         inputRefs.forEach(inputRef -> requireText(inputRef, "inputRefs 元素"));
+        validateDistanceContext(distanceContextId, distancePreference);
     }
 
     /**
@@ -59,6 +73,21 @@ public record ToolContext(
         if (value == null || value.isBlank()) {
             // 统一拒绝空白标识，避免日志和运行快照中出现不可关联的“空调用”。
             throw new IllegalArgumentException(fieldName + " 不能为空");
+        }
+    }
+
+    private static void validateDistanceContext(String distanceContextId, String distancePreference) {
+        if ((distanceContextId == null) != (distancePreference == null)) {
+            throw new IllegalArgumentException("distanceContextId 与 distancePreference 必须同时提供或同时为空");
+        }
+        if (distanceContextId == null) {
+            return;
+        }
+        if (!UUID_PATTERN.matcher(distanceContextId).matches()) {
+            throw new IllegalArgumentException("distanceContextId 必须是标准 UUID");
+        }
+        if (!"NEAREST".equals(distancePreference)) {
+            throw new IllegalArgumentException("distancePreference 只能为 NEAREST");
         }
     }
 }

@@ -16,18 +16,27 @@ import java.util.List;
 public record RankMoviePlanCommand(
         String cityCode, LocalDate date, int ticketCount, String movieId, String cinemaId, List<String> genres,
         LocalTime timeFrom, LocalTime timeTo, LocalTime latestEndTime, BigDecimal budget,
-        List<String> excludedGenres) implements ToolCommand {
+        List<String> excludedGenres, Integer maxDistanceMeters) implements ToolCommand {
+
+    /** 兼容普通推荐旧入口；附近推荐由白名单新字段显式传入距离上限。 */
+    public RankMoviePlanCommand(
+            String cityCode, LocalDate date, int ticketCount, String movieId, String cinemaId, List<String> genres,
+            LocalTime timeFrom, LocalTime timeTo, LocalTime latestEndTime, BigDecimal budget,
+            List<String> excludedGenres) {
+        this(cityCode, date, ticketCount, movieId, cinemaId, genres, timeFrom, timeTo, latestEndTime,
+                budget, excludedGenres, null);
+    }
 
     /** 兼容 B 尚未切换的旧槽位命令；新版正式入口使用完整条件构造器。 */
     public RankMoviePlanCommand(String movieId, String cinemaId, LocalDate date, LocalTime timeFrom, LocalTime timeTo) {
-        this(null, date, 1, movieId, cinemaId, List.of(), timeFrom, timeTo, null, null, List.of());
+        this(null, date, 1, movieId, cinemaId, List.of(), timeFrom, timeTo, null, null, List.of(), null);
     }
 
     /** 复用 Application 查询校验，保证工具入口和直接调用入口对时段的解释一致。 */
     public RankMoviePlanCommand {
         if (cityCode != null && !cityCode.isBlank()) {
             new RecommendationConstraints(cityCode, date, ticketCount, movieId, cinemaId, genres, timeFrom, timeTo,
-                    latestEndTime, budget, excludedGenres);
+                    latestEndTime, budget, excludedGenres, maxDistanceMeters);
         } else {
             new RecommendationQuery(movieId, cinemaId, date, timeFrom, timeTo);
         }
@@ -41,6 +50,6 @@ public record RankMoviePlanCommand(
     /** B 的完整推荐条件只在 D Application 层转换，不把 Agent 命令对象传入领域排序器。 */
     public RecommendationConstraints toConstraints() {
         return new RecommendationConstraints(cityCode, date, ticketCount, movieId, cinemaId, genres, timeFrom, timeTo,
-                latestEndTime, budget, excludedGenres);
+                latestEndTime, budget, excludedGenres, maxDistanceMeters);
     }
 }

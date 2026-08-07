@@ -46,8 +46,8 @@ public class JdbcContentLocalMovieCatalogAdapter implements ContentLocalMovieCat
             return Optional.empty();
         }
         // 两个筛选条件都使用参数绑定，关键字只能影响值，不能改变 SQL 结构。
-        String optional = extended ? ", poster_url, summary, release_date, release_status" : "";
-        String statusClause = extended && releaseStatus != null ? " AND release_status = ?" : "";
+        String optional = ", poster_url, summary, release_date, release_status";
+        String statusClause = releaseStatus != null ? " AND release_status = ?" : "";
         // 关键字为空时不追加 LIKE，避免空串意外匹配整张表并掩盖调用方问题。
         String keywordClause = keyword == null ? "" : " AND LOWER(title) LIKE LOWER(?)";
         // 排序先按上映日期，再按内部 ID，页面翻页时不会因数据库自然顺序变化跳项。
@@ -59,10 +59,10 @@ public class JdbcContentLocalMovieCatalogAdapter implements ContentLocalMovieCat
                    AND duration_minutes > 0 AND rating IS NOT NULL%s%s
                  ORDER BY %s
                 """.formatted(optional, statusClause, keywordClause,
-                extended ? "release_date DESC, id ASC" : "id ASC");
+                "release_date DESC, id ASC");
         // 参数添加顺序与 SQL 中状态、关键字占位符的顺序一致。
         List<Object> args = new ArrayList<>();
-        if (extended && releaseStatus != null) {
+        if (releaseStatus != null) {
             // 上层已限制枚举值，此处仍坚持参数绑定。
             args.add(releaseStatus);
         }
@@ -72,14 +72,14 @@ public class JdbcContentLocalMovieCatalogAdapter implements ContentLocalMovieCat
         }
         List<Row> rows = jdbcTemplate.query(sql, (resultSet, rowNumber) -> {
             // DATE 可为空；来源没有上映日期时保持空值，绝不替换成同步时间。
-            Date releaseDate = extended ? resultSet.getDate("release_date") : null;
+            Date releaseDate = resultSet.getDate("release_date");
             return new Row(new MovieContent(resultSet.getLong("id"), resultSet.getString("source_movie_id"),
                     resultSet.getString("title"), resultSet.getString("genres_json"),
                     resultSet.getInt("duration_minutes"), resultSet.getBigDecimal("rating"),
-                    extended ? resultSet.getString("poster_url") : null,
-                    extended ? resultSet.getString("summary") : null,
+                    resultSet.getString("poster_url"),
+                    resultSet.getString("summary"),
                     releaseDate == null ? null : releaseDate.toLocalDate().toString(),
-                    extended ? resultSet.getString("release_status") : null),
+                    resultSet.getString("release_status")),
                     resultSet.getString("source"), resultSet.getString("source_type"),
                     resultSet.getTimestamp("data_time").toLocalDateTime(),
                     resultSet.getTimestamp("expires_at") == null ? null
