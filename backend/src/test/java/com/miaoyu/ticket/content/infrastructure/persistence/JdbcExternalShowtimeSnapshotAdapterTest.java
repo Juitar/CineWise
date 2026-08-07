@@ -47,7 +47,9 @@ class JdbcExternalShowtimeSnapshotAdapterTest {
                 "NETSTART_MAOYAN", showId, "m1", "c1", 11L, 21L,
                 OffsetDateTime.parse("2026-08-07T11:00:00+08:00"), null, null,
                 ExternalShowtimeQueryPort.PriceSemantic.REFERENCE_ONLY, dataAt,
-                OffsetDateTime.parse(expiresAt), false)),
+                OffsetDateTime.parse(expiresAt), false, false, null,
+                ExternalShowtimeQueryPort.QualityStatus.ACCEPTED,
+                new ExternalShowtimeQueryPort.ExternalShowtimeKey("NETSTART_MAOYAN", "c1", showId))),
                 dataAt, OffsetDateTime.parse(expiresAt));
     }
 

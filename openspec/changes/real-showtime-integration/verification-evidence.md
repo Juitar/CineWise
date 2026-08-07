@@ -9,3 +9,4 @@
 - `mvnw -DskipTests checkstyle:check` 仍被 dev 基线既有的 `ContentSyncService.java:219` 长行阻断；排期新增源文件没有 Checkstyle 长行错误。
 - 全量 `mvnw verify` 的既有失败来自 dev 基线 Agent 测试和上述旧 Checkstyle 问题，未发现排期定向测试失败。
 - 按 D 技能的统计口径，新增排期源文件的中文注释比例目前未全部达到 30%；这属于代码收尾项，不能宣称已完成。
+- 2026-08-07 在独立的 `origin/dev` 工作树运行 `MinimalReadOnlyAgentServiceTest,RankMoviePlanExecutionAdapterTest`，同样得到 3 个失败：两个 `MinimalReadOnlyAgentServiceTest` 和一个 `RankMoviePlanExecutionAdapterTest`。该结果复现了 PR CI 失败，证明不是本 change 引入；本 PR 的排期定向测试保持通过。

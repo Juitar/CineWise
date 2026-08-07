@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.content.application.ExternalShowtimeProvider;
 import java.math.BigDecimal;
+import java.net.SocketTimeoutException;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -64,6 +65,7 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
     }
 
     private FetchOneResult fetchOne(LocalDate showDate, ExternalCinema externalCinema) {
+        // 每次尝试都先占用共享预算，重试不能绕过影片、影院和排期共用的 10 req/min 限制。
         if (!allowRequest()) {
             return new FetchOneResult(List.of(), FailureCategory.RATE_LIMITED);
         }
@@ -122,6 +124,7 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
         try {
             OffsetDateTime startTime = LocalDateTime.parse(date + " " + time, DATE_TIME)
                     .atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime();
+            // seqNo 只在 provider + cinemaId 范围内使用；Application 会把三元组公开给 A 作为导入幂等键。
             return new Candidate(showId, movieId, cinemaId, startTime, price(show.path("vipPrice").asText(null)));
         } catch (DateTimeParseException exception) {
             return null;
@@ -161,7 +164,7 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
                 && response.getStatusCode().is5xxServerError();
     }
 
-    private static FailureCategory classify(Exception exception) {
+    static FailureCategory classify(Exception exception) {
         if (exception instanceof RestClientResponseException response) {
             if (response.getStatusCode().value() == 429) {
                 return FailureCategory.RATE_LIMITED;
@@ -169,7 +172,21 @@ public final class NetStartShowtimeProvider implements ExternalShowtimeProvider 
             return response.getStatusCode().is5xxServerError()
                     ? FailureCategory.UPSTREAM_5XX : FailureCategory.INVALID_DATA;
         }
+        if (exception instanceof ResourceAccessException && containsTimeout(exception)) {
+            return FailureCategory.TIMEOUT;
+        }
         return exception instanceof ResourceAccessException ? FailureCategory.NETWORK : FailureCategory.INVALID_DATA;
+    }
+
+    /** Spring 会把连接、读超时包装成 ResourceAccessException；继续检查原因链才能和普通断网区分。 */
+    private static boolean containsTimeout(Throwable throwable) {
+        for (Throwable current = throwable; current != null; current = current.getCause()) {
+            if (current instanceof SocketTimeoutException || current instanceof java.net.http.HttpTimeoutException
+                    || current instanceof java.util.concurrent.TimeoutException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void pauseBeforeRetry() {

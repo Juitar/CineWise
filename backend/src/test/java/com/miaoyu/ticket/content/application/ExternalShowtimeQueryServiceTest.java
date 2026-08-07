@@ -30,12 +30,15 @@ class ExternalShowtimeQueryServiceTest {
         ExternalShowtimeQueryPort.QueryResult result = service.query(
                 new ExternalShowtimeQueryPort.Query(DATE, List.of(21L)));
 
-        assertThat(result.degraded()).isFalse();
         assertThat(result.snapshots()).singleElement().satisfies(snapshot -> {
             assertThat(snapshot.movieId()).isEqualTo(11L);
             assertThat(snapshot.cinemaId()).isEqualTo(21L);
             assertThat(snapshot.priceSemantic()).isEqualTo(ExternalShowtimeQueryPort.PriceSemantic.REFERENCE_ONLY);
             assertThat(snapshot.expiresAt()).isEqualTo(OffsetDateTime.parse("2026-08-07T09:10:00+08:00"));
+            assertThat(snapshot.degraded()).isFalse();
+            assertThat(snapshot.qualityStatus()).isEqualTo(ExternalShowtimeQueryPort.QualityStatus.ACCEPTED);
+            assertThat(snapshot.externalShowtimeKey()).isEqualTo(
+                    new ExternalShowtimeQueryPort.ExternalShowtimeKey("NETSTART_MAOYAN", "c1", "s1"));
         });
         assertThat(snapshots.saved).isPresent();
     }
@@ -52,9 +55,10 @@ class ExternalShowtimeQueryServiceTest {
         ExternalShowtimeQueryPort.QueryResult result = service.query(
                 new ExternalShowtimeQueryPort.Query(DATE, List.of(21L)));
 
-        assertThat(result.snapshots()).containsExactly(snapshot);
-        assertThat(result.degraded()).isTrue();
-        assertThat(result.fallbackType()).isEqualTo(ExternalShowtimeQueryPort.FallbackType.SNAPSHOT);
+        assertThat(result.snapshots()).singleElement().satisfies(resultSnapshot -> {
+            assertThat(resultSnapshot.degraded()).isTrue();
+            assertThat(resultSnapshot.fallbackType()).isEqualTo(ExternalShowtimeQueryPort.FallbackType.SNAPSHOT);
+        });
     }
 
     @Test
@@ -126,7 +130,9 @@ class ExternalShowtimeQueryServiceTest {
                 21L, OffsetDateTime.parse("2026-08-07T11:00:00+08:00"), null, null,
                 ExternalShowtimeQueryPort.PriceSemantic.REFERENCE_ONLY,
                 OffsetDateTime.parse("2026-08-07T09:00:00+08:00"),
-                OffsetDateTime.parse("2026-08-07T09:10:00+08:00"), false);
+                OffsetDateTime.parse("2026-08-07T09:10:00+08:00"), false, false, null,
+                ExternalShowtimeQueryPort.QualityStatus.ACCEPTED,
+                new ExternalShowtimeQueryPort.ExternalShowtimeKey("NETSTART_MAOYAN", "c1", "s1"));
     }
 
     /** 内存快照让用例只验证 Application 决策，不依赖 MySQL 夹具。 */

@@ -50,14 +50,14 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
     public QueryResult query(Query query) {
         validate(query);
         if (query.cinemaIds().isEmpty()) {
-            return new QueryResult(List.of(), false, null);
+            return new QueryResult(List.of());
         }
         List<Long> cinemaIds = distinctCinemaIds(query.cinemaIds());
         Map<String, ContentExternalIdentityLookupPort.ExternalIdentity> localCinemaIds =
                 resolveExternalCinemas(cinemaIds);
         if (localCinemaIds.isEmpty()) {
             // 没有 ACTIVE 外部影院映射是正常的本地资料缺失，不应该访问 Provider 或报成上游故障。
-            return new QueryResult(List.of(), false, null);
+            return new QueryResult(List.of());
         }
         List<ExternalShowtimeProvider.ExternalCinema> externalCinemas = localCinemaIds.values().stream()
                 .filter(identity -> identity.providerCityId() != null && !identity.providerCityId().isBlank())
@@ -65,7 +65,7 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
                         identity.externalId(), identity.providerCityId()))
                 .toList();
         if (externalCinemas.isEmpty()) {
-            return new QueryResult(List.of(), false, null);
+            return new QueryResult(List.of());
         }
         ExternalShowtimeProvider.FetchResult fetched = provider.fetch(query.showDate(), externalCinemas);
         if (!fetched.available()) {
@@ -77,14 +77,15 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
                 .min(OffsetDateTime::compareTo).orElse(dataAt.plusMinutes(10));
         snapshotPort.save(query.showDate(), cinemaIds,
                 new ExternalShowtimeSnapshotPort.Snapshot(accepted, dataAt, expiresAt));
-        return new QueryResult(accepted, false, null);
+        return new QueryResult(accepted);
     }
 
     private QueryResult fallback(LocalDate showDate, List<Long> cinemaIds) {
         OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         return snapshotPort.find(showDate, cinemaIds)
                 .filter(snapshot -> snapshot.expiresAt().isAfter(now))
-                .map(snapshot -> new QueryResult(snapshot.snapshots(), true, FallbackType.SNAPSHOT))
+                .map(snapshot -> new QueryResult(snapshot.snapshots().stream()
+                        .map(this::asSnapshotFallback).toList()))
                 .orElseThrow(() -> new BusinessException(ShowtimeErrorCode.PROVIDER_UNAVAILABLE));
     }
 
@@ -118,7 +119,9 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
             OffsetDateTime expiresAt = min(candidate.startTime(), dataAt.plusMinutes(10));
             accepted.add(new ExternalShowtimeSnapshot(PROVIDER, candidate.externalShowId(), candidate.externalMovieId(),
                     candidate.externalCinemaId(), movieId, cinemaId, candidate.startTime(), null,
-                    candidate.listedPrice(), PriceSemantic.REFERENCE_ONLY, dataAt, expiresAt, false));
+                    candidate.listedPrice(), PriceSemantic.REFERENCE_ONLY, dataAt, expiresAt, false, false, null,
+                    QualityStatus.ACCEPTED, new ExternalShowtimeKey(PROVIDER, candidate.externalCinemaId(),
+                    candidate.externalShowId())));
         }
         return List.copyOf(accepted);
     }
@@ -135,6 +138,15 @@ public class ExternalShowtimeQueryService implements ExternalShowtimeQueryPort {
 
     private static OffsetDateTime min(OffsetDateTime first, OffsetDateTime second) {
         return first.isBefore(second) ? first : second;
+    }
+
+    /** 快照原始内容保留采集事实；仅在本次读路径上标记为降级，不能回写并污染下一次实时结果。 */
+    private ExternalShowtimeSnapshot asSnapshotFallback(ExternalShowtimeSnapshot snapshot) {
+        return new ExternalShowtimeSnapshot(snapshot.source(), snapshot.externalShowId(), snapshot.externalMovieId(),
+                snapshot.externalCinemaId(), snapshot.movieId(), snapshot.cinemaId(), snapshot.startTime(),
+                snapshot.endTime(), snapshot.listedPrice(), snapshot.priceSemantic(), snapshot.dataAt(),
+                snapshot.expiresAt(), snapshot.isExpired(), true, FallbackType.SNAPSHOT, snapshot.qualityStatus(),
+                snapshot.externalShowtimeKey());
     }
 
     private static List<Long> distinctCinemaIds(List<Long> cinemaIds) {

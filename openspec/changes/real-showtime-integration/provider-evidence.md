@@ -13,7 +13,7 @@
 | --- | --- | --- |
 | 外部影院身份 | `data.cinemaId` | 返回数值影院 ID；与本地影院通过既有 `content_identity_mapping` 映射。 |
 | 外部影片身份 | `data.movies[].id` | 返回数值影片 ID；与本地影片通过既有映射关联。 |
-| 外部场次身份 | `shows[].plist[].seqNo` | 返回非空序列号，作为 `externalShowId`；缺失时隔离，不拼接名称或时间。 |
+| 外部场次身份 | `shows[].plist[].seqNo` | 返回非空序列号，作为 `externalShowId`；未证明跨影院唯一，导入键必须是 `provider + externalCinemaId + externalShowId`；缺失时隔离，不拼接名称或时间。 |
 | 放映日期和时间 | `shows[].showDate`、`shows[].plist[].tm` | 日期形如 `yyyy-MM-dd`，时间形如 `HH:mm`；按 Asia/Shanghai 转换。 |
 | 参考标价 | `shows[].plist[].vipPrice` | 返回数字字符串；只作为 `listedPrice`，不能写为本地交易价格。 |
 | 展示资料 | `lang`、`th` | 可选的语言和影厅文本；不进入 A 的本地影厅事实。 |

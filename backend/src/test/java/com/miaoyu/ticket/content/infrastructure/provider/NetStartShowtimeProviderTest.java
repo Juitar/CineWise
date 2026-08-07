@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import org.springframework.web.client.ResourceAccessException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -87,6 +88,15 @@ class NetStartShowtimeProviderTest {
         assertThat(provider.fetch(LocalDate.of(2026, 8, 7),
                 List.of(new ExternalShowtimeProvider.ExternalCinema("c1", "70"))).failureCategory())
                 .isEqualTo(ExternalShowtimeProvider.FailureCategory.PROVIDER_DISABLED);
+    }
+
+    @Test
+    void givenReadTimeout_whenClassify_thenItReturnsTimeoutInsteadOfNetwork() {
+        ResourceAccessException timeout = new ResourceAccessException("read timeout",
+                new java.net.SocketTimeoutException());
+
+        assertThat(NetStartShowtimeProvider.classify(timeout))
+                .isEqualTo(ExternalShowtimeProvider.FailureCategory.TIMEOUT);
     }
 
     @Test

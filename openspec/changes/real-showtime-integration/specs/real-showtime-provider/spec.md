@@ -35,6 +35,17 @@
 - **THEN** DTO 只可包含可空 `listedPrice` 和固定 `priceSemantic=REFERENCE_ONLY`
 - **AND** D 丢弃外部余座和座位数据，不把它们当作可售库存
 
+### Requirement: 外部场次必须使用三元幂等身份
+
+系统 SHALL 公开 `ExternalShowtimeKey(provider, externalCinemaId, externalShowId)`。NetStart 的 `seqNo` 只被证实在单个 Provider 和影院范围内可用，A MUST NOT 仅用 `seqNo` 导入或更新本地沙箱场次。
+
+#### Scenario: A 重复导入同一外部场次
+
+- **GIVEN** 两次候选具有相同 `provider`、`externalCinemaId` 和 `externalShowId`
+- **WHEN** A 决定导入候选
+- **THEN** A 使用该三元组进行幂等判断
+- **AND** 候选仍必须是 `qualityStatus=ACCEPTED`、`isExpired=false`、`degraded=false`
+
 ### Requirement: 候选必须具有统一时区、时效和降级标记
 
 系统 SHALL 将开场和散场时间转换为 `Asia/Shanghai` 的带偏移 ISO 8601 时间。每条候选必须返回 `source`、`dataAt`、`expiresAt`、`isExpired`、`degraded` 和 `fallbackType`。`endTime` 不晚于 `startTime`、时间无法解析或超过已确认未来窗口的记录必须隔离。

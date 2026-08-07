@@ -28,8 +28,12 @@ public interface ExternalShowtimeQueryPort {
         }
     }
 
-    /** 批次降级不改变每条候选的来源时间；A 可据此拒绝把陈旧数据导入本地票务事实。 */
-    record QueryResult(List<ExternalShowtimeSnapshot> snapshots, boolean degraded, FallbackType fallbackType) {
+    /**
+     * 查询结果只承载已经隔离完成的候选。
+     *
+     * <p>降级和质量字段放在候选本身，避免 A 只取列表元素时丢失导入判断依据。</p>
+     */
+    record QueryResult(List<ExternalShowtimeSnapshot> snapshots) {
         public QueryResult {
             snapshots = List.copyOf(snapshots);
         }
@@ -41,14 +45,26 @@ public interface ExternalShowtimeQueryPort {
     /** 外部标价只是参考，A 不能直接把它当成本地票价。 */
     enum PriceSemantic { REFERENCE_ONLY }
 
+    /** A 只能导入 ACCEPTED 候选；其他状态预留给后续逐条隔离结果，不以空字段表达原因。 */
+    enum QualityStatus { ACCEPTED }
+
+    /**
+     * 外部场次幂等身份。
+     *
+     * <p>NetStart 的 seqNo 未证明可跨影院唯一，A 导入时必须同时使用 provider、externalCinemaId
+     * 和 externalShowId，不能只保存 seqNo。</p>
+     */
+    record ExternalShowtimeKey(String provider, String externalCinemaId, String externalShowId) { }
+
     /**
      * 已映射且通过字段质量校验的候选。
      *
      * <p>时间均为 Asia/Shanghai 带偏移时间；NetStart 没有可靠散场时间时 endTime 为空，A 不得自行推算。</p>
      */
-    record ExternalShowtimeSnapshot(String provider, String externalShowId, String externalMovieId,
+    record ExternalShowtimeSnapshot(String source, String externalShowId, String externalMovieId,
                                    String externalCinemaId, Long movieId, Long cinemaId,
                                    OffsetDateTime startTime, OffsetDateTime endTime, BigDecimal listedPrice,
                                    PriceSemantic priceSemantic, OffsetDateTime dataAt, OffsetDateTime expiresAt,
-                                   boolean expired) { }
+                                   boolean isExpired, boolean degraded, FallbackType fallbackType,
+                                   QualityStatus qualityStatus, ExternalShowtimeKey externalShowtimeKey) { }
 }
