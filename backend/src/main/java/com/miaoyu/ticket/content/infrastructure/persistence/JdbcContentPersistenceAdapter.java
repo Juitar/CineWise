@@ -173,33 +173,33 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
      * 它们不会进入公开 DTO，也不能从前端请求直接传入。
      */
     @Override
-    public long ensureCinema(CinemaRow row, String cityName, String providerCityId) {
+    public long ensureCinema(CinemaRow row, String cityName, String cityCode) {
         Long existingId = findCinemaId(row.source(), row.sourceCinemaId());
         if (existingId != null) {
-            updateCinema(existingId, row, cityName, providerCityId);
+            updateCinema(existingId, row, cityName, cityCode);
             ensureIdentityMapping(row.source(), "CINEMA", row.sourceCinemaId(), existingId, row.dataTime());
             return existingId;
         }
         try {
-            insertCinema(row, cityName, providerCityId);
+            insertCinema(row, cityName, cityCode);
             ensureIdentityMapping(row.source(), "CINEMA", row.sourceCinemaId(), row.id(), row.dataTime());
             return row.id();
         } catch (DuplicateKeyException duplicate) {
             long existingAfterConflict = requireCinemaId(row.source(), row.sourceCinemaId(), duplicate);
-            updateCinema(existingAfterConflict, row, cityName, providerCityId);
+            updateCinema(existingAfterConflict, row, cityName, cityCode);
             ensureIdentityMapping(row.source(), "CINEMA", row.sourceCinemaId(), existingAfterConflict, row.dataTime());
             return existingAfterConflict;
         }
     }
 
-    private void insertCinema(CinemaRow row, String cityName, String providerCityId) {
+    private void insertCinema(CinemaRow row, String cityName, String cityCode) {
         if (hasV014CinemaColumns()) {
             jdbcTemplate.update("""
                     INSERT INTO cinema (id, source_cinema_id, name, city_code, city_name, provider_city_id,
                     area, address, longitude, latitude, source_type, source, data_time, expires_at,
                     version, deleted_at, create_time, update_time)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)
-                    """, row.id(), row.sourceCinemaId(), row.name(), row.cityCode(), cityName, providerCityId,
+                    """, row.id(), row.sourceCinemaId(), row.name(), row.cityCode(), cityName, cityCode,
                     row.area(), row.address(), row.longitude(), row.latitude(), row.sourceType().name(), row.source(),
                     timestamp(row.dataTime()), nullableTimestamp(row.expiresAt()), timestamp(row.dataTime()),
                     timestamp(row.dataTime()));
@@ -215,15 +215,16 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
     }
 
     /** 同一来源影院资料发生变化时保留业务 ID，并刷新可展示字段和受控城市归属。 */
-    private void updateCinema(long existingId, CinemaRow row, String cityName, String providerCityId) {
+    private void updateCinema(long existingId, CinemaRow row, String cityName, String cityCode) {
         if (hasV014CinemaColumns()) {
             jdbcTemplate.update("""
                     UPDATE cinema SET name = ?, city_code = ?, city_name = COALESCE(?, city_name),
                     provider_city_id = COALESCE(?, provider_city_id), area = COALESCE(?, area),
-                    address = COALESCE(?, address), longitude = COALESCE(?, longitude), latitude = COALESCE(?, latitude),
+                    address = COALESCE(?, address), longitude = COALESCE(?, longitude),
+                    latitude = COALESCE(?, latitude),
                     source_type = ?, data_time = ?, expires_at = ?, version = version + 1, update_time = ?
                     WHERE id = ? AND source = ? AND source_cinema_id = ?
-                    """, row.name(), row.cityCode(), cityName, providerCityId, row.area(), row.address(),
+                    """, row.name(), row.cityCode(), cityName, cityCode, row.area(), row.address(),
                     row.longitude(), row.latitude(), row.sourceType().name(), timestamp(row.dataTime()),
                     nullableTimestamp(row.expiresAt()), timestamp(row.dataTime()), existingId, row.source(),
                     row.sourceCinemaId());
@@ -241,9 +242,13 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
 
     private boolean hasV014CinemaColumns() {
         Boolean cached = v014CinemaColumnsAvailable;
-        if (cached != null) return cached;
+        if (cached != null) {
+            return cached;
+        }
         synchronized (this) {
-            if (v014CinemaColumnsAvailable != null) return v014CinemaColumnsAvailable;
+            if (v014CinemaColumnsAvailable != null) {
+                return v014CinemaColumnsAvailable;
+            }
             try {
                 jdbcTemplate.query("SELECT city_name FROM cinema WHERE 1 = 0", (resultSet, rowNumber) -> null);
                 v014CinemaColumnsAvailable = true;
@@ -282,7 +287,8 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
                         ELSE 'INVALID'
                     END,
                     update_time = VALUES(update_time)
-                """, idGenerator == null ? internalId : idGenerator.nextId(), provider, resourceType, externalId, internalId,
+                """, idGenerator == null ? internalId : idGenerator.nextId(), provider, resourceType, externalId,
+                internalId,
                 timestamp(dataTime), timestamp(dataTime));
     }
 
@@ -336,7 +342,8 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
                     version, create_time, update_time)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
                     """, row.id(), row.provider(), row.resourceType(), row.requestId(), row.status().name(),
-                    row.errorCode(), row.totalCount(), row.successCount(), row.failureCount(), timestamp(row.startedAt()),
+                    row.errorCode(), row.totalCount(), row.successCount(), row.failureCount(),
+                    timestamp(row.startedAt()),
                     nullableTimestamp(row.finishedAt()), row.errorSummary(), timestamp(row.startedAt()),
                     timestamp(row.startedAt()));
             return;
@@ -347,8 +354,9 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
                 city_name, provider_city_id, version, create_time, update_time)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
                 """, row.id(), row.provider(), row.resourceType(), row.requestId(), row.status().name(),
-                row.errorCode(), row.totalCount(), row.successCount(), row.failureCount(), timestamp(row.startedAt()),
-                nullableTimestamp(row.finishedAt()), row.errorSummary(), row.cityName(), row.providerCityId(),
+                row.errorCode(), row.totalCount(), row.successCount(), row.failureCount(),
+                timestamp(row.startedAt()),
+                nullableTimestamp(row.finishedAt()), row.errorSummary(), row.cityName(), row.cityCode(),
                 timestamp(row.startedAt()),
                 timestamp(row.startedAt()));
     }
@@ -356,9 +364,13 @@ public class JdbcContentPersistenceAdapter implements ContentPersistencePort {
     /** V014 前的 H2 回归库没有城市审计列，不能让兼容测试误报 SQL 错误。 */
     private boolean hasV014SyncLogColumns() {
         Boolean cached = v014SyncLogColumnsAvailable;
-        if (cached != null) return cached;
+        if (cached != null) {
+            return cached;
+        }
         synchronized (this) {
-            if (v014SyncLogColumnsAvailable != null) return v014SyncLogColumnsAvailable;
+            if (v014SyncLogColumnsAvailable != null) {
+                return v014SyncLogColumnsAvailable;
+            }
             try {
                 jdbcTemplate.query("SELECT city_name FROM data_sync_log WHERE 1 = 0",
                         (resultSet, rowNumber) -> null);

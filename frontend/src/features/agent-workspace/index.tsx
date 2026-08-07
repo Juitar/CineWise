@@ -6,6 +6,7 @@ import { useAgentWorkspace } from '../../modules/agent/useAgentWorkspace';
 import { takePendingAgentDraft } from '../../modules/agent/entryDraft';
 import type { AgentSession } from '../../modules/agent/types';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
+import { AgentDisplayItemView } from './cards';
 import './index.css';
 
 interface SessionListProps {
@@ -129,26 +130,11 @@ export function AgentWorkspace({ sessionId }: { sessionId: string }) {
           ) : (
             <div className="agent-message-list" role="list">
               {workspace.projection.items.map((item) => (
-                <article
-                  className={`agent-message-item agent-message-item--${item.kind}`}
+                <AgentDisplayItemView
                   key={item.key}
-                  role="listitem"
-                >
-                  {item.kind === 'card-placeholder' && <strong>卡片暂不可用</strong>}
-                  {item.title && <strong>{item.title}</strong>}
-                  <p>{item.text}</p>
-                  {item.selectSeatsPath && <Link to={item.selectSeatsPath}>去选座</Link>}
-                  {item.fields && item.fields.length > 0 && (
-                    <dl className="agent-card-fields">
-                      {item.fields.map((field) => (
-                        <div key={`${field.label}:${field.value}`}>
-                          <dt>{field.label}</dt>
-                          <dd>{field.value}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  )}
-                </article>
+                  item={item}
+                  onConfirm={(itemKey, confirmed) => void workspace.confirm(itemKey, confirmed)}
+                />
               ))}
             </div>
           )}

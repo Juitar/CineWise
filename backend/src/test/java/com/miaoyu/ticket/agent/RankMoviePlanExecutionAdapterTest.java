@@ -62,7 +62,7 @@ class RankMoviePlanExecutionAdapterTest {
         assertThat(definition.timeout()).isEqualTo(AgentToolDefinitions.RANK_MOVIE_PLAN_TIMEOUT);
         assertThat(definition.inputs()).extracting("name").containsExactly(
                 "cityCode", "date", "ticketCount", "movieId", "cinemaId", "genres",
-                "timeFrom", "timeTo", "latestEndTime", "budget", "excludedGenres");
+                "timeFrom", "timeTo", "latestEndTime", "budget", "excludedGenres", "maxDistanceMeters");
 
         var validation = new PlanSchemaValidator(registry).validate(
                 candidatePlan(FailurePolicy.FAIL, false), validValidationContext());
@@ -80,8 +80,8 @@ class RankMoviePlanExecutionAdapterTest {
     }
 
     @Test
-    void shouldCallRealDToolAndKeepShowtimeUnavailableAsSuccessfulDegradation() {
-        RankMoviePlanTool tool = spy(realUnavailableShowtimeTool());
+    void shouldMapMockedRecommendationToolDegradationAsSuccessfulResult() {
+        RankMoviePlanTool tool = unavailableRecommendationTool();
         ToolRegistry registry = registry();
         ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry);
         ExecutionPlan plan = validatedPlan(registry, FailurePolicy.FAIL, false);
@@ -108,6 +108,27 @@ class RankMoviePlanExecutionAdapterTest {
         assertThat(commandCaptor.getValue()).isEqualTo(new RankMoviePlanCommand(
                 "430100", LocalDate.of(2026, 8, 4), 1, "101", "201", List.of(), null, null, null, null,
                 List.of()));
+    }
+
+    @Test
+    void shouldPassTrustedNearestContextWithoutPuttingItInCommand() {
+        RankMoviePlanTool tool = unavailableRecommendationTool();
+        ToolRegistry registry = registry();
+        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry);
+        RankMoviePlanExecutionAdapter adapter = new RankMoviePlanExecutionAdapter(tool, stateMachine);
+        ExecutionPlan plan = validatedPlan(registry, FailurePolicy.FAIL, false);
+
+        adapter.execute(new RankMoviePlanExecutionRequest(
+                stateMachine.initialize(plan), "rank", "run-1", "trace-1", 9_000L,
+                "550e8400-e29b-41d4-a716-446655440000", "NEAREST"));
+
+        ArgumentCaptor<ToolContext> contextCaptor = ArgumentCaptor.forClass(ToolContext.class);
+        ArgumentCaptor<RankMoviePlanCommand> commandCaptor = ArgumentCaptor.forClass(RankMoviePlanCommand.class);
+        verify(tool).executeRecommendationPlan(contextCaptor.capture(), commandCaptor.capture());
+        assertThat(contextCaptor.getValue().distanceContextId())
+                .isEqualTo("550e8400-e29b-41d4-a716-446655440000");
+        assertThat(contextCaptor.getValue().distancePreference()).isEqualTo("NEAREST");
+        assertThat(commandCaptor.getValue().maxDistanceMeters()).isNull();
     }
 
     @Test
@@ -258,12 +279,15 @@ class RankMoviePlanExecutionAdapterTest {
         return new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan()));
     }
 
-    private static RankMoviePlanTool realUnavailableShowtimeTool() {
-        return new RankMoviePlanTool(new FixedRecommendationQueryService(
-                () -> new FixedRecommendationCatalog(
-                        "fixed-rec-v1", "FIXED_RECOMMENDATION", ContentSourceType.MOCK, 360L),
-                query -> List.of(),
-                Clock.fixed(NOW, ZoneOffset.UTC)));
+    private static RankMoviePlanTool unavailableRecommendationTool() {
+        RankMoviePlanTool tool = mock(RankMoviePlanTool.class);
+        RecommendationPlanResult result = new RecommendationPlanResult(
+                "1.0", "fixture", List.of(), List.of("SHOWTIME"), null, false, "TICKETING:MOCK",
+                NOW, NOW.plusSeconds(1_800), true);
+        when(tool.executeRecommendationPlan(any(ToolContext.class), any(RankMoviePlanCommand.class)))
+                .thenReturn(new ToolResult<>(ToolStatus.SUCCESS, result, null, false, false, "RENDER_RESULT",
+                        true, "SHOWTIME_UNAVAILABLE", 1L, result.dataAt(), result.expiresAt()));
+        return tool;
     }
 
     private static ExecutionPlan validatedPlan(

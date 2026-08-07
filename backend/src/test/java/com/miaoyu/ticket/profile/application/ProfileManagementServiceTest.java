@@ -29,7 +29,13 @@ class ProfileManagementServiceTest {
     TagRepository tags = new TagRepository();
     WriteRepository writes = new WriteRepository();
     ProfileManagementService service = new ProfileManagementService(
-        currentUserAccessor(), userId -> true, preferences, tags, writes, new EmptyCache(), ids(),
+        currentUserAccessor(),
+        userId -> new ProfileDataConsentSnapshot(true, 1L, 0L, null, null),
+        preferences,
+        tags,
+        writes,
+        new EmptyCache(),
+        ids(),
         Clock.fixed(Instant.parse("2026-08-06T00:00:00Z"), ZoneOffset.UTC),
         new ObjectMapper().findAndRegisterModules());
     ProfileManagementService.CreateTagCommand command = new ProfileManagementService.CreateTagCommand(

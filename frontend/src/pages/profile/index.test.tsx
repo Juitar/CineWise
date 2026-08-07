@@ -18,6 +18,14 @@ const user: CurrentUser = {
 const mocks = vi.hoisted(() => ({
   auth: { currentUser: null as CurrentUser | null },
   logout: { handleLogout: vi.fn(), isLoggingOut: false },
+  profile: {
+    load: vi.fn(),
+    notice: '未开启画像数据使用',
+    profile: null,
+    saving: false,
+    setEnabled: vi.fn(),
+    state: 'consent-required',
+  },
 }));
 
 vi.mock('umi', () => ({
@@ -34,6 +42,10 @@ vi.mock('../../shared/auth/AuthProvider', () => ({
 
 vi.mock('../../modules/auth/useLogout', () => ({
   useLogout: () => mocks.logout,
+}));
+
+vi.mock('../../modules/profile/useProfile', () => ({
+  useProfile: () => mocks.profile,
 }));
 
 describe('ProfilePage', () => {
@@ -56,12 +68,14 @@ describe('ProfilePage', () => {
     expect(screen.getByRole('link', { name: '查看隐私说明' })).toHaveAttribute('href', '/privacy');
   });
 
-  it('显示可进入真实订单列表的入口，不展示未接入的记录和画像数据', () => {
+  it('显示订单入口，并在未同意时不展示旧画像数据', () => {
     render(<ProfilePage />);
 
     expect(screen.getByRole('link', { name: '我的订单' })).toHaveAttribute('href', '/orders');
     expect(screen.queryByText('我的观影记录')).not.toBeInTheDocument();
-    expect(screen.queryByText('AI 观影画像')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'AI 观影画像' })).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('未开启画像数据使用');
+    expect(screen.queryByText('开启个性化')).not.toBeInTheDocument();
     expect(screen.queryByText('星际穿越')).not.toBeInTheDocument();
   });
 

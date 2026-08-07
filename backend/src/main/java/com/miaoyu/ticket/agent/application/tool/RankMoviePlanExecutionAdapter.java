@@ -45,7 +45,7 @@ public final class RankMoviePlanExecutionAdapter
      */
     private static final Set<String> COMMAND_INPUT_NAMES = Set.of(
             "cityCode", "date", "ticketCount", "movieId", "cinemaId", "genres", "timeFrom", "timeTo",
-            "latestEndTime", "budget", "excludedGenres");
+            "latestEndTime", "budget", "excludedGenres", "maxDistanceMeters");
 
     private final RankMoviePlanTool rankMoviePlanTool;
     private final ExecutionPlanStateMachine stateMachine;
@@ -126,7 +126,8 @@ public final class RankMoviePlanExecutionAdapter
     @Override
     public ReadOnlyToolExecutionAdapter.ExecutionResult execute(ReadOnlyToolExecutionAdapter.ExecutionRequest request) {
         RankMoviePlanExecutionResult result = execute(new RankMoviePlanExecutionRequest(
-                request.state(), request.nodeId(), request.runId(), request.traceId(), request.remainingDeadlineMs()));
+                request.state(), request.nodeId(), request.runId(), request.traceId(), request.remainingDeadlineMs(),
+                request.distanceContextId(), request.distancePreference()));
         return new ReadOnlyToolExecutionAdapter.ExecutionResult(result.state(), result.toolResult());
     }
 
@@ -155,7 +156,9 @@ public final class RankMoviePlanExecutionAdapter
                 request.traceId(),
                 null,
                 null,
-                node.slotSnapshot().version());
+                node.slotSnapshot().version(),
+                request.distanceContextId(),
+                request.distancePreference());
     }
 
     private static List<String> declaredSlotReferences(ExecutionPlanNode node) {
@@ -184,9 +187,10 @@ public final class RankMoviePlanExecutionAdapter
         BigDecimal budget = parseBudget(optionalSlotValue(references, slotValues, "budget"));
         List<String> excludedGenres = parseStringList(
                 optionalSlotValue(references, slotValues, "excludedGenres"), "excludedGenres");
+        Integer maxDistanceMeters = optionalPositiveIntSlotValue(references, slotValues, "maxDistanceMeters");
         return new RankMoviePlanCommand(
                 cityCode, date, ticketCount, movieId, cinemaId, genres, timeFrom, timeTo, latestEndTime, budget,
-                excludedGenres);
+                excludedGenres, maxDistanceMeters);
     }
 
     private static Map<String, InputReference> indexSlotReferences(ExecutionPlanNode node) {
@@ -252,6 +256,12 @@ public final class RankMoviePlanExecutionAdapter
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException(inputName + " 必须是正整数", exception);
         }
+    }
+
+    private static Integer optionalPositiveIntSlotValue(
+            Map<String, InputReference> references, Map<String, String> slotValues, String inputName) {
+        String value = optionalSlotValue(references, slotValues, inputName);
+        return value == null ? null : parsePositiveInt(value, inputName);
     }
 
     private static BigDecimal parseBudget(String value) {

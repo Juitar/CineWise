@@ -49,14 +49,24 @@ vi.mock('antd', () => ({
       </div>
     </div>
   ),
-  Input: () => <input />,
-  Menu: ({ items }: { items: Array<{ label?: React.ReactNode }> }) => (
+  Menu: ({ items }: { items: Array<{ icon?: React.ReactNode; label?: React.ReactNode }> }) => (
     <nav>
       {items.map((item, index) => (
-        <React.Fragment key={index}>{item.label}</React.Fragment>
+        <React.Fragment key={index}>
+          {item.icon}
+          {item.label}
+        </React.Fragment>
       ))}
     </nav>
   ),
+}));
+
+vi.mock('../../shared/components/icons/layout-icons', () => ({
+  FilmIcon: () => <span data-testid="film-icon" />,
+  HomeIcon: () => <span data-testid="home-icon" />,
+  MapPinIcon: () => <span data-testid="map-pin-icon" />,
+  OrderIcon: () => <span data-testid="order-icon" />,
+  UserIcon: () => <span data-testid="user-icon" />,
 }));
 
 vi.mock('antd-mobile', () => {
@@ -84,22 +94,29 @@ describe('用户端订单导航', () => {
 
   afterEach(cleanup);
 
-  it('已登录用户可以从桌面侧栏和用户菜单进入订单列表', () => {
+  it('桌面侧边栏的首页和影片入口使用不同图标', () => {
+    render(<DesktopSidebar />);
+
+    expect(screen.getByTestId('home-icon')).toBeInTheDocument();
+    expect(screen.getByTestId('film-icon')).toBeInTheDocument();
+  });
+
+  it('桌面侧边栏和用户菜单均不显示订单入口', () => {
     const { unmount } = render(<DesktopSidebar />);
-    expect(screen.getByRole('link', { name: '我的订单' })).toHaveAttribute('href', '/orders');
+    expect(screen.queryByRole('link', { name: '我的订单' })).not.toBeInTheDocument();
     unmount();
 
     render(<DesktopTopBar />);
-    expect(screen.getByRole('link', { name: '我的订单' })).toHaveAttribute('href', '/orders');
+    expect(screen.queryByRole('link', { name: '我的订单' })).not.toBeInTheDocument();
   });
 
-  it('移动端底部导航为已登录用户显示订单入口', () => {
+  it('移动端底部导航不显示订单入口', () => {
     render(<MobileTabBar />);
 
-    expect(screen.getByRole('button', { name: '订单' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '订单' })).not.toBeInTheDocument();
   });
 
-  it('未登录用户看不到桌面和移动端的订单操作', () => {
+  it('未登录用户也看不到公共导航中的订单操作', () => {
     mocks.auth.currentUser = null;
     mocks.auth.status = 'anonymous';
 

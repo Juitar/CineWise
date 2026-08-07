@@ -5,7 +5,7 @@ import { AlternativeShowList } from '../../../features/alternative-show-list/Alt
 import { useRefundPage } from '../../../modules/order/transaction-hooks';
 import { buildAlternativeShowSeatPath } from '../../../modules/order/routes';
 import { formatOrderDateTime } from '../../../modules/order/formatters';
-import { TransactionBackButton } from '../../../features/transaction-back-button/TransactionBackButton';
+import { TransactionBreadcrumb } from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import './index.css';
 
 /**
@@ -42,9 +42,12 @@ export default function RefundPage() {
   return (
     <div className="refund-page-wrapper">
       <div className="refund-page-content">
-        <TransactionBackButton
-          onBack={() => history.push(`/orders/${encodeURIComponent(orderNo)}`)}
-          label="返回订单详情"
+        <TransactionBreadcrumb
+          items={[
+            { label: '我的订单', to: '/orders' },
+            { label: '订单详情', to: `/orders/${encodeURIComponent(orderNo)}` },
+            { label: '申请退票' },
+          ]}
         />
         <RefundConfirmation
           orderNo={impact?.orderNo ?? orderNo}

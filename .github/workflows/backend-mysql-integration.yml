@@ -46,7 +46,9 @@ jobs:
       CINEWISE_MYSQL_REFUND_IT: "true"
       CINEWISE_MYSQL_PAID_TRAVEL_RECONCILIATION_IT: "true"
       CINEWISE_MYSQL_REFUNDED_TRAVEL_RECONCILIATION_IT: "true"
+      CINEWISE_MYSQL_TRAVEL_IT: "true"
       CINEWISE_MYSQL_ADMIN_ORDER_IT: "true"
+      CINEWISE_MYSQL_PROFILE_CONSENT_IT: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,15 +59,17 @@ jobs:
           java-version: "21"
           cache: maven
           cache-dependency-path: backend/pom.xml
-      - name: Create migration and Agent integration databases
+      - name: Create isolated integration databases
         env:
           MYSQL_PWD: root-ci-only
         run: >-
           mysql --protocol=tcp -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u root
           -e "CREATE DATABASE cinewise_migration_ci CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
           CREATE DATABASE cinewise_agent_it CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+          CREATE DATABASE cinewise_profile_consent_it CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
           GRANT ALL PRIVILEGES ON cinewise_migration_ci.* TO 'cinewise_ci'@'%';
-          GRANT ALL PRIVILEGES ON cinewise_agent_it.* TO 'cinewise_ci'@'%';"
+          GRANT ALL PRIVILEGES ON cinewise_agent_it.* TO 'cinewise_ci'@'%';
+          GRANT ALL PRIVILEGES ON cinewise_profile_consent_it.* TO 'cinewise_ci'@'%';"
       - name: Verify latest Flyway migrations on empty MySQL
         working-directory: backend
         env:
@@ -79,7 +83,7 @@ jobs:
         working-directory: backend
         run: >-
           bash ./mvnw --batch-mode --no-transfer-progress
-          -Dtest=ShowQueryMySqlIntegrationTest,OrderCreationMySqlConcurrencyIntegrationTest,OrderLifecycleMySqlIntegrationTest,PaymentMySqlIntegrationTest,RefundMySqlIntegrationTest,PaidTravelTaskReconciliationMySqlIntegrationTest,RefundedTravelTaskReconciliationMySqlIntegrationTest,AdminOrderQueryMySqlIntegrationTest
+          -Dtest=ShowQueryMySqlIntegrationTest,OrderCreationMySqlConcurrencyIntegrationTest,OrderLifecycleMySqlIntegrationTest,PaymentMySqlIntegrationTest,RefundMySqlIntegrationTest,PaidTravelTaskReconciliationMySqlIntegrationTest,RefundedTravelTaskReconciliationMySqlIntegrationTest,PaidTravelTaskReconciliationIntegrationTest,RefundedTravelTaskReconciliationIntegrationTest,TravelTaskPaymentEventIntegrationTest,TravelTaskControllerIntegrationTest,AdminOrderQueryMySqlIntegrationTest
           test
       - name: Run Agent MySQL persistence integration tests
         working-directory: backend
@@ -89,6 +93,14 @@ jobs:
         run: >-
           bash ./mvnw --batch-mode --no-transfer-progress
           -Dtest=AgentPersistenceMySqlIntegrationTest
+          test
+      - name: Run profile consent MySQL transaction integration tests
+        working-directory: backend
+        env:
+          MYSQL_DATABASE: cinewise_profile_consent_it
+        run: >-
+          bash ./mvnw --batch-mode --no-transfer-progress
+          -Dtest=ProfileDataConsentMySqlIntegrationTest
           test
       - name: Repeat Agent Flyway initialization
         working-directory: backend

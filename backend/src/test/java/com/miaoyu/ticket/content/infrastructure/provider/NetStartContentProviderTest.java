@@ -246,7 +246,64 @@ class NetStartContentProviderTest {
     }
 
     @Test
-    void givenSameReleaseStateButYesterdayMaterialCheck_whenIncrementalSync_thenItRefreshesTheDetail() {
+    void givenElevenMovies_whenTwoIncrementalRoundsRun_thenSecondRoundGetsTheRemainingMovies() {
+        NetStartRawClient client = query -> {
+            if (query.contentId() == null) {
+                return json("{\"movieList\":[{\"id\":1},{\"id\":2},{\"id\":3},{\"id\":4},"
+                        + "{\"id\":5},{\"id\":6},{\"id\":7},{\"id\":8},{\"id\":9},{\"id\":10},"
+                        + "{\"id\":11}]}" );
+            }
+            return json("{\"detailMovie\":{\"id\":" + query.contentId()
+                    + ",\"nm\":\"test\",\"cat\":\"drama\",\"dur\":\"90 minutes\",\"sc\":\"8.0\"}}");
+        };
+        var firstRound = provider(client).fetchCurrentHotMovies(Set.of());
+        Set<String> savedIds = firstRound.contents().stream()
+                .map(content -> ((MovieContent) content.result().data().getFirst()).sourceMovieId())
+                .collect(java.util.stream.Collectors.toSet());
+
+        // 新 Provider 实例代表下一分钟的独立同步轮次；已保存的九部不再占用详情预算。
+        var secondRound = provider(client).fetchCurrentHotMovies(savedIds);
+
+        assertThat(firstRound.contents()).hasSize(9);
+        assertThat(secondRound.contents()).extracting(content ->
+                ((MovieContent) content.result().data().getFirst()).sourceMovieId()).containsExactly("10", "11");
+    }
+
+    @Test
+    void givenEightMovies_whenIncrementalSyncRuns_thenItStopsAfterTheDirectoryAndEightDetails() {
+        AtomicInteger calls = new AtomicInteger();
+        NetStartContentProvider provider = provider(query -> {
+            calls.incrementAndGet();
+            if (query.contentId() == null) {
+                return json("{\"movieList\":[{\"id\":1},{\"id\":2},{\"id\":3},{\"id\":4},"
+                        + "{\"id\":5},{\"id\":6},{\"id\":7},{\"id\":8}]}" );
+            }
+            return json("{\"detailMovie\":{\"id\":" + query.contentId()
+                    + ",\"nm\":\"test\",\"cat\":\"drama\",\"dur\":\"90 minutes\",\"sc\":\"8.0\"}}");
+        });
+
+        var batch = provider.fetchCurrentHotMovies(Set.of());
+
+        assertThat(calls).hasValue(9);
+        assertThat(batch.contents()).hasSize(8);
+    }
+
+    @Test
+    void givenRateLimitedDirectory_whenIncrementalSyncRuns_thenItDoesNotCreateMovieContent() {
+        NetStartContentProvider provider = provider(query -> {
+            throw HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "rate", null, null, null);
+        });
+
+        var batch = provider.fetchCurrentHotMovies(Set.of());
+
+        assertThat(batch.contents()).isEmpty();
+        assertThat(batch.attemptedCount()).isEqualTo(1);
+        assertThat(batch.outcome()).isEqualTo(
+                com.miaoyu.ticket.content.application.LiveContentSyncPort.Outcome.RATE_LIMITED);
+    }
+
+    @Test
+    void givenSameReleaseState_whenIncrementalSync_thenItSkipsTheDetail() {
         AtomicInteger calls = new AtomicInteger();
         NetStartContentProvider provider = provider(query -> {
             calls.incrementAndGet();
@@ -258,6 +315,23 @@ class NetStartContentProviderTest {
         });
         var batch = provider.fetchCurrentHotMovies(Map.of("1", new ContentPersistencePort.MovieState(
                 "2026-08-01", "NOW_SHOWING", LocalDateTime.of(2026, 8, 3, 10, 0))));
+        assertThat(calls).hasValue(1);
+        assertThat(batch.contents()).isEmpty();
+    }
+
+    @Test
+    void givenChangedReleaseState_whenIncrementalSync_thenItRefreshesTheDetail() {
+        AtomicInteger calls = new AtomicInteger();
+        NetStartContentProvider provider = provider(query -> {
+            calls.incrementAndGet();
+            if (query.contentId() == null) {
+                return json("{\"movieList\":[{\"id\":1,\"rt\":\"2026-08-02\",\"globalReleased\":true}]}" );
+            }
+            return json("{\"detailMovie\":{\"id\":1,\"nm\":\"refresh\",\"cat\":\"drama\","
+                    + "\"dur\":\"90 minutes\",\"sc\":\"8.0\"}}");
+        });
+        var batch = provider.fetchCurrentHotMovies(Map.of("1", new ContentPersistencePort.MovieState(
+                "2026-08-01", "NOW_SHOWING", LocalDateTime.of(2026, 8, 6, 10, 0))));
         assertThat(calls).hasValue(2);
         assertThat(batch.contents()).hasSize(1);
     }

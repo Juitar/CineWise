@@ -1,0 +1,60 @@
+.agent-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.agent-card-heading strong {
+  min-width: 0;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.agent-card-text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.agent-question-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.agent-question-options span {
+  padding: 6px 10px;
+  border: 1px solid #d8d2ff;
+  border-radius: 999px;
+  background: #f7f5ff;
+  color: #5146a8;
+}
+
+.agent-card-primary-link {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  margin-top: 12px;
+  font-weight: 600;
+}
+
+.agent-progress-indicator {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #6c5ce7;
+  box-shadow: 0 0 0 4px #eeeaff;
+}
+
+@media (max-width: 1023px) {
+  .agent-card-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .agent-card-primary-link {
+    min-height: 44px;
+  }
+}

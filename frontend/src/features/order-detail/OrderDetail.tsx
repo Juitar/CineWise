@@ -28,8 +28,9 @@ export interface OrderDetailProps {
   onPay?: () => void;
   onCancel?: () => void;
   onViewTicket?: () => void;
+  onViewTravel?: () => void;
   onApplyRefund?: () => void;
-  onBackToHome?: () => void;
+  onViewOrders?: () => void;
   cancelResultUnknown?: boolean;
   onRecoverCancel?: () => void;
 }
@@ -61,8 +62,9 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
   onPay,
   onCancel,
   onViewTicket,
+  onViewTravel,
   onApplyRefund,
-  onBackToHome,
+  onViewOrders,
   cancelResultUnknown = false,
   onRecoverCancel,
 }) => {
@@ -147,7 +149,7 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
 
     if (isOfflineReadOnly) {
       return (
-        <div className="order-detail-actions">{renderDefaultBtn('返回首页', onBackToHome)}</div>
+        <div className="order-detail-actions">{renderDefaultBtn('查看订单列表', onViewOrders)}</div>
       );
     }
 
@@ -207,6 +209,7 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
         return (
           <div className="order-detail-actions">
             {renderPrimaryBtn('查看电子票', onViewTicket)}
+            {renderDefaultBtn('查看出行建议', onViewTravel)}
             {renderDefaultBtn('申请退票', onApplyRefund)}
           </div>
         );
@@ -223,7 +226,9 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
       case 'EXPIRED':
       default:
         return (
-          <div className="order-detail-actions">{renderDefaultBtn('返回首页', onBackToHome)}</div>
+          <div className="order-detail-actions">
+            {renderDefaultBtn('查看订单列表', onViewOrders)}
+          </div>
         );
     }
   };

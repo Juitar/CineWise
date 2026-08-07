@@ -2,6 +2,7 @@ package com.miaoyu.ticket.agent.application.persistence;
 
 import com.miaoyu.ticket.agent.application.AgentErrorCode;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
+import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSessionStatus;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
@@ -10,6 +11,7 @@ import com.miaoyu.ticket.common.error.BusinessException;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,16 +22,19 @@ public class AgentSessionManagementService {
     private final CurrentUserAccessor currentUserAccessor;
     private final AgentSessionRepository sessionRepository;
     private final AgentMessageRepository messageRepository;
+    private final AgentRunRepository runRepository;
     private final Clock clock;
 
     public AgentSessionManagementService(
             CurrentUserAccessor currentUserAccessor,
             AgentSessionRepository sessionRepository,
             AgentMessageRepository messageRepository,
+            AgentRunRepository runRepository,
             Clock clock) {
         this.currentUserAccessor = currentUserAccessor;
         this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
+        this.runRepository = runRepository;
         this.clock = clock;
     }
 
@@ -50,8 +55,15 @@ public class AgentSessionManagementService {
         long userId = currentUserAccessor.requireCurrentUserId();
         AgentSession session = requireActiveSession(sessionId, userId);
         long total = messageRepository.countBySessionIdAndUserId(session.id(), userId);
-        return new MessagePage(total, safePage, safeSize,
-                messageRepository.findBySessionIdAndUserId(session.id(), userId, offset(safePage, safeSize), safeSize));
+        List<AgentMessage> messages =
+                messageRepository.findBySessionIdAndUserId(session.id(), userId, offset(safePage, safeSize), safeSize);
+        Map<Long, String> publicRunIds = runRepository.findByIdsAndUserIdAndSessionId(
+                        messages.stream().map(AgentMessage::runId).distinct().toList(), userId, session.id())
+                .stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(AgentRun::id, AgentRun::runId));
+        return new MessagePage(total, safePage, safeSize, messages.stream()
+                .map(message -> new MessageRecord(message, requiredRunId(message, publicRunIds)))
+                .toList());
     }
 
     @Transactional
@@ -127,6 +139,14 @@ public class AgentSessionManagementService {
         return Math.multiplyExact(page - 1, size);
     }
 
+    private static String requiredRunId(AgentMessage message, Map<Long, String> publicRunIds) {
+        String runId = publicRunIds.get(message.runId());
+        if (runId == null) {
+            throw new IllegalStateException("历史消息关联的运行不属于当前用户或会话");
+        }
+        return runId;
+    }
+
     private LocalDateTime now() {
         return LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
     }
@@ -134,7 +154,10 @@ public class AgentSessionManagementService {
     public record SessionPage(long total, int page, int size, List<AgentSession> records) {
     }
 
-    public record MessagePage(long total, int page, int size, List<AgentMessage> records) {
+    public record MessagePage(long total, int page, int size, List<MessageRecord> records) {
+    }
+
+    public record MessageRecord(AgentMessage message, String runId) {
     }
 
     public record ClearResult(String sessionId, boolean cleared) {

@@ -11,9 +11,6 @@ import com.miaoyu.ticket.content.domain.ContentSource;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.time.Instant;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -56,14 +53,20 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
     private final Clock clock;
     private final NetStartRawClient rawClient;
     private final NetStartContentMapper mapper = new NetStartContentMapper();
-    private final Deque<Instant> requestTimes = new ArrayDeque<>();
+    private final NetStartRequestLimiter requestLimiter;
 
     public NetStartContentProvider(NetStartProperties properties, Environment environment, Clock clock,
                                    NetStartRawClient rawClient) {
+        this(properties, environment, clock, rawClient, new NetStartRequestLimiter(properties, clock));
+    }
+
+    NetStartContentProvider(NetStartProperties properties, Environment environment, Clock clock,
+                            NetStartRawClient rawClient, NetStartRequestLimiter requestLimiter) {
         this.properties = properties;
         this.environment = environment;
         this.clock = clock;
         this.rawClient = rawClient;
+        this.requestLimiter = requestLimiter;
     }
 
     /**
@@ -119,17 +122,7 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
      * <p>每次尝试（包括可重试请求）都会先消耗额度，避免重试绕开保护值。
      * 到达阈值后返回空结果，由上层记录 RATE_LIMITED 并继续离线回退。</p>
      */
-    private synchronized boolean allowRequest() {
-        Instant now = clock.instant();
-        while (!requestTimes.isEmpty() && !requestTimes.peekFirst().plusSeconds(60).isAfter(now)) {
-            requestTimes.removeFirst();
-        }
-        if (requestTimes.size() >= properties.requestsPerMinute()) {
-            return false;
-        }
-        requestTimes.addLast(now);
-        return true;
-    }
+    private boolean allowRequest() { return requestLimiter.allowRequest(); }
 
     private boolean isRetryable(Exception exception) {
         return exception instanceof ResourceAccessException || exception instanceof RestClientResponseException response
@@ -329,10 +322,8 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
                 || !java.util.Objects.equals(releaseStatus, savedState.releaseStatus())) {
             return false;
         }
-        // 目录只提供上映状态和日期，无法直接判断海报或简介变化；至少每天重新抽取未在当天复查的详情，
-        // 同时仍受十次请求预算限制。旧夹具没有 dataTime 时维持原有跳过语义。
-        return savedState.dataTime() == null || savedState.dataTime().toLocalDate().equals(
-                LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID).toLocalDate());
+        // 目录只提供上映状态和日期；两者都未变化时，已保存影片直接跳过详情请求，避免定时任务重复写入。
+        return true;
     }
 
     /**

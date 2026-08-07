@@ -1,0 +1,10 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "runId": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "WAITING_LOCATION",
+    "lastEventId": "46"
+  },
+  "traceId": "0123456789abcdef0123456789abcdef"
+}

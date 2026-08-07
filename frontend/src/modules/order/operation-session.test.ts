@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearWriteOperationSession,
   getWriteOperationSession,
@@ -11,6 +11,10 @@ describe('订单写操作稳定恢复会话', () => {
     vi.stubGlobal('crypto', {
       randomUUID: vi.fn().mockReturnValueOnce('key-1').mockReturnValueOnce('request-1'),
     });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('退款会话在刷新式重读时沿用相同幂等标识', () => {
@@ -26,5 +30,53 @@ describe('订单写操作稳定恢复会话', () => {
     expect(getWriteOperationSession('payment', 'CW2').resultUnknown).toBe(true);
     clearWriteOperationSession('payment', 'CW2');
     expect(sessionStorage.length).toBe(0);
+  });
+
+  it('HTTP 环境缺少 randomUUID 时使用 getRandomValues', () => {
+    const bytes = new Uint8Array(16).fill(0xab);
+    vi.stubGlobal('crypto', {
+      getRandomValues: (target: Uint8Array) => {
+        target.set(bytes);
+        return target;
+      },
+    });
+
+    const session = getWriteOperationSession('payment', 'CW3');
+    expect(session.idempotencyKey).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+  });
+
+  it('Crypto API 不可用时仍生成合法且不重复的兜底标识', () => {
+    vi.stubGlobal('crypto', undefined);
+
+    const first = getWriteOperationSession('cancel', 'CW4');
+    const second = getWriteOperationSession('refund', 'CW5');
+    expect(first.idempotencyKey).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(second.idempotencyKey).not.toBe(first.idempotencyKey);
+    expect(second.clientRequestId).not.toBe(second.idempotencyKey);
+  });
+
+  it('会话存储受限时在当前页面复用写操作标识和未知状态', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+
+    const first = getWriteOperationSession('refund', 'CW6');
+    const second = getWriteOperationSession('refund', 'CW6');
+    markWriteResultUnknown('refund', 'CW6');
+    const recovered = getWriteOperationSession('refund', 'CW6');
+
+    expect(second).toEqual(first);
+    expect(recovered).toMatchObject({ ...first, resultUnknown: true });
+    expect(() => clearWriteOperationSession('refund', 'CW6')).not.toThrow();
   });
 });

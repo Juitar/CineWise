@@ -216,7 +216,7 @@ public class ProfileManagementService {
 
   private long requireConsentAndUser() {
     long userId = currentUserAccessor.requireCurrentUserId();
-    if (!consentQuery.isGranted(userId)) {
+    if (!consentQuery.findByUserId(userId).granted()) {
       throw new BusinessException(ProfileErrorCode.PROFILE_DATA_CONSENT_REQUIRED);
     }
     return userId;

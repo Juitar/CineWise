@@ -130,7 +130,14 @@ describe('HomePage', () => {
     expect(screen.getByRole('heading', { level: 3, name: '长沙星河影城' })).toBeInTheDocument();
     expect(screen.getByText(/来源：NETSTART，更新于/)).toBeInTheDocument();
     expect(screen.getByText('演示数据')).toBeInTheDocument();
-    expect(screen.getAllByText('票务信息暂不可用')).toHaveLength(2);
+    expect(screen.getByRole('link', { name: '查看《星河远征》详情并选择影院' })).toHaveAttribute(
+      'href',
+      '/movies/8100001',
+    );
+    expect(screen.getByRole('link', { name: '查看长沙星河影城详情' })).toHaveAttribute(
+      'href',
+      '/cinemas/8200001',
+    );
     expect(pageMocks.useMovieList).toHaveBeenCalledWith({ page: 1, size: 5 });
     expect(pageMocks.useCinemaList).toHaveBeenCalledWith({
       location: '430100',
@@ -142,10 +149,11 @@ describe('HomePage', () => {
   it('影片和影院首次加载时分别显示骨架状态', () => {
     pageMocks.useMovieList.mockReturnValue(movieState({ data: null, isLoading: true }));
     pageMocks.useCinemaList.mockReturnValue(cinemaState({ data: null, isLoading: true }));
-    render(<HomePage />);
+    const { container } = render(<HomePage />);
 
     expect(screen.getByLabelText('首页影片加载中')).toBeInTheDocument();
     expect(screen.getByLabelText('首页影院加载中')).toBeInTheDocument();
+    expect(container.querySelector('.adm-skeleton')).toBeInTheDocument();
   });
 
   it('保留旧影片时展示刷新和离线只读快照状态', () => {
@@ -177,10 +185,11 @@ describe('HomePage', () => {
     pageMocks.useCinemaList.mockReturnValue(
       cinemaState({ data: { ...cinemaResponse, records: [], total: 0 } }),
     );
-    render(<HomePage />);
+    const { container } = render(<HomePage />);
 
     expect(screen.getByText('暂无可展示的影片')).toBeInTheDocument();
     expect(screen.getByText('长沙暂无可展示的影院')).toBeInTheDocument();
+    expect(container.querySelectorAll('.adm-empty')).toHaveLength(2);
   });
 
   it('网络失败时显示问题编号并可分别重试', () => {
@@ -206,12 +215,13 @@ describe('HomePage', () => {
         retry: retryCinemas,
       }),
     );
-    render(<HomePage />);
+    const { container } = render(<HomePage />);
 
     expect(screen.getByText('影片加载失败')).toBeInTheDocument();
     expect(screen.getByText('影院加载失败')).toBeInTheDocument();
     expect(screen.getByText('问题编号：trace-home-movies')).toBeInTheDocument();
     expect(screen.getByText('问题编号：trace-home-cinemas')).toBeInTheDocument();
+    expect(container.querySelectorAll('.adm-error-block')).toHaveLength(2);
     const retryButtons = screen.getAllByRole('button', { name: /重\s*试/ });
     fireEvent.click(retryButtons[0]);
     fireEvent.click(retryButtons[1]);
@@ -243,6 +253,7 @@ describe('HomePage', () => {
     expect(text).not.toContain('库存');
     expect(cardText).not.toMatch(/\b\d{1,2}:\d{2}\b/);
     expect(within(content as HTMLElement).queryByRole('button', { name: '购票' })).toBeNull();
+    expect(within(content as HTMLElement).queryByRole('link', { name: /购票/ })).toBeNull();
   });
 
   it.each([
@@ -257,11 +268,36 @@ describe('HomePage', () => {
   });
 
   it('首页 Agent 输入只保存内存草稿并跳转受保护工作区', () => {
-    render(<HomePage />);
-    fireEvent.change(screen.getByLabelText('首页 Agent 输入'), {
+    const { container } = render(<HomePage />);
+    const agentInput = screen.getByLabelText('首页 Agent 输入');
+    expect(agentInput).toHaveClass('adm-input-element');
+    expect(container.querySelector('.home-mobile-agent-input')).toHaveClass('adm-input');
+    expect(container.querySelector('.home-mobile-agent-send-btn')).toHaveClass('adm-button');
+    fireEvent.change(agentInput, {
       target: { value: '推荐一部电影' },
     });
     fireEvent.click(screen.getByRole('button', { name: '发送' }));
     expect(pageMocks.navigate).toHaveBeenCalledWith('/assistant');
+  });
+
+  it('PC Agent 入口不展示静态影片、影院、路线或价格', () => {
+    pageMocks.isMobile = false;
+    render(<HomePage />);
+    expect(screen.getByText('从真实需求开始规划')).toBeInTheDocument();
+    expect(screen.queryByText('云边有个小卖部')).not.toBeInTheDocument();
+    expect(screen.queryByText(/杭州UME|1.2km|¥96|路线预览|店内餐饮/)).not.toBeInTheDocument();
+  });
+
+  it('PC 首页继续使用 Ant Design 的加载、错误和空态组件', () => {
+    pageMocks.isMobile = false;
+    pageMocks.useMovieList.mockReturnValue(movieState({ data: null, isLoading: true }));
+    pageMocks.useCinemaList.mockReturnValue(
+      cinemaState({ data: { ...cinemaResponse, records: [], total: 0 } }),
+    );
+    const { container } = render(<HomePage />);
+
+    expect(container.querySelector('.ant-skeleton')).toBeInTheDocument();
+    expect(container.querySelector('.ant-empty')).toBeInTheDocument();
+    expect(container.querySelector('.adm-skeleton')).not.toBeInTheDocument();
   });
 });

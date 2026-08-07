@@ -2,24 +2,20 @@ import { Menu } from 'antd';
 import React from 'react';
 import { Link, useLocation } from 'umi';
 import { BrandLogoIcon } from '../../shared/components/icons';
-import { useAuth } from '../../shared/auth/AuthProvider';
 import {
   FilmIcon,
+  HomeIcon,
   MapPinIcon,
-  OrderIcon,
   UserIcon,
 } from '../../shared/components/icons/layout-icons';
 
 export const DesktopSidebar: React.FC = () => {
   const location = useLocation();
-  const { currentUser, status } = useAuth();
-  const isAuthenticated = status === 'authenticated' && currentUser !== null;
 
   const getSelectedKeys = () => {
     if (location.pathname === '/') return ['home'];
     if (location.pathname.startsWith('/movies')) return ['movies'];
     if (location.pathname.startsWith('/cinemas')) return ['cinemas'];
-    if (location.pathname.startsWith('/orders')) return ['orders'];
     if (location.pathname.startsWith('/profile')) return ['profile'];
     return [];
   };
@@ -41,7 +37,7 @@ export const DesktopSidebar: React.FC = () => {
           items={[
             {
               key: 'home',
-              icon: <FilmIcon size={18} />,
+              icon: <HomeIcon size={18} />,
               label: <Link to="/">首页</Link>,
             },
             {
@@ -57,15 +53,6 @@ export const DesktopSidebar: React.FC = () => {
             {
               type: 'divider',
             },
-            ...(isAuthenticated
-              ? [
-                  {
-                    key: 'orders',
-                    icon: <OrderIcon size={18} />,
-                    label: <Link to="/orders">我的订单</Link>,
-                  },
-                ]
-              : []),
             {
               key: 'profile',
               icon: <UserIcon size={18} />,

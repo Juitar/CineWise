@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupTestEnvironment } from '../../../features/test-utils';
 import {
@@ -8,14 +8,23 @@ import {
   usePaymentQuery,
 } from '../../../modules/order/transaction-hooks';
 
+const routeMocks = vi.hoisted(() => ({ historyPush: vi.fn() }));
+const travelMocks = vi.hoisted(() => ({ error: null, find: vi.fn(), isLoading: false }));
+
 vi.mock('umi', () => ({
-  history: { push: vi.fn() },
+  history: { push: routeMocks.historyPush },
   useParams: () => ({ orderNo: 'CW1' }),
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => (
+    <a href={to}>{children}</a>
+  ),
 }));
 vi.mock('../../../modules/order/transaction-hooks', () => ({
   useCancelOrder: vi.fn(),
   useOrder: vi.fn(),
   usePaymentQuery: vi.fn(),
+}));
+vi.mock('../../../modules/travel/useTravelTask', () => ({
+  useTravelTaskByOrder: () => travelMocks,
 }));
 const contentMocks = vi.hoisted(() => ({
   getMovieDetail: vi.fn(),
@@ -30,10 +39,56 @@ setupTestEnvironment();
 
 describe('订单详情交易时间展示', () => {
   beforeEach(() => {
+    routeMocks.historyPush.mockReset();
+    travelMocks.find.mockReset();
+    travelMocks.error = null;
     contentMocks.getMovieDetail.mockReset();
     contentMocks.getCinemaDetail.mockReset();
     contentMocks.getMovieDetail.mockRejectedValue(new Error('内容夹具未提供影片资料'));
     contentMocks.getCinemaDetail.mockRejectedValue(new Error('内容夹具未提供影院资料'));
+  });
+
+  it('已支付订单按 orderId 查询真实出行任务后导航', async () => {
+    travelMocks.find.mockResolvedValue({ taskId: '90001' });
+    vi.mocked(useOrder).mockReturnValue({
+      data: {
+        orderId: '1',
+        orderNo: 'CW1',
+        showId: '11',
+        movieId: '22',
+        cinemaId: '33',
+        showStartTime: '2026-08-10T14:30:00+08:00',
+        seatIds: ['101'],
+        ticketCount: 1,
+        unitPrice: '39.00',
+        totalAmount: '39.00',
+        status: 'PAID',
+        expireTime: '2026-08-10T14:00:00+08:00',
+        stateVersion: 1,
+        updatedAt: '2026-08-05T04:00:00Z',
+      },
+      loading: false,
+      error: null,
+      refresh: vi.fn(),
+    });
+    vi.mocked(useCancelOrder).mockReturnValue({
+      submitting: false,
+      resultUnknown: false,
+      error: null,
+      submit: vi.fn(),
+      recover: vi.fn(),
+    });
+    vi.mocked(usePaymentQuery).mockReturnValue({
+      payment: null,
+      querying: false,
+      error: null,
+      query: vi.fn(),
+    });
+
+    render(<OrderDetailPage />);
+    fireEvent.click(screen.getByRole('button', { name: '查看出行建议' }));
+    await waitFor(() => expect(travelMocks.find).toHaveBeenCalledWith('1'));
+    expect(routeMocks.historyPush).toHaveBeenCalledWith('/travel/90001');
   });
 
   it('按固定业务时区展示支付截止和更新时间', () => {

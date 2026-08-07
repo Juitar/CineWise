@@ -9,10 +9,10 @@ import { resolveSafeReturnUrl } from '../../shared/auth/safeReturnUrl';
 import {
   BrandLogoIcon,
   CinemaIllustrationSVG,
-  HomeIcon,
   LockIcon,
   MailIcon,
 } from '../../shared/components/icons';
+import { HomeIcon } from '../../shared/components/icons/layout-icons';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import './index.css';
 

@@ -8,6 +8,7 @@ import com.miaoyu.ticket.auth.application.RoleCode;
 import com.miaoyu.ticket.order.event.PaymentSucceededEvent;
 import com.miaoyu.ticket.profile.application.ProfileBehaviorRecorder;
 import com.miaoyu.ticket.profile.application.ProfileDataConsentQuery;
+import com.miaoyu.ticket.profile.application.ProfileDataConsentSnapshot;
 import java.time.OffsetDateTime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -138,7 +139,9 @@ class ProfileBehaviorMySqlIntegrationTest {
         @Bean
         @Primary
         ProfileDataConsentQuery profileTestConsentQuery() {
-            return userId -> userId == TEST_USER_ID;
+            return userId -> userId == TEST_USER_ID
+                    ? new ProfileDataConsentSnapshot(true, 1L, 0L, null, null)
+                    : ProfileDataConsentSnapshot.notGranted();
         }
     }
 }

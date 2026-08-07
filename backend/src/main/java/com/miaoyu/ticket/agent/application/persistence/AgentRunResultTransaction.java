@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.agent.application.persistence;
 
 import com.miaoyu.ticket.agent.application.run.MinimalReadOnlyAgentResult;
+import com.miaoyu.ticket.agent.application.AgentDistanceContextApplicationService;
 import com.miaoyu.ticket.agent.application.run.AgentRunReplyFactory;
 import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorResult;
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
@@ -45,6 +46,7 @@ public class AgentRunResultTransaction {
     private final AgentRuntimeEventService runtimeEventService;
     private final BusinessIdGenerator idGenerator;
     private final Clock clock;
+    private final AgentDistanceContextApplicationService distanceContextService;
 
     public AgentRunResultTransaction(
             AgentRunRepository runRepository,
@@ -54,7 +56,8 @@ public class AgentRunResultTransaction {
             AgentPersistenceJsonFactory jsonFactory,
             AgentRuntimeEventService runtimeEventService,
             BusinessIdGenerator idGenerator,
-            Clock clock) {
+            Clock clock,
+            AgentDistanceContextApplicationService distanceContextService) {
         this.runRepository = runRepository;
         this.stepRepository = stepRepository;
         this.messageRepository = messageRepository;
@@ -63,6 +66,7 @@ public class AgentRunResultTransaction {
         this.runtimeEventService = runtimeEventService;
         this.idGenerator = idGenerator;
         this.clock = clock;
+        this.distanceContextService = distanceContextService;
     }
 
     /** 写入本轮结果；PROCESSING 保持 RUNNING 和活动会话引用。 */
@@ -115,6 +119,8 @@ public class AgentRunResultTransaction {
     @Transactional
     public void recordFailure(AgentRun run) {
         Objects.requireNonNull(run, "运行不能为空");
+        // 仅清理当前进程见过的一次性 ID；不猜测重启前的 ID。
+        distanceContextService.cleanupIfPresent(run.runId());
         LocalDateTime now = now();
         AgentRun failed = nextRun(run, null, AgentRunStatus.FAILED, now);
         if (!runRepository.updateTerminalWithCas(failed, run.version())) {

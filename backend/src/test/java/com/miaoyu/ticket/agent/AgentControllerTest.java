@@ -157,7 +157,8 @@ class AgentControllerTest {
                         "session-1", "摘要", "ACTIVE", created, created))));
         when(runtimeService.listMySessionMessages("session-1", 1, 20)).thenReturn(new PageResult<>(1L, 1, 20,
                 List.of(new AgentInteractionRuntimeService.MessageView("message-1", "ASSISTANT", "TEXT", "已完成",
-                        new ObjectMapper().readTree("{}"), "COMPLETED", created, created))));
+                        "52b810c5-4b03-4a41-9c36-07372f1a6f59", new ObjectMapper().readTree("{}"), "COMPLETED",
+                        created, created))));
         when(runtimeService.clearMySession("session-1"))
                 .thenReturn(new AgentInteractionRuntimeService.ClearSessionView("session-1", true));
         when(runtimeService.clearMySessions())
@@ -174,7 +175,8 @@ class AgentControllerTest {
                 .andExpect(jsonPath("$.data.records[0].sessionId").value("session-1"));
         mockMvc.perform(get("/api/v1/agent/sessions/session-1/messages"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.records[0].messageId").value("message-1"));
+                .andExpect(jsonPath("$.data.records[0].messageId").value("message-1"))
+                .andExpect(jsonPath("$.data.records[0].runId").value("52b810c5-4b03-4a41-9c36-07372f1a6f59"));
         mockMvc.perform(delete("/api/v1/agent/sessions/session-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.cleared").value(true));

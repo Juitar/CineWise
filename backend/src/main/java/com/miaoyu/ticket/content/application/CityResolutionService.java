@@ -61,13 +61,31 @@ public class CityResolutionService {
      * 仅供 D 的后续按城市同步使用，调用方只能先取得已受控返回的标准城市名。
      * 此方法不属于 REST DTO，Provider 城市标识不会流向 C、B 或页面状态。
      */
-    public Optional<String> findProviderCityId(String cityName) {
+    public Optional<String> findCityCode(String cityName) {
         if (cityName == null || cityName.isBlank()) {
             return Optional.empty();
         }
         CityCatalog catalog = catalogLoadResult.catalog()
                 .orElseThrow(() -> new BusinessException(CityResolutionErrorCode.DATA_UNAVAILABLE));
-        return Optional.ofNullable(catalog.providerCityIdByName().get(cityName));
+        return switch (cityName) {
+            case "长沙" -> Optional.of("430100");
+            case "杭州" -> Optional.of("330100");
+            default -> Optional.empty();
+        };
+    }
+
+    /** 仅允许受控同步入口按行政区码反查已核对的城市名，不接受 Provider 内部 ID。 */
+    public Optional<String> findCityName(String cityCode) {
+        if (cityCode == null || cityCode.isBlank()) {
+            return Optional.empty();
+        }
+        CityCatalog catalog = catalogLoadResult.catalog()
+                .orElseThrow(() -> new BusinessException(CityResolutionErrorCode.DATA_UNAVAILABLE));
+        return switch (cityCode) {
+            case "430100" -> Optional.of("长沙");
+            case "330100" -> Optional.of("杭州");
+            default -> Optional.empty();
+        };
     }
 
     /**
@@ -84,19 +102,22 @@ public class CityResolutionService {
                 return CatalogLoadResult.unavailable();
             }
             // 后续同步只能从标准城市名取得内部 ci，绝不能信任页面提交的 Provider 标识。
-            Map<String, String> providerCityIdByName = document.cities().stream()
+            Map<String, String> cityCodeByName = document.cities().stream()
                     .filter(entry -> entry.cityName() != null && !entry.cityName().isBlank()
-                            && entry.providerCityId() != null && !entry.providerCityId().isBlank())
-                    .collect(Collectors.toUnmodifiableMap(
-                            CityEntry::cityName, CityEntry::providerCityId, (left, right) -> {
+                            && entry.resolvedCode() != null && !entry.resolvedCode().isBlank())
+                .collect(Collectors.toUnmodifiableMap(
+                            CityEntry::cityName, CityEntry::resolvedCode, (left, right) -> {
                                 throw new IllegalArgumentException("duplicate city name");
                             }));
             // 重复城市名或 ci 都会造成同步范围错误，必须拒绝整份目录。
-            if (providerCityIdByName.size() != document.cities().size()
-                    || providerCityIdByName.values().stream().distinct().count() != providerCityIdByName.size()) {
+            if (cityCodeByName.size() != document.cities().size()
+                    || cityCodeByName.values().stream().distinct().count() != cityCodeByName.size()) {
                 return CatalogLoadResult.unavailable();
             }
-            return CatalogLoadResult.available(new CityCatalog(List.copyOf(document.cities()), providerCityIdByName));
+            Map<String, String> cityNameByCode = cityCodeByName.entrySet().stream()
+                    .collect(Collectors.toUnmodifiableMap(Map.Entry::getValue, Map.Entry::getKey));
+            return CatalogLoadResult.available(new CityCatalog(List.copyOf(document.cities()), cityCodeByName,
+                    cityNameByCode));
         } catch (Exception exception) {
             // 不把文件内容、异常详情或用户输入写入日志，C 只需得到稳定的不可用错误码。
             return CatalogLoadResult.unavailable();
@@ -104,14 +125,19 @@ public class CityResolutionService {
     }
 
     /** 单条目录只保存标准城市名和 D 内部使用的 Provider 城市标识。 */
-    private record CityEntry(String cityName, String providerCityId) { }
+    private record CityEntry(String cityName, String cityCode, String providerCityId) {
+        String resolvedCode() {
+            return cityCode == null || cityCode.isBlank() ? providerCityId : cityCode;
+        }
+    }
 
     /** JSON 外层记录核验元数据，便于离线更新目录时审查来源和检查日期。 */
     private record CityCatalogDocument(
             String catalogVersion, String source, String checkedAt, List<CityEntry> cities) { }
 
     /** 不可变目录索引；解析请求只读它，不会把用户输入写回目录。 */
-    private record CityCatalog(List<CityEntry> entries, Map<String, String> providerCityIdByName) { }
+    private record CityCatalog(List<CityEntry> entries, Map<String, String> cityCodeByName,
+                               Map<String, String> cityNameByCode) { }
 
     /** 用 Optional 区分“目录可用但无城市”与“目录本身不可用”。 */
     private record CatalogLoadResult(Optional<CityCatalog> catalog) {

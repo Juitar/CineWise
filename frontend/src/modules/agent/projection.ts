@@ -1,5 +1,12 @@
 import { AGENT_EVENT_TYPES } from './types';
-import type { AgentEvent, AgentMessage, AgentRunSnapshot, AgentWorkspaceStatus } from './types';
+import type {
+  AgentActionConfirmationResult,
+  AgentConfirmationStatus,
+  AgentEvent,
+  AgentMessage,
+  AgentRunSnapshot,
+  AgentWorkspaceStatus,
+} from './types';
 import { validateAgentCardEvent, validateAgentToolEvent } from './contract';
 
 export type AgentDisplayKind =
@@ -20,7 +27,14 @@ export interface AgentDisplayItem {
   text: string;
   title?: string;
   fields?: readonly { label: string; value: string }[];
+  options?: readonly string[];
   selectSeatsPath?: string;
+  confirmation?: {
+    actionId: string;
+    runId: string;
+    status: AgentConfirmationStatus;
+    submitting: boolean;
+  };
 }
 
 /** 仅使用已校验的场次、影片和影院 ID 构造选座地址，不补齐其他业务参数。 */
@@ -76,19 +90,45 @@ export function createAgentProjection(sessionId: string): AgentProjection {
   };
 }
 
-const CONFIRMATION_STATUS_TEXT: Readonly<Record<string, string>> = {
-  PENDING_CONFIRMATION: '确认操作待处理（只读）',
-  EXECUTING: '确认操作处理中（只读）',
+const CONFIRMATION_STATUS_TEXT: Readonly<Record<AgentConfirmationStatus, string>> = {
+  PENDING_CONFIRMATION: '等待你的确认',
+  EXECUTING: '确认操作处理中',
   RESULT_UNKNOWN: '确认结果暂时无法确定，请等待状态恢复',
-  SUCCEEDED: '确认操作已完成（只读）',
-  FAILED: '确认操作未完成（只读）',
-  EXPIRED: '确认操作已过期（只读）',
-  REJECTED: '确认操作已拒绝（只读）',
-  INVALIDATED: '确认内容已失效（只读）',
+  SUCCEEDED: '确认操作已完成',
+  FAILED: '确认操作未完成',
+  EXPIRED: '确认操作已过期',
+  REJECTED: '确认操作已拒绝',
+  INVALIDATED: '确认内容已失效',
 };
 
 export function safeConfirmationStatusText(value: unknown): string | null {
-  return typeof value === 'string' ? (CONFIRMATION_STATUS_TEXT[value] ?? null) : null;
+  return typeof value === 'string'
+    ? (CONFIRMATION_STATUS_TEXT[value as AgentConfirmationStatus] ?? null)
+    : null;
+}
+
+function confirmationItem(event: AgentEvent): AgentDisplayItem {
+  const payload = event.payload;
+  const status = payload.status as AgentConfirmationStatus;
+  return {
+    key: `event:${event.eventId}`,
+    kind: 'plan-card',
+    title: payload.title as string,
+    text: safeConfirmationStatusText(status) ?? '确认操作不可用',
+    fields: [
+      ...(payload.displayLines as readonly string[]).map((value, index) => ({
+        label: `确认内容 ${index + 1}`,
+        value,
+      })),
+      { label: '有效期至', value: payload.expiresAt as string },
+    ],
+    confirmation: {
+      actionId: payload.actionId as string,
+      runId: event.runId,
+      status,
+      submitting: false,
+    },
+  };
 }
 
 function payloadText(payload: Readonly<Record<string, unknown>>, key: string): string | null {
@@ -127,6 +167,7 @@ function candidateFields(event: AgentEvent, collection: 'movies' | 'plans') {
     const prefix = collection === 'movies' ? `影片 ${index + 1}` : `方案 ${index + 1}`;
     const fields: Array<{ label: string; value: string }> = [];
     const entries = [
+      ['片名', candidate.title],
       ['影片 ID', candidate.movieId],
       ['影院 ID', candidate.cinemaId],
       ['场次 ID', candidate.showId],
@@ -167,12 +208,14 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
   }
   if (type === 'QUESTION') {
     const locationState = locationStateText(event);
+    const options = event.payload.options as readonly Record<string, unknown>[];
     return {
       key,
       kind: 'question',
       title: event.payload.message as string,
       text: locationState ?? (event.payload.message as string),
       fields: locationState ? [{ label: '位置授权', value: locationState }] : undefined,
+      options: options.map((option) => option.label as string),
     };
   }
   if (type === 'BUSINESS_INTENT') {
@@ -234,6 +277,7 @@ function safePlaceholder(event: AgentEvent): AgentDisplayItem {
 function displayItem(event: AgentEvent): AgentDisplayItem | null {
   const key = `event:${event.eventId}`;
   if (event.eventType === 'card') {
+    if ('actionId' in event.payload) return confirmationItem(event);
     const confirmationText = safeConfirmationStatusText(event.payload.status);
     return confirmationText
       ? { key, kind: 'card-placeholder', text: confirmationText }
@@ -263,6 +307,28 @@ function displayItem(event: AgentEvent): AgentDisplayItem | null {
   }
   if (!['plan.created', 'plan.replanned'].includes(event.eventType)) return safePlaceholder(event);
   return null;
+}
+
+export function updateConfirmationItem(
+  projection: AgentProjection,
+  itemKey: string,
+  update: Pick<AgentActionConfirmationResult, 'status'> | { submitting: boolean },
+): AgentProjection {
+  return {
+    ...projection,
+    items: projection.items.map((item) => {
+      if (item.key !== itemKey || !item.confirmation) return item;
+      const confirmation =
+        'submitting' in update
+          ? { ...item.confirmation, submitting: update.submitting }
+          : { ...item.confirmation, status: update.status, submitting: false };
+      return {
+        ...item,
+        text: safeConfirmationStatusText(confirmation.status) ?? item.text,
+        confirmation,
+      };
+    }),
+  };
 }
 
 function nextStatus(event: AgentEvent, current: AgentWorkspaceStatus): AgentWorkspaceStatus {
@@ -354,6 +420,19 @@ function itemFromHistory(message: AgentMessage): AgentDisplayItem {
   const type = message.type.toUpperCase();
   const confirmationText = safeConfirmationStatusText(message.payload.status);
   if (confirmationText) {
+    if ('actionId' in message.payload)
+      return confirmationItem({
+        eventId: message.messageId,
+        sessionId: '',
+        runId: message.runId,
+        planId: null,
+        planVersion: null,
+        nodeId: null,
+        eventType: 'card',
+        displayText: message.text,
+        payload: message.payload,
+        occurredAt: null,
+      });
     return {
       key: `message:${message.messageId}`,
       kind: 'card-placeholder',
@@ -391,37 +470,102 @@ export function buildProjectionFromHistory(
   return { ...createAgentProjection(sessionId), items: messages.map(itemFromHistory) };
 }
 
-/** 使用运行快照和会话历史整体重建，不把快照事件重复追加到已有消息。 */
+function confirmationKey(runId: string, payload: Readonly<Record<string, unknown>>): string | null {
+  return typeof payload.actionId === 'string' ? `${runId}\u0000${payload.actionId}` : null;
+}
+
+function latestConfirmationEvents(snapshots: readonly AgentRunSnapshot[]): Map<string, AgentEvent> {
+  const latest = new Map<string, AgentEvent>();
+  for (const snapshot of snapshots) {
+    for (const event of snapshot.events) {
+      if (
+        event.sessionId !== snapshot.sessionId ||
+        event.runId !== snapshot.runId ||
+        event.eventType !== 'card' ||
+        validateAgentCardEvent(event).decision !== 'render'
+      ) {
+        continue;
+      }
+      const key = confirmationKey(event.runId, event.payload);
+      if (key === null) continue;
+      const previous = latest.get(key);
+      if (previous === undefined || compareDecimalStrings(event.eventId, previous.eventId) > 0) {
+        latest.set(key, event);
+      }
+    }
+  }
+  return latest;
+}
+
+/**
+ * 历史消息只保存生成时的确认状态。页面恢复时必须用运行快照的最新 CARD 覆盖同一操作，
+ * 否则已完成或失效的确认会在刷新后重新变成可点击状态。
+ */
+export function buildProjectionFromHistoryAndSnapshots(
+  sessionId: string,
+  history: readonly AgentMessage[],
+  snapshots: readonly AgentRunSnapshot[],
+): AgentProjection {
+  const historyProjection = buildProjectionFromHistory(sessionId, history);
+  const latest = latestConfirmationEvents(snapshots);
+  return {
+    ...historyProjection,
+    items: historyProjection.items.map((item, index) => {
+      const message = history[index];
+      const key = message === undefined ? null : confirmationKey(message.runId, message.payload);
+      const event = key === null ? undefined : latest.get(key);
+      return event === undefined ? item : confirmationItem(event);
+    }),
+  };
+}
+
+function restoredCards(snapshot: AgentRunSnapshot): AgentDisplayItem[] {
+  const events = snapshot.events.filter(
+    (event) =>
+      event.sessionId === snapshot.sessionId &&
+      event.runId === snapshot.runId &&
+      event.eventType === 'card' &&
+      validateAgentCardEvent(event).decision === 'render' &&
+      (event.payload.type === 'MOVIE_CARD' || event.payload.type === 'PLAN_CARD'),
+  );
+  const latestConfirmations = latestConfirmationEvents([snapshot]);
+  return [
+    ...events
+      .filter((event) => confirmationKey(event.runId, event.payload) === null)
+      .map((event) => typedCard(event)),
+    ...Array.from(latestConfirmations.values()).map((event) => confirmationItem(event)),
+  ];
+}
+
+/** 使用运行快照和会话历史整体重建；只替换该运行对应的卡片，不删除其他运行的历史卡片。 */
 export function buildProjectionFromSnapshot(
   snapshot: AgentRunSnapshot,
   history: readonly AgentMessage[],
 ): AgentProjection {
-  const historyProjection = buildProjectionFromHistory(snapshot.sessionId, history);
-  const restoredCards = snapshot.events
-    .filter(
-      (event) =>
-        event.sessionId === snapshot.sessionId &&
-        event.runId === snapshot.runId &&
-        event.eventType === 'card' &&
-        validateAgentCardEvent(event).decision === 'render' &&
-        (event.payload.type === 'MOVIE_CARD' || event.payload.type === 'PLAN_CARD'),
-    )
-    .map(typedCard);
-  const historyItems =
-    restoredCards.length === 0
-      ? historyProjection.items
-      : historyProjection.items.filter((_, index) => {
-          const type = history[index]?.type.toUpperCase();
-          return type !== 'MOVIE_CARD' && type !== 'PLAN_CARD';
-        });
+  const historyProjection = buildProjectionFromHistoryAndSnapshots(snapshot.sessionId, history, [
+    snapshot,
+  ]);
+  const cards = restoredCards(snapshot);
+  const latestConfirmations = latestConfirmationEvents([snapshot]);
+  const historyItems = historyProjection.items.filter((_, index) => {
+    const message = history[index];
+    if (
+      message === undefined ||
+      message.runId !== snapshot.runId ||
+      (message.type !== 'MOVIE_CARD' && message.type !== 'PLAN_CARD')
+    ) {
+      return true;
+    }
+    const key = confirmationKey(message.runId, message.payload);
+    return key !== null && !latestConfirmations.has(key);
+  });
   const snapshotItems: AgentDisplayItem[] =
     history.length > 0
       ? []
       : snapshot.messages
           .filter(
             (message) =>
-              restoredCards.length === 0 ||
-              (message.type !== 'MOVIE_CARD' && message.type !== 'PLAN_CARD'),
+              cards.length === 0 || (message.type !== 'MOVIE_CARD' && message.type !== 'PLAN_CARD'),
           )
           .map((message) => ({
             key: `run-message:${message.messageId}`,
@@ -452,6 +596,6 @@ export function buildProjectionFromSnapshot(
     planVersion: snapshot.planVersion,
     lastEventId: snapshot.lastEventId,
     status: snapshot.status === 'RUNNING' ? 'STREAMING' : snapshot.status,
-    items: [...historyItems, ...snapshotItems, ...restoredCards, ...stepItems],
+    items: [...historyItems, ...snapshotItems, ...cards, ...stepItems],
   };
 }

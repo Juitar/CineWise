@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.miaoyu.ticket.agent.application.AgentErrorCode;
+import com.miaoyu.ticket.agent.application.AgentDistanceContextApplicationService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunCancellationService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunStepRepository;
@@ -117,7 +118,8 @@ class AgentRunCancellationServiceTest {
             AgentSessionRepository sessions, AgentRuntimeEventService events) {
         CurrentUserAccessor currentUser = Mockito.mock(CurrentUserAccessor.class);
         when(currentUser.requireCurrentUserId()).thenReturn(USER_ID);
-        return new AgentRunCancellationService(currentUser, runs, steps, sessions, events, CLOCK);
+        return new AgentRunCancellationService(currentUser, runs, steps, sessions, events,
+                Mockito.mock(AgentDistanceContextApplicationService.class), CLOCK);
     }
 
     private static AgentRun run(AgentRunStatus status) {

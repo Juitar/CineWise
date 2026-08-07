@@ -72,7 +72,7 @@ public class AgentInteractionRuntimeService {
     public PageResult<MessageView> listMySessionMessages(String sessionId, int page, int size) {
         var result = sessionManagementService.listMySessionMessages(sessionId, page, size);
         return new PageResult<>(result.total(), result.page(), result.size(), result.records().stream()
-                .map(this::message)
+                .map(record -> message(record.message(), record.runId()))
                 .toList());
     }
 
@@ -269,9 +269,9 @@ public class AgentInteractionRuntimeService {
                 time(session.createTime()), time(session.updateTime()));
     }
 
-    private MessageView message(AgentMessage message) {
+    private MessageView message(AgentMessage message, String runId) {
         return new MessageView(message.messageId(), message.role().name(), message.type().name(), message.text(),
-                message.payload() == null ? null : payload(message.payload().value()), message.status().name(),
+                runId, message.payload() == null ? null : payload(message.payload().value()), message.status().name(),
                 time(message.completedAt()), time(message.createTime()));
     }
 
@@ -296,7 +296,8 @@ public class AgentInteractionRuntimeService {
     }
     public record CancelRunView(String runId, String status, OffsetDateTime finishedAt) {
     }
-    public record MessageView(String messageId, String role, String type, String text, JsonNode payload, String status,
+    public record MessageView(String messageId, String role, String type, String text, String runId, JsonNode payload,
+            String status,
             OffsetDateTime completedAt, OffsetDateTime createdAt) {
     }
     public record StepView(String nodeId, String nodeType, String status, int attemptCount, boolean autoSkipped,

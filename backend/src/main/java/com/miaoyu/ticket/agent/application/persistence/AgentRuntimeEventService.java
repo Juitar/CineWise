@@ -100,7 +100,8 @@ public class AgentRuntimeEventService {
                 if (key.contains("token") || key.contains("secret") || key.contains("password")
                         || key.contains("cookie") || key.contains("authorization") || key.contains("prompt")
                         || key.contains("stacktrace") || key.contains("latitude") || key.contains("longitude")
-                        || key.equals("address")) {
+                        || key.equals("address") || key.contains("distancecontextid")
+                        || key.contains("distancepreference") || key.contains("locationresult")) {
                     throw new IllegalArgumentException("Agent 事件载荷包含禁止字段: " + entry.getKey());
                 }
                 rejectSensitiveFields(entry.getValue());

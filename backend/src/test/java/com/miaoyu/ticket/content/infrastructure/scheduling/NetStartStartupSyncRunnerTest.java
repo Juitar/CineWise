@@ -5,10 +5,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miaoyu.ticket.content.application.CityResolutionService;
 import com.miaoyu.ticket.content.application.ContentSyncService;
 import com.miaoyu.ticket.content.infrastructure.provider.NetStartProperties;
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.DefaultResourceLoader;
 
 class NetStartStartupSyncRunnerTest {
 
@@ -33,6 +37,21 @@ class NetStartStartupSyncRunnerTest {
         runner.synchronizeOnce();
 
         verifyNoInteractions(service);
+    }
+
+    @Test
+    void givenEnabledProvider_whenStartupSyncRuns_thenItPassesAdministrativeCodeToCinemaSync() {
+        ContentSyncService service = mock(ContentSyncService.class);
+        when(service.synchronizeDailyContent()).thenReturn(3);
+        NetStartProperties properties = new NetStartProperties(true, true, "https://example.test", "0 0 3 * * *",
+                Duration.ofMillis(500), Duration.ofMillis(1500), 10, 1, Duration.ofMillis(200), List.of("430100"));
+        NetStartStartupSyncRunner runner = new NetStartStartupSyncRunner(properties, service,
+                new CityResolutionService(new ObjectMapper(), new DefaultResourceLoader()));
+
+        runner.synchronizeOnce();
+
+        verify(service).synchronizeCityCinemasWithResult(org.mockito.ArgumentMatchers.eq("长沙"),
+                org.mockito.ArgumentMatchers.eq("430100"), org.mockito.ArgumentMatchers.any());
     }
 
     private NetStartProperties properties(boolean enabled) {

@@ -10,8 +10,8 @@ import com.miaoyu.ticket.agent.application.reply.AgentReplyPayload;
 import com.miaoyu.ticket.agent.application.reply.ErrorReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.ProgressReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.QuestionReplyFacts;
-import com.miaoyu.ticket.agent.application.reply.RecommendationReplyFacts;
-import com.miaoyu.ticket.agent.application.reply.RecommendationReplyFactsMapper;
+import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFacts;
+import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFactsMapper;
 import com.miaoyu.ticket.agent.application.tool.RankMoviePlanExecutionAdapter;
 import com.miaoyu.ticket.agent.application.tool.RankMoviePlanExecutionRequest;
 import com.miaoyu.ticket.agent.application.tool.RankMoviePlanExecutionResult;
@@ -177,12 +177,9 @@ public final class MinimalReadOnlyAgentService {
                             agentRequest, candidatePlan, validation, state, toolResults);
                 }
                 state = stateMachine.startNode(state, node.nodeId());
-                RecommendationReplyFacts facts = RecommendationReplyFactsMapper.from(result, clock.instant());
-                // D 的无场次结果仍是成功查询，只是 purchaseEligible=false，应展示影片卡而不是错误卡。
-                AgentReplyMessageType type = facts.purchaseEligible()
-                        ? AgentReplyMessageType.PLAN_CARD
-                        : AgentReplyMessageType.MOVIE_CARD;
-                reply = generateReply(agentRequest, type, facts);
+                RecommendationPlanCardFacts facts = RecommendationPlanCardFactsMapper.from(result, clock.instant());
+                // 空方案与放宽建议同样是 D 的完整推荐结果，统一用 PLAN_CARD 表示，不能降级成旧影片候选。
+                reply = generateReply(agentRequest, AgentReplyMessageType.PLAN_CARD, facts);
                 state = stateMachine.succeedNode(state, node.nodeId());
                 continue;
             }

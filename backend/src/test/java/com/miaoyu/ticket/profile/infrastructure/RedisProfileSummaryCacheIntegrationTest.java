@@ -3,6 +3,7 @@ package com.miaoyu.ticket.profile.infrastructure;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.miaoyu.ticket.profile.application.ProfileSummary;
+import com.miaoyu.ticket.profile.application.ProfileSummaryCache;
 import com.miaoyu.ticket.profile.domain.ProfileTagPolarity;
 import com.miaoyu.ticket.profile.domain.ProfileTagSource;
 import com.miaoyu.ticket.profile.domain.ProfileTagType;
@@ -18,8 +19,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * 使用 D 的 Redis 隧道验证摘要读写和按用户失效。
- * 只有显式启用真实 Redis 时才运行，防止日常构建意外连接共享缓存。
+ * 使用 D 的 Redis 隧道或 CI 一次性 Redis 验证画像摘要缓存。
+ * 只有显式启用真实 Redis 时才运行，避免日常构建意外连接共享缓存；清理只影响本测试的专属键。
  */
 @ActiveProfiles("test")
 @SpringBootTest(properties = {
@@ -30,17 +31,22 @@ import org.springframework.test.context.ActiveProfiles;
 @EnabledIfEnvironmentVariable(named = "REDIS_INTEGRATION_ENABLED", matches = "true")
 class RedisProfileSummaryCacheIntegrationTest {
     private static final long TEST_USER_ID = 9_807_000_001L;
+    private static final long OTHER_TEST_USER_ID = 9_807_000_002L;
     private static final long TEST_VERSION = 17L;
+    private static final List<String> TEST_KEYS = List.of(
+            ProfileCacheKeyFactory.summaryKey(TEST_USER_ID, TEST_VERSION),
+            ProfileCacheKeyFactory.summaryKey(TEST_USER_ID, TEST_VERSION + 1),
+            ProfileCacheKeyFactory.summaryKey(OTHER_TEST_USER_ID, TEST_VERSION));
 
     @Autowired
-    private RedisProfileSummaryCache cache;
+    private ProfileSummaryCache summaryCache;
 
     @Autowired
     private StringRedisTemplate redisTemplate;
 
     @AfterEach
     void cleanCache() {
-        cache.invalidateUser(TEST_USER_ID);
+        redisTemplate.delete(TEST_KEYS);
     }
 
     @Test
@@ -51,14 +57,25 @@ class RedisProfileSummaryCacheIntegrationTest {
                         new BigDecimal("0.800"), new BigDecimal("0.900"), ProfileTagSource.CONVERSATION,
                         generatedAt)));
 
-        cache.put(TEST_USER_ID, TEST_VERSION, summary);
+        summaryCache.put(TEST_USER_ID, TEST_VERSION, summary);
 
-        assertThat(cache.find(TEST_USER_ID, TEST_VERSION)).contains(summary);
-        assertThat(redisTemplate.hasKey(ProfileCacheKeyFactory.summaryKey(TEST_USER_ID, TEST_VERSION))).isTrue();
+        assertThat(summaryCache.find(TEST_USER_ID, TEST_VERSION)).contains(summary);
+        assertThat(redisTemplate.hasKey(TEST_KEYS.getFirst())).isTrue();
 
-        cache.invalidateUser(TEST_USER_ID);
+        summaryCache.invalidateUser(TEST_USER_ID);
 
-        assertThat(cache.find(TEST_USER_ID, TEST_VERSION)).isEmpty();
-        assertThat(redisTemplate.hasKey(ProfileCacheKeyFactory.summaryKey(TEST_USER_ID, TEST_VERSION))).isFalse();
+        assertThat(summaryCache.find(TEST_USER_ID, TEST_VERSION)).isEmpty();
+        assertThat(redisTemplate.hasKey(TEST_KEYS.getFirst())).isFalse();
+    }
+
+    @Test
+    void shouldDeleteAllTargetUserSummariesAndKeepOtherUsers() {
+        TEST_KEYS.forEach(key -> redisTemplate.opsForValue().set(key, "{}"));
+
+        summaryCache.invalidateUser(TEST_USER_ID);
+
+        assertThat(redisTemplate.hasKey(TEST_KEYS.getFirst())).isFalse();
+        assertThat(redisTemplate.hasKey(TEST_KEYS.get(1))).isFalse();
+        assertThat(redisTemplate.hasKey(TEST_KEYS.get(2))).isTrue();
     }
 }

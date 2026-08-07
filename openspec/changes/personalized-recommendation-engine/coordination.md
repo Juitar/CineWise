@@ -31,7 +31,7 @@
 1. Command 必填 `cityCode/date/ticketCount`；可选字段、禁止字段、`runId` 边界和 JSON 数组传递规则已经写入本 change。
 2. 结果整体使用 `usedProfile/source/dataAt/expiresAt/degraded`；方案、空方案和放宽建议字段已确认。
 3. B 在同一 change 扩展白名单、计划校验、槽位解码、执行适配器和 `PLAN_CARD`，不重排或改写 D 结果。
-4. B 对“附近、近一点、离我近”意图发送 `QUESTION(questionType=LOCATION_AUTHORIZATION, distanceContextId, distancePreference=NEAREST)`；用户确认后才在可信 `ToolContext.distanceContextId` 放入同一 UUID。该字段可空、仅用于本次运行，运行结束、拒绝、失败或到期后删除；经纬度、地址和定位来源不进入 B 的 Command、槽位、模型、持久化、日志、缓存、SSE 或卡片。
+4. PR #134 已提供 `DistanceContextService.createForRun(String runId)` 和 `cleanup(String distanceContextId, String runId)`，以及推荐入口对可信 `ToolContext` 的一次性消费。B 已扩展 `ToolContext` 的 UUID + `NEAREST` 校验，但本期不新增距离上下文 REST 接口、不暂停或恢复 run、不修改 `agent_run` 状态、不新增 Flyway。实际 NEAREST 需要 `WAITING_LOCATION` 的持久化状态、CAS 恢复规则和 MySQL 迁移，留待后续独立 change。普通推荐始终传 `null, null`；经纬度、地址和定位来源不进入 B 的 Command、槽位、模型、持久化、日志、缓存、SSE 或卡片。
 
 ## 3. C：展示和当前用户边界
 

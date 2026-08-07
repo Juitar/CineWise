@@ -10,13 +10,13 @@
 
 ## 前端分层和路由
 
-`modules/ticketing` 提供 DTO、API 与 `useAvailableCinemas(movieId)` Hook，API 复用公共 `apiRequest<T>()`。Hook 处理取消、竞态、加载、失败、重试和当前页面内存快照；页面不直接请求网络。
+`modules/content` 提供 `useMovieDetail(movieId)`，`modules/ticketing` 提供 DTO、API 与 `useAvailableCinemas(movieId)` Hook，API 均复用公共 `apiRequest<T>()`。两个 Hook 分别处理取消、竞态、加载、失败和重试；可售影院 Hook 额外保留当前页面内存快照。页面不直接请求网络。
 
-影片卡片通过语义化 `Link` 进入既有 `/movies/:movieId` 路由。页面从路由读取字符串 `movieId`，选择影院只生成 `/shows?movieId={movieId}&cinemaId={cinemaId}`。统计和最近开场时间仅用于入口展示，场次页仍重新查询权威场次。
+首页和影片列表卡片通过语义化 `Link` 进入既有 `/movies/:movieId` 路由；首页影院卡片通过语义化 `Link` 进入 `/cinemas/:cinemaId`。页面从路由读取字符串 `movieId`，选择影院只生成 `/shows?movieId={movieId}&cinemaId={cinemaId}`。统计和最近开场时间仅用于影片详情/选影院页，首页影院卡片不展示购票、价格、余座或场次时间；场次页仍重新查询权威场次。
 
 ## 页面状态与验收
 
-页面显示加载、合法空页、失败重试、内容或票务不可用、来源时间、`contentExpired`、非实时来源和离线内存快照。合法空页显示“当前没有可售影院”且不显示购票入口；`contentExpired=true` 仅提示影院资料过期，仍保留进入场次页的入口。该接口不会把未知或下线影片返回为 404；若发生非契约 404，按失败状态提供重试。
+页面分别显示影片详情和可售影院的加载、404、合法空页、失败重试、内容或票务不可用、来源时间、`contentExpired`、非实时来源和离线内存快照。影片详情 404 显示资源不存在；可售影院合法空页显示“当前没有可售影院”且不显示购票入口；`contentExpired=true` 仅提示影院资料过期，仍保留进入场次页的入口。可售影院接口不会把未知或下线影片返回为 404；若发生非契约 404，按失败状态提供重试。
 
 PC、移动端和键盘共用同一实现，入口与重试可获得焦点，触控目标最小 44px，窄屏不产生影响操作的横向溢出。测试覆盖入口、正常跳转、空态、加载、失败重试、非契约 404、`303004`、`306003`、过期/非实时来源、离线、移动和键盘。
 

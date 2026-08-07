@@ -32,7 +32,7 @@ public interface ContentPersistencePort {
      * <p>默认实现保留给 V014 前的测试夹具使用；正式 JDBC 实现会覆盖它，避免把 Provider 返回的
      * cityCode 当作可公开展示的城市名称。</p>
      */
-    default long ensureCinema(CinemaRow row, String cityName, String providerCityId) {
+    default long ensureCinema(CinemaRow row, String cityName, String cityCode) {
         return ensureCinema(row);
     }
 
@@ -89,7 +89,7 @@ public interface ContentPersistencePort {
     record SyncLogRow(long id, String provider, String resourceType, String requestId, SyncStatus status,
                       Integer errorCode, int totalCount, int successCount, int failureCount,
                       LocalDateTime startedAt, LocalDateTime finishedAt, String errorSummary,
-                      String cityName, String providerCityId) {
+                      String cityName, String cityCode) {
         /** 兼容 V004/V009 测试夹具；城市同步会使用带城市字段的完整构造器。 */
         public SyncLogRow(long id, String provider, String resourceType, String requestId, SyncStatus status,
                           Integer errorCode, int totalCount, int successCount, int failureCount,

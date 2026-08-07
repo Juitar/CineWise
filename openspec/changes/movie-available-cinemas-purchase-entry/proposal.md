@@ -2,18 +2,19 @@
 
 ## 背景
 
-`/movies` 影片卡片目前不可点击。影院方向已有 `/cinemas/:cinemaId` → `/shows?movieId=&cinemaId=`。A 已完成公开只读 `GET /api/v1/shows/available-cinemas?movieId=&page=&size=` 及其 DTO、OpenAPI 注解、固定夹具和契约测试；C 可在确认安全白名单后接入前端。前端不得下载全量影院逐一探测场次，也不得新增临时 Mock。
+`/movies` 和首页影片卡片目前不能进入影片详情/选影院；首页影院卡片也不能进入既有影院详情。影院方向已有 `/cinemas/:cinemaId` → `/shows?movieId=&cinemaId=`。A 已完成公开只读 `GET /api/v1/shows/available-cinemas?movieId=&page=&size=` 及其 DTO、OpenAPI 注解、固定夹具和契约测试；D 已提供 `GET /api/v1/movies/{movieId}`。前端不得下载全量影院逐一探测场次，也不得新增临时 Mock。
 
 ## 目标
 
-- 接口确认后，为 `/movies` 卡片增加可访问的详情/选影院入口。
-- 新增影片可售影院页，展示影院、可售统计、来源、数据时间、过期和降级提示。
+- 为首页和 `/movies` 的影片卡片增加同一个可访问的详情/选影院入口。
+- 让首页影院卡片以语义化链接进入既有 `/cinemas/:cinemaId`，不直接进入场次页。
+- 影片详情/选影院页同时展示 `GET /api/v1/movies/{movieId}` 的影片资料，以及可售影院、来源、数据时间、过期和降级提示。
 - 选择影院后只跳转到现有 `/shows?movieId={movieId}&cinemaId={cinemaId}`。
 - 覆盖加载、空结果、失败、重试、来源异常、PC/移动端和键盘访问；影片详情是否不存在由内容影片详情接口独立处理，不由本可售影院接口推断。
 
 ## 非目标
 
-不改选座、建单、支付、电子票、退票和 `/shows`；不新增影片、影院、场次、价格、库存或演示购票数据；不在页面直连网络或新增请求封装。
+不改影院详情中的选影片流程、选座、建单、支付、电子票、退票和 `/shows`；不新增影片、影院、场次、价格、库存或演示购票数据；不在页面直连网络或新增请求封装。
 
 ## Owner 与前置确认
 

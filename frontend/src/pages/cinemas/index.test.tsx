@@ -81,7 +81,7 @@ describe('CinemasPage', () => {
   });
 
   it('使用后端影院响应渲染卡片和来源提示', () => {
-    render(<CinemasPage />);
+    const { container } = render(<CinemasPage />);
 
     expect(screen.getByRole('heading', { level: 1, name: '影院列表' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: '妙语影城·滨江店' })).toBeInTheDocument();
@@ -94,6 +94,9 @@ describe('CinemasPage', () => {
       '/cinemas/8200001',
     );
     expect(screen.queryByText('AI 推荐影院')).not.toBeInTheDocument();
+    expect(container.querySelector('.cinema-list-address svg')).toBeInTheDocument();
+    expect(container.querySelector('.cinema-list-arrow svg')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('📍');
     expect(pageMocks.useCinemaList).toHaveBeenCalledWith({
       keyword: undefined,
       location: '430100',

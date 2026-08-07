@@ -265,8 +265,8 @@ public class AgentController {
     }
 
     private AgentMessageResponse message(AgentInteractionRuntimeService.MessageView view) {
-        return new AgentMessageResponse(view.messageId(), view.role(), view.type(), view.text(), view.payload(),
-                view.status(), view.completedAt(), view.createdAt());
+        return new AgentMessageResponse(view.messageId(), view.role(), view.type(), view.text(), view.runId(),
+                view.payload(), view.status(), view.completedAt(), view.createdAt());
     }
 
     private JsonNode payload(String value) {

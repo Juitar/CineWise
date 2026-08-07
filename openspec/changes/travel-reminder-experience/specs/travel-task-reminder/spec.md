@@ -171,7 +171,7 @@ A 分配 Flyway 版本后，迁移 MUST 为 `travel_task.order_version`、`trave
 
 #### Scenario: 跨用户查询任务
 - **GIVEN** 当前用户不是任务所有者
-- **WHEN** 用户查询任务、建议、路线或餐饮
+- **WHEN** 用户查询任务、建议或路线
 - **THEN** 系统拒绝访问且不泄露任务是否存在
 
 #### Scenario: 对话读取建议摘要
@@ -179,3 +179,28 @@ A 分配 Flyway 版本后，迁移 MUST 为 `travel_task.order_version`、`trave
 - **WHEN** D 返回出行工具结果
 - **THEN** 结果只包含任务状态、建议摘要和来源时效信息
 - **AND** 不创建任务、不刷新快照、不发送提醒或请求位置
+
+### Requirement: 本期提醒仅支持修改触发时间
+
+系统 SHALL 仅通过 `PUT /api/v1/travel/tasks/{taskId}/reminder` 修改本人任务的 `triggerAt`。请求 MUST 同时携带 `If-Match` 和请求体 `version`，二者必须相同；成功时返回提交后的 `taskId`、`orderId`、`status`、`triggerAt` 和新 `version`。本期 MUST NOT 提供关闭或重新开启提醒的字段、接口、夹具或数据库迁移；不得以远期时间、`CANCELLED` 或其他任务状态伪装关闭提醒。
+
+#### Scenario: 用户修改提醒时间
+- **GIVEN** 当前用户拥有状态允许编辑的任务，且 `If-Match` 与请求体 `version` 均为任务当前版本
+- **WHEN** 用户提交带时区的 `triggerAt`
+- **THEN** 系统条件更新任务并返回新版本
+
+#### Scenario: 提醒时间更新发生冲突或任务不可编辑
+- **WHEN** `If-Match` 与请求体 `version` 不一致
+- **THEN** 系统返回 HTTP 409 和 `100409`
+- **WHEN** 条件更新未命中或任务状态不允许编辑
+- **THEN** 系统返回 HTTP 409 和 `207003`
+- **WHEN** 任务不存在或不属于当前用户
+- **THEN** 系统返回 HTTP 404 和 `207001`
+- **WHEN** 任务已取消
+- **THEN** 系统返回 HTTP 409 和 `207002`
+
+#### Scenario: 客户端无法确认写入结果
+- **GIVEN** 客户端的 PUT 请求超时或断网
+- **WHEN** 客户端需要确认写入结果
+- **THEN** 客户端 MUST 只调用 `GET /api/v1/travel/tasks/{taskId}` 核对 `triggerAt` 和 `version`
+- **AND** 客户端 MUST NOT 自动重发写请求

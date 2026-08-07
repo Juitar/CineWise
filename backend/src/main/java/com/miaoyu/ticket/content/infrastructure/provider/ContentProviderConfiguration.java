@@ -31,8 +31,27 @@ public class ContentProviderConfiguration {
     }
 
     @Bean
-    LiveContentSyncPort netStartContentSyncPort(NetStartProperties properties, Environment environment, Clock clock,
-                                                NetStartRawClient rawClient) {
-        return new NetStartContentProvider(properties, environment, clock, rawClient);
+    NetStartRequestLimiter netStartRequestLimiter(NetStartProperties properties, Clock clock) {
+        return new NetStartRequestLimiter(properties, clock);
+    }
+
+    @Bean
+    LiveContentSyncPort netStartContentSyncPort(NetStartProperties properties, Environment environment,
+                                                Clock clock, NetStartRawClient rawClient,
+                                                NetStartRequestLimiter requestLimiter) {
+        return new NetStartContentProvider(properties, environment, clock, rawClient, requestLimiter);
+    }
+
+    /** 排期 Provider 使用独立 HTTP 客户端，避免改变已有影片/影院同步的超时配置。 */
+    @Bean
+    com.miaoyu.ticket.content.application.ExternalShowtimeProvider externalShowtimeProvider(
+            NetStartProperties properties, Environment environment, Clock clock,
+            NetStartRequestLimiter requestLimiter) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(properties.connectTimeout());
+        requestFactory.setReadTimeout(properties.readTimeout());
+        RestClient restClient = RestClient.builder().baseUrl(properties.baseUrl())
+                .requestFactory(requestFactory).build();
+        return new NetStartShowtimeProvider(properties, environment, clock, restClient, requestLimiter);
     }
 }

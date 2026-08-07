@@ -1,6 +1,7 @@
 package com.miaoyu.ticket.agent.application.persistence;
 
 import com.miaoyu.ticket.agent.application.AgentErrorCode;
+import com.miaoyu.ticket.agent.application.AgentDistanceContextApplicationService;
 import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRun;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
@@ -25,6 +26,7 @@ public class AgentRunCancellationService {
     private final AgentRunStepRepository stepRepository;
     private final AgentSessionRepository sessionRepository;
     private final AgentRuntimeEventService runtimeEventService;
+    private final AgentDistanceContextApplicationService distanceContextService;
     private final Clock clock;
 
     public AgentRunCancellationService(
@@ -33,12 +35,14 @@ public class AgentRunCancellationService {
             AgentRunStepRepository stepRepository,
             AgentSessionRepository sessionRepository,
             AgentRuntimeEventService runtimeEventService,
+            AgentDistanceContextApplicationService distanceContextService,
             Clock clock) {
         this.currentUserAccessor = currentUserAccessor;
         this.runRepository = runRepository;
         this.stepRepository = stepRepository;
         this.sessionRepository = sessionRepository;
         this.runtimeEventService = runtimeEventService;
+        this.distanceContextService = distanceContextService;
         this.clock = clock;
     }
 
@@ -50,6 +54,8 @@ public class AgentRunCancellationService {
         if (run.status().isTerminal()) {
             return run;
         }
+        // B 只在本进程仍持有 ID 时清理；重启后的上下文由 D 的 300 秒 TTL 到期。
+        distanceContextService.cleanupIfPresent(runId);
         LocalDateTime now = now();
         stepRepository.findByRunId(run.id()).stream()
                 .filter(step -> step.status() == PlanNodeStatus.PENDING

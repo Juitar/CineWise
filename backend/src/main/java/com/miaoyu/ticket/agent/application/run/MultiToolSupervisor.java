@@ -129,7 +129,8 @@ public final class MultiToolSupervisor {
             ReadOnlyToolExecutionAdapter adapter = toolExecutorRegistry.require(node.targetName());
             ReadOnlyToolExecutionAdapter.ExecutionRequest executionRequest =
                     new ReadOnlyToolExecutionAdapter.ExecutionRequest(
-                    state, node.nodeId(), request.runId(), request.traceId(), request.remainingDeadlineMs());
+                    state, node.nodeId(), request.runId(), request.traceId(), request.remainingDeadlineMs(),
+                    request.distanceContextId(), request.distancePreference());
             ReadOnlyToolExecutionAdapter.ExecutionResult executed = adapter.execute(executionRequest);
             state = executed.state();
             results.add(new MultiToolSupervisorResult.NodeToolResult(

@@ -5,5 +5,5 @@ package com.miaoyu.ticket.profile.application;
  * 画像不能通过读取认证表或登录状态推断同意；C 尚未接入时由默认实现返回未同意。
  */
 public interface ProfileDataConsentQuery {
-  boolean isGranted(long userId);
+  ProfileDataConsentSnapshot findByUserId(long userId);
 }

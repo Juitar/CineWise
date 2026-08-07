@@ -1,0 +1,20 @@
+{
+  "purpose": "C 的 /travel/:taskId 浏览器测试可拦截的固定响应；不代表真实登录凭据或数据库记录。",
+  "authenticatedUser": { "scope": "当前已登录用户本人", "taskId": "90001", "orderId": "80001" },
+  "taskDetail": "task-detail-success.json",
+  "advice": "advice-weather-normal.json",
+  "updateRequest": {
+    "method": "PUT",
+    "path": "/api/v1/travel/tasks/90001/reminder",
+    "headers": { "If-Match": "\"1\"" },
+    "body": { "triggerAt": "2026-08-05T17:00:00+08:00", "version": 1 }
+  },
+  "responses": {
+    "success": "reminder-update-success.json",
+    "headerBodyVersionConflict": "reminder-update-header-body-version-conflict.json",
+    "persistedVersionConflict": "reminder-update-version-conflict.json",
+    "notFoundOrForbidden": "reminder-update-not-found.json",
+    "cancelled": "reminder-update-cancelled.json",
+    "timeoutThenGetRecovery": "reminder-update-timeout-get-recovery.json"
+  }
+}

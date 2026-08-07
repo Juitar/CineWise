@@ -87,6 +87,35 @@
   font-size: 14px;
 }
 
+.home-mobile-notice {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff7e6;
+  color: #ad4e00;
+  font-size: 13px;
+}
+
+.home-mobile-error,
+.home-mobile-empty {
+  padding: 16px 0;
+}
+
+.home-card-skeleton-mobile {
+  display: flex;
+  width: 100%;
+  gap: 12px;
+}
+
+.home-poster-skeleton {
+  flex: 0 0 88px;
+  height: 124px;
+  border-radius: 8px;
+}
+
+.home-skeleton-copy {
+  flex: 1;
+}
+
 /* --- 首页主体双栏布局 --- */
 .home-page-main {
   display: flex;
@@ -204,6 +233,20 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 2%);
 }
 
+.home-card-link {
+  color: inherit;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 100%;
+  text-decoration: none;
+}
+
+.home-card-link:focus-visible {
+  outline: 3px solid rgba(108, 92, 231, 45%);
+  outline-offset: -3px;
+}
+
 .movie-poster-large {
   width: 100%;
   height: 196px;
@@ -296,12 +339,13 @@
   font-size: 12px;
 }
 
-.home-sale-unavailable {
+.home-card-action {
   width: 100%;
   padding-top: 8px;
   border-top: 1px solid #f0f0f0;
-  color: #8c8c8c;
+  color: #6c5ce7;
   font-size: 12px;
+  text-align: center;
 }
 
 .home-card-skeleton {
@@ -444,6 +488,32 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.home-agent-entry-copy {
+  padding: 22px;
+  margin: auto 0;
+  background: rgba(255, 255, 255, 88%);
+  border: 1px solid rgba(108, 92, 231, 14%);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(108, 92, 231, 8%);
+}
+
+.home-agent-entry-copy h3,
+.home-agent-entry-copy p {
+  margin: 0;
+}
+
+.home-agent-entry-copy h3 {
+  color: #312e81;
+  font-size: 18px;
+}
+
+.home-agent-entry-copy p {
+  margin-top: 12px;
+  color: #5b6475;
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 /* 消息气泡通用 */

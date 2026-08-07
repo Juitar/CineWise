@@ -1,9 +1,10 @@
-import { Dropdown } from 'antd';
+import { Avatar, Dropdown } from 'antd';
 import type { MenuProps } from 'antd';
 import React, { useState } from 'react';
 import { useNavigate } from 'umi';
 
 import { useAuth } from '../../shared/auth/AuthProvider';
+import { ChevronDownIcon, UserIcon } from '../../shared/components/icons/layout-icons';
 import './index.css';
 
 export function AdminTopBar() {
@@ -40,12 +41,9 @@ export function AdminTopBar() {
           trigger={['click']}
         >
           <button type="button" className="admin-user-profile">
-            <div className="admin-avatar" aria-hidden="true">
-              管
-            </div>
-            <span className="admin-name">
-              {currentUser?.nickname ?? '管理员'} <span className="arrow-down">v</span>
-            </span>
+            <Avatar className="admin-avatar" icon={<UserIcon size={18} />} />
+            <span className="admin-name">{currentUser?.nickname ?? '管理员'}</span>
+            <ChevronDownIcon className="arrow-down" size={14} />
           </button>
         </Dropdown>
       </div>

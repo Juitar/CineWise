@@ -4,8 +4,8 @@ import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.application.reply.ErrorReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.ProgressReplyFacts;
 import com.miaoyu.ticket.agent.application.reply.QuestionReplyFacts;
-import com.miaoyu.ticket.agent.application.reply.RecommendationReplyFacts;
-import com.miaoyu.ticket.agent.application.reply.RecommendationReplyFactsMapper;
+import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFacts;
+import com.miaoyu.ticket.agent.application.reply.RecommendationPlanCardFactsMapper;
 import com.miaoyu.ticket.agent.application.reply.SelectSeatsReplyFacts;
 import com.miaoyu.ticket.agent.domain.tool.ToolResult;
 import com.miaoyu.ticket.agent.domain.tool.ToolStatus;
@@ -49,13 +49,12 @@ public final class AgentRunReplyFactory {
         }
         ToolResult<RecommendationPlanResult> recommendation = lastSuccessfulRecommendation(result);
         if (recommendation != null) {
-            RecommendationReplyFacts facts = RecommendationReplyFactsMapper.from(recommendation, now);
-            AgentReplyMessageType type = facts.purchaseEligible()
-                    ? AgentReplyMessageType.PLAN_CARD : AgentReplyMessageType.MOVIE_CARD;
-            String text = facts.purchaseEligible()
-                    ? "已找到 " + facts.candidates().size() + " 个可购方案。"
-                    : "已找到影片候选，但当前条件下暂无可购场次。";
-            return new com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse(text, type, facts);
+            RecommendationPlanCardFacts facts = RecommendationPlanCardFactsMapper.from(recommendation, now);
+            String text = facts.plans().isEmpty()
+                    ? "当前条件下暂无可购方案。"
+                    : "已找到 " + facts.plans().size() + " 个可购方案。";
+            return new com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse(
+                    text, AgentReplyMessageType.PLAN_CARD, facts);
         }
         ToolResult<?> failed = lastFailed(result);
         if (failed != null) {

@@ -20,21 +20,22 @@ class ContentSyncJobTest {
     @Test
     void givenControlledCity_whenDailyJobRuns_thenItSynchronizesMoviesAndThatCityCinemas() {
         ContentSyncService service = Mockito.mock(ContentSyncService.class);
-        when(service.synchronizeCityCinemasWithResult(eq("长沙"), eq("70"), any()))
+        when(service.synchronizeCityCinemasWithResult(eq("长沙"), eq("430100"), any()))
                 .thenReturn(new ContentSyncService.CurrentHotMovieSyncResult(1, 1, 0,
                         LiveContentSyncPort.Outcome.SUCCESS, null));
-        when(service.synchronizeCityCinemasWithResult(eq("杭州"), eq("50"), any()))
+        when(service.synchronizeCityCinemasWithResult(eq("杭州"), eq("330100"), any()))
                 .thenReturn(new ContentSyncService.CurrentHotMovieSyncResult(1, 1, 0,
                         LiveContentSyncPort.Outcome.SUCCESS, null));
         NetStartProperties properties = new NetStartProperties(true, false, "https://example.test", "0 0 3 * * *",
-                Duration.ofMillis(500), Duration.ofMillis(1500), 10, 1, Duration.ofMillis(200), List.of("长沙", "杭州"));
+                Duration.ofMillis(500), Duration.ofMillis(1500), 10, 1, Duration.ofMillis(200),
+                List.of("430100", "330100"));
         ContentSyncJob job = new ContentSyncJob(service,
                 new CityResolutionService(new ObjectMapper(), new DefaultResourceLoader()), properties);
 
         job.synchronizeDailyContent();
 
         verify(service).synchronizeCurrentHotMovies();
-        verify(service).synchronizeCityCinemasWithResult(eq("长沙"), eq("70"), any());
-        verify(service).synchronizeCityCinemasWithResult(eq("杭州"), eq("50"), any());
+        verify(service).synchronizeCityCinemasWithResult(eq("长沙"), eq("430100"), any());
+        verify(service).synchronizeCityCinemasWithResult(eq("杭州"), eq("330100"), any());
     }
 }

@@ -23,7 +23,7 @@ class CityResolutionServiceTest {
 
         assertThat(result.status()).isEqualTo(CityResolutionService.Status.RESOLVED);
         assertThat(result.cityName()).isEqualTo("长沙");
-        assertThat(service.findProviderCityId(result.cityName())).contains("70");
+        assertThat(service.findCityCode(result.cityName())).contains("430100");
     }
 
     @Test
@@ -32,7 +32,7 @@ class CityResolutionServiceTest {
 
         assertThat(result.status()).isEqualTo(CityResolutionService.Status.RESOLVED);
         assertThat(result.cityName()).isEqualTo("杭州");
-        assertThat(service.findProviderCityId(result.cityName())).contains("50");
+        assertThat(service.findCityCode(result.cityName())).contains("330100");
     }
 
     @Test
@@ -58,8 +58,8 @@ class CityResolutionServiceTest {
     void givenDuplicateCityNameOrProviderId_whenLoadCatalog_thenItRejectsTheCatalog() {
         String duplicateCatalog = """
                 {"catalogVersion":"v1","source":"fixture","checkedAt":"2026-08-05","cities":[
-                  {"cityName":"长沙","providerCityId":"70"},
-                  {"cityName":"长沙","providerCityId":"50"}
+                  {"cityName":"长沙","cityCode":"430100"},
+                  {"cityName":"长沙","cityCode":"330100"}
                 ]}
                 """;
         CityResolutionService unavailableService = new CityResolutionService(

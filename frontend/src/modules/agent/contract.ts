@@ -1,5 +1,7 @@
 import type {
   AgentEvent,
+  AgentActionConfirmationResult,
+  AgentConfirmationStatus,
   AgentCardPayloadType,
   AgentMessage,
   AgentMessagePage,
@@ -29,6 +31,16 @@ const BUSINESS_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const DECIMAL_ID_PATTERN = /^(0|[1-9]\d*)$/;
 const POSITIVE_JAVA_LONG_PATTERN = /^[1-9]\d*$/;
 const JAVA_LONG_MAX = '9223372036854775807';
+const CONFIRMATION_STATUSES = new Set<AgentConfirmationStatus>([
+  'PENDING_CONFIRMATION',
+  'EXECUTING',
+  'RESULT_UNKNOWN',
+  'SUCCEEDED',
+  'FAILED',
+  'EXPIRED',
+  'REJECTED',
+  'INVALIDATED',
+]);
 
 export class AgentContractError extends Error {
   constructor(message = 'Agent 服务返回的数据格式不正确') {
@@ -144,6 +156,7 @@ export function parseAgentMessage(value: unknown): AgentMessage {
     role: text(current.role),
     type: text(current.type),
     text: text(current.text, true),
+    runId: businessId(current.runId),
     payload: record(current.payload),
     status: text(current.status),
     completedAt: optionalNullableDate(current, 'completedAt'),
@@ -276,6 +289,18 @@ function validateRecommendation(
   if ('missingFactors' in payload) textArray(payload.missingFactors);
   optionalText(payload, 'fallbackType');
 }
+function validateConfirmationCard(payload: Record<string, unknown>): void {
+  businessId(payload.actionId);
+  text(payload.actionType);
+  text(payload.title);
+  textArray(payload.displayLines);
+  dateText(payload.expiresAt);
+  if (
+    typeof payload.status !== 'string' ||
+    !CONFIRMATION_STATUSES.has(payload.status as AgentConfirmationStatus)
+  )
+    throw new AgentContractError();
+}
 
 function validateBusinessIntent(payload: Record<string, unknown>): void {
   if (payload.type !== 'BUSINESS_INTENT') throw new AgentContractError();
@@ -324,6 +349,10 @@ export function validateAgentCardEvent(event: AgentEvent): AgentCardValidation {
     return { decision: 'safe-text' };
   }
   try {
+    if ('actionId' in event.payload) {
+      validateConfirmationCard(event.payload as Record<string, unknown>);
+      return { decision: 'render', payloadType: type as AgentCardPayloadType };
+    }
     if ((type === 'MOVIE_CARD' || type === 'PLAN_CARD') && (!event.planId || !event.planVersion)) {
       throw new AgentContractError();
     }
@@ -351,6 +380,19 @@ export function validateAgentCardEvent(event: AgentEvent): AgentCardValidation {
   } catch {
     return { decision: 'reject' };
   }
+}
+
+export function parseAgentActionConfirmationResult(value: unknown): AgentActionConfirmationResult {
+  const current = record(value);
+  const status = text(current.status) as AgentConfirmationStatus;
+  if (!CONFIRMATION_STATUSES.has(status)) throw new AgentContractError();
+  return {
+    actionId: businessId(current.actionId),
+    runId: businessId(current.runId),
+    planVersion: nonNegativeInteger(current.planVersion),
+    status,
+    updatedAt: dateText(current.updatedAt),
+  };
 }
 
 export function validateAgentToolEvent(event: AgentEvent): boolean {
