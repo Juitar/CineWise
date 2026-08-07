@@ -11,6 +11,9 @@ function sessionKey(showId: string, seatIds: string[]): string {
   return `cinewise:order-confirm:${showId}:${[...seatIds].sort().join('_')}`;
 }
 
+// sessionStorage 被隐私策略禁用时，当前页面仍必须复用同一建单标识，不能因重渲染生成第二笔订单。
+const inMemorySessions = new Map<string, ConfirmOrderSession>();
+
 /**
  * 创建建单幂等标识。
  *
@@ -23,6 +26,12 @@ function createSession(): ConfirmOrderSession {
     idempotencyKey: createOrderUuid(),
     isResultUnknown: false,
   };
+}
+
+function createInMemorySession(key: string): ConfirmOrderSession {
+  const session = createSession();
+  inMemorySessions.set(key, session);
+  return session;
 }
 
 /**
@@ -39,7 +48,7 @@ export function getConfirmOrderSession(showId: string, seatIds: string[]): Confi
   try {
     stored = sessionStorage.getItem(key);
   } catch {
-    return createSession();
+    return inMemorySessions.get(key) ?? createInMemorySession(key);
   }
   if (stored) {
     try {
@@ -49,18 +58,24 @@ export function getConfirmOrderSession(showId: string, seatIds: string[]): Confi
         typeof parsed.idempotencyKey === 'string' &&
         typeof parsed.isResultUnknown === 'boolean'
       ) {
-        return parsed as ConfirmOrderSession;
+        const session = parsed as ConfirmOrderSession;
+        inMemorySessions.set(key, session);
+        return session;
       }
     } catch {
-      sessionStorage.removeItem(key);
+      try {
+        sessionStorage.removeItem(key);
+      } catch {
+        // 损坏快照无法清理时仍使用当前页内存会话，避免重渲染生成新的建单标识。
+      }
     }
   }
 
-  const created = createSession();
+  const created = inMemorySessions.get(key) ?? createInMemorySession(key);
   try {
     sessionStorage.setItem(key, JSON.stringify(created));
   } catch {
-    // 浏览器禁用会话存储时仍允许当前页面内复用 Hook 返回的标识。
+    // 浏览器禁用会话存储时，模块内存会话仍可保证当前页面内复用原标识。
   }
   return created;
 }
@@ -85,8 +100,10 @@ export function markConfirmOrderUnknown(showId: string, seatIds: string[]): void
   }
   const key = sessionKey(showId, seatIds);
   const session = getConfirmOrderSession(showId, seatIds);
+  const resultUnknownSession = { ...session, isResultUnknown: true };
+  inMemorySessions.set(key, resultUnknownSession);
   try {
-    sessionStorage.setItem(key, JSON.stringify({ ...session, isResultUnknown: true }));
+    sessionStorage.setItem(key, JSON.stringify(resultUnknownSession));
   } catch {
     // 当前页面仍由 Hook 维持未知保护，持久化不可用时不泄露或重组标识。
   }
@@ -97,6 +114,7 @@ export function clearConfirmOrderSession(showId: string, seatIds: string[]): voi
   if (!showId || seatIds.length === 0) {
     return;
   }
+  inMemorySessions.delete(sessionKey(showId, seatIds));
   try {
     sessionStorage.removeItem(sessionKey(showId, seatIds));
   } catch {

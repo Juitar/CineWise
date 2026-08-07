@@ -59,10 +59,24 @@ describe('订单写操作稳定恢复会话', () => {
     expect(second.clientRequestId).not.toBe(second.idempotencyKey);
   });
 
-  it('会话存储受限时返回内存会话而不抛出异常', () => {
+  it('会话存储受限时在当前页面复用写操作标识和未知状态', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new DOMException('blocked', 'SecurityError');
     });
-    expect(() => getWriteOperationSession('payment', 'CW6')).not.toThrow();
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+
+    const first = getWriteOperationSession('refund', 'CW6');
+    const second = getWriteOperationSession('refund', 'CW6');
+    markWriteResultUnknown('refund', 'CW6');
+    const recovered = getWriteOperationSession('refund', 'CW6');
+
+    expect(second).toEqual(first);
+    expect(recovered).toMatchObject({ ...first, resultUnknown: true });
+    expect(() => clearWriteOperationSession('refund', 'CW6')).not.toThrow();
   });
 });

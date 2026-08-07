@@ -12,12 +12,21 @@ function sessionKey(operation: WriteOperation, orderNo: string): string {
   return `cinewise:${operation}:${orderNo}`;
 }
 
+// sessionStorage 不可用时只在当前页面生命周期保存会话，确保结果未知恢复不会换用新幂等键。
+const inMemorySessions = new Map<string, WriteOperationSession>();
+
 function createSession(operation: WriteOperation): WriteOperationSession {
   return {
     idempotencyKey: createOrderUuid(),
     clientRequestId: operation === 'refund' ? createOrderUuid() : undefined,
     resultUnknown: false,
   };
+}
+
+function createInMemorySession(key: string, operation: WriteOperation): WriteOperationSession {
+  const session = createSession(operation);
+  inMemorySessions.set(key, session);
+  return session;
 }
 
 /**
@@ -34,7 +43,7 @@ export function getWriteOperationSession(
   try {
     stored = sessionStorage.getItem(key);
   } catch {
-    return createSession(operation);
+    return inMemorySessions.get(key) ?? createInMemorySession(key, operation);
   }
   if (stored) {
     try {
@@ -44,7 +53,9 @@ export function getWriteOperationSession(
         typeof parsed.resultUnknown === 'boolean' &&
         (operation !== 'refund' || typeof parsed.clientRequestId === 'string')
       ) {
-        return parsed as WriteOperationSession;
+        const session = parsed as WriteOperationSession;
+        inMemorySessions.set(key, session);
+        return session;
       }
     } catch {
       try {
@@ -55,7 +66,7 @@ export function getWriteOperationSession(
     }
   }
 
-  const created = createSession(operation);
+  const created = inMemorySessions.get(key) ?? createInMemorySession(key, operation);
   try {
     sessionStorage.setItem(key, JSON.stringify(created));
   } catch {
@@ -67,11 +78,10 @@ export function getWriteOperationSession(
 /** 标记响应未知，刷新后仍禁止重新发送对应写请求。 */
 export function markWriteResultUnknown(operation: WriteOperation, orderNo: string): void {
   const session = getWriteOperationSession(operation, orderNo);
+  const resultUnknownSession = { ...session, resultUnknown: true };
+  inMemorySessions.set(sessionKey(operation, orderNo), resultUnknownSession);
   try {
-    sessionStorage.setItem(
-      sessionKey(operation, orderNo),
-      JSON.stringify({ ...session, resultUnknown: true }),
-    );
+    sessionStorage.setItem(sessionKey(operation, orderNo), JSON.stringify(resultUnknownSession));
   } catch {
     // 结果未知状态仍由当前 Hook 保存；存储受限不应导致页面异常。
   }
@@ -79,6 +89,7 @@ export function markWriteResultUnknown(operation: WriteOperation, orderNo: strin
 
 /** 服务端已明确返回结果后清理本次写操作会话。 */
 export function clearWriteOperationSession(operation: WriteOperation, orderNo: string): void {
+  inMemorySessions.delete(sessionKey(operation, orderNo));
   try {
     sessionStorage.removeItem(sessionKey(operation, orderNo));
   } catch {
