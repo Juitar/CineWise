@@ -42,8 +42,8 @@
 
 ## 6. 验证、质量与交付
 
-- [ ] 6.1 D 完成任务、Provider、缓存、调度、事件、通知、权限、并发、降级和隐私的单元及集成测试；验证：测试输出记录通过数、失败数、跳过数和失败复现信息。
+- [x] 6.1 D 完成任务、Provider、缓存、调度、事件、通知、权限、并发、降级和隐私的单元及集成测试；验证：2026-08-07 在关闭真实天气、路线和邮件 Provider 的配置下执行全量测试，191 个测试类汇总 738 通过、0 失败、0 错误、51 个按环境条件跳过；A/D MySQL 联调结果见 `docs/database-migrations/V013_TRAVEL_INTEGRATION_VALIDATION_2026-08-07.md`，本地离线记录见 `docs/travel-offline-regression-2026-08-07.md`。
 - [ ] 6.2 后续由 A、C、D 在 MySQL 8、Redis 和 Mock 邮件 Provider 环境执行事件、缓存、通知恢复和隐私验证；服务器 Key、Compose 实际注入、真实 SMTP 和生产环境验证不阻塞本 change 当前 D 代码与测试完成。验证：不在该任务中用普通应用环境执行 Flyway，真实环境结果附环境、命令和缺陷编号。
-- [ ] 6.3 D 执行离线演示回归：关闭真实天气、路线和邮件 Provider；验证：核心购票和电子票可用，出行能力明确降级，未把 Mock 作为实时事实。
+- [x] 6.3 D 执行离线演示回归：关闭真实天气、路线和邮件 Provider；验证：2026-08-07 全量后端测试在 `AMAP_WEATHER_ENABLED=false`、`AMAP_ROUTE_ENABLED=false`、`AUTH_MAIL_DELIVERY_ENABLED=false` 下通过，出行测试覆盖天气/路线 Demo 降级、邮件 Mock、来源时效和隐私边界；记录见 `docs/travel-offline-regression-2026-08-07.md`。
 - [ ] 6.4 D 执行 `backend\mvnw.cmd verify`、`openspec validate travel-reminder-experience --strict`、`git diff --check` 和变更文件核对；待 MySQL 工作流实际执行 V013 集成测试并处理当前 dev 的既有 Checkstyle 问题后，才能声明构建、测试、架构检查、Checkstyle、SpotBugs、JaCoCo 全部通过。
 - [ ] 6.5 D 记录回归结果、缺陷、风险、关联提交和 A/B/C 审查结论；验证：所有已勾选任务均有对应证据，全部完成后再同步主规格并归档。
