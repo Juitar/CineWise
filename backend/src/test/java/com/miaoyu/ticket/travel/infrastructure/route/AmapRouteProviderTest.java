@@ -35,6 +35,41 @@ class AmapRouteProviderTest {
     }
 
     @Test
+    void givenWalkingMode_whenPlanning_thenUseWalkingClientAndNormalizeMode() {
+        AmapRouteProvider provider = new AmapRouteProvider(
+                new AmapRouteProperties(true, "test-key", Duration.ofSeconds(2), Duration.ofSeconds(5),
+                        Duration.ofMinutes(15)), new AmapRouteClient() {
+                            @Override
+                            public JsonNode queryDrivingRoute(String origin, String destination, String key) {
+                                throw new AssertionError("步行不应请求驾车接口");
+                            }
+
+                            @Override
+                            public JsonNode queryWalkingRoute(String origin, String destination, String key) {
+                                assertThat(origin).isEqualTo("120.1,30.2");
+                                assertThat(destination).isEqualTo("120.2,30.3");
+                                return json("{\"status\":\"1\",\"route\":{\"paths\":[{\"duration\":\"600\"}]}}");
+                            }
+                        });
+
+        var result = provider.plan(point("120.1", "30.2"), point("120.2", "30.3"), "walking", REQUESTED_AT);
+
+        assertThat(result).isPresent();
+        assertThat(result.orElseThrow().travelMode()).isEqualTo("WALKING");
+        assertThat(result.orElseThrow().durationMinutes()).isEqualTo(10);
+    }
+
+    @Test
+    void givenUnsupportedMode_whenPlanning_thenDoNotCallAmap() {
+        AmapRouteProvider provider = provider((origin, destination, key) -> {
+            throw new AssertionError("不支持的模式不应请求高德");
+        });
+
+        assertThat(provider.plan(point("120.1", "30.2"), point("120.2", "30.3"), "TRANSIT", REQUESTED_AT))
+                .isEmpty();
+    }
+
+    @Test
     void givenDisabledOrMissingKey_whenPlanning_thenDoNotCallAmap() {
         AmapRouteProvider disabled = new AmapRouteProvider(
                 new AmapRouteProperties(false, "test-key", Duration.ofSeconds(2), Duration.ofSeconds(5),

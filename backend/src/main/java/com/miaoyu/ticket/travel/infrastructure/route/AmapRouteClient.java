@@ -6,4 +6,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 @FunctionalInterface
 interface AmapRouteClient {
     JsonNode queryDrivingRoute(String origin, String destination, String key);
+
+    /** 保持旧测试客户端兼容；真实 HTTP 客户端必须覆盖步行接口。 */
+    default JsonNode queryWalkingRoute(String origin, String destination, String key) {
+        return null;
+    }
 }
