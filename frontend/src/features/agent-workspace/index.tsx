@@ -92,12 +92,24 @@ function formatPlanReason(value: string): string {
 
 function WorkspaceIcon({ kind }: { kind: 'add' | 'clear' | 'history' }) {
   if (kind === 'add') {
-    return <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>;
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+    );
   }
   if (kind === 'clear') {
-    return <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M9 7l1-3h4l1 3M7 7l1 13h8l1-13" /></svg>;
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M4 7h16M10 11v6M14 11v6M9 7l1-3h4l1 3M7 7l1 13h8l1-13" />
+      </svg>
+    );
   }
-  return <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 9h8M8 13h5" /></svg>;
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M4 5h16v14H4zM8 9h8M8 13h5" />
+    </svg>
+  );
 }
 
 function AgentDiscoveryPane({ sessionId }: { sessionId: string }) {
@@ -110,20 +122,34 @@ function AgentDiscoveryPane({ sessionId }: { sessionId: string }) {
       <div className="agent-discovery-hero">
         <span>妙语观影工作台</span>
         <h1>先浏览，也可以直接说出你的观影需求</h1>
-        <p>右侧助手会把你的条件整理成可购方案；选片、选档期、选座和确认订单都留在这个工作区完成。</p>
+        <p>
+          右侧助手会把你的条件整理成可购方案；选片、选档期、选座和确认订单都留在这个工作区完成。
+        </p>
       </div>
       <section className="agent-discovery-section" aria-labelledby="agent-discovery-movies">
         <div className="agent-discovery-section-head">
-          <div><FilmIcon size={19} /><h2 id="agent-discovery-movies">正在热映</h2></div>
+          <div>
+            <FilmIcon size={19} />
+            <h2 id="agent-discovery-movies">正在热映</h2>
+          </div>
           <Link to="/movies">全部影片</Link>
         </div>
         <div className="agent-discovery-movie-grid">
           {movies.data?.records.map((movie) => {
             const poster = safePosterUrl(movie.posterUrl);
             return (
-              <Link className="agent-discovery-movie" key={movie.movieId}
-                to={`${workspaceBase}/movies/${encodeURIComponent(movie.movieId)}`}>
-                {poster ? <img alt="" src={poster} /> : <div className="agent-discovery-poster-fallback"><FilmIcon size={24} /></div>}
+              <Link
+                className="agent-discovery-movie"
+                key={movie.movieId}
+                to={`${workspaceBase}/movies/${encodeURIComponent(movie.movieId)}`}
+              >
+                {poster ? (
+                  <img alt="" src={poster} />
+                ) : (
+                  <div className="agent-discovery-poster-fallback">
+                    <FilmIcon size={24} />
+                  </div>
+                )}
                 <strong>{movie.title}</strong>
                 <span>{movie.genres.join(' / ') || '类型待更新'}</span>
               </Link>
@@ -135,14 +161,21 @@ function AgentDiscoveryPane({ sessionId }: { sessionId: string }) {
       </section>
       <section className="agent-discovery-section" aria-labelledby="agent-discovery-cinemas">
         <div className="agent-discovery-section-head">
-          <div><CinemaIcon size={19} /><h2 id="agent-discovery-cinemas">长沙影院</h2></div>
+          <div>
+            <CinemaIcon size={19} />
+            <h2 id="agent-discovery-cinemas">长沙影院</h2>
+          </div>
           <Link to="/cinemas">全部影院</Link>
         </div>
         <div className="agent-discovery-cinema-grid">
           {cinemas.data?.records.map((cinema) => (
-            <Link className="agent-discovery-cinema" key={cinema.cinemaId}
-              to={`/cinemas/${encodeURIComponent(cinema.cinemaId)}`}>
-              <strong>{cinema.name}</strong><span>{cinema.area || '长沙'}</span>
+            <Link
+              className="agent-discovery-cinema"
+              key={cinema.cinemaId}
+              to={`/cinemas/${encodeURIComponent(cinema.cinemaId)}`}
+            >
+              <strong>{cinema.name}</strong>
+              <span>{cinema.area || '长沙'}</span>
             </Link>
           ))}
           {cinemas.isLoading && <Spin />}
@@ -164,13 +197,19 @@ function RecommendationPlanPane({
   sessionId: string;
 }) {
   const selectedPlan =
-    selectedIndex === null || item?.plans === undefined ? null : item.plans[selectedIndex] ?? null;
+    selectedIndex === null || item?.plans === undefined
+      ? null
+      : (item.plans[selectedIndex] ?? null);
   const selectedPlanExpired =
-    selectedPlan === null || selectedPlan.expired || Date.parse(selectedPlan.expiresAt) <= Date.now();
+    selectedPlan === null ||
+    selectedPlan.expired ||
+    Date.parse(selectedPlan.expiresAt) <= Date.now();
   const selectSeatsPath =
     selectedPlan !== null && selectedPlan.purchaseEligible && !selectedPlanExpired
       ? `/recommendations/${encodeURIComponent(sessionId)}${buildAgentSelectSeatsPath(
-          selectedPlan.showId, selectedPlan.movieId, selectedPlan.cinemaId,
+          selectedPlan.showId,
+          selectedPlan.movieId,
+          selectedPlan.cinemaId,
         )}`
       : null;
   return (
@@ -259,7 +298,11 @@ function RecommendationPlanPane({
 }
 
 /** Agent 工作区视图；桌面和移动布局共享同一个 useAgentWorkspace 状态。 */
-export function AgentWorkspace({ sessionId, variant = 'debug', businessContent }: AgentWorkspaceProps) {
+export function AgentWorkspace({
+  sessionId,
+  variant = 'debug',
+  businessContent,
+}: AgentWorkspaceProps) {
   const navigate = useNavigate();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [draft, setDraft] = useState('');
@@ -331,34 +374,68 @@ export function AgentWorkspace({ sessionId, variant = 'debug', businessContent }
       className={`agent-workspace agent-workspace--${variant}`}
       aria-label="妙语 Agent 工作区"
     >
-      {variant === 'debug' && (
-        <aside className="agent-workspace-sidebar">{sessionHistory}</aside>
-      )}
+      {variant === 'debug' && <aside className="agent-workspace-sidebar">{sessionHistory}</aside>}
       {variant === 'recommendations' && (
         <div className="agent-workspace-business-pane">
-          {businessContent ?? (latestPlanItem ? (
-            <RecommendationPlanPane
-              item={latestPlanItem}
-              onSelect={selectPlan}
-              selectedIndex={selectedIndex}
-              sessionId={sessionId}
-            />
-          ) : <AgentDiscoveryPane sessionId={sessionId} />)}
+          {businessContent ??
+            (latestPlanItem ? (
+              <RecommendationPlanPane
+                item={latestPlanItem}
+                onSelect={selectPlan}
+                selectedIndex={selectedIndex}
+                sessionId={sessionId}
+              />
+            ) : (
+              <AgentDiscoveryPane sessionId={sessionId} />
+            ))}
         </div>
       )}
       <div className="agent-workspace-main">
         <header className="agent-workspace-header">
           <div className="agent-workspace-brand">
-            <span className="agent-workspace-brand-icon"><RobotIcon size={18} /></span>
+            <span className="agent-workspace-brand-icon">
+              <RobotIcon size={18} />
+            </span>
             <div>
-              {variant === 'recommendations' ? <h2>妙语 AI 观影助手</h2> : <h1>妙语 AI 观影助手</h1>}
-              <span className="agent-workspace-status"><i />安全入口 · {STATUS_TEXT[workspace.projection.status]}</span>
+              {variant === 'recommendations' ? (
+                <h2>妙语 AI 观影助手</h2>
+              ) : (
+                <h1>妙语 AI 观影助手</h1>
+              )}
+              <span className="agent-workspace-status">
+                <i />
+                安全入口 · {STATUS_TEXT[workspace.projection.status]}
+              </span>
             </div>
           </div>
           <div className="agent-workspace-actions">
-            <Tooltip title="新建会话"><Button aria-label="新建会话" className="agent-icon-button" icon={<WorkspaceIcon kind="add" />} onClick={() => void createSession()} type="text" /></Tooltip>
-            <Tooltip title="历史会话"><Button aria-label="历史会话" className="agent-icon-button" icon={<WorkspaceIcon kind="history" />} onClick={() => setHistoryOpen((open) => !open)} type="text" /></Tooltip>
-            <Tooltip title="清空当前会话"><Button aria-label="清空当前会话" className="agent-icon-button" icon={<WorkspaceIcon kind="clear" />} onClick={() => void workspace.clearCurrent()} type="text" /></Tooltip>
+            <Tooltip title="新建会话">
+              <Button
+                aria-label="新建会话"
+                className="agent-icon-button"
+                icon={<WorkspaceIcon kind="add" />}
+                onClick={() => void createSession()}
+                type="text"
+              />
+            </Tooltip>
+            <Tooltip title="历史会话">
+              <Button
+                aria-label="历史会话"
+                className="agent-icon-button"
+                icon={<WorkspaceIcon kind="history" />}
+                onClick={() => setHistoryOpen((open) => !open)}
+                type="text"
+              />
+            </Tooltip>
+            <Tooltip title="清空当前会话">
+              <Button
+                aria-label="清空当前会话"
+                className="agent-icon-button"
+                icon={<WorkspaceIcon kind="clear" />}
+                onClick={() => void workspace.clearCurrent()}
+                type="text"
+              />
+            </Tooltip>
             {busy && workspace.projection.runId && (
               <Button danger onClick={() => void workspace.cancel()}>
                 取消运行
@@ -370,11 +447,29 @@ export function AgentWorkspace({ sessionId, variant = 'debug', businessContent }
         <Collapse
           activeKey={historyOpen ? ['sessions'] : []}
           className="agent-history-collapse"
-          items={[{
-            key: 'sessions',
-            label: '历史会话',
-            children: <div><div className="agent-history-clear"><span>按第一条消息区分会话</span><Tooltip title="清空全部历史"><Button aria-label="清空全部历史" className="agent-icon-button" icon={<WorkspaceIcon kind="clear" />} onClick={() => void workspace.clearAll()} type="text" /></Tooltip></div>{sessionHistory}</div>,
-          }]}
+          items={[
+            {
+              key: 'sessions',
+              label: '历史会话',
+              children: (
+                <div>
+                  <div className="agent-history-clear">
+                    <span>按第一条消息区分会话</span>
+                    <Tooltip title="清空全部历史">
+                      <Button
+                        aria-label="清空全部历史"
+                        className="agent-icon-button"
+                        icon={<WorkspaceIcon kind="clear" />}
+                        onClick={() => void workspace.clearAll()}
+                        type="text"
+                      />
+                    </Tooltip>
+                  </div>
+                  {sessionHistory}
+                </div>
+              ),
+            },
+          ]}
           onChange={(keys) => setHistoryOpen(keys.includes('sessions'))}
         />
 
@@ -435,7 +530,6 @@ export function AgentWorkspace({ sessionId, variant = 'debug', businessContent }
           <Link to="/cinemas">影院列表</Link>。
         </nav>
       </div>
-
     </section>
   );
 }

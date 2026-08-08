@@ -111,7 +111,10 @@ function CinemaCard({ cinema, movieId }: { cinema: AvailableCinema; movieId: str
         <Link
           aria-label={`选择${cinema.name}的场次`}
           className="available-cinemas-purchase-link"
-          to={workspacePath(location.pathname, `/shows?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinema.cinemaId)}`)}
+          to={workspacePath(
+            location.pathname,
+            `/shows?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinema.cinemaId)}`,
+          )}
         >
           选择影院
         </Link>

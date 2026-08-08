@@ -695,8 +695,7 @@ export function buildProjectionFromHistory(
   messages: readonly AgentMessage[],
 ): AgentProjection {
   const latestUserIndex = messages.reduce(
-    (latest, message, index) =>
-      message.role.toUpperCase() === 'USER' ? index : latest,
+    (latest, message, index) => (message.role.toUpperCase() === 'USER' ? index : latest),
     -1,
   );
   let latestPlanMessageId: string | null = null;
@@ -760,7 +759,9 @@ function latestTravelAdviceEvents(snapshots: readonly AgentRunSnapshot[]): Map<s
   return latest;
 }
 
-function latestRecommendationEvents(snapshots: readonly AgentRunSnapshot[]): Map<string, AgentEvent> {
+function latestRecommendationEvents(
+  snapshots: readonly AgentRunSnapshot[],
+): Map<string, AgentEvent> {
   const latest = new Map<string, AgentEvent>();
   for (const snapshot of snapshots) {
     for (const event of snapshot.events) {
