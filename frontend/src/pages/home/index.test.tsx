@@ -267,6 +267,17 @@ describe('HomePage', () => {
     expect(screen.getByTestId('home-cinema-8200001')).toBeInTheDocument();
   });
 
+  it.each([
+    ['移动端', true],
+    ['PC 端', false],
+  ])('%s 都不展示无功能的个性化服务卡片', (_name, isMobile) => {
+    pageMocks.isMobile = isMobile;
+    render(<HomePage />);
+
+    expect(screen.queryByText('想要更精准的推荐？')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '开启个性化服务' })).not.toBeInTheDocument();
+  });
+
   it('首页 Agent 输入只保存内存草稿并跳转受保护工作区', () => {
     const { container } = render(<HomePage />);
     const agentInput = screen.getByLabelText('首页 Agent 输入');

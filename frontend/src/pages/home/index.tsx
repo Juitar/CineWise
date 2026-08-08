@@ -353,27 +353,6 @@ export default function HomePage() {
                   </div>
                 ) : null}
               </section>
-
-              <div className="personalized-banner">
-                <div className="personalized-icon-wrap">
-                  <RobotIcon size={24} />
-                </div>
-                <div className="personalized-content">
-                  <div className="personalized-title">想要更精准的推荐？</div>
-                  <div className="personalized-desc">
-                    开启后，AI将结合路线、出发时间与附近美食等信息，为你提供个性化观影方案
-                  </div>
-                </div>
-                {isMobile ? (
-                  <MobileButton className="personalized-btn" color="primary" size="small">
-                    开启个性化服务
-                  </MobileButton>
-                ) : (
-                  <DesktopButton className="personalized-btn" type="primary">
-                    开启个性化服务
-                  </DesktopButton>
-                )}
-              </div>
             </>
           </div>
         </section>

@@ -352,61 +352,6 @@
   pointer-events: none;
 }
 
-/* 个性化横幅 */
-.personalized-banner {
-  display: flex;
-  align-items: center;
-  background: linear-gradient(135deg, rgba(108, 92, 231, 5%) 0%, rgba(139, 123, 255, 10%) 100%);
-  border-radius: 16px;
-  padding: 20px 24px;
-  border: 1px solid rgba(108, 92, 231, 10%);
-}
-
-.personalized-icon-wrap {
-  width: 48px;
-  height: 48px;
-  border-radius: 24px;
-  background: linear-gradient(135deg, #6c5ce7 0%, #8b7bff 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  margin-right: 16px;
-}
-
-.personalized-content {
-  flex: 1;
-}
-
-.personalized-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 4px;
-}
-
-.personalized-desc {
-  font-size: 13px;
-  color: #6b7280;
-}
-
-.personalized-btn {
-  padding: 8px 20px;
-  border-radius: 20px;
-  background: transparent;
-  border: 1px solid #6c5ce7;
-  color: #6c5ce7;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.personalized-btn:hover {
-  background: #6c5ce7;
-  color: white;
-}
-
 /* --- PC 端右侧 Agent 面板 (Glassmorphism & Premium Design) --- */
 .home-page-agent-sidebar {
   width: 380px;
