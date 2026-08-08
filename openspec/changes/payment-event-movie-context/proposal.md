@@ -10,12 +10,13 @@
 - 沿场次查询 Repository、MyBatis 映射、支付实时发布和支付对账补偿链路传递 `movieId`。
 - 扩展 `PaymentSucceededEvent`，对外使用可空正十进制字符串 `movieId`。
 - 同步支付事件测试、夹具和重复/补偿语义。
+- D 在收到非空 `movieId` 后通过内容模块公开应用接口读取影片主类型，并按既有行为权重规则生成 `MOVIE_GENRE/BEHAVIOR` 标签。
 
 ## Non-Goals
 
 - 不修改 `OrderInvalidated` 或退票画像行为。
 - 不由 A 查询电影名称、电影类型或生成画像标签。
-- 不修改 D 的内容查询和画像算法，不新增数据库迁移。
+- 不修改支付、订单、退款事件和数据库迁移；历史订单不做补采。
 
 ## Owner and compatibility
 

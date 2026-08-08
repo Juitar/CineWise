@@ -31,6 +31,26 @@ The payment transaction publisher and paid-order reconciliation publisher SHALL 
 - **THEN** the event uses the authoritative current show context
 - **AND** its movie ID conversion is identical to the real-time payment path
 
+### Requirement: D generates a movie-genre tag from a valid payment movie context
+
+D SHALL use a non-null positive `movieId` from `PaymentSucceededEvent` only through the content module's public Application API to obtain the movie's primary genre. When the genre is available, D SHALL record `PAID_ORDER` as `SHOW` evidence and apply the existing `PAID_ORDER` behavior weight to an `ACTIVE` `MOVIE_GENRE` tag with source `BEHAVIOR` and polarity `LIKE`. D SHALL NOT access content persistence directly, alter the payment result, or backfill historical paid orders.
+
+#### Scenario: A paid movie has a primary genre
+
+- **GIVEN** A publishes a committed payment event with a positive `movieId`
+- **AND** the content Application API returns the primary genre `科幻`
+- **WHEN** D receives the event after payment commit
+- **THEN** D records one `PAID_ORDER/SHOW` behavior event
+- **AND** D creates or updates the user's `MOVIE_GENRE=科幻` `BEHAVIOR` tag using the existing weight and expiry rules
+
+#### Scenario: Movie context cannot yield a genre
+
+- **GIVEN** the payment event has no valid `movieId`, or the content Application API has no usable genre
+- **WHEN** D receives the event after payment commit
+- **THEN** D records only the `PAID_ORDER/SHOW` behavior event
+- **AND** D does not create or update a behavior tag
+- **AND** payment remains successful
+
 ### Requirement: Existing invalidation event remains unchanged
 
 A SHALL NOT add fields or new interfaces to `OrderInvalidated` for this change. Existing payment, travel, and refund flows SHALL remain functional when `movieId` is null.
