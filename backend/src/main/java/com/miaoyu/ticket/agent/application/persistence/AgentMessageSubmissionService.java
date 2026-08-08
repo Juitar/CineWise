@@ -3,7 +3,6 @@ package com.miaoyu.ticket.agent.application.persistence;
 import com.miaoyu.ticket.agent.application.AgentFailurePersistedException;
 import com.miaoyu.ticket.agent.application.AgentDistanceRecommendationApplicationService;
 import com.miaoyu.ticket.agent.application.confirmation.CreateOrderConfirmationActionOrchestrator;
-import com.miaoyu.ticket.agent.application.run.MultiToolSupervisor;
 import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorRequest;
 import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorResult;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
@@ -29,7 +28,7 @@ public class AgentMessageSubmissionService {
     private final AgentInitialRunTransaction initialRunTransaction;
     private final AgentConcurrentRequestLookupTransaction concurrentRequestLookupTransaction;
     private final AgentRunResultTransaction runResultTransaction;
-    private final MultiToolSupervisor multiToolSupervisor;
+    private final AgentReadOnlyExecutionTransaction readOnlyExecutionTransaction;
     private final CreateOrderConfirmationActionOrchestrator confirmationActionOrchestrator;
     private final AgentMessageRepository messageRepository;
     private final AgentRunStepRepository stepRepository;
@@ -42,7 +41,7 @@ public class AgentMessageSubmissionService {
             AgentInitialRunTransaction initialRunTransaction,
             AgentConcurrentRequestLookupTransaction concurrentRequestLookupTransaction,
             AgentRunResultTransaction runResultTransaction,
-            MultiToolSupervisor multiToolSupervisor,
+            AgentReadOnlyExecutionTransaction readOnlyExecutionTransaction,
             CreateOrderConfirmationActionOrchestrator confirmationActionOrchestrator,
             AgentMessageRepository messageRepository,
             AgentRunStepRepository stepRepository,
@@ -53,7 +52,7 @@ public class AgentMessageSubmissionService {
         this.initialRunTransaction = initialRunTransaction;
         this.concurrentRequestLookupTransaction = concurrentRequestLookupTransaction;
         this.runResultTransaction = runResultTransaction;
-        this.multiToolSupervisor = multiToolSupervisor;
+        this.readOnlyExecutionTransaction = readOnlyExecutionTransaction;
         this.confirmationActionOrchestrator = confirmationActionOrchestrator;
         this.messageRepository = messageRepository;
         this.stepRepository = stepRepository;
@@ -143,7 +142,7 @@ public class AgentMessageSubmissionService {
             AtomicBoolean textDeltaPersisted = new AtomicBoolean();
             var trustedContextReply = planCardFollowUpResolver
                     .resolve(initial.run().sessionId(), userId, request.content()).orElse(null);
-            MultiToolSupervisorResult result = multiToolSupervisor.run(new MultiToolSupervisorRequest(
+            MultiToolSupervisorResult result = readOnlyExecutionTransaction.execute(new MultiToolSupervisorRequest(
                     request.clientRequestId(),
                     request.content(),
                     request.validationContext(),

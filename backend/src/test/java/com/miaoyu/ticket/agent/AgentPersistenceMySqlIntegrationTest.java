@@ -36,8 +36,6 @@ import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlan;
 import com.miaoyu.ticket.agent.domain.plan.CandidatePlanNode;
 import com.miaoyu.ticket.agent.domain.plan.FailurePolicy;
-import com.miaoyu.ticket.agent.domain.plan.InputReference;
-import com.miaoyu.ticket.agent.domain.plan.InputReferenceSource;
 import com.miaoyu.ticket.agent.domain.plan.PlanNodeType;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationContext;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationIssue;
@@ -219,7 +217,7 @@ class AgentPersistenceMySqlIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM agent_run WHERE user_id = ?", USER_ID)).isEqualTo(1);
         assertThat(count("SELECT COUNT(*) FROM agent_message WHERE user_id = ?", USER_ID)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM agent_event WHERE session_id = ?", Integer.class, FIRST_SESSION)).isEqualTo(1);
+                "SELECT COUNT(*) FROM agent_event WHERE session_id = ?", Integer.class, FIRST_SESSION)).isEqualTo(2);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT last_committed_event_id
                   FROM agent_event_stream_cursor
@@ -295,12 +293,16 @@ class AgentPersistenceMySqlIntegrationTest {
     @Test
     void shouldCallReadOnlyAgentOutsideDatabaseTransactionAndPersistFailureResult() {
         insertSession(FIRST_SESSION_ID, FIRST_SESSION);
-        Mockito.when(modelGateway.generatePlan(Mockito.any())).thenAnswer(invocation -> {
-            toolCalledInsideTransaction.set(TransactionSynchronizationManager.isActualTransactionActive());
-            return invalidResult();
-        });
+        PlanValidationContext context = rankValidationContext();
+        Mockito.when(rankMoviePlanExecutionAdapter.execute(
+                        Mockito.any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class)))
+                .thenAnswer(invocation -> {
+                    toolCalledInsideTransaction.set(TransactionSynchronizationManager.isActualTransactionActive());
+                    return failedRankResult(invocation.getArgument(0));
+                });
 
-        AgentMessageSubmissionResult result = messageSubmissionService.submit(command(FIRST_SESSION, "request-1"));
+        AgentMessageSubmissionResult result = messageSubmissionService.submit(new AgentMessageSubmissionCommand(
+                FIRST_SESSION, "推荐电影", "request-1", context.slotSnapshot(), context, 3_000L));
 
         assertThat(toolCalledInsideTransaction).isFalse();
         assertThat(result.snapshot().run().status()).isEqualTo(AgentRunStatus.FAILED);
@@ -329,7 +331,7 @@ class AgentPersistenceMySqlIntegrationTest {
 
         AgentRun recovered = runRepository.findByRunIdAndUserId(waiting.run().runId(), USER_ID)
                 .orElseThrow();
-        assertThat(recovered.status()).isEqualTo(AgentRunStatus.FAILED);
+        assertThat(recovered.status()).isEqualTo(AgentRunStatus.COMPLETED);
         assertThat(submitted.runId()).isNotEqualTo(waiting.run().runId());
         assertThat(count("SELECT COUNT(*) FROM agent_run WHERE session_id = ?", FIRST_SESSION_ID)).isEqualTo(2);
         assertThat(sessionRepository.findBySessionIdAndUserId(FIRST_SESSION, USER_ID).orElseThrow().activeRunId())
@@ -340,14 +342,7 @@ class AgentPersistenceMySqlIntegrationTest {
     void shouldExecuteRankMoviePlanThroughSupervisorAndPersistPlanVersionFromSubmission() {
         insertSession(FIRST_SESSION_ID, FIRST_SESSION);
         PlanValidationContext context = rankValidationContext();
-        CandidatePlan plan = new CandidatePlan("supervisor-plan", 1, List.of(new CandidatePlanNode(
-                "rank", PlanNodeType.CALL_TOOL, RankMoviePlanTool.TARGET_NAME,
-                List.of(slotReference("cityCode"), slotReference("date"), slotReference("ticketCount"),
-                        slotReference("movieId"), slotReference("cinemaId")),
-                List.of(), FailurePolicy.FAIL)));
-        Mockito.when(modelGateway.generatePlan(Mockito.any())).thenReturn(new PlanGenerationResponse(
-                plan, PlanValidationResult.invalid(List.of(new PlanValidationIssue(
-                        PlanValidationIssueCode.TOOL_NOT_FOUND, "ignored", "ignored", "ignored")))));
+        Mockito.when(modelGateway.generatePlan(Mockito.any())).thenReturn(invalidResult());
         Mockito.when(rankMoviePlanExecutionAdapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
         Mockito.when(rankMoviePlanExecutionAdapter.execute(
                         Mockito.any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class)))
@@ -359,7 +354,9 @@ class AgentPersistenceMySqlIntegrationTest {
         String persistedPlanId = result.snapshot().run().planId();
         assertThat(persistedPlanId).isEqualTo(java.util.UUID.fromString(persistedPlanId).toString());
         assertThat(result.snapshot().run().planVersion()).isEqualTo(1);
-        assertThat(result.snapshot().steps()).extracting(step -> step.nodeId()).containsExactly("rank");
+        assertThat(result.snapshot().steps())
+                .extracting(step -> step.nodeId())
+                .containsExactly("rank-movie-plan", "render-result");
         Mockito.verify(rankMoviePlanExecutionAdapter)
                 .execute(Mockito.any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class));
     }
@@ -594,10 +591,6 @@ class AgentPersistenceMySqlIntegrationTest {
                         "movieId", "1", "cinemaId", "2")));
     }
 
-    private static InputReference slotReference(String name) {
-        return new InputReference(name, InputReferenceSource.SLOT, name);
-    }
-
     private static ReadOnlyToolExecutionAdapter.ExecutionResult successfulRankResult(
             ReadOnlyToolExecutionAdapter.ExecutionRequest request) {
         ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(
@@ -610,6 +603,17 @@ class AgentPersistenceMySqlIntegrationTest {
         ToolResult<RecommendationPlanResult> toolResult = new ToolResult<>(
                 ToolStatus.SUCCESS, recommendation, null, false, false, "CONTINUE", true,
                 "SHOWTIME_UNAVAILABLE", 1L, recommendation.dataAt(), recommendation.expiresAt());
+        return new ReadOnlyToolExecutionAdapter.ExecutionResult(
+                stateMachine.recordToolResult(running, request.nodeId(), toolResult), toolResult);
+    }
+
+    private static ReadOnlyToolExecutionAdapter.ExecutionResult failedRankResult(
+            ReadOnlyToolExecutionAdapter.ExecutionRequest request) {
+        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(
+                new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan())));
+        var running = stateMachine.startNode(request.state(), request.nodeId());
+        ToolResult<RecommendationPlanResult> toolResult = new ToolResult<>(
+                ToolStatus.FAILED, null, 306002, false, false, null, false, null, null, null, null);
         return new ReadOnlyToolExecutionAdapter.ExecutionResult(
                 stateMachine.recordToolResult(running, request.nodeId(), toolResult), toolResult);
     }

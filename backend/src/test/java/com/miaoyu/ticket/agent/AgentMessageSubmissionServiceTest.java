@@ -14,6 +14,7 @@ import com.miaoyu.ticket.agent.application.persistence.AgentMessageRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionCommand;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionService;
 import com.miaoyu.ticket.agent.application.persistence.AgentPlanCardFollowUpResolver;
+import com.miaoyu.ticket.agent.application.persistence.AgentReadOnlyExecutionTransaction;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunResultTransaction;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunStaleRecoveryService;
 import com.miaoyu.ticket.agent.application.persistence.AgentRunStepRepository;
@@ -22,7 +23,6 @@ import com.miaoyu.ticket.agent.application.AgentDistanceRecommendationApplicatio
 import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.application.reply.TextReplyFacts;
-import com.miaoyu.ticket.agent.application.run.MultiToolSupervisor;
 import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorRequest;
 import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorResult;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRequestHash;
@@ -49,7 +49,8 @@ class AgentMessageSubmissionServiceTest {
         AgentConcurrentRequestLookupTransaction concurrentRequestLookupTransaction =
                 mock(AgentConcurrentRequestLookupTransaction.class);
         AgentRunResultTransaction runResultTransaction = mock(AgentRunResultTransaction.class);
-        MultiToolSupervisor multiToolSupervisor = mock(MultiToolSupervisor.class);
+        AgentReadOnlyExecutionTransaction readOnlyExecutionTransaction =
+                mock(AgentReadOnlyExecutionTransaction.class);
         CreateOrderConfirmationActionOrchestrator confirmationActionOrchestrator =
                 mock(CreateOrderConfirmationActionOrchestrator.class);
         AgentMessageRepository messageRepository = mock(AgentMessageRepository.class);
@@ -66,7 +67,8 @@ class AgentMessageSubmissionServiceTest {
         when(currentUserAccessor.requireCurrentUserId()).thenReturn(7L);
         when(initialRunTransaction.submit(7L, command())).thenReturn(new AgentInitialRunResult(running, false));
         when(planCardFollowUpResolver.resolve(1L, 7L, "推荐电影")).thenReturn(Optional.of(explanation));
-        when(multiToolSupervisor.run(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+        when(readOnlyExecutionTransaction.execute(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(supervisorResult);
         when(runResultTransaction.recordWithEvents(running, supervisorResult, false))
                 .thenReturn(new AgentRunResultTransaction.RecordedRunResult(completed, List.of()));
@@ -74,14 +76,14 @@ class AgentMessageSubmissionServiceTest {
         when(stepRepository.findByRunId(100L)).thenReturn(List.of());
         AgentMessageSubmissionService service = new AgentMessageSubmissionService(
                 currentUserAccessor, initialRunTransaction, concurrentRequestLookupTransaction,
-                runResultTransaction, multiToolSupervisor, confirmationActionOrchestrator,
+                runResultTransaction, readOnlyExecutionTransaction, confirmationActionOrchestrator,
                 messageRepository, stepRepository, staleRecoveryService, distanceRecommendationService,
                 planCardFollowUpResolver);
 
         service.submit(command());
 
         var request = org.mockito.ArgumentCaptor.forClass(MultiToolSupervisorRequest.class);
-        verify(multiToolSupervisor).run(request.capture(), org.mockito.ArgumentMatchers.any());
+        verify(readOnlyExecutionTransaction).execute(request.capture(), org.mockito.ArgumentMatchers.any());
         assertEquals(explanation, request.getValue().trustedContextReply());
     }
 
@@ -92,7 +94,8 @@ class AgentMessageSubmissionServiceTest {
         AgentConcurrentRequestLookupTransaction concurrentRequestLookupTransaction =
                 mock(AgentConcurrentRequestLookupTransaction.class);
         AgentRunResultTransaction runResultTransaction = mock(AgentRunResultTransaction.class);
-        MultiToolSupervisor multiToolSupervisor = mock(MultiToolSupervisor.class);
+        AgentReadOnlyExecutionTransaction readOnlyExecutionTransaction =
+                mock(AgentReadOnlyExecutionTransaction.class);
         CreateOrderConfirmationActionOrchestrator confirmationActionOrchestrator =
                 mock(CreateOrderConfirmationActionOrchestrator.class);
         AgentMessageRepository messageRepository = mock(AgentMessageRepository.class);
@@ -108,7 +111,7 @@ class AgentMessageSubmissionServiceTest {
                 initialRunTransaction,
                 concurrentRequestLookupTransaction,
                 runResultTransaction,
-                multiToolSupervisor,
+                readOnlyExecutionTransaction,
                 confirmationActionOrchestrator,
                 messageRepository,
                 stepRepository,
@@ -133,7 +136,8 @@ class AgentMessageSubmissionServiceTest {
         AgentConcurrentRequestLookupTransaction concurrentRequestLookupTransaction =
                 mock(AgentConcurrentRequestLookupTransaction.class);
         AgentRunResultTransaction runResultTransaction = mock(AgentRunResultTransaction.class);
-        MultiToolSupervisor multiToolSupervisor = mock(MultiToolSupervisor.class);
+        AgentReadOnlyExecutionTransaction readOnlyExecutionTransaction =
+                mock(AgentReadOnlyExecutionTransaction.class);
         CreateOrderConfirmationActionOrchestrator confirmationActionOrchestrator =
                 mock(CreateOrderConfirmationActionOrchestrator.class);
         AgentMessageRepository messageRepository = mock(AgentMessageRepository.class);
@@ -152,7 +156,7 @@ class AgentMessageSubmissionServiceTest {
                 initialRunTransaction,
                 concurrentRequestLookupTransaction,
                 runResultTransaction,
-                multiToolSupervisor,
+                readOnlyExecutionTransaction,
                 confirmationActionOrchestrator,
                 messageRepository,
                 stepRepository,
@@ -166,7 +170,8 @@ class AgentMessageSubmissionServiceTest {
         verify(staleRecoveryService).recoverStaleRuns();
         verify(distanceRecommendationService).recoverExpiredWaitingRuns();
         verify(messageRepository).findByRunIdAndUserId(100L, 7L);
-        verify(multiToolSupervisor, never()).run(org.mockito.ArgumentMatchers.any());
+        verify(readOnlyExecutionTransaction, never()).execute(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
         verify(runResultTransaction, never()).record(
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(
