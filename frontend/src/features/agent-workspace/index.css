@@ -165,11 +165,13 @@
   gap: 8px;
   color: #5f4cd0;
 }
+
 .agent-discovery-section-head h2 {
   margin: 0;
   color: #27233e;
   font-size: 21px;
 }
+
 .agent-discovery-section-head a {
   color: #6853df;
   font-weight: 700;
@@ -200,6 +202,7 @@
   box-shadow: 0 12px 26px rgba(58, 45, 126, 12%);
   transform: translateY(-2px);
 }
+
 .agent-discovery-movie img,
 .agent-discovery-poster-fallback {
   width: 100%;
@@ -207,21 +210,25 @@
   object-fit: cover;
   background: #e9e5fb;
 }
+
 .agent-discovery-poster-fallback {
   display: grid;
   place-items: center;
   color: #725fe1;
 }
+
 .agent-discovery-movie strong,
 .agent-discovery-movie span {
   padding: 0 12px;
 }
+
 .agent-discovery-movie strong {
   overflow: hidden;
   font-size: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .agent-discovery-movie span {
   padding-bottom: 13px;
   color: #777489;
@@ -233,6 +240,7 @@
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
 }
+
 .agent-discovery-cinema {
   display: grid;
   gap: 6px;
@@ -243,6 +251,7 @@
   color: #302c45;
   text-decoration: none;
 }
+
 .agent-discovery-cinema span {
   color: #807d90;
   font-size: 13px;
@@ -427,6 +436,7 @@
   gap: 10px;
   min-width: 0;
 }
+
 .agent-workspace-brand-icon {
   display: grid;
   width: 36px;
@@ -437,6 +447,7 @@
   color: #fff;
   box-shadow: 0 7px 16px rgba(111, 80, 222, 24%);
 }
+
 .agent-workspace-status {
   display: inline-flex;
   align-items: center;
@@ -444,12 +455,14 @@
   color: #7b778b;
   font-size: 12px;
 }
+
 .agent-workspace-status i {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: #25ba69;
 }
+
 .agent-icon-button {
   display: grid;
   width: 34px;
@@ -459,15 +472,17 @@
   border-radius: 10px;
   color: #5e5971;
 }
+
 .agent-icon-button svg {
   width: 18px;
   height: 18px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.8;
 }
+
 .agent-icon-button:hover {
   background: #f1effa !important;
   color: #664fda !important;
@@ -477,19 +492,23 @@
   border: 0;
   background: #faf9fd;
 }
+
 .agent-history-collapse .ant-collapse-item {
   border: 1px solid #ece9f5 !important;
   border-radius: 13px !important;
 }
+
 .agent-history-collapse .ant-collapse-header {
   align-items: center !important;
   color: #39344e !important;
   font-weight: 700;
 }
+
 .agent-history-collapse .ant-collapse-content {
   border-top: 1px solid #ece9f5 !important;
   background: #fff;
 }
+
 .agent-history-clear {
   display: flex;
   align-items: center;
@@ -497,6 +516,7 @@
   color: #827e91;
   font-size: 12px;
 }
+
 .agent-history-collapse .agent-session-list {
   max-height: 235px;
   min-height: 0;
@@ -671,6 +691,7 @@
   .agent-discovery-pane {
     padding: 18px 14px;
   }
+
   .agent-discovery-hero {
     padding: 28px 22px;
     border-radius: 22px;

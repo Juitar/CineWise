@@ -237,6 +237,15 @@ function locationStateText(event: AgentEvent): string | null {
   return '等待位置授权';
 }
 
+function safePlaceholder(event: AgentEvent): AgentDisplayItem {
+  const confirmationText = safeConfirmationStatusText(event.payload.status);
+  return {
+    key: `event:${event.eventId}`,
+    kind: 'card-placeholder',
+    text: confirmationText ?? '暂不支持此类 Agent 内容，已安全隐藏详情',
+  };
+}
+
 function typedCard(event: AgentEvent): AgentDisplayItem {
   const key = `event:${event.eventId}`;
   const type = event.payload.type;
@@ -396,15 +405,6 @@ function thinkingItem(event: AgentEvent): AgentDisplayItem {
     kind: 'thinking',
     text: thinkingText(event),
     sourceRunId: event.runId,
-  };
-}
-
-function safePlaceholder(event: AgentEvent): AgentDisplayItem {
-  const confirmationText = safeConfirmationStatusText(event.payload.status);
-  return {
-    key: `event:${event.eventId}`,
-    kind: 'card-placeholder',
-    text: confirmationText ?? '暂不支持此类 Agent 内容，已安全隐藏详情',
   };
 }
 
