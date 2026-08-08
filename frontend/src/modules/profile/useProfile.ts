@@ -13,6 +13,7 @@ import {
   type UpdateProfileTagRequest,
   type ProfilePage,
 } from './api';
+import { createProfileUuid } from './uuid';
 
 const CONSENT_REQUIRED_CODE = 202004;
 const VERSION_CONFLICT_CODE = 202002;
@@ -102,7 +103,7 @@ export function useProfile(privacyPolicyVersion: string) {
         const preference = await updateMyPersonalization(
           enabled,
           profile.preference.version,
-          crypto.randomUUID(),
+          createProfileUuid(),
         );
         setProfile((current) => (current ? { ...current, preference } : null));
         setNotice(null);
@@ -196,7 +197,7 @@ export function useProfile(privacyPolicyVersion: string) {
       savingRef.current = true;
       setSaving(true);
       try {
-        await createMyTag(request, profile.preference.version, crypto.randomUUID());
+        await createMyTag(request, profile.preference.version, createProfileUuid());
         await load();
         setNotice(null);
       } catch (error) {
@@ -217,7 +218,7 @@ export function useProfile(privacyPolicyVersion: string) {
       savingRef.current = true;
       setSaving(true);
       try {
-        await updateMyTag(tagId, request, profile.preference.version, crypto.randomUUID());
+        await updateMyTag(tagId, request, profile.preference.version, createProfileUuid());
         await load();
         setNotice(null);
       } catch (error) {
@@ -238,7 +239,7 @@ export function useProfile(privacyPolicyVersion: string) {
       savingRef.current = true;
       setSaving(true);
       try {
-        await deleteMyTag(tagId, profile.preference.version, crypto.randomUUID());
+        await deleteMyTag(tagId, profile.preference.version, createProfileUuid());
         await load();
         setNotice(null);
       } catch (error) {
