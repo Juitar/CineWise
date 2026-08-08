@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('umi', () => ({
   Link: ({ children, to }: React.PropsWithChildren<{ to: string }>) => <a href={to}>{children}</a>,
+  useLocation: () => ({ pathname: '/recommendations' }),
   useNavigate: () => mocks.navigate,
   useParams: () => mocks.params,
 }));

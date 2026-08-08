@@ -127,7 +127,10 @@ export default function OrderConfirmPage() {
     );
   }
 
-  const seatsPath = workspacePath(location.pathname, `/shows/${encodeURIComponent(showId)}/seats?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`);
+  const seatsPath = workspacePath(
+    location.pathname,
+    `/shows/${encodeURIComponent(showId)}/seats?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`,
+  );
 
   const handleReturnToSeats = () => {
     history.push(seatsPath);
