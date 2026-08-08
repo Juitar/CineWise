@@ -291,28 +291,49 @@ class AgentPersistenceMySqlIntegrationTest {
     }
 
     @Test
-    void shouldCallReadOnlyAgentOutsideDatabaseTransactionAndPersistFailureResult() {
+    void shouldCallReadOnlyAgentOutsideDatabaseTransactionAndPersistFailureResult() throws Exception {
         insertSession(FIRST_SESSION_ID, FIRST_SESSION);
         PlanValidationContext context = rankValidationContext();
+        CountDownLatch toolStarted = new CountDownLatch(1);
+        CountDownLatch allowToolCompletion = new CountDownLatch(1);
         Mockito.when(rankMoviePlanExecutionAdapter.execute(
                         Mockito.any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class)))
                 .thenAnswer(invocation -> {
                     toolCalledInsideTransaction.set(TransactionSynchronizationManager.isActualTransactionActive());
+                    toolStarted.countDown();
+                    if (!allowToolCompletion.await(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("工具执行测试未在预期时间内完成");
+                    }
                     return failedRankResult(invocation.getArgument(0));
                 });
 
-        AgentMessageSubmissionResult result = new TransactionTemplate(transactionManager).execute(status -> {
-            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
-            return messageSubmissionService.submit(new AgentMessageSubmissionCommand(
-                    FIRST_SESSION, "推荐电影", "request-1", context.slotSnapshot(), context, 3_000L));
-        });
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<AgentMessageSubmissionResult> submitted = executor.submit(() ->
+                    new TransactionTemplate(transactionManager).execute(status -> {
+                        assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
+                        return messageSubmissionService.submit(new AgentMessageSubmissionCommand(
+                                FIRST_SESSION, "推荐电影", "request-1", context.slotSnapshot(), context, 3_000L));
+                    }));
+            assertThat(toolStarted.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
 
-        assertThat(toolCalledInsideTransaction).isFalse();
-        assertThat(result).isNotNull();
-        assertThat(result.snapshot().run().status()).isEqualTo(AgentRunStatus.FAILED);
-        assertThat(result.snapshot().messages()).hasSize(2);
-        assertThat(sessionRepository.findBySessionIdAndUserId(FIRST_SESSION, USER_ID).orElseThrow().activeRunId())
-                .isNull();
+            Future<Boolean> lockProbe = executor.submit(() -> new TransactionTemplate(transactionManager)
+                    .execute(status -> sessionRepository.findBySessionIdAndUserIdForUpdate(FIRST_SESSION, USER_ID)
+                            .isPresent()));
+            assertThat(lockProbe.get(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+
+            allowToolCompletion.countDown();
+            AgentMessageSubmissionResult result = submitted.get(2, java.util.concurrent.TimeUnit.SECONDS);
+
+            assertThat(toolCalledInsideTransaction).isFalse();
+            assertThat(result.snapshot().run().status()).isEqualTo(AgentRunStatus.FAILED);
+            assertThat(result.snapshot().messages()).hasSize(2);
+            assertThat(sessionRepository.findBySessionIdAndUserId(FIRST_SESSION, USER_ID).orElseThrow().activeRunId())
+                    .isNull();
+        } finally {
+            allowToolCompletion.countDown();
+            executor.shutdownNow();
+        }
     }
 
     @Test
