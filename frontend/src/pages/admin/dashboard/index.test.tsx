@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { message } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 
 import { setupTestEnvironment } from '../../../features/test-utils';
@@ -45,5 +46,30 @@ describe('AdminContentPage', () => {
     expect(screen.getByText('NetStart / MOVIE')).toBeInTheDocument();
     expect(screen.getByText('仅用于开发和演示')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '手动同步' })).toBeEnabled();
+  });
+
+  it('仅在同步请求被服务端接受时提示成功', async () => {
+    const submit = vi.fn().mockResolvedValueOnce({ syncId: 'sync-1' }).mockResolvedValueOnce(null);
+    const success = vi.spyOn(message, 'success').mockImplementation(() => undefined as never);
+    useAdminContentSync.mockReturnValue({
+      sources: [],
+      task: null,
+      error: null,
+      loading: false,
+      submitting: false,
+      resultUnknown: false,
+      isTaskInProgress: false,
+      refresh: vi.fn(),
+      submit,
+      recover: vi.fn(),
+    });
+    render(<AdminContentPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: '手动同步' }));
+    await waitFor(() => expect(success).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('button', { name: '手动同步' }));
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
+    expect(success).toHaveBeenCalledTimes(1);
   });
 });

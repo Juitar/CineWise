@@ -32,8 +32,8 @@ export function useAdminContentSync() {
     void refresh();
   }, [refresh]);
   const submit = useCallback(
-    async (cityName: string) => {
-      if (submitting || resultUnknown || isTaskInProgress) return;
+    async (cityName: string): Promise<ContentSyncTask | null> => {
+      if (submitting || resultUnknown || isTaskInProgress) return null;
       const clientRequestId = crypto.randomUUID();
       sessionStorage.setItem(key, clientRequestId);
       setSubmitting(true);
@@ -44,6 +44,7 @@ export function useAdminContentSync() {
         if (isTerminalTask(next)) sessionStorage.removeItem(key);
         setResultUnknown(false);
         await refresh();
+        return next;
       } catch (e) {
         const apiError = toError(e);
         if (apiError.isResultUnknown) setResultUnknown(true);
@@ -51,6 +52,7 @@ export function useAdminContentSync() {
           sessionStorage.removeItem(key);
           setError(apiError);
         }
+        return null;
       } finally {
         setSubmitting(false);
       }

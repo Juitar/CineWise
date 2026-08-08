@@ -65,4 +65,20 @@ describe('内容同步恢复 Hook', () => {
     expect(api.requestContentSync).not.toHaveBeenCalled();
     expect(crypto.randomUUID).not.toHaveBeenCalled();
   });
+
+  it('仅在同步请求被服务端接受时返回任务', async () => {
+    api.requestContentSync.mockResolvedValue(runningTask);
+    const hook = renderHook(() => useAdminContentSync());
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+
+    await expect(hook.result.current.submit('长沙')).resolves.toEqual(runningTask);
+  });
+
+  it('同步请求失败时返回空结果供页面避免误报成功', async () => {
+    api.requestContentSync.mockRejectedValue(new Error('network failure'));
+    const hook = renderHook(() => useAdminContentSync());
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+
+    await expect(hook.result.current.submit('长沙')).resolves.toBeNull();
+  });
 });
