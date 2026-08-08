@@ -25,4 +25,20 @@ describe('createProfileUuid', () => {
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/,
     );
   });
+
+  it('crypto 完全不可用时仍生成格式正确且连续不重复的非敏感幂等键', () => {
+    vi.stubGlobal('crypto', undefined);
+    vi.spyOn(Date, 'now').mockReturnValue(1_770_000_000_000);
+    const random = vi.spyOn(Math, 'random');
+
+    const identifiers = Array.from({ length: 100 }, () => createProfileUuid());
+
+    expect(random).toHaveBeenCalled();
+    expect(new Set(identifiers)).toHaveLength(100);
+    identifiers.forEach((identifier) => {
+      expect(identifier).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+    });
+  });
 });
