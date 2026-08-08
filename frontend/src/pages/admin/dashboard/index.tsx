@@ -1,4 +1,4 @@
-import { Alert, Button, Empty, Input, Spin, Table, Tag } from 'antd';
+import { Alert, Button, Empty, Input, Spin, Table, Tag, message } from 'antd';
 import { useState } from 'react';
 
 import { useAdminContentSync } from '../../../modules/admin-content/hooks';
@@ -10,6 +10,12 @@ const format = (value: string | null) =>
 export default function AdminContentPage() {
   const [cityName, setCityName] = useState('长沙');
   const state = useAdminContentSync();
+  const submitContentSync = async () => {
+    const task = await state.submit(cityName.trim());
+    if (task !== null) {
+      message.success('已触发内容同步指令');
+    }
+  };
   return (
     <div className="admin-dashboard-container">
       <h1 className="page-title">内容同步状态</h1>
@@ -52,7 +58,7 @@ export default function AdminContentPage() {
             type="primary"
             loading={state.submitting}
             disabled={state.resultUnknown || state.isTaskInProgress || cityName.trim().length === 0}
-            onClick={() => void state.submit(cityName.trim())}
+            onClick={() => void submitContentSync()}
           >
             手动同步
           </Button>
