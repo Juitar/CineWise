@@ -1,6 +1,7 @@
 import { Alert, Button, Empty, Skeleton, Tag } from 'antd';
 import React from 'react';
-import { Link, useParams } from 'umi';
+import { Link, useLocation, useParams } from 'umi';
+import { workspacePath } from '../../modules/agent/workspaceRoute';
 
 import { getFreshnessNotices } from '../../modules/content/freshness';
 import { safePosterUrl } from '../../modules/content/poster';
@@ -83,6 +84,7 @@ function MovieDetailCard() {
 }
 
 function CinemaCard({ cinema, movieId }: { cinema: AvailableCinema; movieId: string }) {
+  const location = useLocation();
   const sourceIsNonRealtime =
     isNonRealtimeSource(cinema.contentSource) || isNonRealtimeSource(cinema.scheduleSource);
   return (
@@ -109,7 +111,7 @@ function CinemaCard({ cinema, movieId }: { cinema: AvailableCinema; movieId: str
         <Link
           aria-label={`选择${cinema.name}的场次`}
           className="available-cinemas-purchase-link"
-          to={`/shows?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinema.cinemaId)}`}
+          to={workspacePath(location.pathname, `/shows?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinema.cinemaId)}`)}
         >
           选择影院
         </Link>

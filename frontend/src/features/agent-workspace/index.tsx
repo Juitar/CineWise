@@ -1,12 +1,19 @@
-import { Alert, Button, Drawer, Empty, Input, Spin, Tag } from 'antd';
+import { Alert, Button, Collapse, Empty, Input, Spin, Tag, Tooltip } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'umi';
 
 import { takePendingAgentDraft } from '../../modules/agent/entryDraft';
-import type { AgentDisplayItem, AgentPlanDisplay } from '../../modules/agent/projection';
+import {
+  buildAgentSelectSeatsPath,
+  type AgentDisplayItem,
+  type AgentPlanDisplay,
+} from '../../modules/agent/projection';
 import type { AgentSession } from '../../modules/agent/types';
 import { useAgentWorkspace } from '../../modules/agent/useAgentWorkspace';
-import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
+import { safePosterUrl } from '../../modules/content/poster';
+import { useCinemaList } from '../../modules/content/useCinemaList';
+import { useMovieList } from '../../modules/content/useMovieList';
+import { CinemaIcon, FilmIcon, RobotIcon } from '../../shared/components/icons/layout-icons';
 import { AgentDisplayItemView } from './cards';
 import './index.css';
 
@@ -51,11 +58,13 @@ const PLAN_TYPE_TEXT: Readonly<Record<string, string>> = {
   COMPREHENSIVE: '综合推荐',
   LOW_PRICE: '低价优先',
   TIME_FIRST: '时间优先',
+  EARLY_TIME: '时间较早',
 };
 
 interface AgentWorkspaceProps {
   sessionId: string;
   variant?: 'debug' | 'recommendations';
+  businessContent?: React.ReactNode;
 }
 
 interface SelectedPlanRef {
@@ -63,23 +72,107 @@ interface SelectedPlanRef {
   index: number;
 }
 
-function planReferenceText(index: number, request: string): string {
-  return `基于当前最新推荐中的第 ${index + 1} 个方案，${request}`;
+function formatPlanTime(value: string): string {
+  const time = new Date(value);
+  return Number.isNaN(time.getTime())
+    ? '场次时间待确认'
+    : new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(time);
+}
+
+function formatPlanReason(value: string): string {
+  const labels: Record<string, string> = {
+    COMPREHENSIVE: '综合条件更均衡',
+    LOW_PRICE: '当前价格更低',
+    EARLY_TIME: '开场时间更早',
+    TIME_FIRST: '开场时间更合适',
+  };
+  const key = Object.keys(labels).find((candidate) => value.includes(candidate));
+  return key ? labels[key] : value;
+}
+
+function WorkspaceIcon({ kind }: { kind: 'add' | 'clear' | 'history' }) {
+  if (kind === 'add') {
+    return <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>;
+  }
+  if (kind === 'clear') {
+    return <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M9 7l1-3h4l1 3M7 7l1 13h8l1-13" /></svg>;
+  }
+  return <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 9h8M8 13h5" /></svg>;
+}
+
+function AgentDiscoveryPane({ sessionId }: { sessionId: string }) {
+  const movies = useMovieList({ page: 1, size: 5 });
+  const cinemas = useCinemaList({ location: '430100', page: 1, size: 3 });
+  const workspaceBase = `/recommendations/${encodeURIComponent(sessionId)}`;
+
+  return (
+    <section className="agent-discovery-pane" aria-label="首页浏览区">
+      <div className="agent-discovery-hero">
+        <span>妙语观影工作台</span>
+        <h1>先浏览，也可以直接说出你的观影需求</h1>
+        <p>右侧助手会把你的条件整理成可购方案；选片、选档期、选座和确认订单都留在这个工作区完成。</p>
+      </div>
+      <section className="agent-discovery-section" aria-labelledby="agent-discovery-movies">
+        <div className="agent-discovery-section-head">
+          <div><FilmIcon size={19} /><h2 id="agent-discovery-movies">正在热映</h2></div>
+          <Link to="/movies">全部影片</Link>
+        </div>
+        <div className="agent-discovery-movie-grid">
+          {movies.data?.records.map((movie) => {
+            const poster = safePosterUrl(movie.posterUrl);
+            return (
+              <Link className="agent-discovery-movie" key={movie.movieId}
+                to={`${workspaceBase}/movies/${encodeURIComponent(movie.movieId)}`}>
+                {poster ? <img alt="" src={poster} /> : <div className="agent-discovery-poster-fallback"><FilmIcon size={24} /></div>}
+                <strong>{movie.title}</strong>
+                <span>{movie.genres.join(' / ') || '类型待更新'}</span>
+              </Link>
+            );
+          })}
+          {movies.isLoading && <Spin />}
+          {!movies.isLoading && !movies.data?.records.length && <Empty description="暂无影片" />}
+        </div>
+      </section>
+      <section className="agent-discovery-section" aria-labelledby="agent-discovery-cinemas">
+        <div className="agent-discovery-section-head">
+          <div><CinemaIcon size={19} /><h2 id="agent-discovery-cinemas">长沙影院</h2></div>
+          <Link to="/cinemas">全部影院</Link>
+        </div>
+        <div className="agent-discovery-cinema-grid">
+          {cinemas.data?.records.map((cinema) => (
+            <Link className="agent-discovery-cinema" key={cinema.cinemaId}
+              to={`/cinemas/${encodeURIComponent(cinema.cinemaId)}`}>
+              <strong>{cinema.name}</strong><span>{cinema.area || '长沙'}</span>
+            </Link>
+          ))}
+          {cinemas.isLoading && <Spin />}
+        </div>
+      </section>
+    </section>
+  );
 }
 
 function RecommendationPlanPane({
-  busy,
   item,
   onSelect,
-  selectSeatsPath,
   selectedIndex,
+  sessionId,
 }: {
-  busy: boolean;
   item: AgentDisplayItem | null;
   onSelect(index: number): void;
-  selectSeatsPath: string | null;
   selectedIndex: number | null;
+  sessionId: string;
 }) {
+  const selectedPlan =
+    selectedIndex === null || item?.plans === undefined ? null : item.plans[selectedIndex] ?? null;
+  const selectedPlanExpired =
+    selectedPlan === null || selectedPlan.expired || Date.parse(selectedPlan.expiresAt) <= Date.now();
+  const selectSeatsPath =
+    selectedPlan !== null && selectedPlan.purchaseEligible && !selectedPlanExpired
+      ? `/recommendations/${encodeURIComponent(sessionId)}${buildAgentSelectSeatsPath(
+          selectedPlan.showId, selectedPlan.movieId, selectedPlan.cinemaId,
+        )}`
+      : null;
   return (
     <section className="agent-recommendation-pane" aria-labelledby="agent-recommendation-title">
       <header className="agent-recommendation-header">
@@ -102,7 +195,6 @@ function RecommendationPlanPane({
                 <button
                   aria-pressed={selected}
                   className={`agent-recommendation-option${selected ? ' is-selected' : ''}`}
-                  disabled={busy}
                   onClick={() => onSelect(index)}
                   type="button"
                 >
@@ -118,7 +210,7 @@ function RecommendationPlanPane({
                   <dl className="agent-recommendation-details">
                     <div>
                       <dt>场次</dt>
-                      <dd>{plan.startTime}</dd>
+                      <dd>{formatPlanTime(plan.startTime)}</dd>
                     </div>
                     {plan.rating !== null && (
                       <div>
@@ -130,14 +222,13 @@ function RecommendationPlanPane({
                   {!!plan.reasons.length && (
                     <ul className="agent-recommendation-reasons">
                       {plan.reasons.map((reason) => (
-                        <li key={reason}>{reason}</li>
+                        <li key={reason}>{formatPlanReason(reason)}</li>
                       ))}
                     </ul>
                   )}
                   <div className="agent-recommendation-meta">
-                    <span>来源：{plan.source}</span>
-                    <span>数据时间：{plan.dataAt}</span>
-                    <span>有效期至：{plan.expiresAt}</span>
+                    <span>{plan.purchaseEligible ? '可直接进入选座' : '当前不可直接购买'}</span>
+                    <span>以进入选座页后的最新座位状态为准</span>
                   </div>
                   {(expired || !plan.purchaseEligible) && (
                     <span className="agent-recommendation-unavailable">
@@ -157,7 +248,7 @@ function RecommendationPlanPane({
       )}
       {selectSeatsPath && (
         <Link className="agent-recommendation-seat-link" to={selectSeatsPath}>
-          去选座
+          去选座：{selectedPlan?.movieName}
         </Link>
       )}
       <p className="agent-recommendation-note">
@@ -168,10 +259,9 @@ function RecommendationPlanPane({
 }
 
 /** Agent 工作区视图；桌面和移动布局共享同一个 useAgentWorkspace 状态。 */
-export function AgentWorkspace({ sessionId, variant = 'debug' }: AgentWorkspaceProps) {
+export function AgentWorkspace({ sessionId, variant = 'debug', businessContent }: AgentWorkspaceProps) {
   const navigate = useNavigate();
-  const isMobile = useMediaQuery('(max-width: 1023px)');
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [selectedPlanRef, setSelectedPlanRef] = useState<SelectedPlanRef | null>(null);
   const workspace = useAgentWorkspace(sessionId);
@@ -188,18 +278,10 @@ export function AgentWorkspace({ sessionId, variant = 'debug' }: AgentWorkspaceP
   const selectedIndex =
     latestPlanItem && selectedPlanRef?.itemKey === latestPlanItem.key
       ? selectedPlanRef.index
-      : latestPlanItem
-        ? 0
-        : null;
-  const selectSeatsPath =
-    [...workspace.projection.items.slice(latestPlanIndex + 1)]
-      .reverse()
-      .find((item) => item.kind === 'business-intent' && item.selectSeatsPath)?.selectSeatsPath ??
-    null;
+      : null;
 
   const selectSession = (nextSessionId: string) => {
     workspace.stopActiveStream();
-    setDrawerOpen(false);
     navigate(`${routeBase}/${encodeURIComponent(nextSessionId)}`);
   };
 
@@ -208,20 +290,25 @@ export function AgentWorkspace({ sessionId, variant = 'debug' }: AgentWorkspaceP
     if (created) selectSession(created.sessionId);
   };
 
-  const send = async () => {
-    const content =
-      variant === 'recommendations' && selectedIndex !== null
-        ? planReferenceText(selectedIndex, draft)
-        : draft;
-    const sent = await workspace.submit(content);
-    if (sent) setDraft('');
+  const send = () => {
+    const content = draft;
+    setDraft('');
+    const restoreDraft = () => {
+      setDraft((current) => (current.length > 0 ? current : content));
+    };
+    void workspace.submit(content).then((sent) => {
+      if (!sent) restoreDraft();
+    }, restoreDraft);
   };
 
   const selectPlan = (index: number) => {
-    if (!latestPlanItem || busy) return;
+    if (!latestPlanItem?.plans?.[index]) return;
     setSelectedPlanRef({ itemKey: latestPlanItem.key, index });
-    void workspace.submit(planReferenceText(index, '请解释这个方案，并说明是否需要继续调整。'));
   };
+
+  useEffect(() => {
+    setSelectedPlanRef(null);
+  }, [sessionId]);
 
   useEffect(() => {
     if (workspace.loadStatus !== 'ready') return;
@@ -229,19 +316,13 @@ export function AgentWorkspace({ sessionId, variant = 'debug' }: AgentWorkspaceP
     if (pendingDraft) void workspace.submit(pendingDraft);
   }, [workspace.loadStatus, workspace.submit]);
 
-  const sidebar = (
+  const sessionHistory = (
     <div className="agent-workspace-sidebar-content">
-      <Button type="primary" block onClick={() => void createSession()}>
-        新建会话
-      </Button>
       <SessionList
         activeSessionId={sessionId}
         sessions={workspace.sessions}
         onSelect={selectSession}
       />
-      <Button block onClick={() => void workspace.clearAll()}>
-        清空本人会话
-      </Button>
     </div>
   );
 
@@ -250,36 +331,52 @@ export function AgentWorkspace({ sessionId, variant = 'debug' }: AgentWorkspaceP
       className={`agent-workspace agent-workspace--${variant}`}
       aria-label="妙语 Agent 工作区"
     >
-      {variant === 'debug' && !isMobile && (
-        <aside className="agent-workspace-sidebar">{sidebar}</aside>
+      {variant === 'debug' && (
+        <aside className="agent-workspace-sidebar">{sessionHistory}</aside>
       )}
       {variant === 'recommendations' && (
-        <RecommendationPlanPane
-          busy={busy}
-          item={latestPlanItem}
-          onSelect={selectPlan}
-          selectSeatsPath={selectSeatsPath}
-          selectedIndex={selectedIndex}
-        />
+        <div className="agent-workspace-business-pane">
+          {businessContent ?? (latestPlanItem ? (
+            <RecommendationPlanPane
+              item={latestPlanItem}
+              onSelect={selectPlan}
+              selectedIndex={selectedIndex}
+              sessionId={sessionId}
+            />
+          ) : <AgentDiscoveryPane sessionId={sessionId} />)}
+        </div>
       )}
       <div className="agent-workspace-main">
         <header className="agent-workspace-header">
-          <div>
-            {variant === 'recommendations' ? <h2>妙语观影助手</h2> : <h1>妙语观影助手</h1>}
-            <Tag>{STATUS_TEXT[workspace.projection.status]}</Tag>
+          <div className="agent-workspace-brand">
+            <span className="agent-workspace-brand-icon"><RobotIcon size={18} /></span>
+            <div>
+              {variant === 'recommendations' ? <h2>妙语 AI 观影助手</h2> : <h1>妙语 AI 观影助手</h1>}
+              <span className="agent-workspace-status"><i />安全入口 · {STATUS_TEXT[workspace.projection.status]}</span>
+            </div>
           </div>
           <div className="agent-workspace-actions">
-            {(isMobile || variant === 'recommendations') && (
-              <Button onClick={() => setDrawerOpen(true)}>会话列表</Button>
-            )}
+            <Tooltip title="新建会话"><Button aria-label="新建会话" className="agent-icon-button" icon={<WorkspaceIcon kind="add" />} onClick={() => void createSession()} type="text" /></Tooltip>
+            <Tooltip title="历史会话"><Button aria-label="历史会话" className="agent-icon-button" icon={<WorkspaceIcon kind="history" />} onClick={() => setHistoryOpen((open) => !open)} type="text" /></Tooltip>
+            <Tooltip title="清空当前会话"><Button aria-label="清空当前会话" className="agent-icon-button" icon={<WorkspaceIcon kind="clear" />} onClick={() => void workspace.clearCurrent()} type="text" /></Tooltip>
             {busy && workspace.projection.runId && (
               <Button danger onClick={() => void workspace.cancel()}>
                 取消运行
               </Button>
             )}
-            <Button onClick={() => void workspace.clearCurrent()}>清空当前</Button>
           </div>
         </header>
+
+        <Collapse
+          activeKey={historyOpen ? ['sessions'] : []}
+          className="agent-history-collapse"
+          items={[{
+            key: 'sessions',
+            label: '历史会话',
+            children: <div><div className="agent-history-clear"><span>按第一条消息区分会话</span><Tooltip title="清空全部历史"><Button aria-label="清空全部历史" className="agent-icon-button" icon={<WorkspaceIcon kind="clear" />} onClick={() => void workspace.clearAll()} type="text" /></Tooltip></div>{sessionHistory}</div>,
+          }]}
+          onChange={(keys) => setHistoryOpen(keys.includes('sessions'))}
+        />
 
         {workspace.feedback && <Alert type="info" showIcon message={workspace.feedback} />}
         {workspace.projection.safeError && (
@@ -305,7 +402,7 @@ export function AgentWorkspace({ sessionId, variant = 'debug' }: AgentWorkspaceP
                   planPresentation={variant === 'recommendations' ? 'summary' : 'full'}
                   selectSeatsEnabled={variant === 'debug' || index > latestPlanIndex}
                   answerDisabled={busy}
-                  onAnswer={(_itemKey, answer) => workspace.submit(answer)}
+                  onAnswer={(_itemKey, answer) => workspace.submitQuestionAnswer(answer)}
                   onConfirm={(itemKey, confirmed) => void workspace.confirm(itemKey, confirmed)}
                 />
               ))}
@@ -339,15 +436,6 @@ export function AgentWorkspace({ sessionId, variant = 'debug' }: AgentWorkspaceP
         </nav>
       </div>
 
-      <Drawer
-        title="会话列表"
-        placement="left"
-        width="min(88vw, 360px)"
-        open={(isMobile || variant === 'recommendations') && drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-      >
-        {sidebar}
-      </Drawer>
     </section>
   );
 }

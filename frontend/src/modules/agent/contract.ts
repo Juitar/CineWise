@@ -240,16 +240,6 @@ function finiteNumber(value: unknown): number {
   return value;
 }
 
-function requiredNullableText(current: Record<string, unknown>, key: string): void {
-  if (!(key in current)) throw new AgentContractError();
-  if (current[key] !== null) text(current[key]);
-}
-
-function requiredNullableNonNegativeInteger(current: Record<string, unknown>, key: string): void {
-  if (!(key in current)) throw new AgentContractError();
-  if (current[key] !== null) nonNegativeInteger(current[key]);
-}
-
 function validatePlanItem(value: unknown): void {
   const item = record(value);
   exactKeys(item, [
@@ -281,7 +271,7 @@ function validatePlanItem(value: unknown): void {
   text(item.price);
   text(item.currency);
   dateText(item.startTime);
-  requiredNullableText(item, 'rating');
+  if ('rating' in item && item.rating !== null) text(item.rating);
   finiteNumber(item.score);
   textArray(item.reasons);
   text(item.source);
@@ -289,7 +279,9 @@ function validatePlanItem(value: unknown): void {
   dateText(item.expiresAt);
   boolean(item.expired);
   boolean(item.purchaseEligible);
-  requiredNullableNonNegativeInteger(item, 'distanceMeters');
+  if ('distanceMeters' in item && item.distanceMeters !== null) {
+    nonNegativeInteger(item.distanceMeters);
+  }
 }
 
 function validatePlanCard(payload: Record<string, unknown>): void {
@@ -313,8 +305,7 @@ function validatePlanCard(payload: Record<string, unknown>): void {
   text(payload.algorithmVersion);
   array(payload.plans).forEach(validatePlanItem);
   textArray(payload.missingFactors);
-  if (!('relaxationSuggestion' in payload)) throw new AgentContractError();
-  if (payload.relaxationSuggestion !== null) {
+  if ('relaxationSuggestion' in payload && payload.relaxationSuggestion !== null) {
     const relaxation = record(payload.relaxationSuggestion);
     exactKeys(relaxation, ['factor', 'message']);
     text(relaxation.factor);

@@ -1,5 +1,6 @@
 import { Button, Input, Tag } from 'antd';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import Markdown, { defaultUrlTransform } from 'react-markdown';
 import { Link } from 'umi';
 
 import type { AgentDisplayItem } from '../../../modules/agent/projection';
@@ -28,8 +29,62 @@ function CardFields({ fields }: Pick<AgentDisplayItem, 'fields'>) {
   );
 }
 
+function useTypingText(text: string, typing: boolean | undefined): string {
+  const [visibleText, setVisibleText] = useState(typing ? '' : text);
+  const visibleTextRef = useRef(typing ? '' : text);
+
+  useEffect(() => {
+    if (!typing) {
+      visibleTextRef.current = text;
+      setVisibleText(text);
+      return undefined;
+    }
+
+    // SSE 后续分片到达时，不能从第一个字重新播放，否则用户会看到消息反复闪回。
+    // 同一 streamId 的 text 只会追加；如果意外收到不相同的内容，安全地从头播放新内容。
+    let index = text.startsWith(visibleTextRef.current) ? visibleTextRef.current.length : 0;
+    if (index === 0 && visibleTextRef.current) {
+      visibleTextRef.current = '';
+      setVisibleText('');
+    }
+    const timer = window.setInterval(() => {
+      index = Math.min(index + 1, text.length);
+      const next = text.slice(0, index);
+      visibleTextRef.current = next;
+      setVisibleText(next);
+      if (index >= text.length) window.clearInterval(timer);
+    }, 35);
+    return () => window.clearInterval(timer);
+  }, [text, typing]);
+
+  return visibleText;
+}
+
 function MessageBubble({ item }: { item: AgentDisplayItem }) {
-  return <p className="agent-card-text">{item.text}</p>;
+  const text = useTypingText(item.text, item.typing);
+  return (
+    <div className="agent-card-markdown">
+      <Markdown
+        skipHtml
+        urlTransform={defaultUrlTransform}
+        components={{
+          a: ({ children, href }) =>
+            href ? (
+              <a href={href} target="_blank" rel="noreferrer">
+                {children}
+              </a>
+            ) : (
+              <>{children}</>
+            ),
+        }}
+      >
+        {text}
+      </Markdown>
+      {item.typing && text.length < item.text.length && (
+        <span className="agent-typing-caret" aria-label="正在输入" />
+      )}
+    </div>
+  );
 }
 
 function QuestionCard({
@@ -46,10 +101,16 @@ function QuestionCard({
   const submitAnswer = async (value: string) => {
     const normalized = value.trim();
     if (disabled || !normalized) return;
+    const previousAnswer = answer;
+    setAnswer(normalized);
+    setSubmitted(true);
     setSubmitting(true);
     try {
       const sent = await onAnswer(item.key, normalized);
-      if (sent) setSubmitted(true);
+      if (!sent) {
+        setAnswer(previousAnswer);
+        setSubmitted(false);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -122,6 +183,7 @@ function PlanCard({
   presentation: 'full' | 'summary';
 }) {
   if (presentation === 'summary') {
+    const planCount = item.plans?.length ?? 0;
     return (
       <>
         <div className="agent-card-heading">
@@ -129,7 +191,9 @@ function PlanCard({
           <strong>{item.title}</strong>
         </div>
         <p className="agent-card-text">
-          已生成 {item.plans?.length ?? 0} 个真实方案，请在左侧方案区选择后继续交流。
+          {planCount > 0
+            ? `已生成 ${planCount} 个真实方案，请在左侧方案区选择后继续交流。`
+            : '当前条件下暂无可购场次，可以更换日期或城市后重试。'}
         </p>
         {item.relaxationSuggestion && (
           <p className="agent-card-status">可调整条件：{item.relaxationSuggestion}</p>
@@ -275,16 +339,19 @@ function TravelAdviceCard({ item }: { item: AgentDisplayItem }) {
   );
 }
 
-function ProgressCard({ item }: { item: AgentDisplayItem }) {
+function ThinkingBubble({ item }: { item: AgentDisplayItem }) {
   return (
-    <>
-      <div className="agent-card-heading">
-        <span className="agent-progress-indicator" aria-hidden="true" />
-        <strong>处理进度</strong>
-      </div>
-      <p className="agent-card-text">{item.text}</p>
-      <CardFields fields={item.fields} />
-    </>
+    <div className="agent-thinking" role="status" aria-live="polite">
+      <span className="agent-thinking-dots" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      <span>
+        <strong>思考中</strong>
+        <span className="agent-thinking-stage">{item.text}</span>
+      </span>
+    </div>
   );
 }
 
@@ -371,8 +438,8 @@ export function AgentDisplayItemView({
     case 'business-intent':
       content = <BusinessIntentCard item={item} selectSeatsEnabled={selectSeatsEnabled} />;
       break;
-    case 'progress':
-      content = <ProgressCard item={item} />;
+    case 'thinking':
+      content = <ThinkingBubble item={item} />;
       break;
     case 'error':
       content = <ErrorCard item={item} />;

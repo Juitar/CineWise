@@ -17,7 +17,7 @@ export type AgentDisplayKind =
   | 'travel-advice-card'
   | 'completed'
   | 'error'
-  | 'progress'
+  | 'thinking'
   | 'question'
   | 'business-intent'
   | 'user-text';
@@ -44,10 +44,16 @@ export interface AgentDisplayItem {
     status: AgentConfirmationStatus;
     submitting: boolean;
   };
+  typing?: boolean;
+  streamId?: string;
+  /** 仅用于把同一次运行的临时展示替换掉，不来自服务端 payload。 */
+  sourceRunId?: string;
 }
 
 export interface AgentPlanDisplay {
   showId: string;
+  movieId: string;
+  cinemaId: string;
   planType: string;
   movieName: string;
   cinemaName: string;
@@ -279,15 +285,7 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
     };
   }
   if (type === 'PROGRESS') {
-    return {
-      key,
-      kind: 'progress',
-      text: event.displayText || '正在处理',
-      fields: [
-        { label: '阶段', value: event.payload.stage as string },
-        { label: '状态', value: event.payload.status as string },
-      ],
-    };
+    return safePlaceholder(event);
   }
   if (type === 'ERROR') {
     return { key, kind: 'error', text: event.displayText || '本次请求未完成' };
@@ -335,6 +333,8 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
   const plans = isPlan
     ? (event.payload.plans as readonly Record<string, unknown>[]).slice(0, 3).map((plan) => ({
         showId: plan.showId as string,
+        movieId: plan.movieId as string,
+        cinemaId: plan.cinemaId as string,
         planType: plan.planType as string,
         movieName: plan.movieName as string,
         cinemaName: plan.cinemaName as string,
@@ -370,6 +370,35 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
   };
 }
 
+function thinkingText(event: AgentEvent): string {
+  switch (event.eventType) {
+    case 'message.start':
+      return '正在理解你的需求';
+    case 'message.delta':
+      return '正在生成回复';
+    case 'plan.created':
+    case 'plan.replanned':
+    case 'step.start':
+      return '正在规划观影方案';
+    case 'tool.start':
+    case 'tool.complete':
+    case 'tool.error':
+    case 'step.complete':
+      return '正在查询和整理观影信息';
+    default:
+      return '正在思考中';
+  }
+}
+
+function thinkingItem(event: AgentEvent): AgentDisplayItem {
+  return {
+    key: `thinking:${event.runId}`,
+    kind: 'thinking',
+    text: thinkingText(event),
+    sourceRunId: event.runId,
+  };
+}
+
 function safePlaceholder(event: AgentEvent): AgentDisplayItem {
   const confirmationText = safeConfirmationStatusText(event.payload.status);
   return {
@@ -383,6 +412,8 @@ function displayItem(event: AgentEvent): AgentDisplayItem | null {
   const key = `event:${event.eventId}`;
   if (event.eventType === 'card') {
     if ('actionId' in event.payload) return confirmationItem(event);
+    // 运行进度只在本次流中以“思考中”提示，不应作为历史卡片留下。
+    if (event.payload.type === 'PROGRESS') return null;
     const confirmationText = safeConfirmationStatusText(event.payload.status);
     return confirmationText
       ? { key, kind: 'card-placeholder', text: confirmationText }
@@ -391,14 +422,20 @@ function displayItem(event: AgentEvent): AgentDisplayItem | null {
   if (event.eventType === 'message.error' || event.eventType === 'step.failed') {
     return { key, kind: 'error', text: event.displayText || '本次请求未完成' };
   }
-  if (event.eventType === 'run.complete' || event.eventType === 'message.complete') {
-    return { key, kind: 'completed', text: event.displayText || '运行已完成' };
-  }
   if (event.eventType === 'message.delta') {
-    return { key, kind: 'assistant-text', text: event.displayText };
+    const text = payloadText(event.payload, 'text');
+    return text === null
+      ? thinkingItem(event)
+      : {
+          key: `stream:${event.runId}`,
+          kind: 'assistant-text',
+          text,
+          typing: true,
+          streamId: event.runId,
+        };
   }
-  if (event.eventType === 'tool.complete' && event.payload.degraded === true) {
-    return { key, kind: 'progress', text: `${event.displayText || '工具已完成'}，结果可能不完整` };
+  if (event.eventType === 'run.complete' || event.eventType === 'message.complete') {
+    return null;
   }
   if (
     event.eventType === 'message.start' ||
@@ -408,10 +445,60 @@ function displayItem(event: AgentEvent): AgentDisplayItem | null {
     event.eventType === 'tool.error' ||
     event.eventType === 'step.complete'
   ) {
-    return { key, kind: 'progress', text: event.displayText || '正在处理' };
+    return thinkingItem(event);
   }
   if (!['plan.created', 'plan.replanned'].includes(event.eventType)) return safePlaceholder(event);
   return null;
+}
+
+function clearsThinking(event: AgentEvent, item: AgentDisplayItem | null): boolean {
+  if (
+    event.eventType === 'message.complete' ||
+    event.eventType === 'run.complete' ||
+    event.eventType === 'message.error' ||
+    event.eventType === 'step.failed'
+  ) {
+    return true;
+  }
+  if (event.eventType === 'message.delta') return payloadText(event.payload, 'text') !== null;
+  return event.eventType === 'card' && item?.kind !== 'thinking';
+}
+
+function removeThinkingForRun(
+  items: readonly AgentDisplayItem[],
+  runId: string,
+): readonly AgentDisplayItem[] {
+  return items.filter((candidate) => candidate.key !== `thinking:${runId}`);
+}
+
+function runAlreadyHasResult(items: readonly AgentDisplayItem[], runId: string): boolean {
+  return items.some(
+    (candidate) => candidate.sourceRunId === runId && candidate.kind !== 'thinking',
+  );
+}
+
+function mergeStreamText(
+  items: readonly AgentDisplayItem[],
+  item: AgentDisplayItem,
+): readonly AgentDisplayItem[] {
+  if (item.kind === 'thinking') {
+    const existingIndex = items.findIndex((candidate) => candidate.key === item.key);
+    return existingIndex < 0
+      ? [...items, item]
+      : items.map((candidate, index) => (index === existingIndex ? item : candidate));
+  }
+  if (item.streamId === undefined) {
+    return [...items, item];
+  }
+  const existingIndex = items.findIndex((candidate) => candidate.streamId === item.streamId);
+  if (existingIndex < 0) {
+    return [...items, item];
+  }
+  return items.map((candidate, index) =>
+    index === existingIndex
+      ? { ...candidate, text: `${candidate.text}${item.text}`, typing: true }
+      : candidate,
+  );
 }
 
 export function updateConfirmationItem(
@@ -503,6 +590,28 @@ export function consumeAgentEvent(
       ? safePlaceholder(event)
       : displayItem(event);
   const failed = event.eventType === 'message.error' || event.eventType === 'step.failed';
+  const itemsWithoutThinking = clearsThinking(event, item)
+    ? removeThinkingForRun(projection.items, event.runId)
+    : projection.items;
+  const itemsWithoutSupersededCards = itemsWithoutThinking.filter((candidate) => {
+    if (
+      (item?.kind === 'question' || item?.kind === 'plan-card' || item?.kind === 'movie-card') &&
+      candidate.kind === 'question'
+    ) {
+      return false;
+    }
+    return !(
+      item?.kind === 'plan-card' &&
+      !item.confirmation &&
+      candidate.kind === 'plan-card' &&
+      !candidate.confirmation
+    );
+  });
+  const itemWithRunId = item === null ? null : { ...item, sourceRunId: event.runId };
+  const shouldAppendItem =
+    itemWithRunId !== null &&
+    (itemWithRunId.kind !== 'thinking' ||
+      !runAlreadyHasResult(itemsWithoutSupersededCards, event.runId));
   return {
     outcome: 'applied',
     projection: {
@@ -515,15 +624,19 @@ export function consumeAgentEvent(
           : projection.planVersion,
       lastEventId: event.eventId,
       status: nextStatus(event, projection.status),
-      items: item ? [...projection.items, item] : projection.items,
+      items:
+        shouldAppendItem && itemWithRunId
+          ? mergeStreamText(itemsWithoutSupersededCards, itemWithRunId)
+          : itemsWithoutSupersededCards,
       safeError: failed ? (item?.text ?? '本次请求未完成') : projection.safeError,
     },
   };
 }
 
-function itemFromHistory(message: AgentMessage): AgentDisplayItem {
+function itemFromHistory(message: AgentMessage): AgentDisplayItem | null {
   const type = message.type.toUpperCase();
   const payload = message.payload ?? {};
+  if (message.role.toUpperCase() === 'USER' && payload.entry === 'question') return null;
   const confirmationText = safeConfirmationStatusText(payload.status);
   if (confirmationText) {
     if ('actionId' in payload)
@@ -569,6 +682,7 @@ function itemFromHistory(message: AgentMessage): AgentDisplayItem {
       text: message.text || '请求未完成',
     };
   }
+  if (type === 'PROGRESS') return null;
   return {
     key: `message:${message.messageId}`,
     kind: message.role === 'USER' ? 'user-text' : 'assistant-text',
@@ -580,7 +694,37 @@ export function buildProjectionFromHistory(
   sessionId: string,
   messages: readonly AgentMessage[],
 ): AgentProjection {
-  return { ...createAgentProjection(sessionId), items: messages.map(itemFromHistory) };
+  const latestUserIndex = messages.reduce(
+    (latest, message, index) =>
+      message.role.toUpperCase() === 'USER' ? index : latest,
+    -1,
+  );
+  let latestPlanMessageId: string | null = null;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (
+      message.type.toUpperCase() === 'PLAN_CARD' &&
+      typeof message.payload?.actionId !== 'string'
+    ) {
+      latestPlanMessageId = message.messageId;
+      break;
+    }
+  }
+  return {
+    ...createAgentProjection(sessionId),
+    items: messages.flatMap((message, index) => {
+      if (message.type.toUpperCase() === 'QUESTION' && index < latestUserIndex) return [];
+      if (
+        message.type.toUpperCase() === 'PLAN_CARD' &&
+        typeof message.payload?.actionId !== 'string' &&
+        message.messageId !== latestPlanMessageId
+      ) {
+        return [];
+      }
+      const item = itemFromHistory(message);
+      return item === null ? [] : [item];
+    }),
+  };
 }
 
 function confirmationKey(
@@ -605,6 +749,27 @@ function latestTravelAdviceEvents(snapshots: readonly AgentRunSnapshot[]): Map<s
         event.runId !== snapshot.runId ||
         event.eventType !== 'card' ||
         event.payload.type !== 'TRAVEL_ADVICE_CARD' ||
+        validateAgentCardEvent(event).decision !== 'render'
+      )
+        continue;
+      const previous = latest.get(event.runId);
+      if (previous === undefined || compareDecimalStrings(event.eventId, previous.eventId) > 0)
+        latest.set(event.runId, event);
+    }
+  }
+  return latest;
+}
+
+function latestRecommendationEvents(snapshots: readonly AgentRunSnapshot[]): Map<string, AgentEvent> {
+  const latest = new Map<string, AgentEvent>();
+  for (const snapshot of snapshots) {
+    for (const event of snapshot.events) {
+      if (
+        event.sessionId !== snapshot.sessionId ||
+        event.runId !== snapshot.runId ||
+        event.eventType !== 'card' ||
+        !['MOVIE_CARD', 'PLAN_CARD'].includes(String(event.payload.type)) ||
+        confirmationKey(event.runId, event.payload) !== null ||
         validateAgentCardEvent(event).decision !== 'render'
       )
         continue;
@@ -649,12 +814,16 @@ export function buildProjectionFromHistoryAndSnapshots(
   snapshots: readonly AgentRunSnapshot[],
 ): AgentProjection {
   const historyProjection = buildProjectionFromHistory(sessionId, history);
+  const historyByItemKey = new Map(
+    history.map((message) => [`message:${message.messageId}`, message] as const),
+  );
   const latest = latestConfirmationEvents(snapshots);
   const latestTravelAdvice = latestTravelAdviceEvents(snapshots);
+  const latestRecommendations = latestRecommendationEvents(snapshots);
   return {
     ...historyProjection,
-    items: historyProjection.items.map((item, index) => {
-      const message = history[index];
+    items: historyProjection.items.map((item) => {
+      const message = historyByItemKey.get(item.key);
       const key = message === undefined ? null : confirmationKey(message.runId, message.payload);
       const event = key === null ? undefined : latest.get(key);
       if (event !== undefined) return confirmationItem(event);
@@ -662,7 +831,12 @@ export function buildProjectionFromHistoryAndSnapshots(
         message !== undefined && isTravelAdviceHistory(message)
           ? latestTravelAdvice.get(message.runId)
           : undefined;
-      return travelAdviceEvent === undefined ? item : typedCard(travelAdviceEvent);
+      if (travelAdviceEvent !== undefined) return typedCard(travelAdviceEvent);
+      const recommendationEvent =
+        message !== undefined && ['MOVIE_CARD', 'PLAN_CARD'].includes(message.type.toUpperCase())
+          ? latestRecommendations.get(message.runId)
+          : undefined;
+      return recommendationEvent === undefined ? item : typedCard(recommendationEvent);
     }),
   };
 }
@@ -679,9 +853,14 @@ function restoredCards(snapshot: AgentRunSnapshot): AgentDisplayItem[] {
         event.payload.type === 'TRAVEL_ADVICE_CARD'),
   );
   const latestConfirmations = latestConfirmationEvents([snapshot]);
+  const latestRecommendation = latestRecommendationEvents([snapshot]).get(snapshot.runId);
   return [
     ...events
-      .filter((event) => confirmationKey(event.runId, event.payload) === null)
+      .filter((event) => {
+        if (confirmationKey(event.runId, event.payload) !== null) return false;
+        if (event.payload.type !== 'MOVIE_CARD' && event.payload.type !== 'PLAN_CARD') return true;
+        return event.eventId === latestRecommendation?.eventId;
+      })
       .map((event) => typedCard(event)),
     ...Array.from(latestConfirmations.values()).map((event) => confirmationItem(event)),
   ];
@@ -697,8 +876,11 @@ export function buildProjectionFromSnapshot(
   ]);
   const cards = restoredCards(snapshot);
   const latestConfirmations = latestConfirmationEvents([snapshot]);
-  const historyItems = historyProjection.items.filter((_, index) => {
-    const message = history[index];
+  const historyByItemKey = new Map(
+    history.map((message) => [`message:${message.messageId}`, message] as const),
+  );
+  const historyItems = historyProjection.items.filter((item) => {
+    const message = historyByItemKey.get(item.key);
     if (
       message === undefined ||
       message.runId !== snapshot.runId ||
@@ -739,22 +921,12 @@ export function buildProjectionFromSnapshot(
                 ? '卡片数据暂不完整'
                 : message.text,
           }));
-  const stepItems: AgentDisplayItem[] = snapshot.steps.map((step) => ({
-    key: `run-step:${step.nodeId}`,
-    kind: step.status === 'FAILED' ? 'error' : step.status === 'SUCCESS' ? 'completed' : 'progress',
-    text:
-      step.status === 'FAILED'
-        ? '有步骤未完成'
-        : step.status === 'SUCCESS'
-          ? '步骤已完成'
-          : '步骤处理中',
-  }));
   return {
     ...historyProjection,
     runId: snapshot.runId,
     planVersion: snapshot.planVersion,
     lastEventId: snapshot.lastEventId,
     status: snapshot.status === 'RUNNING' ? 'STREAMING' : snapshot.status,
-    items: [...historyItems, ...snapshotItems, ...cards, ...stepItems],
+    items: [...historyItems, ...snapshotItems, ...cards],
   };
 }

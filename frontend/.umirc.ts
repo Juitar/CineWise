@@ -57,6 +57,36 @@ export default defineConfig({
           wrappers: ['@/shared/auth/RequireAuth'],
         },
         {
+          path: '/recommendations/:sessionId/movies/:movieId',
+          component: '@/pages/recommendations',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
+          path: '/recommendations/:sessionId/shows',
+          component: '@/pages/recommendations',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
+          path: '/recommendations/:sessionId/shows/:showId/seats',
+          component: '@/pages/recommendations',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
+          path: '/recommendations/:sessionId/orders/confirm',
+          component: '@/pages/recommendations',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
+          path: '/recommendations/:sessionId/orders/:orderNo',
+          component: '@/pages/recommendations',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
+          path: '/recommendations/:sessionId/payments/:orderNo',
+          component: '@/pages/recommendations',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
           path: '/shows/:showId/seats',
           component: '@/pages/seats',
           wrappers: ['@/shared/auth/RequireAuth'],

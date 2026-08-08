@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect } from 'react';
-import { history, useSearchParams } from 'umi';
+import { history, useLocation, useSearchParams } from 'umi';
+import { workspacePath } from '../../../modules/agent/workspaceRoute';
 import { Alert, message } from 'antd';
 import { ErrorBlock } from 'antd-mobile';
 import { OrderConfirmation } from '../../../features/order-confirmation/OrderConfirmation';
@@ -28,6 +29,7 @@ import './index.css';
  */
 export default function OrderConfirmPage() {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const showId = searchParams.get('showId') || '';
   const movieId = searchParams.get('movieId') || '';
   const cinemaId = searchParams.get('cinemaId') || '';
@@ -125,7 +127,7 @@ export default function OrderConfirmPage() {
     );
   }
 
-  const seatsPath = `/shows/${encodeURIComponent(showId)}/seats?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`;
+  const seatsPath = workspacePath(location.pathname, `/shows/${encodeURIComponent(showId)}/seats?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`);
 
   const handleReturnToSeats = () => {
     history.push(seatsPath);
@@ -202,13 +204,13 @@ export default function OrderConfirmPage() {
   const handlePay = () => {
     if (order?.status === 'PENDING_PAYMENT') {
       // 支付必须由用户在支付页主动确认，建单成功页只提供安全导航出口。
-      history.push(buildPaymentPath(order.orderNo));
+      history.push(workspacePath(location.pathname, buildPaymentPath(order.orderNo)));
     }
   };
 
   const handleViewOrder = () => {
     if (order) {
-      history.push(buildOrderDetailPath(order.orderNo));
+      history.push(workspacePath(location.pathname, buildOrderDetailPath(order.orderNo)));
     }
   };
 

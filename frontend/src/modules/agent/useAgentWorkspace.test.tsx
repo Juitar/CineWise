@@ -113,9 +113,9 @@ describe('useAgentWorkspace 状态与恢复', () => {
     completedAt: '2026-08-05T16:30:00+08:00',
     createdAt: '2026-08-05T16:30:00+08:00',
   };
-  it('刷新时恢复 payload 为 null 的用户文本和只读问题历史', async () => {
+  it('刷新时恢复普通用户文本和只读问题历史，但隐藏问题卡回答消息', async () => {
     mocks.listAgentMessages.mockResolvedValue({
-      total: 2,
+      total: 3,
       page: 1,
       size: 100,
       records: [
@@ -140,6 +140,17 @@ describe('useAgentWorkspace 状态与恢复', () => {
           status: 'COMPLETED',
           completedAt: '2026-08-08T10:00:01+08:00',
           createdAt: '2026-08-08T10:00:01+08:00',
+        },
+        {
+          messageId: 'message-question-answer-1',
+          runId: 'run-2',
+          role: 'USER',
+          type: 'TEXT',
+          text: '明天',
+          payload: { entry: 'question' },
+          status: 'COMPLETED',
+          completedAt: null,
+          createdAt: '2026-08-08T10:00:02+08:00',
         },
       ],
     });
@@ -191,6 +202,10 @@ describe('useAgentWorkspace 状态与恢复', () => {
     });
     expect(result.current.projection.status).toBe('RESULT_UNKNOWN');
     expect(mocks.postAgentStream).toHaveBeenCalledOnce();
+    expect(mocks.postAgentStream.mock.calls[0][1]).toMatchObject({
+      content: '推荐电影',
+      context: { entry: 'workspace' },
+    });
     expect(mocks.getAgentRun).not.toHaveBeenCalled();
   });
 
@@ -249,6 +264,31 @@ describe('useAgentWorkspace 状态与恢复', () => {
     await act(async () => {
       await first;
     });
+  });
+
+  it('问题卡回答标记 question 来源且不追加独立用户气泡', async () => {
+    mocks.postAgentStream.mockImplementation(
+      async (_session, _request, _cursor, _signal, handlers) => {
+        await handlers.onEvent(processingEvent);
+      },
+    );
+    const { result } = renderHook(() => useAgentWorkspace('session-example-1'));
+    await waitFor(() => expect(result.current.loadStatus).toBe('ready'));
+
+    await act(async () => {
+      await result.current.submitQuestionAnswer('明天');
+    });
+
+    expect(mocks.postAgentStream).toHaveBeenCalledWith(
+      'session-example-1',
+      expect.objectContaining({ content: '明天', context: { entry: 'question' } }),
+      '0',
+      expect.any(AbortSignal),
+      expect.any(Object),
+    );
+    expect(result.current.projection.items).not.toContainEqual(
+      expect.objectContaining({ kind: 'user-text', text: '明天' }),
+    );
   });
 
   it('终态后第二轮消息保留会话游标并绑定新的 runId 和 planVersion', async () => {

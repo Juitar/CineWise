@@ -28,6 +28,7 @@ import { postAgentStream } from './sse';
 import type { AgentMessage, AgentSession, AgentStreamRequest } from './types';
 
 type LoadStatus = 'error' | 'loading' | 'ready';
+type AgentSubmissionEntry = 'question' | 'workspace';
 
 function safeErrorMessage(error: unknown): string {
   if (error instanceof AgentContractError) return error.message;
@@ -100,11 +101,24 @@ function isTerminal(status: AgentProjection['status']): boolean {
   return ['CANCELLED', 'COMPLETED', 'FAILED'].includes(status);
 }
 
+function withoutLocalThinking(
+  projection: AgentProjection,
+  localThinkingKey: string,
+): AgentProjection {
+  return {
+    ...projection,
+    items: projection.items.filter((item) => item.key !== localThinkingKey),
+  };
+}
+
 function cardRecoveryRunIds(messages: readonly AgentMessage[]): readonly string[] {
   return Array.from(
     new Set([
       ...messages
         .filter((message) => typeof message.payload?.actionId === 'string')
+        .map((message) => message.runId),
+      ...messages
+        .filter((message) => ['MOVIE_CARD', 'PLAN_CARD'].includes(message.type.toUpperCase()))
         .map((message) => message.runId),
       ...travelAdviceRecoveryRunIds(messages),
     ]),
@@ -243,6 +257,7 @@ export function useAgentWorkspace(sessionId: string) {
       const controller = new AbortController();
       controllerRef.current = controller;
       const sequence = sequenceRef.current;
+      const localThinkingKey = `local-thinking:${request.clientRequestId}`;
       if (!recovering) {
         replaceProjection({ ...projectionRef.current, status: 'CONNECTING', safeError: null });
       }
@@ -268,7 +283,8 @@ export function useAgentWorkspace(sessionId: string) {
           onEvent: async (event) => {
             if (sequence !== sequenceRef.current || event.sessionId !== sessionId) return;
             armInactivity();
-            const result = consumeAgentEvent(projectionRef.current, event);
+            const current = withoutLocalThinking(projectionRef.current, localThinkingKey);
+            const result = consumeAgentEvent(current, event);
             if (result.outcome === 'ignored') return;
             if (result.outcome === 'reset-required') {
               clearInactivity();
@@ -290,10 +306,14 @@ export function useAgentWorkspace(sessionId: string) {
               return;
             }
             replaceProjection(result.projection);
+            if (isTerminal(result.projection.status)) {
+              clearInactivity();
+              if (controllerRef.current === controller) controllerRef.current = null;
+            }
           },
         });
         clearInactivity();
-        controllerRef.current = null;
+        if (controllerRef.current === controller) controllerRef.current = null;
         const current = projectionRef.current;
         if (!isTerminal(current.status)) {
           if (current.runId) await recoverRun(sequence, resume);
@@ -308,8 +328,8 @@ export function useAgentWorkspace(sessionId: string) {
       } catch (error) {
         clearInactivity();
         if (sequence !== sequenceRef.current || controller.signal.aborted) return;
-        controllerRef.current = null;
-        const current = projectionRef.current;
+        if (controllerRef.current === controller) controllerRef.current = null;
+        const current = withoutLocalThinking(projectionRef.current, localThinkingKey);
         if (current.runId) await recoverRun(sequence, resume);
         else {
           const definitelyRejected =
@@ -328,8 +348,8 @@ export function useAgentWorkspace(sessionId: string) {
     [clearInactivity, recoverRun, replaceProjection, sessionId, stopActiveStream],
   );
 
-  const submit = useCallback(
-    async (content: string): Promise<boolean> => {
+  const submitMessage = useCallback(
+    async (content: string, entry: AgentSubmissionEntry): Promise<boolean> => {
       const normalized = content.trim();
       if (
         !normalized ||
@@ -344,14 +364,23 @@ export function useAgentWorkspace(sessionId: string) {
       const request: AgentStreamRequest = {
         clientRequestId: createClientRequestId(),
         content: normalized,
-        context: { entry: 'workspace' },
+        context: { entry },
       };
       const localItem: AgentDisplayItem = {
         key: `local:${request.clientRequestId}`,
         kind: 'user-text',
         text: normalized,
       };
+      const localThinkingItem: AgentDisplayItem = {
+        key: `local-thinking:${request.clientRequestId}`,
+        kind: 'thinking',
+        text: '正在理解你的需求',
+      };
       const previous = projectionRef.current;
+      const visibleItems =
+        entry === 'workspace'
+          ? previous.items.filter((item) => item.kind !== 'question')
+          : previous.items;
       const cursor = previous.lastEventId;
       // eventId 是会话级递增游标，而 runId/planVersion 只属于一次运行。
       // 终态后发送新消息必须解除旧运行绑定，否则新运行的全部事件都会被 reducer 忽略。
@@ -359,13 +388,26 @@ export function useAgentWorkspace(sessionId: string) {
         ...previous,
         runId: null,
         planVersion: null,
-        items: [...previous.items, localItem],
+        items:
+          entry === 'workspace'
+            ? [...visibleItems, localItem, localThinkingItem]
+            : [...visibleItems, localThinkingItem],
         safeError: null,
       });
       await startStream(request, cursor);
       return true;
     },
     [replaceProjection, startStream],
+  );
+
+  const submit = useCallback(
+    (content: string): Promise<boolean> => submitMessage(content, 'workspace'),
+    [submitMessage],
+  );
+
+  const submitQuestionAnswer = useCallback(
+    (content: string): Promise<boolean> => submitMessage(content, 'question'),
+    [submitMessage],
   );
 
   const cancel = useCallback(async () => {
@@ -492,5 +534,6 @@ export function useAgentWorkspace(sessionId: string) {
     sessions,
     stopActiveStream,
     submit,
+    submitQuestionAnswer,
   };
 }

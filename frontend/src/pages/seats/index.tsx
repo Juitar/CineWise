@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { history, useParams, useSearchParams } from 'umi';
+import { history, useLocation, useParams, useSearchParams } from 'umi';
+import { workspacePath } from '../../modules/agent/workspaceRoute';
 import { Button, Spin, Alert, message } from 'antd';
 import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
 import { useSeatMap } from '../../modules/ticketing/hooks';
@@ -15,6 +16,7 @@ import './index.css';
  */
 export default function SeatsPage() {
   const params = useParams<{ showId: string }>();
+  const location = useLocation();
   const showId = params.showId;
   const [searchParams] = useSearchParams();
   const movieId = searchParams.get('movieId') || '';
@@ -50,7 +52,7 @@ export default function SeatsPage() {
     selectedSeatIds.forEach((id) => {
       query.append('seatId', id);
     });
-    history.push(`/orders/confirm?${query.toString()}`);
+    history.push(workspacePath(location.pathname, `/orders/confirm?${query.toString()}`));
   };
 
   const selectedSeats = useMemo(

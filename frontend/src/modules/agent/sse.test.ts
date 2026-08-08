@@ -64,6 +64,48 @@ describe('SSE 分块解析', () => {
 });
 
 describe('POST SSE 客户端', () => {
+  it('读取到首个 SSE 事件后立即投递，不等待响应流结束', async () => {
+    let closeStream: () => void = () => {
+      throw new Error('测试流尚未初始化');
+    };
+    const encoder = new TextEncoder();
+    const eventText = `id: 40\nevent: step.start\ndata: ${JSON.stringify(processingEvent)}\n\n`;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        closeStream = () => controller.close();
+        controller.enqueue(encoder.encode(eventText));
+      },
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(csrfResponse())
+      .mockResolvedValueOnce(new Response(stream, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const onEvent = vi.fn();
+
+    let finished = false;
+    const pending = postAgentStream(
+      'session-example-1',
+      REQUEST,
+      null,
+      new AbortController().signal,
+      {
+        onEvent,
+        onHeartbeat: vi.fn(),
+      },
+    ).then(() => {
+      finished = true;
+    });
+
+    await vi.waitFor(() =>
+      expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ eventId: '40' })),
+    );
+    expect(finished).toBe(false);
+    closeStream();
+    await pending;
+    expect(finished).toBe(true);
+  });
+
   it('携带 JSON、Cookie、CSRF 和 Last-Event-ID 并解析事件', async () => {
     const eventText = `id: 40\nevent: step.start\ndata: ${JSON.stringify(processingEvent)}\n\n`;
     const fetchMock = vi

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -17,7 +17,10 @@ vi.mock('umi', () => ({
   ),
 }));
 
-afterEach(() => cleanup());
+afterEach(() => {
+  vi.useRealTimers();
+  cleanup();
+});
 
 const onConfirm = vi.fn();
 const onAnswer = vi.fn(async () => true);
@@ -40,7 +43,7 @@ describe('Agent 类型化卡片', () => {
     ['assistant-text', '普通回复'],
     ['user-text', '用户消息'],
     ['completed', '运行已完成'],
-    ['progress', '正在查询场次'],
+    ['thinking', '正在查询场次'],
     ['error', '暂时无法完成'],
   ] as const)('渲染 %s 展示项', (kind, text) => {
     renderItem({ key: kind, kind, text });
@@ -48,7 +51,14 @@ describe('Agent 类型化卡片', () => {
     expect(screen.getByRole('listitem')).toHaveAttribute('data-agent-card-kind', kind);
   });
 
-  it('问题卡提交选项值并支持自由文本', async () => {
+  it('思考中提示使用助手气泡和点状动画，不展示处理进度卡片', () => {
+    renderItem({ key: 'thinking', kind: 'thinking', text: '正在规划观影方案' });
+    expect(screen.getByRole('status')).toHaveTextContent('思考中正在规划观影方案');
+    expect(screen.queryByText('处理进度')).not.toBeInTheDocument();
+    expect(document.querySelectorAll('.agent-thinking-dots i')).toHaveLength(3);
+  });
+
+  it('问题卡提交选项值并支持自由文本', () => {
     renderItem({
       key: 'question',
       kind: 'question',
@@ -66,7 +76,8 @@ describe('Agent 类型化卡片', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /今\s*天/ }));
     expect(onAnswer).toHaveBeenCalledWith('question', '2099-08-05');
-    expect(screen.getByRole('textbox', { name: '补充回答' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '补充回答' })).toHaveValue('2099-08-05');
+    expect(screen.getByText('回答已提交')).toBeInTheDocument();
   });
 
   it('过期问题卡禁止提交', () => {
@@ -95,6 +106,8 @@ describe('Agent 类型化卡片', () => {
         ? [
             {
               showId: '3001',
+              movieId: '1001',
+              cinemaId: '2001',
               planType: 'COMPREHENSIVE',
               movieName: '示例影片',
               cinemaName: '示例影院',
@@ -189,14 +202,59 @@ describe('Agent 类型化卡片', () => {
     expect(screen.getByRole('button', { name: '拒绝操作' })).toBeDisabled();
   });
 
-  it('危险文本按普通文本渲染', () => {
+  it('危险 HTML 不会作为页面元素渲染', () => {
     const { container } = renderItem({
       key: 'safe-text',
       kind: 'assistant-text',
       text: '<img src=x onerror=alert(1)>',
     });
-    expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
     expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('.agent-card-markdown')).toBeEmptyDOMElement();
+  });
+
+  it('安全渲染 Markdown，不允许模型文本注入 HTML', () => {
+    const { container } = renderItem({
+      key: 'markdown',
+      kind: 'assistant-text',
+      text: '**推荐理由**\n\n- 时间合适\n- <script>alert(1)</script>',
+    });
+    expect(screen.getByText('推荐理由').tagName).toBe('STRONG');
+    expect(container.querySelector('.agent-card-markdown')).toHaveTextContent('时间合适');
+    expect(container.querySelector('script')).toBeNull();
+  });
+
+  it('流式内容在新的分片到达后继续追加，不从头闪回', () => {
+    vi.useFakeTimers();
+    const { rerender } = renderItem({
+      key: 'stream',
+      kind: 'assistant-text',
+      text: '你好',
+      typing: true,
+      streamId: 'run-1',
+    });
+    act(() => vi.advanceTimersByTime(70));
+    expect(screen.getByRole('list')).toHaveTextContent('你好');
+
+    rerender(
+      <div role="list">
+        <AgentDisplayItemView
+          item={{
+            key: 'stream',
+            kind: 'assistant-text',
+            text: '你好，欢迎使用妙语。',
+            typing: true,
+            streamId: 'run-1',
+          }}
+          answerDisabled={false}
+          onAnswer={onAnswer}
+          onConfirm={onConfirm}
+        />
+      </div>,
+    );
+    act(() => vi.advanceTimersByTime(35));
+    expect(screen.getByRole('list')).toHaveTextContent('你好，');
+    act(() => vi.runAllTimers());
+    expect(screen.getByRole('list')).toHaveTextContent('你好，欢迎使用妙语。');
   });
 
   it('未知 kind 固定降级且不显示未知内容', () => {

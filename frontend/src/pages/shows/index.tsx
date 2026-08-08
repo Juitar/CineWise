@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { history, useSearchParams } from 'umi';
+import { history, useLocation, useSearchParams } from 'umi';
+import { workspacePath } from '../../modules/agent/workspaceRoute';
 import { Alert } from 'antd';
 import { ErrorBlock } from 'antd-mobile';
 import { ShowList } from '../../features/show-list/ShowList';
@@ -16,6 +17,7 @@ import './index.css';
  */
 export default function ShowsPage() {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const movieId = searchParams.get('movieId') || undefined;
   const cinemaId = searchParams.get('cinemaId') || undefined;
   const isMobile = useMediaQuery('(max-width: 1023px)');
@@ -56,7 +58,7 @@ export default function ShowsPage() {
 
   const handleSelectShow = (showId: string) => {
     history.push(
-      `/shows/${encodeURIComponent(showId)}/seats?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`,
+      workspacePath(location.pathname, `/shows/${encodeURIComponent(showId)}/seats?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`),
     );
   };
 

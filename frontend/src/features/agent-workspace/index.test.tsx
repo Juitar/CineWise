@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => ({
     }>,
     stopActiveStream: vi.fn(),
     submit: vi.fn(),
+    submitQuestionAnswer: vi.fn(),
   },
 }));
 
@@ -66,6 +67,7 @@ beforeEach(() => {
   };
   vi.clearAllMocks();
   mocks.workspace.submit.mockResolvedValue(true);
+  mocks.workspace.submitQuestionAnswer.mockResolvedValue(true);
 });
 
 afterEach(() => {
@@ -83,14 +85,14 @@ describe('AgentWorkspace 页面', () => {
     expect(screen.getByText('暂无历史会话')).toBeInTheDocument();
   });
 
-  it('未知卡片安全降级且危险 HTML 只作为文本显示', () => {
+  it('未知卡片安全降级且危险 HTML 不会渲染', () => {
     mocks.workspace.projection.items = [
       { key: '1', kind: 'card-placeholder', text: '推荐卡片数据暂不完整' },
       { key: '2', kind: 'assistant-text', text: '<img src=x onerror=alert(1)>' },
     ];
     const { container } = render(<AgentWorkspace sessionId="session-example-1" />);
     expect(screen.getByText('推荐卡片数据暂不完整')).toBeInTheDocument();
-    expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
+    expect(screen.queryByText('<img src=x onerror=alert(1)>')).not.toBeInTheDocument();
     expect(container.querySelector('img')).toBeNull();
     expect(screen.queryByText(/¥|库存|路线|餐饮/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /购票|确认|支付/ })).not.toBeInTheDocument();
@@ -117,6 +119,31 @@ describe('AgentWorkspace 页面', () => {
     expect(screen.getByText('3001')).toBeInTheDocument();
     expect(screen.getByText('已过期')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /购票|确认|拒绝|支付/ })).not.toBeInTheDocument();
+  });
+
+  it('问题卡回答走专用提交入口，不复用主输入框入口', async () => {
+    mocks.workspace.projection.items = [
+      {
+        key: 'question-1',
+        kind: 'question',
+        title: '想在哪天观看？',
+        text: '想在哪天观看？',
+        question: {
+          questionId: 'question-date-1',
+          options: [{ optionId: 'tomorrow', label: '明天', value: '明天' }],
+          allowFreeText: true,
+          expiresAt: '2099-08-08T10:00:00+08:00',
+        },
+      },
+    ];
+
+    render(<AgentWorkspace sessionId="session-example-1" />);
+    fireEvent.click(screen.getByRole('button', { name: /明\s*天/ }));
+
+    await vi.waitFor(() => {
+      expect(mocks.workspace.submitQuestionAnswer).toHaveBeenCalledWith('明天');
+    });
+    expect(mocks.workspace.submit).not.toHaveBeenCalled();
   });
 
   it('只为已校验的选座意图显示去选座入口', () => {
@@ -195,7 +222,7 @@ describe('AgentWorkspace 页面', () => {
     expect(screen.getByRole('button', { name: '处理中' })).toBeDisabled();
   });
 
-  it('推荐工作区展示真实方案并把当前方案序号交给右侧会话', async () => {
+  it('推荐工作区本地选择方案并用方案自身 ID 进入选座', async () => {
     mocks.workspace.projection.items = [
       {
         key: 'plan-latest',
@@ -205,6 +232,8 @@ describe('AgentWorkspace 页面', () => {
         plans: [
           {
             showId: '70001',
+            movieId: '10001',
+            cinemaId: '20001',
             planType: 'COMPREHENSIVE',
             movieName: '真实影片',
             cinemaName: '真实影院',
@@ -235,24 +264,43 @@ describe('AgentWorkspace 页面', () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /综合推荐/ }));
-    await vi.waitFor(() => {
-      expect(mocks.workspace.submit).toHaveBeenCalledWith(
-        '基于当前最新推荐中的第 1 个方案，请解释这个方案，并说明是否需要继续调整。',
-      );
-    });
+    expect(mocks.workspace.submit).not.toHaveBeenCalled();
+    expect(screen.getByRole('link', { name: '去选座：真实影片' })).toHaveAttribute(
+      'href',
+      '/shows/70001/seats?movieId=10001&cinemaId=20001',
+    );
 
     fireEvent.change(screen.getByLabelText('观影需求'), {
       target: { value: '换一家影院' },
     });
     fireEvent.click(screen.getByRole('button', { name: /发.*送/ }));
+    expect(screen.getByLabelText('观影需求')).toHaveValue('');
     await vi.waitFor(() => {
-      expect(mocks.workspace.submit).toHaveBeenLastCalledWith(
-        '基于当前最新推荐中的第 1 个方案，换一家影院',
-      );
+      expect(mocks.workspace.submit).toHaveBeenLastCalledWith('换一家影院');
     });
   });
 
-  it('推荐工作区不从 PLAN_CARD 自行生成选座入口', () => {
+  it('消息提交被拒绝时恢复已立即清空的输入内容', async () => {
+    let finishSubmission!: (sent: boolean) => void;
+    mocks.workspace.submit.mockImplementation(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finishSubmission = resolve;
+        }),
+    );
+
+    render(<AgentWorkspace sessionId="session-example-1" />);
+    fireEvent.change(screen.getByLabelText('观影需求'), { target: { value: '换一家影院' } });
+    fireEvent.click(screen.getByRole('button', { name: /发.*送/ }));
+    expect(screen.getByLabelText('观影需求')).toHaveValue('');
+
+    finishSubmission(false);
+    await vi.waitFor(() => {
+      expect(screen.getByLabelText('观影需求')).toHaveValue('换一家影院');
+    });
+  });
+
+  it('空方案不会沿用旧 BUSINESS_INTENT 的选座入口', () => {
     mocks.workspace.projection.items = [
       {
         key: 'old-select-seats',
@@ -271,6 +319,6 @@ describe('AgentWorkspace 页面', () => {
 
     render(<AgentWorkspace sessionId="session-example-1" variant="recommendations" />);
 
-    expect(screen.queryByRole('link', { name: '去选座' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /去选座/ })).not.toBeInTheDocument();
   });
 });

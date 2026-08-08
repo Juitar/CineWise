@@ -16,6 +16,45 @@
   white-space: pre-wrap;
 }
 
+.agent-card-markdown {
+  overflow-wrap: anywhere;
+}
+
+.agent-card-markdown > :first-child {
+  margin-top: 0;
+}
+
+.agent-card-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.agent-card-markdown pre {
+  overflow-x: auto;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f5f5f5;
+}
+
+.agent-card-markdown code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.agent-typing-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: currentcolor;
+  animation: agent-caret-blink 0.8s step-end infinite;
+}
+
+@keyframes agent-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
 .agent-question-options {
   display: flex;
   flex-wrap: wrap;
@@ -103,13 +142,50 @@
   font-weight: 600;
 }
 
-.agent-progress-indicator {
-  width: 9px;
-  height: 9px;
-  flex: 0 0 auto;
+.agent-thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.agent-thinking strong,
+.agent-thinking-stage {
+  display: block;
+}
+
+.agent-thinking-stage {
+  margin-top: 2px;
+  color: #77718f;
+  font-size: 13px;
+}
+
+.agent-thinking-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.agent-thinking-dots i {
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: #6c5ce7;
-  box-shadow: 0 0 0 4px #eeeaff;
+  animation: agent-thinking-dot 1.05s ease-in-out infinite;
+}
+
+.agent-thinking-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.agent-thinking-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes agent-thinking-dot {
+  50% {
+    opacity: 0.3;
+    transform: translateY(-2px);
+  }
 }
 
 @media (max-width: 1023px) {

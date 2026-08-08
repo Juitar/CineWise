@@ -24,7 +24,7 @@ import {
 } from './projection';
 
 describe('Agent 事件投影', () => {
-  it('恢复 payload 为 null 的用户文本和精简 QUESTION 历史', () => {
+  it('恢复普通用户文本和精简 QUESTION 历史，但隐藏问题卡回答消息', () => {
     const projection = buildProjectionFromHistoryAndSnapshots(
       'session-example-1',
       [
@@ -50,6 +50,17 @@ describe('Agent 事件投影', () => {
           completedAt: '2026-08-08T10:00:01+08:00',
           createdAt: '2026-08-08T10:00:01+08:00',
         },
+        {
+          messageId: 'message-question-answer-1',
+          runId: 'run-2',
+          role: 'USER',
+          type: 'TEXT',
+          text: '明天',
+          payload: { entry: 'question' },
+          status: 'COMPLETED',
+          completedAt: null,
+          createdAt: '2026-08-08T10:00:02+08:00',
+        },
       ],
       [],
     );
@@ -65,6 +76,30 @@ describe('Agent 事件投影', () => {
     expect(compareDecimalStrings('9007199254740993', '9007199254740992')).toBe(1);
     expect(compareDecimalStrings('00043', '43')).toBe(0);
     expect(compareDecimalStrings('9', '10')).toBe(-1);
+  });
+
+  it('刷新历史只保留最新普通 PLAN_CARD 占位', () => {
+    const messages = ['old', 'latest'].map((suffix, index) => ({
+      messageId: `message-plan-${suffix}`,
+      runId: `run-${index + 1}`,
+      role: 'ASSISTANT',
+      type: 'PLAN_CARD',
+      text: `方案 ${suffix}`,
+      payload: {},
+      status: 'COMPLETED',
+      completedAt: '2026-08-08T10:00:01+08:00',
+      createdAt: `2026-08-08T10:00:0${index + 1}+08:00`,
+    }));
+
+    const projection = buildProjectionFromHistoryAndSnapshots(
+      'session-example-1',
+      messages,
+      [],
+    );
+
+    expect(projection.items).toEqual([
+      expect.objectContaining({ key: 'message:message-plan-latest', kind: 'card-placeholder' }),
+    ]);
   });
 
   it('忽略其他会话、其他运行和重复事件且不推进游标', () => {
@@ -151,6 +186,58 @@ describe('Agent 事件投影', () => {
     );
   });
 
+  it('新 PLAN_CARD 替换旧普通方案卡但保留其他消息', () => {
+    const first = consumeAgentEvent(
+      createAgentProjection('session-example-1'),
+      parseAgentEvent(planCard),
+    );
+    if (first.outcome !== 'applied') throw new Error();
+    const second = consumeAgentEvent(
+      {
+        ...first.projection,
+        runId: null,
+        status: 'CONNECTING',
+        items: [
+          { key: 'assistant-before', kind: 'assistant-text', text: '旧说明' },
+          ...first.projection.items,
+          {
+            key: 'confirmation-before',
+            kind: 'plan-card',
+            text: '等待确认',
+            confirmation: {
+              actionId: 'action-1',
+              runId: 'run-confirmation',
+              status: 'PENDING_CONFIRMATION',
+              submitting: false,
+            },
+          },
+        ],
+      },
+      parseAgentEvent({
+        ...planCard,
+        eventId: '99',
+        runId: 'run-plan-new',
+      }),
+    );
+    if (second.outcome !== 'applied') throw new Error();
+
+    expect(
+      second.projection.items.filter(
+        (item) => item.kind === 'plan-card' && !item.confirmation,
+      ),
+    ).toHaveLength(1);
+    expect(second.projection.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'assistant-text', text: '旧说明' }),
+        expect.objectContaining({
+          kind: 'plan-card',
+          confirmation: expect.objectContaining({ actionId: 'action-1' }),
+        }),
+        expect.objectContaining({ kind: 'plan-card', sourceRunId: 'run-plan-new' }),
+      ]),
+    );
+  });
+
   it('TEXT 使用纯文本投影，过期空方案卡仍明确显示过期且不生成业务按钮', () => {
     const text = consumeAgentEvent(
       createAgentProjection('session-example-1'),
@@ -183,7 +270,39 @@ describe('Agent 事件投影', () => {
     expect(JSON.stringify(expired.projection)).not.toMatch(/确认|支付|购票按钮/);
   });
 
-  it('QUESTION、PROGRESS 和 ERROR 使用类型化安全投影', () => {
+  it('message.delta 原地追加同一次运行的助手消息', () => {
+    const first = consumeAgentEvent(
+      createAgentProjection('session-example-1'),
+      parseAgentEvent({
+        ...processingEvent,
+        eventId: '41',
+        eventType: 'message.delta',
+        payload: { text: '正在为你查找' },
+      }),
+    );
+    if (first.outcome !== 'applied') throw new Error();
+    const second = consumeAgentEvent(
+      first.projection,
+      parseAgentEvent({
+        ...processingEvent,
+        eventId: '42',
+        eventType: 'message.delta',
+        payload: { text: '合适场次。' },
+      }),
+    );
+    if (second.outcome !== 'applied') throw new Error();
+
+    expect(second.projection.items).toEqual([
+      expect.objectContaining({
+        key: `stream:${processingEvent.runId}`,
+        kind: 'assistant-text',
+        text: '正在为你查找合适场次。',
+        typing: true,
+      }),
+    ]);
+  });
+
+  it('QUESTION 和 ERROR 使用类型化安全投影，进度不会作为历史卡片留下', () => {
     const question = consumeAgentEvent(
       createAgentProjection('session-example-1'),
       parseAgentEvent(questionCard),
@@ -200,12 +319,72 @@ describe('Agent 事件投影', () => {
     const progress = consumeAgentEvent(question.projection, parseAgentEvent(progressCard));
     const error = consumeAgentEvent(progress.projection, parseAgentEvent(errorCard));
     expect(error.projection.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ kind: 'progress', text: progressCard.displayText }),
-        expect.objectContaining({ kind: 'error', text: '暂时无法完成' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ kind: 'error', text: '暂时无法完成' })]),
+    );
+    expect(error.projection.items).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: 'thinking' })]),
     );
     expect(JSON.stringify(error.projection)).not.toContain('内部详情');
+  });
+
+  it('处理中事件只保留同一条思考中提示，首段文本、最终卡片和终态都会移除它', () => {
+    const started = consumeAgentEvent(
+      createAgentProjection('session-example-1'),
+      parseAgentEvent({ ...processingEvent, eventId: '41', eventType: 'message.start' }),
+    );
+    if (started.outcome !== 'applied') throw new Error();
+    expect(started.projection.items).toEqual([
+      expect.objectContaining({
+        key: `thinking:${processingEvent.runId}`,
+        kind: 'thinking',
+        text: '正在理解你的需求',
+      }),
+    ]);
+
+    const querying = consumeAgentEvent(
+      started.projection,
+      parseAgentEvent({ ...processingEvent, eventId: '42', eventType: 'step.complete' }),
+    );
+    if (querying.outcome !== 'applied') throw new Error();
+    expect(querying.projection.items).toEqual([
+      expect.objectContaining({
+        key: `thinking:${processingEvent.runId}`,
+        text: '正在查询和整理观影信息',
+      }),
+    ]);
+
+    const text = consumeAgentEvent(
+      querying.projection,
+      parseAgentEvent({
+        ...processingEvent,
+        eventId: '43',
+        eventType: 'message.delta',
+        payload: { text: '正在为你查找合适场次。' },
+      }),
+    );
+    if (text.outcome !== 'applied') throw new Error();
+    expect(text.projection.items).toEqual([
+      expect.objectContaining({ kind: 'assistant-text', text: '正在为你查找合适场次。' }),
+    ]);
+
+    const card = consumeAgentEvent(
+      querying.projection,
+      parseAgentEvent({ ...planCard, eventId: '43', runId: processingEvent.runId }),
+    );
+    if (card.outcome !== 'applied') throw new Error();
+    expect(card.projection.items).toEqual([expect.objectContaining({ kind: 'plan-card' })]);
+
+    const completed = consumeAgentEvent(
+      querying.projection,
+      parseAgentEvent({
+        ...processingEvent,
+        eventId: '43',
+        eventType: 'run.complete',
+        payload: { status: 'COMPLETED' },
+      }),
+    );
+    if (completed.outcome !== 'applied') throw new Error();
+    expect(completed.projection.items).toEqual([]);
   });
 
   it('推荐卡只投影已校验的候选标题，不带未声明字段', () => {
