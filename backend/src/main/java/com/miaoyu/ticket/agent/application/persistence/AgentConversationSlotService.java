@@ -10,7 +10,6 @@ import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSessionStatus;
 import com.miaoyu.ticket.agent.domain.plan.SlotSnapshot;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
-import com.miaoyu.ticket.content.application.CityResolutionService;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.agent.application.AgentErrorCode;
@@ -50,21 +49,21 @@ public class AgentConversationSlotService {
     private final AgentConversationSlotRepository slotRepository;
     private final ObjectMapper objectMapper;
     private final Clock clock;
-    private final CityResolutionService cityResolutionService;
+    private final AgentCityCodeResolver cityCodeResolver;
     private final MovieTitleResolutionTool movieTitleResolutionTool;
 
     @Autowired
     public AgentConversationSlotService(CurrentUserAccessor currentUserAccessor,
             AgentSessionRepository sessionRepository, AgentMessageRepository messageRepository,
             AgentConversationSlotRepository slotRepository, ObjectMapper objectMapper, Clock clock,
-            CityResolutionService cityResolutionService, MovieTitleResolutionTool movieTitleResolutionTool) {
+            AgentCityCodeResolver cityCodeResolver, MovieTitleResolutionTool movieTitleResolutionTool) {
         this.currentUserAccessor = currentUserAccessor;
         this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
         this.slotRepository = slotRepository;
         this.objectMapper = objectMapper;
         this.clock = clock;
-        this.cityResolutionService = cityResolutionService;
+        this.cityCodeResolver = cityCodeResolver;
         this.movieTitleResolutionTool = movieTitleResolutionTool;
     }
 
@@ -72,9 +71,9 @@ public class AgentConversationSlotService {
     public AgentConversationSlotService(CurrentUserAccessor currentUserAccessor,
             AgentSessionRepository sessionRepository, AgentMessageRepository messageRepository,
             AgentConversationSlotRepository slotRepository, ObjectMapper objectMapper, Clock clock,
-            CityResolutionService cityResolutionService) {
+            AgentCityCodeResolver cityCodeResolver) {
         this(currentUserAccessor, sessionRepository, messageRepository, slotRepository, objectMapper, clock,
-                cityResolutionService, null);
+                cityCodeResolver, null);
     }
 
     /** 返回本轮唯一可用的服务端快照；无效回答保留旧值，由正常计划流程再次追问。 */
@@ -208,10 +207,7 @@ public class AgentConversationSlotService {
     }
 
     private String resolveCityCode(String text) {
-        CityResolutionService.CityResolution resolved = cityResolutionService.resolve(text);
-        return resolved.status() == CityResolutionService.Status.RESOLVED
-                ? cityResolutionService.findCityCode(resolved.cityName()).orElse(null)
-                : null;
+        return cityCodeResolver.resolveCityCode(text).orElse(null);
     }
 
     private String normalizeDate(String value) {
@@ -294,11 +290,19 @@ public class AgentConversationSlotService {
             if (("下午".equals(period) || "晚上".equals(period) || "今晚".equals(period)) && hour < 12) {
                 hour += 12;
             }
-            if (hour <= 23) return new String[] {String.format("%02d:00", hour), null};
+            if (hour <= 23) {
+                return new String[] {String.format("%02d:00", hour), null};
+            }
         }
-        if (value.contains("下午")) return new String[] {"12:00", "18:00"};
-        if (value.contains("晚上") || value.contains("今晚")) return new String[] {"18:00", "23:59"};
-        if (value.contains("上午")) return new String[] {"06:00", "12:00"};
+        if (value.contains("下午")) {
+            return new String[] {"12:00", "18:00"};
+        }
+        if (value.contains("晚上") || value.contains("今晚")) {
+            return new String[] {"18:00", "23:59"};
+        }
+        if (value.contains("上午")) {
+            return new String[] {"06:00", "12:00"};
+        }
         return null;
     }
 

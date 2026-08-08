@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.agent.application.persistence.AgentConversationSlotRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentConversationSlotService;
+import com.miaoyu.ticket.agent.application.persistence.AgentCityCodeResolver;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
@@ -155,7 +156,10 @@ class AgentConversationSlotServiceTest {
 
         var resolved = service.prepare("session-1", "我想看长沙的动作片", null);
 
-        assertThat(resolved.values()).containsOnlyKeys("cityCode").containsEntry("cityCode", "430100");
+        assertThat(resolved.values())
+                .containsOnlyKeys("cityCode", "genres")
+                .containsEntry("cityCode", "430100")
+                .containsEntry("genres", "[\"动作\"]");
         var persisted = org.mockito.ArgumentCaptor.forClass(String.class);
         verify(slots).update(org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.eq(9L),
                 org.mockito.ArgumentMatchers.eq(0L), persisted.capture());
@@ -210,8 +214,15 @@ class AgentConversationSlotServiceTest {
                 Clock.fixed(Instant.parse("2026-08-07T02:00:00Z"), ZoneId.of("Asia/Shanghai")), cityResolver());
     }
 
-    private static CityResolutionService cityResolver() {
-        return new CityResolutionService(new ObjectMapper(), new DefaultResourceLoader());
+    private static AgentCityCodeResolver cityResolver() {
+        CityResolutionService cityResolutionService = new CityResolutionService(
+                new ObjectMapper(), new DefaultResourceLoader());
+        return text -> {
+            CityResolutionService.CityResolution resolved = cityResolutionService.resolve(text);
+            return resolved.status() == CityResolutionService.Status.RESOLVED
+                    ? cityResolutionService.findCityCode(resolved.cityName())
+                    : java.util.Optional.empty();
+        };
     }
 
     private static SlotSnapshot prepareAnswer(String kind, String answer, String persistedJson) {
