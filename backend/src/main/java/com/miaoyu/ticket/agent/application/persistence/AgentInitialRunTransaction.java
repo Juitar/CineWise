@@ -123,7 +123,17 @@ public class AgentInitialRunTransaction {
         AgentRun existing = runRepository.findByClientRequestId(userId, session.id(), clientRequestId).orElse(null);
         if (existing != null) {
             if (!existing.requestHash().equals(requestHash)) {
-                throw new BusinessException(AgentErrorCode.REQUEST_HASH_MISMATCH);
+                // 重放会在首个请求已提交槽位后再次计算快照；内容相同仍必须返回原运行，
+                // 但不同内容复用同一 clientRequestId 仍然是冲突，不能借此覆盖原请求。
+                boolean sameOriginalContent = messageRepository.findByRunIdAndUserId(existing.id(), userId).stream()
+                        .filter(message -> message.role() == AgentMessageRole.USER)
+                        .map(AgentMessage::text)
+                        .findFirst()
+                        .map(content::equals)
+                        .orElse(false);
+                if (!sameOriginalContent) {
+                    throw new BusinessException(AgentErrorCode.REQUEST_HASH_MISMATCH);
+                }
             }
             return new AgentInitialRunResult(existing, true, slotSnapshot, prepared.conversationContext());
         }
