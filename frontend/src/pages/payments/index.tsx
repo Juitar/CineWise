@@ -9,7 +9,7 @@ import './index.css';
 
 /**
  * 模拟支付页面：/payments/:orderNo
- * 六位密码只在 PaymentPanel 内完成格式校验和清空，页面永远收不到密码值。
+ * 六位 PIN 只在 PaymentPanel 内完成格式校验和清空，页面永远收不到该值。
  */
 export default function PaymentPage() {
   const { orderNo = '' } = useParams<{ orderNo: string }>();

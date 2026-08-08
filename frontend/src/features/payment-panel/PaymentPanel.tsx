@@ -23,8 +23,8 @@ export interface PaymentPanelProps {
 }
 
 /**
- * 模拟支付面板展示并在组件内短暂校验六位数字输入。
- * 密码在触发无参数 onPay 回调前清空，不能传给页面容器、请求层或持久化存储。
+ * 模拟支付面板展示并在组件内短暂校验六位数字 PIN。
+ * PIN 在触发无参数 onPay 回调前清空，不能传给页面容器、请求层或持久化存储。
  */
 export const PaymentPanel: React.FC<PaymentPanelProps> = ({
   orderNo,
@@ -40,8 +40,8 @@ export const PaymentPanel: React.FC<PaymentPanelProps> = ({
   onCancelPayment,
 }) => {
   const isMobile = useMediaQuery('(max-width: 1023px)');
-  const [password, setPassword] = useState('');
-  const [passwordError, setPasswordError] = useState<string>();
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState<string>();
 
   if (status === 'LOADING') {
     return (
@@ -59,13 +59,13 @@ export const PaymentPanel: React.FC<PaymentPanelProps> = ({
   }
 
   const handlePay = () => {
-    if (!/^\d{6}$/.test(password)) {
-      setPasswordError('请输入六位数字');
+    if (!/^\d{6}$/.test(pin)) {
+      setPinError('请输入六位数字');
       return;
     }
-    // 密码只用于浏览器本地格式确认；调用业务回调前立即从组件内存清除。
-    setPassword('');
-    setPasswordError(undefined);
+    // PIN 只用于浏览器本地格式确认；调用业务回调前立即从组件内存清除。
+    setPin('');
+    setPinError(undefined);
     onPay?.();
   };
 
@@ -186,26 +186,29 @@ export const PaymentPanel: React.FC<PaymentPanelProps> = ({
           />
         </div>
       ) : (
-        <div className="payment-password-section">
-          <label className="payment-password-label" htmlFor="mock-payment-password">
-            六位模拟支付密码：
+        <div className="payment-pin-section">
+          <label className="payment-pin-label" htmlFor="mock-payment-pin">
+            六位模拟支付数字：
           </label>
-          <Input.Password
-            id="mock-payment-password"
-            className="payment-password-input"
-            value={password}
+          <Input
+            id="mock-payment-pin"
+            className="payment-pin-input"
+            type="text"
+            value={pin}
             maxLength={6}
             inputMode="numeric"
+            pattern="[0-9]*"
             autoComplete="off"
-            status={passwordError ? 'error' : undefined}
+            spellCheck={false}
+            status={pinError ? 'error' : undefined}
             disabled={isOfflineReadOnly || status !== 'NORMAL'}
             onChange={(event) => {
-              setPassword(event.target.value.replace(/\D/g, '').slice(0, 6));
-              setPasswordError(undefined);
+              setPin(event.target.value.replace(/\D/g, '').slice(0, 6));
+              setPinError(undefined);
             }}
-            aria-label="六位模拟支付密码"
+            aria-label="六位模拟支付数字"
           />
-          {passwordError && <div className="payment-password-error">{passwordError}</div>}
+          {pinError && <div className="payment-pin-error">{pinError}</div>}
           <div className="payment-actions">
             {isMobile ? (
               <MobileButton
