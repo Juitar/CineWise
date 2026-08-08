@@ -19,7 +19,7 @@ describe('stream.reset 恢复', () => {
     expect(getMessages).toHaveBeenCalledWith('session-example-1');
     expect(result.lastEventId).toBe('43');
     expect(result.runId).toBe('run-example-1');
-    expect(result.items).toContainEqual(expect.objectContaining({ text: '步骤已完成' }));
+    expect(result.items).toContainEqual(expect.objectContaining({ text: '已生成推荐结果' }));
   });
 
   it('水位线不一致时停止且不发送任何 GET', async () => {
