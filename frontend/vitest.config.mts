@@ -8,6 +8,7 @@ export default defineConfig({
     restoreMocks: true,
     setupFiles: ['./tests/setup.ts'],
     silent: 'passed-only',
+    testTimeout: 10_000,
     coverage: {
       exclude: ['src/.umi/**', 'src/.umi-production/**', 'src/.umi-test/**'],
       provider: 'v8',

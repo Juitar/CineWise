@@ -91,11 +91,7 @@ describe('Agent 事件投影', () => {
       createdAt: `2026-08-08T10:00:0${index + 1}+08:00`,
     }));
 
-    const projection = buildProjectionFromHistoryAndSnapshots(
-      'session-example-1',
-      messages,
-      [],
-    );
+    const projection = buildProjectionFromHistoryAndSnapshots('session-example-1', messages, []);
 
     expect(projection.items).toEqual([
       expect.objectContaining({ key: 'message:message-plan-latest', kind: 'card-placeholder' }),
@@ -222,9 +218,7 @@ describe('Agent 事件投影', () => {
     if (second.outcome !== 'applied') throw new Error();
 
     expect(
-      second.projection.items.filter(
-        (item) => item.kind === 'plan-card' && !item.confirmation,
-      ),
+      second.projection.items.filter((item) => item.kind === 'plan-card' && !item.confirmation),
     ).toHaveLength(1);
     expect(second.projection.items).toEqual(
       expect.arrayContaining([
