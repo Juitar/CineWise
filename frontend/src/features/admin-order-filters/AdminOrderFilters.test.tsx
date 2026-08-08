@@ -64,6 +64,14 @@ describe('AdminOrderFilters', () => {
     expect(screen.getByText('场次ID')).toBeInTheDocument();
     expect(screen.getByText('下单时间')).toBeInTheDocument();
 
+    expect(screen.getByPlaceholderText('请输入订单号')).toHaveAttribute('name', 'orderNo');
+    expect(screen.getByPlaceholderText('请输入用户ID或邮箱关键字')).toHaveAttribute(
+      'name',
+      'userKeyword',
+    );
+    expect(screen.getByPlaceholderText('请输入影片ID')).toHaveAttribute('name', 'movieId');
+    expect(screen.getByPlaceholderText('请输入场次ID')).toHaveAttribute('name', 'showId');
+
     expect(screen.queryByText('影片名称')).not.toBeInTheDocument();
   });
 

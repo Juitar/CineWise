@@ -92,6 +92,8 @@ export const AdminOrderFilters: React.FC<AdminOrderFiltersProps> = ({
         <div className="admin-order-filters-item">
           <div className="admin-order-filters-label">订单号</div>
           <Input
+            id="filter-orderNo"
+            name="orderNo"
             placeholder="请输入订单号"
             value={orderNo}
             onChange={(e) => setOrderNo(e.target.value)}
@@ -101,6 +103,8 @@ export const AdminOrderFilters: React.FC<AdminOrderFiltersProps> = ({
         <div className="admin-order-filters-item">
           <div className="admin-order-filters-label">用户关键词</div>
           <Input
+            id="filter-userKeyword"
+            name="userKeyword"
             placeholder="请输入用户ID或邮箱关键字"
             value={userKeyword}
             onChange={(e) => setUserKeyword(e.target.value)}
@@ -110,6 +114,7 @@ export const AdminOrderFilters: React.FC<AdminOrderFiltersProps> = ({
         <div className="admin-order-filters-item">
           <div className="admin-order-filters-label">订单状态</div>
           <Select
+            id="filter-status"
             className="admin-order-filters-control-full"
             placeholder="全部状态"
             allowClear
@@ -130,6 +135,8 @@ export const AdminOrderFilters: React.FC<AdminOrderFiltersProps> = ({
         <div className="admin-order-filters-item">
           <div className="admin-order-filters-label">影片ID</div>
           <Input
+            id="filter-movieId"
+            name="movieId"
             placeholder="请输入影片ID"
             value={movieId}
             onChange={(e) => setMovieId(e.target.value)}
@@ -139,6 +146,8 @@ export const AdminOrderFilters: React.FC<AdminOrderFiltersProps> = ({
         <div className="admin-order-filters-item">
           <div className="admin-order-filters-label">场次ID</div>
           <Input
+            id="filter-showId"
+            name="showId"
             placeholder="请输入场次ID"
             value={showId}
             onChange={(e) => setShowId(e.target.value)}
@@ -148,6 +157,7 @@ export const AdminOrderFilters: React.FC<AdminOrderFiltersProps> = ({
         <div className="admin-order-filters-item">
           <div className="admin-order-filters-label">下单时间</div>
           <RangePicker
+            id="filter-dates"
             className="admin-order-filters-control-full"
             placeholder={['开始日期', '结束日期']}
             value={dates}
