@@ -144,9 +144,9 @@ class AgentSessionPersistenceIntegrationTest {
         messageRepository.insert(question(session, 9_709_900_401L, now));
 
         var first = initialRunTransaction.submitConversation(
-                USER_ID, session.sessionId(), "2", "slot-retry-request", null);
+                USER_ID, session.sessionId(), "2", "slot-retry-request", "question");
         var retry = initialRunTransaction.submitConversation(
-                USER_ID, session.sessionId(), "2", "slot-retry-request", null);
+                USER_ID, session.sessionId(), "2", "slot-retry-request", "question");
 
         assertThat(retry.reused()).isTrue();
         assertThat(retry.run().id()).isEqualTo(first.run().id());

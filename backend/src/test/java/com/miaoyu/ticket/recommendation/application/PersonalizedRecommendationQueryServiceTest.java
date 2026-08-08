@@ -89,12 +89,20 @@ class PersonalizedRecommendationQueryServiceTest {
                 new RecommendationContentCandidateQueryService.CinemaCandidate(20L, "测试影院", null, null,
                         "MOCK", LocalDateTime.ofInstant(now, ZoneOffset.UTC),
                         LocalDateTime.ofInstant(now.plusSeconds(3600), ZoneOffset.UTC), false)));
-        RankedRecommendationCandidate show = new RankedRecommendationCandidate(
+        RankedRecommendationCandidate comprehensiveShow = new RankedRecommendationCandidate(
                 "10", "20", "30", new BigDecimal("39.90"),
                 now.plusSeconds(3600), now.plusSeconds(10800), List.of(), null, "TICKETING:MOCK", now,
                 now.plusSeconds(60));
+        RankedRecommendationCandidate lowPriceShow = new RankedRecommendationCandidate(
+                "10", "20", "31", new BigDecimal("29.90"),
+                now.plusSeconds(7200), now.plusSeconds(14400), List.of(), null, "TICKETING:MOCK", now,
+                now.plusSeconds(60));
+        RankedRecommendationCandidate earlyShow = new RankedRecommendationCandidate(
+                "10", "20", "32", new BigDecimal("49.90"),
+                now.plusSeconds(1800), now.plusSeconds(9000), List.of(), null, "TICKETING:MOCK", now,
+                now.plusSeconds(60));
         var batchResult = new RecommendationBatchShowtimeQueryPort.BatchResult(
-                List.of(show), false);
+                List.of(comprehensiveShow, lowPriceShow, earlyShow), false);
         when(showtimes.querySaleable(any(), any())).thenReturn(batchResult);
         MovieContent movie = new MovieContent(10L, "movie-10", "测试影片", "[\"喜剧\"]", 120, new BigDecimal("8.6"));
         when(contents.query(any())).thenReturn(new com.miaoyu.ticket.content.application.ContentResult<>(List.of(movie),
@@ -110,9 +118,16 @@ class PersonalizedRecommendationQueryServiceTest {
                 null, List.of("喜剧"), null, null, null, new BigDecimal("50.00"), List.of());
         var result = service.query(constraints);
 
-        assertThat(result.plans()).singleElement().satisfies(plan -> {
-            assertThat(plan.showId()).isEqualTo("30");
-            assertThat(plan.price()).isEqualByComparingTo("39.90");
+        assertThat(result.plans()).hasSize(3)
+                .extracting(RecommendationPlan::planType)
+                .containsExactly(
+                        RecommendationPlan.PlanType.COMPREHENSIVE,
+                        RecommendationPlan.PlanType.LOW_PRICE,
+                        RecommendationPlan.PlanType.EARLY_TIME);
+        assertThat(result.plans()).extracting(RecommendationPlan::showId).doesNotHaveDuplicates();
+        assertThat(result.plans()).first().satisfies(plan -> {
+            assertThat(plan.showId()).isEqualTo("31");
+            assertThat(plan.price()).isEqualByComparingTo("29.90");
             assertThat(plan.movieName()).isEqualTo("测试影片");
             assertThat(plan.cinemaName()).isEqualTo("测试影院");
             assertThat(plan.rating()).isEqualByComparingTo("8.6");

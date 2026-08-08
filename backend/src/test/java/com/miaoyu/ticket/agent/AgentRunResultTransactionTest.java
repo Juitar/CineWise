@@ -214,6 +214,10 @@ class AgentRunResultTransactionTest {
                 new ExecutionPlanStateMachine(new ToolRegistry(List.of())).initialize(emptyPlan), List.of(),
                 new ReplyGenerationResponse("你好，我可以帮你找电影。", AgentReplyMessageType.TEXT, new TextReplyFacts()));
         when(fixture.runRepository().updateTerminalWithCas(any(), eq(0L))).thenReturn(true);
+        when(fixture.runtimeEventService().append(any(), any(), any(), any())).thenAnswer(invocation ->
+                new com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEvent(
+                        1L, "session-1", "run-1", invocation.getArgument(2), invocation.getArgument(3),
+                        LocalDateTime.of(2026, 9, 3, 10, 0), LocalDateTime.of(2026, 8, 4, 10, 0)));
 
         fixture.transaction().record(run(), result);
 

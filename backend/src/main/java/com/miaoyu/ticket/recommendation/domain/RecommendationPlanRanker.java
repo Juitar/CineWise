@@ -7,7 +7,9 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /** 按固定权重生成三类不重复方案，避免模型或调用方改变排序。 */
 public final class RecommendationPlanRanker {
@@ -28,12 +30,18 @@ public final class RecommendationPlanRanker {
         BigDecimal max = filtered.stream().map(RankedRecommendationCandidate::price)
                 .max(BigDecimal::compareTo).orElseThrow();
         List<RecommendationPlan> plans = new ArrayList<>();
+        Set<String> selectedShowIds = new HashSet<>();
         for (RecommendationPlan.PlanType type : List.of(RecommendationPlan.PlanType.COMPREHENSIVE,
                 RecommendationPlan.PlanType.LOW_PRICE, RecommendationPlan.PlanType.EARLY_TIME)) {
             filtered.stream().map(candidate -> scored(candidate, constraints, min, max, type))
+                    // 同一场次只能展示在一张方案卡中；后续类型从自身排序中的下一条未使用候选开始选择。
+                    .filter(scored -> !selectedShowIds.contains(scored.candidate().showId()))
                     .sorted(comparator(type))
                     .findFirst()
-                    .ifPresent(scored -> plans.add(toPlan(scored, type)));
+                    .ifPresent(scored -> {
+                        plans.add(toPlan(scored, type));
+                        selectedShowIds.add(scored.candidate().showId());
+                    });
         }
         return List.copyOf(plans);
     }
