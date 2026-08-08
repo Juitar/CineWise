@@ -301,10 +301,14 @@ class AgentPersistenceMySqlIntegrationTest {
                     return failedRankResult(invocation.getArgument(0));
                 });
 
-        AgentMessageSubmissionResult result = messageSubmissionService.submit(new AgentMessageSubmissionCommand(
-                FIRST_SESSION, "推荐电影", "request-1", context.slotSnapshot(), context, 3_000L));
+        AgentMessageSubmissionResult result = new TransactionTemplate(transactionManager).execute(status -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
+            return messageSubmissionService.submit(new AgentMessageSubmissionCommand(
+                    FIRST_SESSION, "推荐电影", "request-1", context.slotSnapshot(), context, 3_000L));
+        });
 
         assertThat(toolCalledInsideTransaction).isFalse();
+        assertThat(result).isNotNull();
         assertThat(result.snapshot().run().status()).isEqualTo(AgentRunStatus.FAILED);
         assertThat(result.snapshot().messages()).hasSize(2);
         assertThat(sessionRepository.findBySessionIdAndUserId(FIRST_SESSION, USER_ID).orElseThrow().activeRunId())
