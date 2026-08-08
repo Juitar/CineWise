@@ -68,6 +68,12 @@ public class MybatisAgentSessionRepository implements AgentSessionRepository {
     }
 
     @Override
+    public boolean setSummaryIfAbsent(
+            long sessionId, long userId, String summary, LocalDateTime now) {
+        return mapper.setSessionSummaryIfAbsent(sessionId, userId, summary, now) == 1;
+    }
+
+    @Override
     public boolean releaseActiveRun(long sessionId, long runId) {
         return mapper.releaseActiveRun(sessionId, runId) == 1;
     }

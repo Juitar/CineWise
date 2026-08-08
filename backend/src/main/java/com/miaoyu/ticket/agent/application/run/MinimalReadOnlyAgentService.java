@@ -164,7 +164,7 @@ public final class MinimalReadOnlyAgentService {
                 }
                 state = stateMachine.startNode(state, node.nodeId());
                 // 一轮只产生一个缺失字段问题，避免同时追问多项导致用户回复无法可靠写回槽位。
-                QuestionReplyFacts facts = new QuestionReplyFacts(missingSlot);
+                QuestionReplyFacts facts = QuestionReplyFacts.fromToolSlot(missingSlot);
                 reply = generateReply(agentRequest, AgentReplyMessageType.QUESTION, facts);
                 state = stateMachine.succeedNode(state, node.nodeId());
                 continue;

@@ -228,6 +228,18 @@ class AgentRunResultTransactionTest {
     }
 
     @Test
+    void shouldPersistTextDeltaBeforeFinalAssistantMessage() {
+        Fixture fixture = fixture();
+
+        fixture.transaction().recordTextDelta(run(), "你好，正在为你整理观影需求。");
+
+        ArgumentCaptor<AgentStoredJson> payload = ArgumentCaptor.forClass(AgentStoredJson.class);
+        verify(fixture.runtimeEventService()).append(any(), any(), eq(AgentEventType.MESSAGE_DELTA), payload.capture());
+        assertEquals("{\"text\":\"你好，正在为你整理观影需求。\"}", payload.getValue().value());
+        verify(fixture.messageRepository(), never()).insert(any());
+    }
+
+    @Test
     void shouldPersistToolCompleteAndToolErrorWithStableNodeId() {
         Fixture fixture = fixture();
         ExecutionPlan plan = new ExecutionPlan("plan-tool", 1, List.of(new ExecutionPlanNode(

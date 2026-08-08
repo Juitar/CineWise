@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.miaoyu.ticket.agent.application.model.AgentIntent;
+import com.miaoyu.ticket.agent.application.model.IntentClassificationRequest;
 import com.miaoyu.ticket.agent.application.model.PlanGenerationRequest;
 import com.miaoyu.ticket.agent.application.model.ReplyGenerationRequest;
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
@@ -377,6 +379,15 @@ class AgentContractsAndPlanValidationTest {
         assertEquals(PlanNodeType.CALL_TOOL, result.candidatePlan().nodes().getFirst().type());
         assertTrue(result.candidatePlan().nodes().stream()
                 .noneMatch(node -> node.type() == PlanNodeType.ASK_USER));
+    }
+
+    @Test
+    void shouldRecognizeMovieGenreRequestWithoutExposingTravelCapability() {
+        ToolRegistry registry = new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan()));
+        MockModelGateway gateway = new MockModelGateway(new PlanSchemaValidator(registry), registry);
+
+        assertEquals(AgentIntent.MOVIE,
+                gateway.classifyIntent(new IntentClassificationRequest("我想看长沙的动作片")));
     }
 
     private static CandidatePlanNode node(

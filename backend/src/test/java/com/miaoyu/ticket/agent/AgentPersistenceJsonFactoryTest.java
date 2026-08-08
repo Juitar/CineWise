@@ -26,14 +26,17 @@ class AgentPersistenceJsonFactoryTest {
         AgentPersistenceJsonFactory factory = new AgentPersistenceJsonFactory(mapper);
 
         JsonNode payload = mapper.readTree(factory.cardPayload(new ReplyGenerationResponse(
-                "请补充cityCode。", AgentReplyMessageType.QUESTION, new QuestionReplyFacts("cityCode")),
+                "你想在哪个城市看电影？", AgentReplyMessageType.QUESTION,
+                QuestionReplyFacts.fromToolSlot("cityCode")),
                 LocalDateTime.of(2026, 8, 7, 10, 0)).value());
 
         assertThat(payload.path("type").asText()).isEqualTo("QUESTION");
         assertThat(payload.path("questionId").isTextual()).isTrue();
-        assertThat(payload.path("input").path("name").asText()).isEqualTo("cityCode");
+        assertThat(payload.path("questionKind").asText()).isEqualTo("CITY");
+        assertThat(payload.path("input").path("name").asText()).isEqualTo("城市");
         assertThat(payload.path("options").isArray()).isTrue();
         assertThat(payload.path("expiresAt").asText()).isEqualTo("2026-08-07T10:10+08:00");
+        assertThat(payload.toString()).doesNotContain("cityCode", "travelTaskId", "runId", "actionId");
     }
 
     @Test

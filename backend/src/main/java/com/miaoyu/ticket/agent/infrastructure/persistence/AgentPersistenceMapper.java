@@ -121,6 +121,18 @@ public interface AgentPersistenceMapper {
 
     @Update("""
             UPDATE agent_session
+               SET summary = #{summary}, update_time = #{now}
+             WHERE id = #{sessionId} AND user_id = #{userId} AND status = 'ACTIVE'
+               AND (summary IS NULL OR TRIM(summary) = '')
+            """)
+    int setSessionSummaryIfAbsent(
+            @Param("sessionId") long sessionId,
+            @Param("userId") long userId,
+            @Param("summary") String summary,
+            @Param("now") LocalDateTime now);
+
+    @Update("""
+            UPDATE agent_session
                SET active_run_id = NULL, version = version + 1
              WHERE id = #{sessionId} AND active_run_id = #{runId}
             """)
@@ -313,6 +325,11 @@ public interface AgentPersistenceMapper {
     List<AgentMessageEntity> findMessagesBySessionIdAndUserIdPage(
             @Param("sessionId") long sessionId, @Param("userId") long userId,
             @Param("offset") int offset, @Param("limit") int limit);
+
+    @Select("SELECT " + MESSAGE_COLUMNS + " FROM agent_message WHERE session_id = #{sessionId}"
+            + " AND user_id = #{userId} AND message_type = 'PLAN_CARD' ORDER BY id DESC LIMIT 1")
+    AgentMessageEntity findLatestPlanCardBySessionIdAndUserId(
+            @Param("sessionId") long sessionId, @Param("userId") long userId);
 
     @Select("SELECT COUNT(*) FROM agent_message WHERE session_id = #{sessionId} AND user_id = #{userId}")
     long countMessagesBySessionIdAndUserId(@Param("sessionId") long sessionId, @Param("userId") long userId);

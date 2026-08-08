@@ -28,6 +28,11 @@ public interface AgentSessionRepository {
     /** 仅在本人会话仍为 ACTIVE 且尚未占用活动运行时写入内部 run ID。 */
     boolean claimActiveRun(long sessionId, long userId, long runId, LocalDateTime runExpireAt);
 
+    /** 第一条用户消息写入会话标题；已有标题永远不覆盖。 */
+    default boolean setSummaryIfAbsent(long sessionId, long userId, String summary, LocalDateTime now) {
+        return false;
+    }
+
     /** 仅在会话仍指向当前内部 run ID 时释放，避免旧运行清除新运行。 */
     boolean releaseActiveRun(long sessionId, long runId);
 

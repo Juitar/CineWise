@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
  */
 public record ToolDefinition(
         String name,
+        String purpose,
         Class<? extends ToolCommand> commandType,
         Class<?> resultType,
         boolean readOnly,
@@ -25,6 +26,9 @@ public record ToolDefinition(
     public ToolDefinition {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("工具名称不能为空");
+        }
+        if (purpose == null || purpose.isBlank()) {
+            throw new IllegalArgumentException("工具用途不能为空");
         }
         Objects.requireNonNull(commandType, "Command 类型不能为空");
         Objects.requireNonNull(resultType, "结果类型不能为空");
@@ -48,6 +52,20 @@ public record ToolDefinition(
             // 只允许稳定正数业务码进入 Agent 回复；异常对象和 HTTP 状态不在这里透传。
             throw new IllegalArgumentException("错误码必须为正数");
         }
+    }
+
+    /** 兼容内部测试夹具；生产工具必须在定义处显式提供用途。 */
+    public ToolDefinition(
+            String name,
+            Class<? extends ToolCommand> commandType,
+            Class<?> resultType,
+            boolean readOnly,
+            Duration timeout,
+            boolean idempotencyRequired,
+            List<ToolInputDefinition> inputs,
+            Set<Integer> exposedErrorCodes) {
+        this(name, name, commandType, resultType, readOnly, timeout, idempotencyRequired, inputs,
+                exposedErrorCodes);
     }
 
     /**

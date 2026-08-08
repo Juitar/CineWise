@@ -53,6 +53,7 @@ public final class AgentToolDefinitions {
     public static ToolDefinition rankMoviePlan() {
         return new ToolDefinition(
                 RankMoviePlanTool.TARGET_NAME,
+                "根据城市、日期、人数和可选观影偏好生成可购买的观影方案",
                 RankMoviePlanCommand.class,
                 RecommendationPlanResult.class,
                 true,
@@ -83,6 +84,7 @@ public final class AgentToolDefinitions {
     public static ToolDefinition getTravelAdvice() {
         return new ToolDefinition(
                 GetTravelAdviceTool.TARGET_NAME,
+                "查询当前用户已有且已校验出行任务的天气与出行建议",
                 GetTravelAdviceCommand.class,
                 TravelAdviceToolResult.class,
                 true,
@@ -96,6 +98,7 @@ public final class AgentToolDefinitions {
     public static ToolDefinition queryAvailableDates() {
         return new ToolDefinition(
                 QueryAvailableDatesTool.TARGET_NAME,
+                "查询已确定影片和影院当前可购票的日期",
                 QueryAvailableDatesToolCommand.class,
                 QueryAvailableDatesToolResult.class,
                 true,
@@ -111,6 +114,7 @@ public final class AgentToolDefinitions {
     public static ToolDefinition queryShows() {
         return new ToolDefinition(
                 QueryShowsTool.TARGET_NAME,
+                "查询已确定影片、影院和日期的可用场次",
                 QueryShowsToolCommand.class,
                 QueryShowsToolResult.class,
                 true,
@@ -129,6 +133,7 @@ public final class AgentToolDefinitions {
     public static ToolDefinition createOrder() {
         return new ToolDefinition(
                 CreateOrderTool.TARGET_NAME,
+                "在用户确认后按已校验场次和座位创建订单",
                 ConfirmedOrderCommand.class,
                 CreateOrderToolResult.class,
                 false,

@@ -168,7 +168,8 @@ class MinimalReadOnlyAgentServiceTest {
                 "movieId", "101", "cinemaId", "201")));
 
         assertThat(result.reply().messageType()).isEqualTo(AgentReplyMessageType.QUESTION);
-        assertThat(result.reply().payload()).isEqualTo(new QuestionReplyFacts("cityCode"));
+        assertThat(result.reply().payload()).isEqualTo(QuestionReplyFacts.fromToolSlot("cityCode"));
+        assertThat(result.reply().text()).doesNotContain("cityCode", "movieId", "cinemaId", "showId");
         assertThat(result.candidatePlan().nodes()).singleElement().satisfies(node -> {
             assertThat(node.type()).isEqualTo(PlanNodeType.ASK_USER);
             assertThat(result.state().nodeState(node.nodeId()).status()).isEqualTo(PlanNodeStatus.SUCCESS);

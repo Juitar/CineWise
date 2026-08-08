@@ -4,6 +4,7 @@ import com.miaoyu.ticket.agent.application.model.ModelGateway;
 import com.miaoyu.ticket.agent.application.model.AgentIntent;
 import com.miaoyu.ticket.agent.application.model.IntentClassificationRequest;
 import com.miaoyu.ticket.agent.application.model.PlanGenerationRequest;
+import com.miaoyu.ticket.agent.application.model.PlanningToolDefinition;
 import com.miaoyu.ticket.agent.application.model.ReplyGenerationRequest;
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
 import com.miaoyu.ticket.agent.application.reply.TextReplyFacts;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.Locale;
+import java.util.function.Consumer;
 
 /**
  * B 的多工具计划主控。
@@ -42,6 +44,16 @@ public final class MultiToolSupervisor {
     private static final String TRAVEL_TASK_ID = "travelTaskId";
     /** 仅这些展示字段可以要求用户补充；各种业务引用 ID 必须由服务端结果或上下文提供。 */
     private static final Set<String> QUESTIONABLE_INPUTS = Set.of("cityCode", "date", "ticketCount");
+    /** 明确的观影表达先由服务端判定，避免模型超时或偶发误判把购票请求降级成闲聊。 */
+    private static final List<String> MOVIE_INTENT_TERMS = List.of(
+            "看电影", "想看", "要看", "推荐电影", "推荐影片", "场次", "影院", "影城", "购票", "买票", "选座",
+            "排片", "排场", "有场次", "哪里有", "哪有", "喜剧", "科幻", "动作片", "爱情片", "恐怖片", "悬疑片", "动画片");
+    /** 与真实网关的跨分片隔离一致，保证替换 ModelGateway 时也不会直接把模型原文写入 SSE。 */
+    private static final int TEXT_DELTA_HOLDBACK = 16;
+    private static final Set<String> FORBIDDEN_GENERAL_TEXT = Set.of(
+            "traveltaskid", "userid", "runid", "actionid", "planid", "showid", "movieid", "cinemaid",
+            "taskid", "orderid", "seatid", "ticketid", "refundid", "database id", "数据库id", "/api/",
+            "http://", "https://", "controller", "repository", "mapper", "<script", "<iframe");
 
     private final ModelGateway modelGateway;
     private final ToolRegistry toolRegistry;
@@ -74,8 +86,21 @@ public final class MultiToolSupervisor {
 
     /** 生成、校验并执行本轮可运行的只读节点；写节点始终保留给既有确认动作服务。 */
     public MultiToolSupervisorResult run(MultiToolSupervisorRequest request) {
+        return run(request, ignored -> {
+        });
+    }
+
+    /**
+     * 普通对话的文本分片只在模型网关已经完成输出安全检查后才会进入回调。观影规划和 Tool 调用仍然
+     * 保持原有结构化一次性结果，不能把模型计划或工具原始结果当成文本流推送。
+     */
+    public MultiToolSupervisorResult run(MultiToolSupervisorRequest request, Consumer<String> onTextDelta) {
         MultiToolSupervisorRequest supervisorRequest = Objects.requireNonNull(request, "请求不能为空");
-        AgentIntent intent = modelGateway.classifyIntent(new IntentClassificationRequest(supervisorRequest.input()));
+        Consumer<String> textDeltaConsumer = Objects.requireNonNull(onTextDelta, "文本分片回调不能为空");
+        if (supervisorRequest.trustedContextReply() != null) {
+            return trustedContextText(supervisorRequest);
+        }
+        AgentIntent intent = resolvedIntent(supervisorRequest);
         Set<String> allowedToolNames = allowedToolNames(intent, supervisorRequest.validationContext());
         if (allowedToolNames.isEmpty()) {
             // 普通会话没有可信 travelTaskId 来源；TRAVEL 也只能走安全文本，不能追问内部任务号。
@@ -83,16 +108,45 @@ public final class MultiToolSupervisor {
                     UUID.randomUUID().toString(), 1, List.of());
             PlanValidationResult emptyValidation = planSchemaValidator.validate(
                     emptyPlan, supervisorRequest.validationContext());
+            StreamedReply reply = generalChatReply(supervisorRequest, textDeltaConsumer);
             return new MultiToolSupervisorResult(emptyPlan, emptyValidation,
                     stateMachine.initialize(emptyValidation.executionPlan().orElseThrow()), List.of(), false,
-                    SAFE_GENERAL_CHAT, generalChatReply(supervisorRequest));
+                    SAFE_GENERAL_CHAT, reply.reply(), reply.streamed());
+        }
+        String missingMovieInput = intent == AgentIntent.MOVIE
+                ? firstMissingMovieInput(supervisorRequest.validationContext()) : null;
+        if (missingMovieInput != null && allowedToolNames.contains("rankMoviePlan")) {
+            var questionPlan = new com.miaoyu.ticket.agent.domain.plan.CandidatePlan(
+                    UUID.randomUUID().toString(), 1,
+                    List.of(new com.miaoyu.ticket.agent.domain.plan.CandidatePlanNode(
+                            "ask-" + missingMovieInput,
+                            com.miaoyu.ticket.agent.domain.plan.PlanNodeType.ASK_USER,
+                            "rankMoviePlan", List.of(), List.of(),
+                            com.miaoyu.ticket.agent.domain.plan.FailurePolicy.FAIL)));
+            PlanValidationResult questionValidation = validateForAllowedTools(
+                    questionPlan, supervisorRequest.validationContext(), allowedToolNames);
+            return execute(supervisorRequest, questionPlan, questionValidation,
+                    stateMachine.initialize(questionValidation.executionPlan().orElseThrow()),
+                    new ArrayList<>(), allowedToolNames);
+        }
+        if (intent == AgentIntent.MOVIE && allowedToolNames.contains("rankMoviePlan")) {
+            // 用户追问“哪里有场次/给几个排片”时，上一轮的上午、下午等时间条件只是
+            // 查不到结果的原因，不应继续锁死本轮查询；城市、日期、影片和人数仍然保留。
+            var moviePlan = trustedMovieRecommendationPlan(
+                    supervisorRequest.validationContext(), !isShowtimeDiscoveryRequest(supervisorRequest.input()));
+            PlanValidationResult movieValidation = validateForAllowedTools(
+                    moviePlan, supervisorRequest.validationContext(), allowedToolNames);
+            return execute(supervisorRequest, moviePlan, movieValidation,
+                    stateMachine.initialize(movieValidation.executionPlan().orElseThrow()),
+                    new ArrayList<>(), allowedToolNames);
         }
         var generated = modelGateway.generatePlan(new PlanGenerationRequest(
                 supervisorRequest.clientRequestId(),
                 supervisorRequest.input(),
                 supervisorRequest.validationContext().slotSnapshot().values(),
-                allowedToolNames,
-                profileContextPrefetcher.prefetch(supervisorRequest)));
+                planningTools(allowedToolNames),
+                profileContextPrefetcher.prefetch(supervisorRequest),
+                supervisorRequest.conversationContext()));
         PlanValidationResult validation = validateForAllowedTools(
                 generated.candidatePlan(), supervisorRequest.validationContext(), allowedToolNames);
         if (!validation.isValid()) {
@@ -108,6 +162,45 @@ public final class MultiToolSupervisor {
                 serverValidation,
                 stateMachine.initialize(serverValidation.executionPlan().orElseThrow()),
                 new ArrayList<>(), allowedToolNames);
+    }
+
+    /** 追问已由服务端补齐三个可信槽位后，固定执行推荐工具，不再为同一主流程再次等待模型规划。 */
+    private static com.miaoyu.ticket.agent.domain.plan.CandidatePlan trustedMovieRecommendationPlan(
+            com.miaoyu.ticket.agent.domain.plan.PlanValidationContext validationContext,
+            boolean includeTimeConstraints) {
+        List<com.miaoyu.ticket.agent.domain.plan.InputReference> inputs = new ArrayList<>(List.of(
+                slotReference("cityCode"), slotReference("date"), slotReference("ticketCount")));
+        String genres = validationContext.slotSnapshot().values().get("genres");
+        String movieId = validationContext.slotSnapshot().values().get("movieId");
+        if (movieId != null && !movieId.isBlank()) {
+            inputs.add(slotReference("movieId"));
+        }
+        if (genres != null && !genres.isBlank()) {
+            inputs.add(slotReference("genres"));
+        }
+        if (includeTimeConstraints && validationContext.slotSnapshot().values().containsKey("timeFrom")) {
+            inputs.add(slotReference("timeFrom"));
+        }
+        if (includeTimeConstraints && validationContext.slotSnapshot().values().containsKey("timeTo")) {
+            inputs.add(slotReference("timeTo"));
+        }
+        return new com.miaoyu.ticket.agent.domain.plan.CandidatePlan(
+                UUID.randomUUID().toString(), 1, List.of(
+                        new com.miaoyu.ticket.agent.domain.plan.CandidatePlanNode(
+                                "rank-movie-plan",
+                                com.miaoyu.ticket.agent.domain.plan.PlanNodeType.CALL_TOOL,
+                                "rankMoviePlan", inputs, List.of(),
+                                com.miaoyu.ticket.agent.domain.plan.FailurePolicy.RETRY_ONCE),
+                        new com.miaoyu.ticket.agent.domain.plan.CandidatePlanNode(
+                                "render-result",
+                                com.miaoyu.ticket.agent.domain.plan.PlanNodeType.RENDER_RESULT,
+                                null, List.of(), List.of("rank-movie-plan"),
+                                com.miaoyu.ticket.agent.domain.plan.FailurePolicy.FAIL)));
+    }
+
+    private static com.miaoyu.ticket.agent.domain.plan.InputReference slotReference(String name) {
+        return new com.miaoyu.ticket.agent.domain.plan.InputReference(
+                name, com.miaoyu.ticket.agent.domain.plan.InputReferenceSource.SLOT, name);
     }
 
     /**
@@ -187,7 +280,7 @@ public final class MultiToolSupervisor {
      */
     public MultiToolSupervisorResult replan(
             MultiToolSupervisorRequest request, MultiToolSupervisorResult previousResult) {
-        AgentIntent intent = modelGateway.classifyIntent(new IntentClassificationRequest(request.input()));
+        AgentIntent intent = resolvedIntent(request);
         return replan(request, previousResult, allowedToolNames(intent, request.validationContext()));
     }
 
@@ -202,8 +295,8 @@ public final class MultiToolSupervisor {
         }
         var generated = modelGateway.generatePlan(new PlanGenerationRequest(
                 supervisorRequest.clientRequestId(), supervisorRequest.input(),
-                supervisorRequest.validationContext().slotSnapshot().values(), allowedToolNames,
-                profileContextPrefetcher.prefetch(supervisorRequest)));
+                supervisorRequest.validationContext().slotSnapshot().values(), planningTools(allowedToolNames),
+                profileContextPrefetcher.prefetch(supervisorRequest), supervisorRequest.conversationContext()));
         PlanValidationResult validation = validateForAllowedTools(
                 generated.candidatePlan(), supervisorRequest.validationContext(), allowedToolNames);
         if (!validation.isValid()) {
@@ -246,32 +339,100 @@ public final class MultiToolSupervisor {
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
-    private com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse generalChatReply(
-            MultiToolSupervisorRequest request) {
+    /** 已持久化卡片的解释由服务端确定性生成；这里仅建立一个空计划完成本轮，不调用模型或 Tool。 */
+    private MultiToolSupervisorResult trustedContextText(MultiToolSupervisorRequest request) {
+        var emptyPlan = new com.miaoyu.ticket.agent.domain.plan.CandidatePlan(
+                UUID.randomUUID().toString(), 1, List.of());
+        PlanValidationResult validation = planSchemaValidator.validate(emptyPlan, request.validationContext());
+        return new MultiToolSupervisorResult(emptyPlan, validation,
+                stateMachine.initialize(validation.executionPlan().orElseThrow()), List.of(), false,
+                SAFE_GENERAL_CHAT, request.trustedContextReply(), false);
+    }
+
+    private List<PlanningToolDefinition> planningTools(Set<String> allowedToolNames) {
+        return allowedToolNames.stream().sorted()
+                .map(toolRegistry::find)
+                .flatMap(java.util.Optional::stream)
+                .map(definition -> PlanningToolDefinition.from(definition, QUESTIONABLE_INPUTS))
+                .toList();
+    }
+
+    private StreamedReply generalChatReply(
+            MultiToolSupervisorRequest request, Consumer<String> onTextDelta) {
         try {
-            var reply = modelGateway.generateReply(new ReplyGenerationRequest(
-                    request.clientRequestId(), request.input(), AgentReplyMessageType.TEXT, new TextReplyFacts()));
-            return isSafeGeneralText(reply.text()) ? reply : safeGeneralChatReply();
+            SafeTextDeltaForwarder forwarder = new SafeTextDeltaForwarder(onTextDelta);
+            var reply = modelGateway.generateReplyStream(new ReplyGenerationRequest(
+                    request.clientRequestId(), request.input(), AgentReplyMessageType.TEXT, new TextReplyFacts()),
+                    forwarder::append);
+            forwarder.complete();
+            return isSafeGeneralText(reply.text())
+                    ? new StreamedReply(reply, true)
+                    : new StreamedReply(safeGeneralChatReply(), false);
         } catch (RuntimeException exception) {
             // 供应商异常不能中断已创建的运行，也不能回显内部异常或改为调用 Tool。
-            return safeGeneralChatReply();
+            return new StreamedReply(safeGeneralChatReply(), false);
         }
     }
 
     /** 普通文本不能携带内部标识或服务端路径；命中后必须完全改为固定安全文案。 */
     private static boolean isSafeGeneralText(String text) {
-        String normalized = text == null ? "" : text.toLowerCase(Locale.ROOT);
-        return Set.of(
-                "traveltaskid", "userid", "runid", "actionid", "planid", "showid", "movieid",
-                "cinemaid", "taskid", "orderid", "seatid", "ticketid", "refundid", "database id",
-                "数据库id", "/api/", "http://", "https://", "controller", "repository", "mapper")
-                .stream().noneMatch(normalized::contains);
+        return text != null && !text.isBlank() && !containsForbiddenGeneralText(text);
     }
 
     private static com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse safeGeneralChatReply() {
         return new com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse(
                 "我可以帮你找电影、推荐观影方案或查询场次。你想看什么类型的电影？",
                 AgentReplyMessageType.TEXT, new TextReplyFacts());
+    }
+
+    /** 普通文本和是否已经写入流式事件必须一起返回，避免结束时重复发送整段回复。 */
+    private record StreamedReply(
+            com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse reply, boolean streamed) {
+    }
+
+    /**
+     * 应用层再次守住模型输出边界。留出尾部字符后再发送，能识别被供应商分成两段的内部标识；
+     * 该类不解析文本含义，更不会把文本转为工具输入。
+     */
+    private static final class SafeTextDeltaForwarder {
+        private final Consumer<String> consumer;
+        private final StringBuilder text = new StringBuilder();
+        private int emittedLength;
+
+        private SafeTextDeltaForwarder(Consumer<String> consumer) {
+            this.consumer = Objects.requireNonNull(consumer, "文本分片回调不能为空");
+        }
+
+        private void append(String delta) {
+            if (delta == null || delta.isEmpty()) {
+                return;
+            }
+            text.append(delta);
+            if (containsForbiddenGeneralText(text)) {
+                throw new IllegalArgumentException("模型文本不符合安全要求");
+            }
+            emitUntil(Math.max(0, text.length() - TEXT_DELTA_HOLDBACK));
+        }
+
+        private void complete() {
+            if (text.isEmpty() || containsForbiddenGeneralText(text)) {
+                throw new IllegalArgumentException("模型文本不符合安全要求");
+            }
+            emitUntil(text.length());
+        }
+
+        private void emitUntil(int length) {
+            if (emittedLength < length) {
+                consumer.accept(text.substring(emittedLength, length));
+                emittedLength = length;
+            }
+        }
+    }
+
+    private static boolean containsForbiddenGeneralText(CharSequence text) {
+        String normalized = text.toString().toLowerCase(Locale.ROOT);
+        String compact = normalized.replaceAll("[\\s_-]", "");
+        return FORBIDDEN_GENERAL_TEXT.stream().anyMatch(term -> normalized.contains(term) || compact.contains(term));
     }
 
     private Set<String> allowedToolNames(
@@ -287,6 +448,40 @@ public final class MultiToolSupervisor {
             return toolRegistry.find("getTravelAdvice").isPresent() ? Set.of("getTravelAdvice") : Set.of();
         }
         return Set.of();
+    }
+
+    /** QUESTION 的回答沿用服务端上一轮意图，不再把“明天”“两个人”单独交给模型重新分类。 */
+    private AgentIntent resolvedIntent(MultiToolSupervisorRequest request) {
+        if (request.inheritedIntent() == AgentIntent.MOVIE || isExplicitMovieRequest(request.input())) {
+            return AgentIntent.MOVIE;
+        }
+        return modelGateway.classifyIntent(new IntentClassificationRequest(request.input()));
+    }
+
+    private static boolean isExplicitMovieRequest(String input) {
+        if (input == null || input.isBlank()) {
+            return false;
+        }
+        String normalized = input.replaceAll("\\s+", "");
+        return MOVIE_INTENT_TERMS.stream().anyMatch(normalized::contains);
+    }
+
+    /**
+     * 用户是在询问“当前影片到底有哪些场次”，而不是继续坚持上一轮的时间段。
+     * 这类请求只放宽时间，不放宽城市、日期、人数或已确认影片，避免把旧条件全部清空。
+     */
+    private static boolean isShowtimeDiscoveryRequest(String input) {
+        if (input == null || input.isBlank()) {
+            return false;
+        }
+        String normalized = input.replaceAll("\\s+", "");
+        return normalized.contains("哪里有场次")
+                || normalized.contains("哪有场次")
+                || normalized.contains("有场次吗")
+                || normalized.contains("给我几个场次")
+                || normalized.contains("给几个场次")
+                || normalized.contains("排片")
+                || normalized.contains("排场");
     }
 
     private static boolean hasTrustedTravelTaskContext(
@@ -325,6 +520,17 @@ public final class MultiToolSupervisor {
                 .flatMap(definition -> definition.requiredInputs().stream())
                 .map(com.miaoyu.ticket.agent.domain.tool.ToolInputDefinition::name)
                 .filter(QUESTIONABLE_INPUTS::contains)
+                .filter(name -> {
+                    String value = validationContext.slotSnapshot().values().get(name);
+                    return value == null || value.isBlank();
+                })
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static String firstMissingMovieInput(
+            com.miaoyu.ticket.agent.domain.plan.PlanValidationContext validationContext) {
+        return List.of("cityCode", "date", "ticketCount").stream()
                 .filter(name -> {
                     String value = validationContext.slotSnapshot().values().get(name);
                     return value == null || value.isBlank();

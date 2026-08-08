@@ -42,9 +42,16 @@ public final class AgentRunReplyFactory {
         }
         if (result.safeNextAction() != null && result.safeNextAction().startsWith("QUESTION:")) {
             String missingSlot = result.safeNextAction().substring("QUESTION:".length());
+            QuestionReplyFacts facts;
+            try {
+                facts = QuestionReplyFacts.fromToolSlot(missingSlot);
+            } catch (IllegalArgumentException exception) {
+                return new com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse(
+                        "请补充可用于观影推荐的城市、日期或人数。", AgentReplyMessageType.TEXT,
+                        new TextReplyFacts());
+            }
             return new com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse(
-                    "请补充" + missingSlot + "。", AgentReplyMessageType.QUESTION,
-                    new QuestionReplyFacts(missingSlot));
+                    questionText(facts.kind()), AgentReplyMessageType.QUESTION, facts);
         }
         if (result.toolResults().stream().anyMatch(item -> item.result().status() == ToolStatus.PROCESSING)) {
             String nodeId = result.toolResults().stream()
@@ -84,6 +91,14 @@ public final class AgentRunReplyFactory {
         return new com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse(
                 "计划已保存，请等待下一步操作。", AgentReplyMessageType.PROGRESS,
                 new ProgressReplyFacts("plan"));
+    }
+
+    private static String questionText(QuestionReplyFacts.QuestionKind kind) {
+        return switch (kind) {
+            case CITY -> "你想在哪个城市看电影？";
+            case DATE -> "你想在哪天看电影？";
+            case TICKET_COUNT -> "一共几个人观看？";
+        };
     }
 
     /** 将多工具结果组装成持久化层可接收的 B 结果对象；D 类型依赖停留在应用映射边界。 */

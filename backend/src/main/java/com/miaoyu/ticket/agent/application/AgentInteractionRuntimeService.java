@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.springframework.stereotype.Service;
 
 /** Agent 交互应用门面；HTTP 层不直接依赖持久化用例或持久化领域模型。 */
@@ -93,6 +94,46 @@ public class AgentInteractionRuntimeService {
         var replay = replayService.replay(sessionId, cursor);
         return new StreamView(sessionId, submitted.snapshot().run().runId(), replay.reset(), replay.watermark(),
                 replay.events().stream().map(this::event).toList());
+    }
+
+    /**
+     * 先提交初始短事务并重放 {@code message.start}。调用方必须先发送 returned stream，
+     * 再调用 {@link #completeConversationAndReplay(StartedSubmission, long)}，从而不让模型耗时阻塞首包。
+     */
+    public StartedSubmission beginConversationAndReplay(
+            String sessionId, String clientRequestId, String content, String entry, long cursor) {
+        var submission = submissionService.beginConversation(sessionId, content, clientRequestId, entry, 30_000L);
+        var replay = replayService.replay(sessionId, cursor);
+        StreamView stream = new StreamView(sessionId, submission.initial().run().runId(), replay.reset(),
+                replay.watermark(), replay.events().stream().map(this::event).toList());
+        return new StartedSubmission(submission, stream);
+    }
+
+    /** 初始事件已发送后继续执行同一运行，并只重放首包水位线之后的新事件。 */
+    public StreamView completeConversationAndReplay(StartedSubmission submission, long cursor) {
+        return completeConversationAndReplay(submission, cursor, ignored -> {
+        });
+    }
+
+    /**
+     * 将已持久化的普通文本分片立即转换为既有 SSE 事件视图。调用方只能发送该视图，不能自行拼装
+     * 模型输出；回调异常不会影响运行完成和后续按游标重放。
+     */
+    public StreamView completeConversationAndReplay(
+            StartedSubmission submission, long cursor, Consumer<EventView> onTextDeltaRecorded) {
+        Consumer<EventView> eventConsumer = java.util.Objects.requireNonNull(
+                onTextDeltaRecorded, "文本事件回调不能为空");
+        AgentRun initialRun = submission.submission().initial().run();
+        var submitted = submissionService.completeConversation(submission.submission(), event -> {
+            try {
+                eventConsumer.accept(event(event, initialRun));
+            } catch (RuntimeException ignored) {
+                // 当前 SSE 断开后事件仍可由 replay 恢复，不能让回调异常写成运行失败。
+            }
+        });
+        var replay = replayService.replay(submission.stream().sessionId(), cursor);
+        return new StreamView(submission.stream().sessionId(), submitted.snapshot().run().runId(), replay.reset(),
+                replay.watermark(), replay.events().stream().map(this::event).toList());
     }
 
     /** 仅重放已经提交的事件，供当前 POST SSE 的安全失败分支使用。 */
@@ -234,6 +275,7 @@ public class AgentInteractionRuntimeService {
     private static String displayText(String eventType) {
         return switch (eventType) {
             case "message.start" -> "已接收消息";
+            case "message.delta" -> "正在生成回复";
             case "plan.created" -> "已生成执行计划";
             case "step.start" -> "步骤执行中";
             case "step.complete" -> "步骤已完成";
@@ -274,6 +316,12 @@ public class AgentInteractionRuntimeService {
     }
 
     public record StreamView(String sessionId, String runId, boolean reset, long watermark, List<EventView> events) {
+    }
+    /** 初始短事务与它已可见的 SSE 事件；只在当前服务内传递，不能由 HTTP 请求构造。 */
+    public record StartedSubmission(
+            com.miaoyu.ticket.agent.application.persistence.AgentMessageSubmissionService
+                    .ConversationSubmission submission,
+            StreamView stream) {
     }
     public record RunView(String runId, String sessionId, String status, String planId, Integer planVersion,
             OffsetDateTime startedAt, OffsetDateTime finishedAt, String lastEventId, List<RunMessageView> messages,

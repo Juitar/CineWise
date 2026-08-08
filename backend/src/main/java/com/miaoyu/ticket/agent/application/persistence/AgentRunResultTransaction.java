@@ -15,6 +15,7 @@ import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStatus;
 import com.miaoyu.ticket.agent.domain.persistence.AgentRunStep;
 import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
+import com.miaoyu.ticket.agent.domain.persistence.AgentRuntimeEvent;
 import com.miaoyu.ticket.agent.domain.plan.ExecutionPlanNode;
 import com.miaoyu.ticket.agent.domain.plan.PlanNodeStatus;
 import com.miaoyu.ticket.agent.domain.run.ExecutionNodeState;
@@ -72,13 +73,14 @@ public class AgentRunResultTransaction {
     /** 写入本轮结果；PROCESSING 保持 RUNNING 和活动会话引用。 */
     @Transactional
     public AgentRun record(AgentRun run, MinimalReadOnlyAgentResult result) {
-        return recordInternal(run, result, null);
+        return recordInternal(run, result, null, false).run();
     }
 
-    private AgentRun recordInternal(
+    private RecordedRunResult recordInternal(
             AgentRun run,
             MinimalReadOnlyAgentResult result,
-            List<MultiToolSupervisorResult.NodeToolResult> nodeToolResults) {
+            List<MultiToolSupervisorResult.NodeToolResult> nodeToolResults,
+            boolean replyTextStreamed) {
         Objects.requireNonNull(run, "运行不能为空");
         Objects.requireNonNull(result, "运行结果不能为空");
         LocalDateTime now = now();
@@ -97,11 +99,12 @@ public class AgentRunResultTransaction {
                     .toList());
         }
         messageRepository.insert(assistantMessage(run, result, now));
-        recordVisibleEvents(sessionFor(run), nextRun, result, nodeToolResults, now);
+        List<AgentRuntimeEvent> completionEvents = recordVisibleEvents(
+                sessionFor(run), nextRun, result, nodeToolResults, now, replyTextStreamed);
         if (nextStatus.isTerminal()) {
             sessionRepository.releaseActiveRun(run.sessionId(), run.id());
         }
-        return nextRun;
+        return new RecordedRunResult(nextRun, completionEvents);
     }
 
     /**
@@ -110,8 +113,38 @@ public class AgentRunResultTransaction {
      */
     @Transactional
     public AgentRun record(AgentRun run, MultiToolSupervisorResult result) {
+        return record(run, result, false);
+    }
+
+    /**
+     * {@code true} 仅表示本轮已经把普通文本分片持久化为事件。不能根据模型是否支持流式输出推断，
+     * 否则没有订阅者的内部调用会丢失唯一的 {@code message.delta}。
+     */
+    @Transactional
+    public AgentRun record(AgentRun run, MultiToolSupervisorResult result, boolean replyTextStreamed) {
+        return recordWithEvents(run, result, replyTextStreamed).run();
+    }
+
+    @Transactional
+    public RecordedRunResult recordWithEvents(
+            AgentRun run, MultiToolSupervisorResult result, boolean replyTextStreamed) {
         Objects.requireNonNull(result, "运行结果不能为空");
-        return recordInternal(run, AgentRunReplyFactory.asMinimalResult(result, clock.instant()), result.toolResults());
+        return recordInternal(run, AgentRunReplyFactory.asMinimalResult(result, clock.instant()), result.toolResults(),
+                replyTextStreamed);
+    }
+
+    /**
+     * 将已由模型网关过滤的普通文本分片写入既有 {@code message.delta} 事件。每个分片是独立短事务，
+     * 因此模型持续输出时，SSE 可以立即读取已提交的事件；最终消息仍由 {@link #record} 一次性保存。
+     */
+    @Transactional
+    public AgentRuntimeEvent recordTextDelta(AgentRun run, String text) {
+        Objects.requireNonNull(run, "运行不能为空");
+        if (text == null || text.isBlank()) {
+            throw new IllegalArgumentException("文本分片不能为空");
+        }
+        return runtimeEventService.append(sessionFor(run), run, AgentEventType.MESSAGE_DELTA,
+                jsonFactory.eventPayload(Map.of("text", text)));
     }
 
 
@@ -150,12 +183,13 @@ public class AgentRunResultTransaction {
                 jsonFactory.slotSnapshot(node), startedAt, finishedAt, 0L, now, now, run.expireAt());
     }
 
-    private void recordVisibleEvents(
+    private List<AgentRuntimeEvent> recordVisibleEvents(
             AgentSession session,
             AgentRun run,
             MinimalReadOnlyAgentResult result,
             List<MultiToolSupervisorResult.NodeToolResult> nodeToolResults,
-            LocalDateTime now) {
+            LocalDateTime now,
+            boolean replyTextStreamed) {
         ExecutionRunState state = result.state();
         if (state != null) {
             runtimeEventService.append(session, run, AgentEventType.PLAN_CREATED,
@@ -191,10 +225,29 @@ public class AgentRunResultTransaction {
         AgentStoredJson replyEventPayload = replyEvent == AgentEventType.CARD
                 ? jsonFactory.cardPayload(result.reply(), now)
                 : jsonFactory.eventPayload(Map.of("messageType", replyType.name()));
-        runtimeEventService.append(session, run, replyEvent, replyEventPayload);
+        if (replyType == AgentReplyMessageType.TEXT && !replyTextStreamed) {
+            runtimeEventService.append(session, run, AgentEventType.MESSAGE_DELTA,
+                    jsonFactory.eventPayload(Map.of("text", result.reply().text())));
+        }
+        AgentRuntimeEvent replyCompleted = runtimeEventService.append(session, run, replyEvent, replyEventPayload);
+        List<AgentRuntimeEvent> completionEvents = new ArrayList<>();
+        if (replyType == AgentReplyMessageType.TEXT) {
+            completionEvents.add(replyCompleted);
+        }
         if (run.status().isTerminal()) {
-            runtimeEventService.append(session, run, AgentEventType.RUN_COMPLETE,
+            AgentRuntimeEvent runCompleted = runtimeEventService.append(session, run, AgentEventType.RUN_COMPLETE,
                     jsonFactory.eventPayload(Map.of("status", run.status().name())));
+            if (replyType == AgentReplyMessageType.TEXT) {
+                completionEvents.add(runCompleted);
+            }
+        }
+        return List.copyOf(completionEvents);
+    }
+
+    public record RecordedRunResult(AgentRun run, List<AgentRuntimeEvent> completionEvents) {
+        public RecordedRunResult {
+            run = Objects.requireNonNull(run, "运行不能为空");
+            completionEvents = List.copyOf(completionEvents);
         }
     }
 

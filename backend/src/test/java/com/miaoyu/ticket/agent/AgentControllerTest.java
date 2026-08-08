@@ -30,6 +30,7 @@ import com.miaoyu.ticket.agent.domain.confirmation.ConfirmedOrderCommand;
 import com.miaoyu.ticket.agent.domain.confirmation.AgentActionWriteIdentifiers;
 import java.time.OffsetDateTime;
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.Executor;
 import org.springframework.beans.factory.ObjectProvider;
@@ -58,6 +59,11 @@ class AgentControllerTest {
         @SuppressWarnings("unchecked")
         ObjectProvider<TaskScheduler> taskSchedulerProvider = Mockito.mock(ObjectProvider.class);
         when(taskSchedulerProvider.getIfAvailable()).thenReturn(taskScheduler);
+        when(taskScheduler.schedule(org.mockito.ArgumentMatchers.any(Runnable.class),
+                org.mockito.ArgumentMatchers.any(Instant.class))).thenAnswer(invocation -> {
+                    invocation.getArgument(0, Runnable.class).run();
+                    return null;
+                });
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules()
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mockMvc = MockMvcBuilders.standaloneSetup(
@@ -219,9 +225,17 @@ class AgentControllerTest {
     @Test
     void shouldWritePersistedEventWithStableSseFields() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
-        when(runtimeService.submitAndReplay("session-1", "4fc7ae0d-1c05-4bc1-9ad8-c84b1c706925", "推荐电影",
-                "workspace", 0L)).thenReturn(new AgentInteractionRuntimeService.StreamView("session-1", "run-1",
-                        false, 7L, List.of(new AgentInteractionRuntimeService.EventView("7", "session-1", "run-1",
+        var started = new AgentInteractionRuntimeService.StartedSubmission(null,
+                new AgentInteractionRuntimeService.StreamView("session-1", "run-1", false, 7L,
+                        List.of(new AgentInteractionRuntimeService.EventView("7", "session-1", "run-1",
+                                null, null, null, "message.start", "已接收消息",
+                                objectMapper.readTree("{\"phase\":\"accepted\"}"),
+                                OffsetDateTime.parse("2026-08-05T10:00:00+08:00")))));
+        when(runtimeService.beginConversationAndReplay("session-1", "4fc7ae0d-1c05-4bc1-9ad8-c84b1c706925", "推荐电影",
+                "workspace", 0L)).thenReturn(started);
+        when(runtimeService.completeConversationAndReplay(eq(started), eq(7L), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new AgentInteractionRuntimeService.StreamView("session-1", "run-1", false, 8L,
+                        List.of(new AgentInteractionRuntimeService.EventView("8", "session-1", "run-1",
                                 "plan-1", 1, "rank-\"movie", "step.complete", "步骤已完成",
                                 objectMapper.readTree("{\"nodeId\":\"rank-\\\"movie\"}"),
                                 OffsetDateTime.parse("2026-08-05T10:00:01+08:00")))));
@@ -238,17 +252,30 @@ class AgentControllerTest {
 
         org.assertj.core.api.Assertions.assertThat(result.getResponse().getContentAsString())
                 .contains("id:7")
+                .contains("event:message.start")
+                .contains("id:8")
                 .contains("event:step.complete")
                 .contains("\"nodeId\":\"rank-\\\"movie\"");
-        verify(runtimeService).submitAndReplay("session-1", "4fc7ae0d-1c05-4bc1-9ad8-c84b1c706925", "推荐电影",
-                "workspace", 0L);
+        org.mockito.InOrder calls = Mockito.inOrder(runtimeService);
+        calls.verify(runtimeService).beginConversationAndReplay("session-1", "4fc7ae0d-1c05-4bc1-9ad8-c84b1c706925",
+                "推荐电影", "workspace", 0L);
+        calls.verify(runtimeService).completeConversationAndReplay(eq(started), eq(7L),
+                org.mockito.ArgumentMatchers.any());
     }
 
     @Test
     void shouldReplaySafeFailureEventsWhenSubmissionFailureWasPersisted() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
-        when(runtimeService.submitAndReplay("session-1", "4fc7ae0d-1c05-4bc1-9ad8-c84b1c706925", "推荐电影",
-                "workspace", 0L)).thenThrow(new AgentFailurePersistedException());
+        var started = new AgentInteractionRuntimeService.StartedSubmission(null,
+                new AgentInteractionRuntimeService.StreamView("session-1", "run-1", false, 7L,
+                        List.of(new AgentInteractionRuntimeService.EventView("7", "session-1", "run-1",
+                                null, null, null, "message.start", "已接收消息",
+                                objectMapper.readTree("{\"phase\":\"accepted\"}"),
+                                OffsetDateTime.parse("2026-08-05T10:00:00+08:00")))));
+        when(runtimeService.beginConversationAndReplay("session-1", "4fc7ae0d-1c05-4bc1-9ad8-c84b1c706925", "推荐电影",
+                "workspace", 0L)).thenReturn(started);
+        when(runtimeService.completeConversationAndReplay(eq(started), eq(7L), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new AgentFailurePersistedException());
         var failedReplay = new AgentInteractionRuntimeService.StreamView("session-1", "run-1", false, 9L, List.of(
                         new AgentInteractionRuntimeService.EventView("8", "session-1", "run-1", null, null, null,
                                 "message.error", "本次请求未完成", objectMapper.readTree("{\"reason\":\"RUN_FAILED\"}"),
@@ -256,7 +283,7 @@ class AgentControllerTest {
                         new AgentInteractionRuntimeService.EventView("9", "session-1", "run-1", null, null, null,
                                 "run.complete", "运行已结束", objectMapper.readTree("{\"status\":\"FAILED\"}"),
                                 OffsetDateTime.parse("2026-08-05T10:00:02+08:00"))));
-        when(runtimeService.replayPersistedEvents("session-1", 0L)).thenReturn(failedReplay);
+        when(runtimeService.replayPersistedEvents("session-1", 7L)).thenReturn(failedReplay);
 
         MvcResult result = mockMvc.perform(post("/api/v1/agent/sessions/session-1/messages/stream")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -274,7 +301,7 @@ class AgentControllerTest {
                 .contains("id:9")
                 .contains("event:run.complete")
                 .doesNotContain("数据库故障详情");
-        verify(runtimeService).replayPersistedEvents("session-1", 0L);
+        verify(runtimeService).replayPersistedEvents("session-1", 7L);
     }
 
     private static AgentConfirmationAction action() {

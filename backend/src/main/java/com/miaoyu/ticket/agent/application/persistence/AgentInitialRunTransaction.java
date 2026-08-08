@@ -28,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AgentInitialRunTransaction {
     private static final int RETENTION_DAYS = 30;
+    /** 首包进度不带 text，前端按既有 message.delta 进度项展示，不能与最终回复正文拼接。 */
+    private static final AgentStoredJson INITIAL_PROGRESS_PAYLOAD = new AgentStoredJson("{\"phase\":\"generating\"}");
 
     private final AgentSessionRepository sessionRepository;
     private final AgentRunRepository runRepository;
@@ -100,6 +102,7 @@ public class AgentInitialRunTransaction {
         }
         runtimeEventService.append(session, run, AgentEventType.MESSAGE_START,
                 new AgentStoredJson("{\"phase\":\"accepted\"}"));
+        runtimeEventService.append(session, run, AgentEventType.MESSAGE_DELTA, INITIAL_PROGRESS_PAYLOAD);
         return new AgentInitialRunResult(run, false);
     }
 
@@ -122,7 +125,7 @@ public class AgentInitialRunTransaction {
             if (!existing.requestHash().equals(requestHash)) {
                 throw new BusinessException(AgentErrorCode.REQUEST_HASH_MISMATCH);
             }
-            return new AgentInitialRunResult(existing, true, slotSnapshot);
+            return new AgentInitialRunResult(existing, true, slotSnapshot, prepared.conversationContext());
         }
         conversationSlotService.persistLocked(session, userId, prepared);
         long runId = idGenerator.nextId();
@@ -141,13 +144,29 @@ public class AgentInitialRunTransaction {
         }
         messageRepository.insert(new AgentMessage(
                 idGenerator.nextId(), UUID.randomUUID().toString(), session.id(), runId, userId,
-                AgentMessageRole.USER, AgentMessageType.TEXT, content, null, AgentMessageStatus.COMPLETED,
+                AgentMessageRole.USER, AgentMessageType.TEXT, content, userMessagePayload(entry),
+                AgentMessageStatus.COMPLETED,
                 now, now, expireAt));
+        sessionRepository.setSummaryIfAbsent(session.id(), userId, sessionSummary(content), now);
         if (!sessionRepository.claimActiveRun(session.id(), userId, runId, expireAt)) {
             throw new BusinessException(AgentErrorCode.ACTIVE_RUN_CONFLICT);
         }
         runtimeEventService.append(session, run, AgentEventType.MESSAGE_START,
                 new AgentStoredJson("{\"phase\":\"accepted\"}"));
-        return new AgentInitialRunResult(run, false, slotSnapshot);
+        runtimeEventService.append(session, run, AgentEventType.MESSAGE_DELTA, INITIAL_PROGRESS_PAYLOAD);
+        return new AgentInitialRunResult(run, false, slotSnapshot, prepared.conversationContext());
+    }
+
+    /** 只保存受控展示来源；普通输入保持旧 payload，其他任意 entry 也不能伪装成追问回答。 */
+    private static AgentStoredJson userMessagePayload(String entry) {
+        return "question".equals(entry) ? new AgentStoredJson("{\"entry\":\"question\"}") : null;
+    }
+
+    private static String sessionSummary(String content) {
+        String normalized = content == null ? "" : content.strip().replaceAll("\\s+", " ");
+        if (normalized.length() <= 80) {
+            return normalized;
+        }
+        return normalized.substring(0, 80) + "…";
     }
 }

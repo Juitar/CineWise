@@ -7,9 +7,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /** 按固定权重生成三类不重复方案，避免模型或调用方改变排序。 */
 public final class RecommendationPlanRanker {
@@ -29,16 +27,11 @@ public final class RecommendationPlanRanker {
                 .min(BigDecimal::compareTo).orElseThrow();
         BigDecimal max = filtered.stream().map(RankedRecommendationCandidate::price)
                 .max(BigDecimal::compareTo).orElseThrow();
-        Set<String> usedShows = new HashSet<>();
         List<RecommendationPlan> plans = new ArrayList<>();
         for (RecommendationPlan.PlanType type : List.of(RecommendationPlan.PlanType.COMPREHENSIVE,
                 RecommendationPlan.PlanType.LOW_PRICE, RecommendationPlan.PlanType.EARLY_TIME)) {
             filtered.stream().map(candidate -> scored(candidate, constraints, min, max, type))
-                    .sorted(Comparator.comparingDouble(Scored::score).reversed()
-                            .thenComparing(scored -> scored.candidate().price())
-                            .thenComparing(scored -> scored.candidate().startTime())
-                            .thenComparing(scored -> scored.candidate().showId()))
-                    .filter(scored -> usedShows.add(scored.candidate().showId()))
+                    .sorted(comparator(type))
                     .findFirst()
                     .ifPresent(scored -> plans.add(toPlan(scored, type)));
         }
@@ -84,6 +77,21 @@ public final class RecommendationPlanRanker {
         LocalDateTime start = LocalDateTime.ofInstant(candidate.startTime(), BUSINESS_ZONE);
         long minutes = java.time.Duration.between(constraints.timeFrom(), start.toLocalTime()).toMinutes();
         return Math.max(0D, 100D - Math.max(0L, minutes) / 30D * 15D);
+    }
+
+    private static Comparator<Scored> comparator(RecommendationPlan.PlanType type) {
+        return switch (type) {
+            case LOW_PRICE -> Comparator.comparing((Scored scored) -> scored.candidate().price())
+                    .thenComparing(scored -> scored.candidate().startTime())
+                    .thenComparing(scored -> scored.candidate().showId());
+            case EARLY_TIME -> Comparator.comparing((Scored scored) -> scored.candidate().startTime())
+                    .thenComparing(scored -> scored.candidate().price())
+                    .thenComparing(scored -> scored.candidate().showId());
+            case COMPREHENSIVE, NEAREST -> Comparator.comparingDouble(Scored::score).reversed()
+                    .thenComparing(scored -> scored.candidate().price())
+                    .thenComparing(scored -> scored.candidate().startTime())
+                    .thenComparing(scored -> scored.candidate().showId());
+        };
     }
 
     private static RecommendationPlan toPlan(Scored scored, RecommendationPlan.PlanType type) {

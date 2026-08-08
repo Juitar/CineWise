@@ -16,10 +16,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.UUID;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -28,6 +31,8 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.security.concurrent.DelegatingSecurityContextExecutor;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -132,9 +137,17 @@ public class AgentController {
     @PostMapping(value = "/sessions/{sessionId}/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter submitAndStream(@PathVariable String sessionId,
             @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId,
-            @Valid @RequestBody AgentMessageStreamRequest request) {
+            @Valid @RequestBody AgentMessageStreamRequest request,
+            HttpServletResponse response) {
         long cursor = parseCursor(lastEventId);
-        SseEmitter emitter = new SseEmitter(30_000L);
+        // 初始短事务必须留在请求线程：活动运行冲突等业务异常应直接返回 HTTP 错误，
+        // 不能在 SSE 已经返回 200 后丢到后台线程，导致页面永远停在“思考中”。
+        AgentInteractionRuntimeService.StartedSubmission started =
+                runtimeService.beginConversationAndReplay(sessionId, request.clientRequestId(),
+                        request.content(), request.context().entry(), cursor);
+        response.setHeader("Cache-Control", "no-cache, no-transform");
+        response.setHeader("X-Accel-Buffering", "no");
+        SseEmitter emitter = new SseEmitter(0L);
         AtomicReference<ScheduledFuture<?>> heartbeat = new AtomicReference<>();
         Runnable cancelHeartbeat = () -> cancelHeartbeat(heartbeat);
         SseDisconnectHandler disconnectHandler = new SseDisconnectHandler(cancelHeartbeat);
@@ -148,16 +161,44 @@ public class AgentController {
         if (taskScheduler != null) {
             heartbeat.set(taskScheduler.scheduleAtFixedRate(() -> sendHeartbeat(emitter), HEARTBEAT_INTERVAL));
         }
-        try {
-            new DelegatingSecurityContextExecutor(applicationTaskExecutor).execute(() -> {
+        // 请求结束时 Spring 会清空原 SecurityContext，不能把原对象直接交给延迟任务；
+        // 这里复制认证信息，保证 SseEmitter 建立后后台 Agent 仍能获得当前用户。
+        SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+        securityContext.setAuthentication(SecurityContextHolder.getContext().getAuthentication());
+        Executor authenticatedExecutor =
+                new DelegatingSecurityContextExecutor(applicationTaskExecutor, securityContext);
+        Runnable beginAfterEmitterReady = () -> {
+            // 先提交响应头和一个完整 SSE 注释块，浏览器无需等待数据库或模型即可建立流。
+            sendHeartbeat(emitter);
+            authenticatedExecutor.execute(() -> {
                 try {
-                    var submission = runtimeService.submitAndReplay(
-                            sessionId, request.clientRequestId(), request.content(), request.context().entry(), cursor);
-                    writeEvents(emitter, submission);
+                    // 初始短事务已提交；首包必须在模型和工具执行前发出，但不能关闭 SSE。
+                    writeEvents(emitter, started.stream(), false);
+                    long replayCursor = lastSentEventId(started.stream(), cursor);
+                    AtomicLong sentCursor = new AtomicLong(replayCursor);
+                    var completion = runtimeService.completeConversationAndReplay(started, replayCursor,
+                            event -> {
+                                writeEvent(emitter, event);
+                                sentCursor.accumulateAndGet(Long.parseLong(event.eventId()), Math::max);
+                            });
+                    writeEvents(emitter, onlyAfter(completion, sentCursor.get()), true);
                 } catch (AgentFailurePersistedException exception) {
-                    writeEvents(emitter, runtimeService.replayPersistedEvents(sessionId, cursor));
+                    long replayCursor = lastSentEventId(started.stream(), cursor);
+                    writeEvents(emitter, onlyAfter(runtimeService.replayPersistedEvents(sessionId, replayCursor),
+                            replayCursor), true);
+                } catch (RuntimeException exception) {
+                    cancelHeartbeat.run();
+                    emitter.completeWithError(exception);
                 }
             });
+        };
+        try {
+            if (taskScheduler != null) {
+                // 让 MVC 完成 SseEmitter 绑定后再写首事件，避免被容器缓存到整条响应结束。
+                taskScheduler.schedule(beginAfterEmitterReady, Instant.now().plusMillis(25));
+            } else {
+                beginAfterEmitterReady.run();
+            }
         } catch (RuntimeException exception) {
             cancelHeartbeat.run();
             throw exception;
@@ -181,7 +222,7 @@ public class AgentController {
     }
 
     private void writeEvents(
-            SseEmitter emitter, AgentInteractionRuntimeService.StreamView replay) {
+            SseEmitter emitter, AgentInteractionRuntimeService.StreamView replay, boolean complete) {
         try {
             if (replay.reset()) {
                 emitter.send(SseEmitter.event().id(Long.toString(replay.watermark())).name("stream.reset")
@@ -190,9 +231,20 @@ public class AgentController {
                                 cardPayload("{\"watermark\":\"" + replay.watermark() + "\"}"), null)));
             }
             for (var event : replay.events()) {
-                emitter.send(SseEmitter.event().id(event.eventId()).name(event.eventType()).data(eventSummary(event)));
+                writeEvent(emitter, event);
             }
-            emitter.complete();
+            if (complete) {
+                emitter.complete();
+            }
+        } catch (IOException exception) {
+            emitter.completeWithError(exception);
+        }
+    }
+
+    /** 已提交的文本分片必须马上写入当前 SSE；写失败只结束这条连接，事件仍可按游标恢复。 */
+    private void writeEvent(SseEmitter emitter, AgentInteractionRuntimeService.EventView event) {
+        try {
+            emitter.send(SseEmitter.event().id(event.eventId()).name(event.eventType()).data(eventSummary(event)));
         } catch (IOException exception) {
             emitter.completeWithError(exception);
         }
@@ -211,6 +263,22 @@ public class AgentController {
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException("Last-Event-ID 必须是非负十进制整数");
         }
+    }
+
+    private static long lastSentEventId(AgentInteractionRuntimeService.StreamView stream, long fallback) {
+        if (stream.events().isEmpty()) {
+            return fallback;
+        }
+        return Long.parseLong(stream.events().getLast().eventId());
+    }
+
+    /** 流式文本已经实时写过，最终 replay 只补尚未发送的计划、卡片和完成事件。 */
+    private static AgentInteractionRuntimeService.StreamView onlyAfter(
+            AgentInteractionRuntimeService.StreamView stream, long cursor) {
+        return new AgentInteractionRuntimeService.StreamView(stream.sessionId(), stream.runId(), stream.reset(),
+                stream.watermark(), stream.events().stream()
+                        .filter(event -> Long.parseLong(event.eventId()) > cursor)
+                        .toList());
     }
 
     private AgentCardEventResponse eventSummary(AgentInteractionRuntimeService.EventView event) {

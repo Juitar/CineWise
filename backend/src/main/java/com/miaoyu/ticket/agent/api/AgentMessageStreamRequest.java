@@ -14,6 +14,6 @@ public record AgentMessageStreamRequest(
         @NotBlank @Size(max = 2000) String content,
         @NotNull @Valid Context context) {
 
-    public record Context(@NotBlank @Size(max = 64) String entry) {
+    public record Context(@NotBlank @Pattern(regexp = "^(workspace|question)$") String entry) {
     }
 }

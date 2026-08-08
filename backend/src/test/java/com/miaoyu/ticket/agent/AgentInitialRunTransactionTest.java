@@ -8,6 +8,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 import com.miaoyu.ticket.agent.application.AgentErrorCode;
@@ -21,6 +22,8 @@ import com.miaoyu.ticket.agent.application.persistence.AgentRuntimeEventService;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSessionStatus;
+import com.miaoyu.ticket.agent.domain.persistence.AgentEventType;
+import com.miaoyu.ticket.agent.domain.persistence.AgentStoredJson;
 import com.miaoyu.ticket.agent.domain.plan.SlotSnapshot;
 import com.miaoyu.ticket.agent.domain.plan.PlanValidationContext;
 import com.miaoyu.ticket.common.error.BusinessException;
@@ -31,6 +34,7 @@ import java.time.ZoneId;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 import org.springframework.dao.DuplicateKeyException;
@@ -50,6 +54,21 @@ class AgentInitialRunTransactionTest {
         order.verify(fixture.runRepository()).insert(any());
         order.verify(fixture.messageRepository()).insert(any());
         order.verify(fixture.sessionRepository()).claimActiveRun(1L, 7L, 100L, NOW.plusDays(30));
+    }
+
+    @Test
+    void shouldAppendInitialProgressWithoutReplyText() {
+        Fixture fixture = fixture(true);
+
+        fixture.transaction().submit(7L, command());
+
+        ArgumentCaptor<AgentEventType> types = ArgumentCaptor.forClass(AgentEventType.class);
+        ArgumentCaptor<AgentStoredJson> payloads = ArgumentCaptor.forClass(AgentStoredJson.class);
+        verify(fixture.runtimeEventService(), times(2)).append(any(), any(), types.capture(), payloads.capture());
+        assertEquals(java.util.List.of(AgentEventType.MESSAGE_START, AgentEventType.MESSAGE_DELTA),
+                types.getAllValues());
+        assertEquals("{\"phase\":\"accepted\"}", payloads.getAllValues().getFirst().value());
+        assertEquals("{\"phase\":\"generating\"}", payloads.getAllValues().get(1).value());
     }
 
     @Test
@@ -154,7 +173,7 @@ class AgentInitialRunTransactionTest {
                 conversationSlotService,
                 idGenerator,
                 Clock.fixed(Instant.parse("2026-08-04T02:00:00Z"), ZoneId.of("Asia/Shanghai")));
-        return new Fixture(transaction, sessionRepository, runRepository, messageRepository);
+        return new Fixture(transaction, sessionRepository, runRepository, messageRepository, runtimeEventService);
     }
 
     private static AgentMessageSubmissionCommand command() {
@@ -182,7 +201,8 @@ class AgentInitialRunTransactionTest {
             AgentInitialRunTransaction transaction,
             AgentSessionRepository sessionRepository,
             AgentRunRepository runRepository,
-            AgentMessageRepository messageRepository) {
+            AgentMessageRepository messageRepository,
+            AgentRuntimeEventService runtimeEventService) {
     }
     private static final java.time.LocalDateTime NOW = java.time.LocalDateTime.of(2026, 8, 4, 10, 0);
 }

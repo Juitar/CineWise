@@ -76,6 +76,31 @@ class MultiToolSupervisorTest {
     }
 
     @Test
+    void shouldReturnTrustedPlanExplanationWithoutClassifyingOrCallingTool() {
+        ToolRegistry registry = new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan()));
+        PlanSchemaValidator validator = new PlanSchemaValidator(registry);
+        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry);
+        ModelGateway gateway = Mockito.mock(ModelGateway.class);
+        RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
+        when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
+        when(adapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
+        MultiToolSupervisor supervisor = new MultiToolSupervisor(
+                gateway, registry, validator, stateMachine, List.of(adapter));
+        ReplyGenerationResponse explanation = new ReplyGenerationResponse(
+                "第2个方案不需要继续调整。", AgentReplyMessageType.TEXT, new TextReplyFacts());
+
+        var result = supervisor.run(new MultiToolSupervisorRequest(
+                "explain-1", "解释第2个方案", context(), "run-explain", "trace-explain", 3_000L,
+                null, null, null, null, explanation));
+
+        assertThat(result.generatedReply()).isEqualTo(explanation);
+        assertThat(result.toolResults()).isEmpty();
+        Mockito.verify(gateway, never()).classifyIntent(any());
+        Mockito.verify(gateway, never()).generatePlan(any());
+        Mockito.verify(adapter, never()).execute(any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class));
+    }
+
+    @Test
     void shouldNotAskForTravelTaskIdWhenTravelIntentHasNoTrustedContext() {
         ToolRegistry registry = new ToolRegistry(List.of(
                 AgentToolDefinitions.rankMoviePlan(), AgentToolDefinitions.getTravelAdvice()));
@@ -211,9 +236,8 @@ class MultiToolSupervisorTest {
                         Instant.parse("2026-08-05T01:00:00Z"))));
         when(profileTool.execute(any())).thenReturn(new ToolResult<>(ToolStatus.SUCCESS, summary, null, false,
                 false, null, false, null, 3L, Instant.now(), Instant.now().plusSeconds(1)));
-        CandidatePlan plan = new CandidatePlan("model-plan", 1, List.of(new CandidatePlanNode(
-                "ask", PlanNodeType.ASK_USER, null, List.of(), List.of(), FailurePolicy.FAIL)));
-        var context = new PlanValidationContext(Map.of(), Map.of(), new SlotSnapshot(1L, Map.of()));
+        CandidatePlan plan = new CandidatePlan("model-plan", 1, List.of());
+        var context = context();
         when(gateway.generatePlan(any())).thenReturn(
                 new PlanGenerationResponse(plan, validator.validate(plan, context)));
         MultiToolSupervisor supervisor = new MultiToolSupervisor(gateway, registry, validator, stateMachine,
@@ -488,6 +512,40 @@ class MultiToolSupervisorTest {
     }
 
     @Test
+    void shouldInheritMovieIntentAndCarryOriginalRequestOutsideTrustedSlots() {
+        ToolRegistry registry = new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan()));
+        PlanSchemaValidator validator = new PlanSchemaValidator(registry);
+        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry);
+        ModelGateway gateway = Mockito.mock(ModelGateway.class);
+        when(gateway.classifyIntent(any())).thenReturn(AgentIntent.GENERAL_CHAT);
+        CandidatePlan emptyPlan = new CandidatePlan("model-plan", 1, List.of());
+        PlanValidationContext answerContext = new PlanValidationContext(
+                Map.of("cityCode", String.class, "date", LocalDate.class, "ticketCount", Integer.class),
+                Map.of(), new SlotSnapshot(3L, Map.of(
+                        "cityCode", "430100", "date", "2026-08-08", "ticketCount", "2")));
+        when(gateway.generatePlan(any())).thenReturn(
+                new PlanGenerationResponse(emptyPlan, validator.validate(emptyPlan, answerContext)));
+        RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
+        when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
+        when(adapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
+        MultiToolSupervisor supervisor = new MultiToolSupervisor(
+                gateway, registry, validator, stateMachine, List.of(adapter));
+
+        supervisor.run(new MultiToolSupervisorRequest(
+                "follow-up", "明天", answerContext, "run-follow-up", "trace-follow-up", 3_000L,
+                null, null, "我想看长沙蜘蛛侠", AgentIntent.MOVIE));
+
+        var captured = org.mockito.ArgumentCaptor.forClass(
+                com.miaoyu.ticket.agent.application.model.PlanGenerationRequest.class);
+        Mockito.verify(gateway, never()).classifyIntent(any());
+        Mockito.verify(gateway).generatePlan(captured.capture());
+        assertThat(captured.getValue().conversationContext()).isEqualTo("我想看长沙蜘蛛侠");
+        assertThat(captured.getValue().confirmedSlots())
+                .containsOnlyKeys("cityCode", "date", "ticketCount")
+                .doesNotContainValue("我想看长沙蜘蛛侠");
+    }
+
+    @Test
     void shouldAdvanceRenderResultAfterReadOnlyToolAndLeaveCardReady() {
         ToolRegistry registry = new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan()));
         PlanSchemaValidator validator = new PlanSchemaValidator(registry);
@@ -532,7 +590,7 @@ class MultiToolSupervisorTest {
 
     private static ModelGateway movieGateway() {
         ModelGateway gateway = Mockito.mock(ModelGateway.class);
-        when(gateway.classifyIntent(any())).thenReturn(AgentIntent.MOVIE);
+        Mockito.doReturn(AgentIntent.MOVIE).when(gateway).classifyIntent(any());
         return gateway;
     }
 

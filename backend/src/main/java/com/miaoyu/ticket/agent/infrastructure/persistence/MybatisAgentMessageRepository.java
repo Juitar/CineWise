@@ -3,6 +3,7 @@ package com.miaoyu.ticket.agent.infrastructure.persistence;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageRepository;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
 /** 仅保存和读取当前用户会话中的可展示消息。 */
@@ -31,6 +32,12 @@ public class MybatisAgentMessageRepository implements AgentMessageRepository {
         return mapper.findMessagesBySessionIdAndUserIdPage(sessionId, userId, offset, limit).stream()
                 .map(AgentPersistenceMappings::toDomain)
                 .toList();
+    }
+
+    @Override
+    public Optional<AgentMessage> findLatestPlanCardBySessionIdAndUserId(long sessionId, long userId) {
+        return Optional.ofNullable(mapper.findLatestPlanCardBySessionIdAndUserId(sessionId, userId))
+                .map(AgentPersistenceMappings::toDomain);
     }
 
     @Override

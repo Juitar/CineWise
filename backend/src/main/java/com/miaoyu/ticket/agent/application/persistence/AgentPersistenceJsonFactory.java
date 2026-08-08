@@ -72,11 +72,11 @@ public class AgentPersistenceJsonFactory {
             }
             OffsetDateTime expiresAt = occurredAt.plusMinutes(10L)
                     .atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime();
-            Map<String, Object> input = Map.of("name", facts.missingSlot(), "type", "TEXT");
+            Map<String, Object> input = Map.of("name", facts.inputLabel(), "type", "TEXT");
             return write(Map.of(
                     "type", "QUESTION",
                     "questionId", UUID.randomUUID().toString(),
-                    "questionKind", "SLOT_INPUT",
+                    "questionKind", facts.kind().name(),
                     "message", reply.text(),
                     "options", List.of(),
                     "allowFreeText", true,

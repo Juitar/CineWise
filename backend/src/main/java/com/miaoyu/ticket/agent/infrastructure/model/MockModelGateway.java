@@ -64,7 +64,12 @@ public final class MockModelGateway implements ModelGateway {
         if (input.contains("出行") || input.contains("天气")) {
             return AgentIntent.TRAVEL;
         }
-        if (input.contains("电影") || input.contains("场次") || input.contains("影院") || input.contains("推荐")) {
+        if (input.contains("电影") || input.contains("场次") || input.contains("影院") || input.contains("推荐")
+                || input.contains("动作片") || input.contains("喜剧片") || input.contains("科幻片")
+                || input.contains("爱情片") || input.contains("动画片") || input.contains("悬疑片")
+                || input.contains("剧情片") || input.contains("恐怖片") || input.contains("犯罪片")
+                || input.contains("冒险片") || input.contains("奇幻片") || input.contains("战争片")
+                || input.contains("纪录片")) {
             return AgentIntent.MOVIE;
         }
         return AgentIntent.GENERAL_CHAT;
@@ -210,7 +215,11 @@ public final class MockModelGateway implements ModelGateway {
 
     private static String questionText(QuestionReplyFacts facts) {
         // 这是测试用固定文案；生产模型可润色措辞，但不能替换 facts 中指定的缺失字段。
-        return "请补充" + facts.missingSlot() + "。";
+        return switch (facts.kind()) {
+            case CITY -> "你想在哪个城市看电影？";
+            case DATE -> "你想在哪天看电影？";
+            case TICKET_COUNT -> "一共几个人观看？";
+        };
     }
 
     private static String recommendationText(RecommendationReplyFacts facts, boolean purchaseEligible) {

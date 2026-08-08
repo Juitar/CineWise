@@ -15,7 +15,20 @@ public record MultiToolSupervisorResult(
         List<NodeToolResult> toolResults,
         boolean awaitingConfirmation,
         String safeNextAction,
-        ReplyGenerationResponse generatedReply) {
+        ReplyGenerationResponse generatedReply,
+        boolean replyTextStreamed) {
+
+    public MultiToolSupervisorResult(
+            CandidatePlan candidatePlan,
+            PlanValidationResult validation,
+            ExecutionRunState state,
+            List<NodeToolResult> toolResults,
+            boolean awaitingConfirmation,
+            String safeNextAction,
+            ReplyGenerationResponse generatedReply) {
+        this(candidatePlan, validation, state, toolResults, awaitingConfirmation, safeNextAction, generatedReply,
+                false);
+    }
 
     public MultiToolSupervisorResult(
             CandidatePlan candidatePlan,
@@ -24,7 +37,7 @@ public record MultiToolSupervisorResult(
             List<NodeToolResult> toolResults,
             boolean awaitingConfirmation,
             String safeNextAction) {
-        this(candidatePlan, validation, state, toolResults, awaitingConfirmation, safeNextAction, null);
+        this(candidatePlan, validation, state, toolResults, awaitingConfirmation, safeNextAction, null, false);
     }
 
     public MultiToolSupervisorResult {
