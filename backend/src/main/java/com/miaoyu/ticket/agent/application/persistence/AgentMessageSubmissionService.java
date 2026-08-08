@@ -3,7 +3,6 @@ package com.miaoyu.ticket.agent.application.persistence;
 import com.miaoyu.ticket.agent.application.AgentFailurePersistedException;
 import com.miaoyu.ticket.agent.application.AgentDistanceRecommendationApplicationService;
 import com.miaoyu.ticket.agent.application.confirmation.CreateOrderConfirmationActionOrchestrator;
-import com.miaoyu.ticket.agent.application.run.MultiToolSupervisor;
 import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorRequest;
 import com.miaoyu.ticket.agent.application.run.MultiToolSupervisorResult;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
@@ -21,6 +20,8 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /** 已校验计划的提交外层；主控调用刻意位于初始数据库短事务之外。 */
 @Service
@@ -29,7 +30,7 @@ public class AgentMessageSubmissionService {
     private final AgentInitialRunTransaction initialRunTransaction;
     private final AgentConcurrentRequestLookupTransaction concurrentRequestLookupTransaction;
     private final AgentRunResultTransaction runResultTransaction;
-    private final MultiToolSupervisor multiToolSupervisor;
+    private final AgentReadOnlyExecutionTransaction readOnlyExecutionTransaction;
     private final CreateOrderConfirmationActionOrchestrator confirmationActionOrchestrator;
     private final AgentMessageRepository messageRepository;
     private final AgentRunStepRepository stepRepository;
@@ -42,7 +43,7 @@ public class AgentMessageSubmissionService {
             AgentInitialRunTransaction initialRunTransaction,
             AgentConcurrentRequestLookupTransaction concurrentRequestLookupTransaction,
             AgentRunResultTransaction runResultTransaction,
-            MultiToolSupervisor multiToolSupervisor,
+            AgentReadOnlyExecutionTransaction readOnlyExecutionTransaction,
             CreateOrderConfirmationActionOrchestrator confirmationActionOrchestrator,
             AgentMessageRepository messageRepository,
             AgentRunStepRepository stepRepository,
@@ -53,7 +54,7 @@ public class AgentMessageSubmissionService {
         this.initialRunTransaction = initialRunTransaction;
         this.concurrentRequestLookupTransaction = concurrentRequestLookupTransaction;
         this.runResultTransaction = runResultTransaction;
-        this.multiToolSupervisor = multiToolSupervisor;
+        this.readOnlyExecutionTransaction = readOnlyExecutionTransaction;
         this.confirmationActionOrchestrator = confirmationActionOrchestrator;
         this.messageRepository = messageRepository;
         this.stepRepository = stepRepository;
@@ -62,7 +63,8 @@ public class AgentMessageSubmissionService {
         this.planCardFollowUpResolver = planCardFollowUpResolver;
     }
 
-    /** 创建持久化运行后再调用模型和只读工具；不在此方法上声明事务。 */
+    /** 先挂起调用方事务，使初始运行、模型工具和结果落库分别使用独立短事务。 */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AgentMessageSubmissionResult submit(AgentMessageSubmissionCommand command) {
         AgentMessageSubmissionCommand request = Objects.requireNonNull(command, "提交命令不能为空");
         long userId = currentUserAccessor.requireCurrentUserId();
@@ -78,6 +80,7 @@ public class AgentMessageSubmissionService {
     }
 
     /** 真实消息入口将幂等查询、槽位更新和 run 占用放入同一个会话锁事务。 */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AgentMessageSubmissionResult submitConversation(String sessionId, String content, String clientRequestId,
             String entry, long remainingDeadlineMs) {
         return completeConversation(beginConversation(sessionId, content, clientRequestId, entry, remainingDeadlineMs));
@@ -87,6 +90,7 @@ public class AgentMessageSubmissionService {
      * 只完成会话锁定、槽位更新和初始运行短事务。调用方可以在模型调用前先把已提交的
      * {@code message.start} 事件推送给页面；不得在本方法中调用模型或工具。
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ConversationSubmission beginConversation(String sessionId, String content, String clientRequestId,
             String entry, long remainingDeadlineMs) {
         long userId = currentUserAccessor.requireCurrentUserId();
@@ -103,6 +107,7 @@ public class AgentMessageSubmissionService {
     /**
      * 在初始短事务提交后执行模型和只读工具。重复请求只返回既有运行，绝不重复执行模型或工具。
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AgentMessageSubmissionResult completeConversation(ConversationSubmission submission) {
         return completeConversation(submission, ignored -> {
         });
@@ -112,6 +117,7 @@ public class AgentMessageSubmissionService {
      * 普通文本分片先落为既有运行事件，再通知 SSE 调用方；回调失败不影响已提交的运行记录，
      * 断开连接的客户端可按事件游标恢复，绝不因此重跑模型或工具。
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AgentMessageSubmissionResult completeConversation(
             ConversationSubmission submission, Consumer<AgentRuntimeEvent> onTextDeltaRecorded) {
         ConversationSubmission value = Objects.requireNonNull(submission, "会话提交不能为空");
@@ -143,7 +149,7 @@ public class AgentMessageSubmissionService {
             AtomicBoolean textDeltaPersisted = new AtomicBoolean();
             var trustedContextReply = planCardFollowUpResolver
                     .resolve(initial.run().sessionId(), userId, request.content()).orElse(null);
-            MultiToolSupervisorResult result = multiToolSupervisor.run(new MultiToolSupervisorRequest(
+            MultiToolSupervisorResult result = readOnlyExecutionTransaction.execute(new MultiToolSupervisorRequest(
                     request.clientRequestId(),
                     request.content(),
                     request.validationContext(),
