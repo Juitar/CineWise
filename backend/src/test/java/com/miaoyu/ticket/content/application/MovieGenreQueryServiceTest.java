@@ -48,8 +48,25 @@ class MovieGenreQueryServiceTest {
         assertThat(service.findPrimaryGenre("31")).isEmpty();
     }
 
+    @Test
+    void shouldReturnEmptyWhenContentQueryThrowsRuntimeException() {
+        ContentQueryService content = new ContentQueryService(emptyCache(), emptySnapshot(), query -> {
+            throw new IllegalStateException("content provider unavailable");
+        }, new ContentProperties(Duration.ofHours(6), Duration.ofHours(6), Duration.ofDays(7)), CLOCK);
+        MovieGenreQueryService service = new MovieGenreQueryService(content, new ObjectMapper());
+
+        assertThat(service.findPrimaryGenre("31")).isEmpty();
+        assertThat(service.findPrimaryGenre("not-a-number")).isEmpty();
+    }
+
     private MovieGenreQueryService service(Optional<ContentResult<List<? extends ContentItem>>> demoResult) {
-        ContentCachePort cache = new ContentCachePort() {
+        ContentQueryService content = new ContentQueryService(emptyCache(), emptySnapshot(), query -> demoResult,
+                new ContentProperties(Duration.ofHours(6), Duration.ofHours(6), Duration.ofDays(7)), CLOCK);
+        return new MovieGenreQueryService(content, new ObjectMapper());
+    }
+
+    private ContentCachePort emptyCache() {
+        return new ContentCachePort() {
             @Override
             public Optional<ContentResult<List<? extends ContentItem>>> find(ContentQuery query) {
                 return Optional.empty();
@@ -58,7 +75,10 @@ class MovieGenreQueryServiceTest {
             @Override
             public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) { }
         };
-        ContentSnapshotPort snapshot = new ContentSnapshotPort() {
+    }
+
+    private ContentSnapshotPort emptySnapshot() {
+        return new ContentSnapshotPort() {
             @Override
             public Optional<ContentResult<List<? extends ContentItem>>> findLatest(ContentQuery query) {
                 return Optional.empty();
@@ -67,9 +87,6 @@ class MovieGenreQueryServiceTest {
             @Override
             public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) { }
         };
-        ContentQueryService content = new ContentQueryService(cache, snapshot, query -> demoResult,
-                new ContentProperties(Duration.ofHours(6), Duration.ofHours(6), Duration.ofDays(7)), CLOCK);
-        return new MovieGenreQueryService(content, new ObjectMapper());
     }
 
     private ContentResult<List<? extends ContentItem>> movieResult(long movieId, String genresJson) {

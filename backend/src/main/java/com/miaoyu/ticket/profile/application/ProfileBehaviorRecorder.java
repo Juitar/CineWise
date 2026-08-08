@@ -156,12 +156,24 @@ public class ProfileBehaviorRecorder {
   @Transactional
   public RecordResult recordPayment(PaymentSucceededEvent event) {
     long userId = parsePositiveId(event.userId());
-    String genre = movieGenreQueryPort.findPrimaryGenre(event.movieId()).orElse(null);
+    String genre = resolveMovieGenre(event.movieId());
     BehaviorCommand command = new BehaviorCommand(
         event.eventId(), ProfileBehaviorEventType.PAID_ORDER, ProfileBehaviorTargetType.SHOW,
         event.showId(), genre == null ? null : ProfileTagType.MOVIE_GENRE, genre,
         event.occurredAt().toLocalDateTime());
     return recordForUser(userId, command, parsePositiveId(event.orderId()), event.orderVersion());
+  }
+
+  /**
+   * 内容目录是支付后的附加信息；查询异常不能让已提交支付的行为摘要丢失。
+   * 因此只在拿到可靠主类型时写入标签，其他情况统一按无类型支付行为处理。
+   */
+  private String resolveMovieGenre(String movieId) {
+    try {
+      return movieGenreQueryPort.findPrimaryGenre(movieId).orElse(null);
+    } catch (RuntimeException exception) {
+      return null;
+    }
   }
 
   private RecordResult recordForUser(long userId, BehaviorCommand command, Long orderId, Long orderVersion) {

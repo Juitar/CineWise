@@ -88,6 +88,58 @@ class ProfileBehaviorRecorderTest {
   }
 
   @Test
+  void shouldKeepPaidEvidenceWhenMovieGenreIsEmptyOrLookupFails() {
+    EventRepository emptyEvents = new EventRepository();
+    ProfileBehaviorRecorder emptyGenreRecorder = recorder(
+        emptyEvents, new TagRepository(), movieId -> Optional.empty());
+    PaymentSucceededEvent emptyGenre = paymentEvent("payment-empty-genre", "42");
+
+    assertThat(emptyGenreRecorder.recordPayment(emptyGenre))
+        .isEqualTo(new ProfileBehaviorRecorder.RecordResult(true, false));
+    assertThat(emptyEvents.rows).singleElement().satisfies(row -> assertThat(row.changed()).isFalse());
+
+    EventRepository failedEvents = new EventRepository();
+    ProfileBehaviorRecorder failedLookupRecorder = recorder(failedEvents, new TagRepository(), movieId -> {
+      throw new IllegalStateException("content unavailable");
+    });
+
+    assertThat(failedLookupRecorder.recordPayment(paymentEvent("payment-query-failed", "42")))
+        .isEqualTo(new ProfileBehaviorRecorder.RecordResult(true, false));
+    assertThat(failedEvents.rows).singleElement().satisfies(row -> assertThat(row.changed()).isFalse());
+  }
+
+  @Test
+  void shouldReplayPaidGenreEventWithoutWritingAnotherTag() {
+    EventRepository events = new EventRepository();
+    TagRepository tags = new TagRepository();
+    ProfileBehaviorRecorder recorder = recorder(events, tags, movieId -> Optional.of("科幻"));
+    PaymentSucceededEvent event = paymentEvent("payment-replay", "42");
+
+    assertThat(recorder.recordPayment(event)).isEqualTo(new ProfileBehaviorRecorder.RecordResult(true, true));
+    assertThat(recorder.recordPayment(event)).isEqualTo(new ProfileBehaviorRecorder.RecordResult(true, true));
+    assertThat(events.rows).hasSize(1);
+    assertThat(tags.inserted).hasSize(1);
+  }
+
+  @Test
+  void shouldKeepSecondPaidEvidenceButNotChangeGenreWithin24Hours() {
+    EventRepository events = new EventRepository();
+    events.normalizedInWindow = true;
+    TagRepository tags = new TagRepository();
+    ProfileBehaviorRecorder recorder = recorder(events, tags, movieId -> Optional.of("科幻"));
+
+    assertThat(recorder.recordPayment(paymentEvent("payment-window", "42")))
+        .isEqualTo(new ProfileBehaviorRecorder.RecordResult(true, false));
+    assertThat(events.rows).singleElement().satisfies(row -> assertThat(row.changed()).isFalse());
+    assertThat(tags.inserted).isEmpty();
+  }
+
+  private PaymentSucceededEvent paymentEvent(String eventId, String movieId) {
+    return new PaymentSucceededEvent(eventId, "10", "20", movieId, "40", "7", "长沙", null,
+        1L, OffsetDateTime.ofInstant(CLOCK.instant(), ZoneOffset.UTC));
+  }
+
+  @Test
   void shouldRecordAcceptedPlanAsMinimalPlanEvent() {
     EventRepository events = new EventRepository();
     ProfileBehaviorRecorder recorder = recorder(events, new TagRepository());
@@ -190,13 +242,14 @@ class ProfileBehaviorRecorderTest {
   private static final class EventRepository implements ProfileBehaviorEventRepository {
     private final List<NewEvent> rows = new ArrayList<>();
     private boolean conflictAfterSaving;
+    private boolean normalizedInWindow;
     public Optional<Snapshot> findByEventId(String eventId) {
       return rows.stream().filter(row -> row.eventId().equals(eventId)).findFirst().map(row -> new Snapshot(
           row.eventId(), row.userId(), row.eventType(), row.targetType(), row.targetId(), row.occurredAt(),
           row.changed()));
     }
     public boolean existsInWindow(long userId, ProfileBehaviorEventType type, ProfileBehaviorTargetType targetType,
-        String targetId, LocalDateTime since) { return false; }
+        String targetId, LocalDateTime since) { return normalizedInWindow; }
     public void insert(NewEvent event) {
       rows.add(event);
       if (conflictAfterSaving) {

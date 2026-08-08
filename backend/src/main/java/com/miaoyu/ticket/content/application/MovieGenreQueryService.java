@@ -44,6 +44,9 @@ public class MovieGenreQueryService implements MovieGenreQueryPort {
         } catch (BusinessException exception) {
             // 内容目录暂不可用时只跳过标签，不能使支付后的画像事件处理失败。
             return Optional.empty();
+        } catch (RuntimeException exception) {
+            // Provider、缓存或反序列化的非业务异常同样只能影响附加标签，不能阻断支付后处理。
+            return Optional.empty();
         }
     }
 
