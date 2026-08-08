@@ -58,7 +58,10 @@ export default function ShowsPage() {
 
   const handleSelectShow = (showId: string) => {
     history.push(
-      workspacePath(location.pathname, `/shows/${encodeURIComponent(showId)}/seats?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`),
+      workspacePath(
+        location.pathname,
+        `/shows/${encodeURIComponent(showId)}/seats?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`,
+      ),
     );
   };
 

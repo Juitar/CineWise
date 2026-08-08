@@ -193,7 +193,7 @@ describe('AgentWorkspace 页面', () => {
     vi.clearAllMocks();
     mocks.isMobile = true;
     rerender(<AgentWorkspace sessionId="session-example-1" />);
-    fireEvent.click(screen.getByRole('button', { name: '会话列表' }));
+    fireEvent.click(screen.getByRole('button', { name: '历史会话' }));
     expect(screen.getAllByText('当前会话').length).toBeGreaterThan(0);
     expect(mocks.workspace.stopActiveStream).not.toHaveBeenCalled();
   });
@@ -216,7 +216,7 @@ describe('AgentWorkspace 页面', () => {
 
     render(<AgentWorkspace sessionId="session-example-1" />);
 
-    expect(screen.getByText('等待位置')).toBeInTheDocument();
+    expect(screen.getByText(/等待位置/)).toBeInTheDocument();
     expect(screen.getByLabelText('观影需求')).toBeDisabled();
     expect(screen.getByRole('button', { name: '取消运行' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '处理中' })).toBeDisabled();
@@ -267,7 +267,7 @@ describe('AgentWorkspace 页面', () => {
     expect(mocks.workspace.submit).not.toHaveBeenCalled();
     expect(screen.getByRole('link', { name: '去选座：真实影片' })).toHaveAttribute(
       'href',
-      '/shows/70001/seats?movieId=10001&cinemaId=20001',
+      '/recommendations/session-example-1/shows/70001/seats?movieId=10001&cinemaId=20001',
     );
 
     fireEvent.change(screen.getByLabelText('观影需求'), {

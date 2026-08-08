@@ -23,6 +23,7 @@ vi.mock('umi', () => ({
     </a>
   ),
   useParams: () => ({ movieId: mocks.movieId }),
+  useLocation: () => ({ pathname: `/movies/${mocks.movieId}/cinemas` }),
 }));
 
 vi.mock('../../modules/ticketing/useAvailableCinemas', () => ({

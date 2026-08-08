@@ -237,6 +237,15 @@ function locationStateText(event: AgentEvent): string | null {
   return '等待位置授权';
 }
 
+function safePlaceholder(event: AgentEvent): AgentDisplayItem {
+  const confirmationText = safeConfirmationStatusText(event.payload.status);
+  return {
+    key: `event:${event.eventId}`,
+    kind: 'card-placeholder',
+    text: confirmationText ?? '暂不支持此类 Agent 内容，已安全隐藏详情',
+  };
+}
+
 function typedCard(event: AgentEvent): AgentDisplayItem {
   const key = `event:${event.eventId}`;
   const type = event.payload.type;
@@ -396,15 +405,6 @@ function thinkingItem(event: AgentEvent): AgentDisplayItem {
     kind: 'thinking',
     text: thinkingText(event),
     sourceRunId: event.runId,
-  };
-}
-
-function safePlaceholder(event: AgentEvent): AgentDisplayItem {
-  const confirmationText = safeConfirmationStatusText(event.payload.status);
-  return {
-    key: `event:${event.eventId}`,
-    kind: 'card-placeholder',
-    text: confirmationText ?? '暂不支持此类 Agent 内容，已安全隐藏详情',
   };
 }
 
@@ -694,11 +694,6 @@ export function buildProjectionFromHistory(
   sessionId: string,
   messages: readonly AgentMessage[],
 ): AgentProjection {
-  const latestUserIndex = messages.reduce(
-    (latest, message, index) =>
-      message.role.toUpperCase() === 'USER' ? index : latest,
-    -1,
-  );
   let latestPlanMessageId: string | null = null;
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
@@ -712,8 +707,7 @@ export function buildProjectionFromHistory(
   }
   return {
     ...createAgentProjection(sessionId),
-    items: messages.flatMap((message, index) => {
-      if (message.type.toUpperCase() === 'QUESTION' && index < latestUserIndex) return [];
+    items: messages.flatMap((message) => {
       if (
         message.type.toUpperCase() === 'PLAN_CARD' &&
         typeof message.payload?.actionId !== 'string' &&
@@ -760,7 +754,9 @@ function latestTravelAdviceEvents(snapshots: readonly AgentRunSnapshot[]): Map<s
   return latest;
 }
 
-function latestRecommendationEvents(snapshots: readonly AgentRunSnapshot[]): Map<string, AgentEvent> {
+function latestRecommendationEvents(
+  snapshots: readonly AgentRunSnapshot[],
+): Map<string, AgentEvent> {
   const latest = new Map<string, AgentEvent>();
   for (const snapshot of snapshots) {
     for (const event of snapshot.events) {
@@ -814,8 +810,12 @@ export function buildProjectionFromHistoryAndSnapshots(
   snapshots: readonly AgentRunSnapshot[],
 ): AgentProjection {
   const historyProjection = buildProjectionFromHistory(sessionId, history);
-  const historyByItemKey = new Map(
-    history.map((message) => [`message:${message.messageId}`, message] as const),
+  // 普通历史项以 message key 展示，确认卡则复用 SSE 的 event key；两者都要能被最新快照覆盖。
+  const historyByItemKey = new Map<string, AgentMessage>(
+    history.flatMap((message) => [
+      [`message:${message.messageId}`, message] as const,
+      [`event:${message.messageId}`, message] as const,
+    ]),
   );
   const latest = latestConfirmationEvents(snapshots);
   const latestTravelAdvice = latestTravelAdviceEvents(snapshots);
@@ -876,8 +876,12 @@ export function buildProjectionFromSnapshot(
   ]);
   const cards = restoredCards(snapshot);
   const latestConfirmations = latestConfirmationEvents([snapshot]);
-  const historyByItemKey = new Map(
-    history.map((message) => [`message:${message.messageId}`, message] as const),
+  // 与历史投影保持相同的双键映射，避免确认卡在快照恢复时重复保留旧状态。
+  const historyByItemKey = new Map<string, AgentMessage>(
+    history.flatMap((message) => [
+      [`message:${message.messageId}`, message] as const,
+      [`event:${message.messageId}`, message] as const,
+    ]),
   );
   const historyItems = historyProjection.items.filter((item) => {
     const message = historyByItemKey.get(item.key);
