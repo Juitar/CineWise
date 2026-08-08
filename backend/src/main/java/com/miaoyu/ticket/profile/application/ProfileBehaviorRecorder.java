@@ -3,6 +3,7 @@ package com.miaoyu.ticket.profile.application;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
+import com.miaoyu.ticket.content.application.MovieGenreQueryPort;
 import com.miaoyu.ticket.profile.domain.ProfileBehaviorEventType;
 import com.miaoyu.ticket.profile.domain.ProfileBehaviorNormalizer;
 import com.miaoyu.ticket.profile.domain.ProfileBehaviorRule;
@@ -100,6 +101,7 @@ public class ProfileBehaviorRecorder {
   private final ProfileBehaviorEventRepository eventRepository;
   private final ProfileTagRepository tagRepository;
   private final ProfileSummaryCache summaryCache;
+  private final MovieGenreQueryPort movieGenreQueryPort;
   private final BusinessIdGenerator idGenerator;
   private final Clock clock;
 
@@ -110,6 +112,7 @@ public class ProfileBehaviorRecorder {
       ProfileBehaviorEventRepository eventRepository,
       ProfileTagRepository tagRepository,
       ProfileSummaryCache summaryCache,
+      MovieGenreQueryPort movieGenreQueryPort,
       BusinessIdGenerator idGenerator,
       Clock clock) {
     this.currentUserAccessor = currentUserAccessor;
@@ -118,6 +121,7 @@ public class ProfileBehaviorRecorder {
     this.eventRepository = eventRepository;
     this.tagRepository = tagRepository;
     this.summaryCache = summaryCache;
+    this.movieGenreQueryPort = movieGenreQueryPort;
     this.idGenerator = idGenerator;
     this.clock = clock;
   }
@@ -145,13 +149,17 @@ public class ProfileBehaviorRecorder {
         ProfileBehaviorTargetType.PLAN, planId, null, null, occurredAt));
   }
 
-  /** A 的支付事件是受信任来源；消费线程没有用户登录上下文，只使用事件中的用户和订单字段。 */
+  /**
+   * A 的支付事件是受信任来源；消费线程没有用户登录上下文，只使用事件中的用户和订单字段。
+   * 电影类型只能由内容模块的公开端口解释，缺失时仍保留最小 SHOW 行为摘要。
+   */
   @Transactional
   public RecordResult recordPayment(PaymentSucceededEvent event) {
     long userId = parsePositiveId(event.userId());
+    String genre = movieGenreQueryPort.findPrimaryGenre(event.movieId()).orElse(null);
     BehaviorCommand command = new BehaviorCommand(
         event.eventId(), ProfileBehaviorEventType.PAID_ORDER, ProfileBehaviorTargetType.SHOW,
-        event.showId(), null, null,
+        event.showId(), genre == null ? null : ProfileTagType.MOVIE_GENRE, genre,
         event.occurredAt().toLocalDateTime());
     return recordForUser(userId, command, parsePositiveId(event.orderId()), event.orderVersion());
   }
@@ -244,8 +252,7 @@ public class ProfileBehaviorRecorder {
         || command.occurredAt() == null
         || (requiresTag(command.eventType())
             && (command.tagType() == null || command.tagValue() == null))
-        || (command.eventType() == ProfileBehaviorEventType.PAID_ORDER
-            && (command.tagType() != null || command.tagValue() != null))) {
+        || !hasValidPaymentGenre(command)) {
       throw new BusinessException(ProfileErrorCode.INVALID_EVENT);
     }
     boolean validTarget = switch (command.eventType()) {
@@ -268,6 +275,21 @@ public class ProfileBehaviorRecorder {
     return eventType == ProfileBehaviorEventType.CLICK
         || eventType == ProfileBehaviorEventType.FAVORITE
         || eventType == ProfileBehaviorEventType.NOT_INTERESTED;
+  }
+
+  /**
+   * 支付行为允许没有类型，也只允许内容模块提供的电影类型；不能把场次、影院等 A 的事实误写成画像。
+   */
+  private boolean hasValidPaymentGenre(BehaviorCommand command) {
+    if (command.eventType() != ProfileBehaviorEventType.PAID_ORDER) {
+      return true;
+    }
+    if (command.tagType() == null && command.tagValue() == null) {
+      return true;
+    }
+    return command.tagType() == ProfileTagType.MOVIE_GENRE
+        && command.tagValue() != null
+        && !command.tagValue().isBlank();
   }
 
   /** 方案 ID 必须使用 B 生成的标准小写 UUID，避免把临时文本或模型字段写入行为记录。 */

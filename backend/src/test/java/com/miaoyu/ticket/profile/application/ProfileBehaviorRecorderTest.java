@@ -8,6 +8,7 @@ import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
 import com.miaoyu.ticket.auth.application.RoleCode;
 import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import com.miaoyu.ticket.common.error.BusinessException;
+import com.miaoyu.ticket.content.application.MovieGenreQueryPort;
 import com.miaoyu.ticket.order.event.PaymentSucceededEvent;
 import com.miaoyu.ticket.profile.domain.ProfileBehaviorEventType;
 import com.miaoyu.ticket.profile.domain.ProfileBehaviorTargetType;
@@ -56,7 +57,7 @@ class ProfileBehaviorRecorderTest {
   }
 
   @Test
-  void shouldStorePaidOrderAsShowEvidenceWithoutCinemaTag() {
+  void shouldStorePaidOrderAsShowEvidenceWhenMovieGenreIsUnavailable() {
     EventRepository events = new EventRepository();
     TagRepository tags = new TagRepository();
     ProfileBehaviorRecorder recorder = recorder(events, tags);
@@ -66,6 +67,24 @@ class ProfileBehaviorRecorderTest {
     assertThat(recorder.recordPayment(event)).isEqualTo(new ProfileBehaviorRecorder.RecordResult(true, false));
     assertThat(events.rows.getFirst().targetType()).isEqualTo(ProfileBehaviorTargetType.SHOW);
     assertThat(tags.inserted).isEmpty();
+  }
+
+  @Test
+  void shouldCreateBehaviorGenreTagFromPaidMovieContext() {
+    EventRepository events = new EventRepository();
+    TagRepository tags = new TagRepository();
+    ProfileBehaviorRecorder recorder = recorder(events, tags, movieId -> Optional.of("科幻"));
+    PaymentSucceededEvent event = new PaymentSucceededEvent("payment-genre", "10", "20", "30", "40", "7",
+        "长沙", null, 1L, OffsetDateTime.ofInstant(CLOCK.instant(), ZoneOffset.UTC));
+
+    assertThat(recorder.recordPayment(event)).isEqualTo(new ProfileBehaviorRecorder.RecordResult(true, true));
+    assertThat(events.rows).singleElement().satisfies(row -> assertThat(row.changed()).isTrue());
+    assertThat(tags.inserted).singleElement().satisfies(tag -> {
+      assertThat(tag.type()).isEqualTo(ProfileTagType.MOVIE_GENRE);
+      assertThat(tag.value()).isEqualTo("科幻");
+      assertThat(tag.source()).isEqualTo(com.miaoyu.ticket.profile.domain.ProfileTagSource.BEHAVIOR);
+      assertThat(tag.weight()).isEqualByComparingTo("0.350");
+    });
   }
 
   @Test
@@ -132,6 +151,11 @@ class ProfileBehaviorRecorderTest {
   }
 
   private static ProfileBehaviorRecorder recorder(EventRepository events, TagRepository tags) {
+    return recorder(events, tags, movieId -> Optional.empty());
+  }
+
+  private static ProfileBehaviorRecorder recorder(
+      EventRepository events, TagRepository tags, MovieGenreQueryPort movieGenreQueryPort) {
     CurrentUserAccessor users = () -> new CurrentUser(7L, RoleCode.USER, 0L);
     BusinessIdGenerator ids = new BusinessIdGenerator() {
       private long id = 100L;
@@ -147,6 +171,7 @@ class ProfileBehaviorRecorderTest {
         events,
         tags,
         new EmptyCache(),
+        movieGenreQueryPort,
         ids,
         CLOCK);
   }
