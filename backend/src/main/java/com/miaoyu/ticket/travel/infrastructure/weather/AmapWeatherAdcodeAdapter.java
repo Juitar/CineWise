@@ -13,7 +13,9 @@ import org.springframework.web.client.RestClient;
  * 或业务 DTO。调用失败由上层使用已登记区域映射回退。</p>
  */
 public final class AmapWeatherAdcodeAdapter implements WeatherAdcodeAdapter {
-    private static final String ENDPOINT = "/v3/geocode/regeo?location={location}&key={key}&extensions=base";
+    /** 高德逆地理接口必须使用绝对地址，共用 RestClient 未配置高德 baseUrl。 */
+    private static final String ENDPOINT = "https://restapi.amap.com/v3/geocode/regeo"
+            + "?location={location}&key={key}&extensions=base";
     private final AmapWeatherProperties properties;
     private final RestClient restClient;
 

@@ -43,7 +43,9 @@ function text(value: unknown, allowEmpty = false): string {
 }
 
 function optionalText(value: unknown): string | null {
-  return value === null ? null : text(value);
+  // 后端使用 NON_NULL 序列化时，可选字段会被省略而不是显式返回 null。
+  // 页面必须把两种写法视为同一个“暂无数据”状态，不能把正常的建议响应误判为格式错误。
+  return value === null || value === undefined ? null : text(value);
 }
 
 function businessId(value: unknown): string {
@@ -78,7 +80,7 @@ function boolean(value: unknown): boolean {
 }
 
 function dateTime(value: unknown, nullable = false): string | null {
-  if (value === null && nullable) return null;
+  if ((value === null || value === undefined) && nullable) return null;
   const candidate = text(value);
   if (!parseOrderDateTime(candidate)) throw new TravelContractError();
   return candidate;
@@ -124,7 +126,7 @@ export function parseTravelAdvice(value: unknown): TravelAdvice {
   const summary = record(value);
   const weatherValue = summary.weather;
   const weather =
-    weatherValue === null
+    weatherValue === null || weatherValue === undefined
       ? null
       : (() => {
           const item = record(weatherValue);
