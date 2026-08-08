@@ -2,6 +2,7 @@ package com.miaoyu.ticket.agent.application.persistence;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.miaoyu.ticket.agent.application.AgentCityCodeResolver;
 import com.miaoyu.ticket.agent.application.model.AgentConversationContext;
 import com.miaoyu.ticket.agent.application.model.AgentIntent;
 import com.miaoyu.ticket.agent.application.tool.MovieTitleResolutionTool;

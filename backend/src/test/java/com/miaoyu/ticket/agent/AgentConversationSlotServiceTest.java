@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.agent.application.persistence.AgentConversationSlotRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentConversationSlotService;
-import com.miaoyu.ticket.agent.application.persistence.AgentCityCodeResolver;
+import com.miaoyu.ticket.agent.application.AgentCityCodeResolver;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;

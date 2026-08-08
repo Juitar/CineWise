@@ -1,6 +1,6 @@
 package com.miaoyu.ticket.content.application;
 
-import com.miaoyu.ticket.agent.application.persistence.AgentCityCodeResolver;
+import com.miaoyu.ticket.agent.application.AgentCityCodeResolver;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 
