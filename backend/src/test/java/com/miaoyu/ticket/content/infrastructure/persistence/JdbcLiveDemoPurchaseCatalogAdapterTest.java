@@ -75,6 +75,18 @@ class JdbcLiveDemoPurchaseCatalogAdapterTest {
     }
 
     @Test
+    void givenUpstreamExpiryBeforeTwentyFourHours_whenQuerying_thenItUsesConfirmedDemoReferenceWindow() {
+        insertMovie(1, "movie-short-upstream-expiry", 100, "2026-08-06 15:00:00", "2026-08-06 16:00:00");
+        insertCinema(1, "cinema-short-upstream-expiry", "2026-08-06 15:00:00", "2026-08-06 16:00:00");
+
+        var result = adapter.findLiveCatalog("430100");
+
+        assertThat(result.movies()).extracting(ref -> ref.movieId()).containsExactly(1L);
+        assertThat(result.cinemas()).extracting(ref -> ref.cinemaId()).containsExactly(1L);
+        assertThat(result.expiresAt().toLocalDateTime()).isEqualTo(LocalDateTime.of(2026, 8, 7, 15, 0));
+    }
+
+    @Test
     void givenUnreadableStorage_whenQuerying_thenItKeeps303004() {
         jdbc.execute("DROP TABLE movie");
 

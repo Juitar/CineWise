@@ -9,7 +9,7 @@ D 已通过 `ContentPurchaseQueryPort.findLiveDemoPurchaseCatalog` 提供未过�
 - A 每日 03:10 通过 D 的公开目录 API 生成真实影院的本地演示排期；启动时只补齐固定 Demo。
 - 为目录中的全部真实影院生成 A 管理的 `demo-seed` 影厅、场次、座位和价格。
 - 真实 `external-sandbox` 场次按影院和业务日期优先，隐藏同日 `demo-seed`。
-- 目录为空或已过期时不新增 Mock 排期，保留已有交易事实。
+- D 已于 2026-08-09 确认：为 A 的本地演示排期引用，NetStart 每日内容同步的 `dataAt + 24h` 可以覆盖内容表中更早的原始 `expiresAt`；影片、影院页面仍按 D 的原始 `expiresAt` 展示。目录在该 24 小时引用窗口结束后不新增 Mock 排期，保留已有交易事实。
 - 每家影院只生成 1 个影厅、当天和次日每天 2 场、每场 40 座。
 - 清理已结束且无订单、无锁座的 `demo-seed` 场次，不删除任何交易关联数据。
 
