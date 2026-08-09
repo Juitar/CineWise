@@ -20,10 +20,45 @@ import {
   compareDecimalStrings,
   consumeAgentEvent,
   createAgentProjection,
+  deduplicateConfirmationItems,
   safeConfirmationStatusText,
 } from './projection';
 
 describe('Agent 事件投影', () => {
+  it('同一运行确认动作只保留最新状态卡片', () => {
+    const projection = createAgentProjection('session-example-1');
+    const normalized = deduplicateConfirmationItems({
+      ...projection,
+      items: [
+        {
+          key: 'confirmation-pending',
+          kind: 'plan-card',
+          text: '等待你的确认',
+          confirmation: {
+            actionId: 'action-1',
+            runId: 'run-1',
+            status: 'PENDING_CONFIRMATION',
+            submitting: false,
+          },
+        },
+        {
+          key: 'confirmation-succeeded',
+          kind: 'plan-card',
+          text: '确认操作已完成',
+          confirmation: {
+            actionId: 'action-1',
+            runId: 'run-1',
+            status: 'SUCCEEDED',
+            submitting: false,
+          },
+        },
+      ],
+    });
+
+    expect(normalized.items).toHaveLength(1);
+    expect(normalized.items[0].confirmation?.status).toBe('SUCCEEDED');
+  });
+
   it('恢复普通用户文本和精简 QUESTION 历史，但隐藏问题卡回答消息', () => {
     const projection = buildProjectionFromHistoryAndSnapshots(
       'session-example-1',
