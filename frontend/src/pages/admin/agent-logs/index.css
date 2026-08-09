@@ -65,6 +65,16 @@
   font-size: 18px;
 }
 
+.agent-run-status-tag {
+  display: inline-block;
+  max-width: 100%;
+  margin-inline-end: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 @media (max-width: 1023px) {
   .agent-runs-filters {
     grid-template-columns: 1fr 1fr;

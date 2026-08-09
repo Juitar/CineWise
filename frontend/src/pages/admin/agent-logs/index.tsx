@@ -42,6 +42,7 @@ function statusLabel(status: string): string {
     FAILED: '失败',
     PENDING: '待执行',
     RUNNING: '运行中',
+    SUCCESS: '成功',
     SKIPPED: '已跳过',
     SUCCEEDED: '成功',
     WAITING_LOCATION: '等待定位',
@@ -61,6 +62,7 @@ function statusColor(status: string): string {
       return 'error';
     case 'CANCELLED':
       return 'warning';
+    case 'SUCCESS':
     case 'SUCCEEDED':
       return 'success';
     default:
@@ -100,7 +102,11 @@ function formatError(errorCode: number | null, errorSummary: string | null): str
 }
 
 function RunStatus({ status }: { status: string }) {
-  return <Tag color={statusColor(status)}>{statusLabel(status)}</Tag>;
+  return (
+    <Tag className="agent-run-status-tag" color={statusColor(status)} title={statusLabel(status)}>
+      {statusLabel(status)}
+    </Tag>
+  );
 }
 
 const runColumns: ColumnsType<AdminAgentRunSummary> = [
@@ -129,22 +135,34 @@ const runColumns: ColumnsType<AdminAgentRunSummary> = [
 ];
 
 const nodeColumns: ColumnsType<AdminAgentRunNode> = [
-  { dataIndex: 'nodeId', ellipsis: true, title: '节点 ID' },
-  { dataIndex: 'nodeType', title: '节点类型' },
-  { dataIndex: 'targetName', ellipsis: true, render: formatNullable, title: '目标' },
-  { dataIndex: 'status', render: (status: string) => <RunStatus status={status} />, title: '状态' },
-  { dataIndex: 'attemptCount', title: '尝试次数' },
-  { dataIndex: 'toolStatus', render: (value: string | null) => value ?? '—', title: '工具状态' },
-  { dataIndex: 'durationMs', render: formatDuration, title: '耗时' },
+  { dataIndex: 'nodeId', ellipsis: true, title: '节点 ID', width: 180 },
+  { dataIndex: 'nodeType', title: '节点类型', width: 120 },
+  { dataIndex: 'targetName', ellipsis: true, render: formatNullable, title: '目标', width: 140 },
+  {
+    dataIndex: 'status',
+    render: (status: string) => <RunStatus status={status} />,
+    title: '状态',
+    width: 150,
+  },
+  { dataIndex: 'attemptCount', title: '尝试次数', width: 90 },
+  {
+    dataIndex: 'toolStatus',
+    render: (value: string | null) => value ?? '—',
+    title: '工具状态',
+    width: 120,
+  },
+  { dataIndex: 'durationMs', render: formatDuration, title: '耗时', width: 100 },
   {
     dataIndex: 'errorSummary',
     render: (_value: string | null, node) => formatError(node.errorCode, node.errorSummary),
     title: '错误摘要',
+    width: 220,
   },
   {
     dataIndex: 'recoveryHint',
     render: (value: string | null) => value ?? '—',
     title: '恢复建议',
+    width: 180,
   },
 ];
 
@@ -407,7 +425,7 @@ export default function AdminAgentRunsPage() {
               dataSource={detailQuery.data.nodes}
               pagination={false}
               rowKey="nodeId"
-              scroll={{ x: 1100 }}
+              scroll={{ x: 1300 }}
               size="small"
             />
           </div>

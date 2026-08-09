@@ -140,6 +140,35 @@ describe('AdminAgentRunsPage', () => {
     expect(screen.queryByText('ToolContext')).not.toBeInTheDocument();
   });
 
+  it('将后端 SUCCESS 状态显示为成功且保留尝试次数列', () => {
+    mocks.detailState.data = {
+      ...mocks.summary,
+      nodes: [
+        {
+          nodeId: 'node-success',
+          nodeType: 'CALL_TOOL',
+          targetName: null,
+          status: 'SUCCESS',
+          attemptCount: 1,
+          startedAt: '2026-08-05T19:20:01+08:00',
+          finishedAt: '2026-08-05T19:20:04+08:00',
+          durationMs: 3000,
+          toolStatus: 'SUCCESS',
+          errorCode: null,
+          errorSummary: null,
+          recoveryHint: null,
+        },
+      ],
+    };
+
+    render(<AdminAgentRunsPage />);
+    openDetail();
+
+    expect(screen.getByText('成功')).toBeInTheDocument();
+    expect(screen.getAllByText('1').some((element) => element.tagName === 'TD')).toBe(true);
+    expect(screen.getByText('成功').className).toContain('agent-run-status-tag');
+  });
+
   it('等待定位和空计划使用明确中文占位', () => {
     const waitingRun: AdminAgentRunSummary = {
       ...mocks.summary,
