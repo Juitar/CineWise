@@ -20,6 +20,7 @@ import {
   buildProjectionFromSnapshot,
   consumeAgentEvent,
   createAgentProjection,
+  deduplicateConfirmationItems,
   updateConfirmationItem,
 } from './projection';
 import type { AgentDisplayItem, AgentProjection } from './projection';
@@ -207,8 +208,9 @@ export function useAgentWorkspace(sessionId: string) {
   useEffect(() => registerSessionEndHandler(stopActiveStream), [stopActiveStream]);
 
   const replaceProjection = useCallback((next: AgentProjection) => {
-    projectionRef.current = next;
-    setProjection(next);
+    const deduplicated = deduplicateConfirmationItems(next);
+    projectionRef.current = deduplicated;
+    setProjection(deduplicated);
   }, []);
 
   const recoverRun = useCallback(

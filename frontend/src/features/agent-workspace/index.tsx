@@ -3,11 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'umi';
 
 import { takePendingAgentDraft } from '../../modules/agent/entryDraft';
-import {
-  buildAgentSelectSeatsPath,
-  type AgentDisplayItem,
-  type AgentPlanDisplay,
-} from '../../modules/agent/projection';
+import { type AgentDisplayItem, type AgentPlanDisplay } from '../../modules/agent/projection';
 import type { AgentSession } from '../../modules/agent/types';
 import { useAgentWorkspace } from '../../modules/agent/useAgentWorkspace';
 import { safePosterUrl } from '../../modules/content/poster';
@@ -189,29 +185,11 @@ function RecommendationPlanPane({
   item,
   onSelect,
   selectedIndex,
-  sessionId,
 }: {
   item: AgentDisplayItem | null;
   onSelect(index: number): void;
   selectedIndex: number | null;
-  sessionId: string;
 }) {
-  const selectedPlan =
-    selectedIndex === null || item?.plans === undefined
-      ? null
-      : (item.plans[selectedIndex] ?? null);
-  const selectedPlanExpired =
-    selectedPlan === null ||
-    selectedPlan.expired ||
-    Date.parse(selectedPlan.expiresAt) <= Date.now();
-  const selectSeatsPath =
-    selectedPlan !== null && selectedPlan.purchaseEligible && !selectedPlanExpired
-      ? `/recommendations/${encodeURIComponent(sessionId)}${buildAgentSelectSeatsPath(
-          selectedPlan.showId,
-          selectedPlan.movieId,
-          selectedPlan.cinemaId,
-        )}`
-      : null;
   return (
     <section className="agent-recommendation-pane" aria-labelledby="agent-recommendation-title">
       <header className="agent-recommendation-header">
@@ -285,11 +263,6 @@ function RecommendationPlanPane({
       {item?.relaxationSuggestion && (
         <p className="agent-recommendation-relaxation">可调整条件：{item.relaxationSuggestion}</p>
       )}
-      {selectSeatsPath && (
-        <Link className="agent-recommendation-seat-link" to={selectSeatsPath}>
-          去选座：{selectedPlan?.movieName}
-        </Link>
-      )}
       <p className="agent-recommendation-note">
         方案来自 Agent 实时结果。进入选座前仍以票务服务的最新场次状态为准。
       </p>
@@ -347,6 +320,9 @@ export function AgentWorkspace({
   const selectPlan = (index: number) => {
     if (!latestPlanItem?.plans?.[index]) return;
     setSelectedPlanRef({ itemKey: latestPlanItem.key, index });
+    void workspace.submit(
+      `基于当前最新推荐中的第 ${index + 1} 个方案，请解释这个方案，并说明是否需要继续调整。`,
+    );
   };
 
   useEffect(() => {
@@ -383,7 +359,6 @@ export function AgentWorkspace({
                 item={latestPlanItem}
                 onSelect={selectPlan}
                 selectedIndex={selectedIndex}
-                sessionId={sessionId}
               />
             ) : (
               <AgentDiscoveryPane sessionId={sessionId} />

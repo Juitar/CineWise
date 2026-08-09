@@ -222,7 +222,7 @@ describe('AgentWorkspace 页面', () => {
     expect(screen.getByRole('button', { name: '处理中' })).toBeDisabled();
   });
 
-  it('推荐工作区本地选择方案并用方案自身 ID 进入选座', async () => {
+  it('推荐工作区选择方案后发起第二轮解释请求，不自行生成选座入口', async () => {
     mocks.workspace.projection.items = [
       {
         key: 'plan-latest',
@@ -264,11 +264,10 @@ describe('AgentWorkspace 页面', () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /综合推荐/ }));
-    expect(mocks.workspace.submit).not.toHaveBeenCalled();
-    expect(screen.getByRole('link', { name: '去选座：真实影片' })).toHaveAttribute(
-      'href',
-      '/recommendations/session-example-1/shows/70001/seats?movieId=10001&cinemaId=20001',
+    expect(mocks.workspace.submit).toHaveBeenCalledWith(
+      '基于当前最新推荐中的第 1 个方案，请解释这个方案，并说明是否需要继续调整。',
     );
+    expect(screen.queryByRole('link', { name: /去选座/ })).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('观影需求'), {
       target: { value: '换一家影院' },
@@ -300,7 +299,7 @@ describe('AgentWorkspace 页面', () => {
     });
   });
 
-  it('空方案不会沿用旧 BUSINESS_INTENT 的选座入口', () => {
+  it('没有当前 SELECT_SEATS 意图时不显示旧选座入口', () => {
     mocks.workspace.projection.items = [
       {
         key: 'old-select-seats',

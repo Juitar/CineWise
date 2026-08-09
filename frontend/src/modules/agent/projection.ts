@@ -728,6 +728,27 @@ function confirmationKey(
   return typeof payload?.actionId === 'string' ? `${runId}\u0000${payload.actionId}` : null;
 }
 
+/** 网络恢复与本地状态更新可能交错到达；同一确认动作只保留最后状态，避免重复卡片。 */
+export function deduplicateConfirmationItems(projection: AgentProjection): AgentProjection {
+  const items: (AgentDisplayItem | null)[] = [...projection.items];
+  const positions = new Map<string, number>();
+  items.forEach((item, index) => {
+    if (!item?.confirmation) return;
+    const key = `${item.confirmation.runId}\u0000${item.confirmation.actionId}`;
+    const previousIndex = positions.get(key);
+    if (previousIndex === undefined) {
+      positions.set(key, index);
+      return;
+    }
+    items[previousIndex] = item;
+    items[index] = null;
+  });
+  const deduplicatedItems = items.filter((item): item is AgentDisplayItem => item !== null);
+  return deduplicatedItems.length === projection.items.length
+    ? projection
+    : { ...projection, items: deduplicatedItems };
+}
+
 export function travelAdviceRecoveryRunIds(messages: readonly AgentMessage[]): readonly string[] {
   return Array.from(
     new Set(messages.filter(isTravelAdviceHistory).map((message) => message.runId)),

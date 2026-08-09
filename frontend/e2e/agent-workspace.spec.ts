@@ -504,13 +504,16 @@ test('三栏推荐工作区消费 PLAN_CARD 并在第二轮绑定新运行后进
   });
 
   await page.goto(`/recommendations/${sessionId}`);
-  await expect(page.getByRole('heading', { name: '选择适合你的观影方案' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: '先浏览，也可以直接说出你的观影需求' }),
+  ).toBeVisible();
   await page.getByLabel('观影需求').fill('推荐三个方案');
   await page.getByRole('button', { name: /发\s*送/ }).click();
 
   const plans = page.locator('.agent-recommendation-option');
   await expect(plans).toHaveCount(3);
   await expect(plans.nth(1)).toContainText('轻松喜剧二');
+  await expect(page.getByText(/安全入口 · 已完成/)).toBeVisible();
   await plans.nth(1).click();
 
   await expect.poll(() => streamCount).toBe(2);
@@ -518,9 +521,9 @@ test('三栏推荐工作区消费 PLAN_CARD 并在第二轮绑定新运行后进
     '推荐三个方案',
     '基于当前最新推荐中的第 2 个方案，请解释这个方案，并说明是否需要继续调整。',
   ]);
-  await expect(page.getByText('已完成', { exact: true })).toBeVisible();
+  await expect(page.getByText(/安全入口 · 已完成/)).toBeVisible();
   const selectSeatsLinks = page.getByRole('link', { name: '去选座' });
-  await expect(selectSeatsLinks).toHaveCount(2);
+  await expect(selectSeatsLinks).toHaveCount(1);
   await expect(selectSeatsLinks.first()).toHaveAttribute(
     'href',
     '/shows/3002/seats?movieId=1002&cinemaId=2002',
@@ -531,7 +534,7 @@ test('三栏推荐工作区消费 PLAN_CARD 并在第二轮绑定新运行后进
 test('登录用户消费 POST SSE 并展示类型化降级卡片', async ({ page }) => {
   await mockAuthenticatedAgent(page);
   await page.goto(`/assistant/${sessionId}`);
-  await expect(page.getByRole('heading', { name: '妙语观影助手' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '妙语 AI 观影助手' })).toBeVisible();
   const mobileSessionButton = page.getByRole('button', { name: '会话列表' });
   const mobileLayout = await mobileSessionButton.isVisible().catch(() => false);
   if (mobileLayout) {
@@ -547,7 +550,7 @@ test('登录用户消费 POST SSE 并展示类型化降级卡片', async ({ page
   await expect(page.getByText('示例影片')).toBeVisible();
   await expect(page.getByText('当前结果为降级数据，请注意来源和有效时间')).toBeVisible();
   await expect(page.getByText('recommendation')).toBeVisible();
-  await expect(page.getByText('已完成', { exact: true })).toBeVisible();
+  await expect(page.getByText(/安全入口 · 已完成/)).toBeVisible();
   await expect(page.getByRole('button', { name: /购票|确认|支付/ })).toHaveCount(0);
   await expect(page.getByText(/¥|库存|路线|餐饮/)).toHaveCount(0);
 });
@@ -559,7 +562,9 @@ test('登录用户从历史消息确认操作且不展示 actionId', async ({ pa
   await expect(confirm).toBeVisible();
   await expect(page.getByText('action-e2e-1')).toHaveCount(0);
   await confirm.click();
-  await expect(page.getByText('确认操作已完成')).toBeVisible();
+  const completed = page.getByText('确认操作已完成');
+  await expect(completed).toHaveCount(1);
+  await expect(completed).toBeVisible();
   await expect(confirm).toBeDisabled();
 });
 
@@ -589,7 +594,9 @@ test('确认结果未知后按历史消息 runId 恢复且不重发 POST', async
   await expect(confirm).toBeVisible();
   await confirm.click();
 
-  await expect(page.getByText('确认操作已完成')).toBeVisible();
+  const recoveredCompletion = page.getByText('确认操作已完成');
+  await expect(recoveredCompletion).toHaveCount(1);
+  await expect(recoveredCompletion).toBeVisible();
   await expect(confirm).toBeDisabled();
   await expect.poll(requests.confirmationPostCount).toBe(1);
   await expect.poll(requests.messageHistoryQueryCount).toBeGreaterThanOrEqual(2);
