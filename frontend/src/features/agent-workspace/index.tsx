@@ -308,11 +308,19 @@ export function AgentWorkspace({
 
   const send = () => {
     const content = draft;
+    const selectedPlanIndex =
+      latestPlanItem && selectedPlanRef?.itemKey === latestPlanItem.key
+        ? selectedPlanRef.index
+        : null;
+    const submittedContent =
+      selectedPlanIndex === null
+        ? content
+        : `基于当前最新推荐中的第 ${selectedPlanIndex + 1} 个方案，${content}`;
     setDraft('');
     const restoreDraft = () => {
       setDraft((current) => (current.length > 0 ? current : content));
     };
-    void workspace.submit(content).then((sent) => {
+    void workspace.submit(submittedContent).then((sent) => {
       if (!sent) restoreDraft();
     }, restoreDraft);
   };
@@ -327,7 +335,7 @@ export function AgentWorkspace({
 
   useEffect(() => {
     setSelectedPlanRef(null);
-  }, [sessionId]);
+  }, [sessionId, latestPlanItem?.key]);
 
   useEffect(() => {
     if (workspace.loadStatus !== 'ready') return;

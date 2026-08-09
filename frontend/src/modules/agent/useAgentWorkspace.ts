@@ -182,7 +182,9 @@ export function useAgentWorkspace(sessionId: string) {
           cardRecoveryRunIds(messages.records).map((runId) => getAgentRun(runId)),
         );
         if (!active) return;
-        const next = buildProjectionFromHistoryAndSnapshots(sessionId, messages.records, snapshots);
+        const next = deduplicateConfirmationItems(
+          buildProjectionFromHistoryAndSnapshots(sessionId, messages.records, snapshots),
+        );
         projectionRef.current = next;
         setProjection(next);
         setSessions(sessionPage.records);

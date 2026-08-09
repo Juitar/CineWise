@@ -113,6 +113,22 @@ describe('useAgentWorkspace 状态与恢复', () => {
     completedAt: '2026-08-05T16:30:00+08:00',
     createdAt: '2026-08-05T16:30:00+08:00',
   };
+  it('首次加载历史确认状态时只保留同一 action 的一张卡片', async () => {
+    mocks.listAgentMessages.mockResolvedValue({
+      ...emptyMessages,
+      total: 2,
+      records: [confirmationMessage, { ...confirmationMessage, messageId: 'message-confirm-2' }],
+    });
+    mocks.getAgentRun.mockResolvedValue(confirmationSnapshot('SUCCEEDED'));
+
+    const { result } = renderHook(() => useAgentWorkspace('session-example-1'));
+    await waitFor(() => expect(result.current.loadStatus).toBe('ready'));
+
+    const confirmations = result.current.projection.items.filter((item) => item.confirmation);
+    expect(confirmations).toHaveLength(1);
+    expect(confirmations[0]?.confirmation?.status).toBe('SUCCEEDED');
+  });
+
   it('刷新时恢复普通用户文本和只读问题历史，但隐藏问题卡回答消息', async () => {
     mocks.listAgentMessages.mockResolvedValue({
       total: 3,

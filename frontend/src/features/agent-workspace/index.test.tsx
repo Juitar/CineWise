@@ -275,7 +275,9 @@ describe('AgentWorkspace 页面', () => {
     fireEvent.click(screen.getByRole('button', { name: /发.*送/ }));
     expect(screen.getByLabelText('观影需求')).toHaveValue('');
     await vi.waitFor(() => {
-      expect(mocks.workspace.submit).toHaveBeenLastCalledWith('换一家影院');
+      expect(mocks.workspace.submit).toHaveBeenLastCalledWith(
+        '基于当前最新推荐中的第 1 个方案，换一家影院',
+      );
     });
   });
 
