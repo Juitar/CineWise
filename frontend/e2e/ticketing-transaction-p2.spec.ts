@@ -115,7 +115,7 @@ test('订单列表进入详情并取消待支付订单', async ({ page }) => {
   await expect(page.getByRole('button', { name: '取消订单' })).not.toBeVisible();
 });
 
-test('本地校验模拟密码后以空业务请求体完成支付并进入结果页', async ({ page }) => {
+test('本地校验模拟支付数字后以空业务请求体完成支付并进入结果页', async ({ page }) => {
   await page.route('**/api/v1/orders**', async (route) => {
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
@@ -137,7 +137,7 @@ test('本地校验模拟密码后以空业务请求体完成支付并进入结�
   });
 
   await page.goto(`/payments/${orderNo}`);
-  await page.getByLabel('六位模拟支付密码').fill('123456');
+  await page.getByLabel('六位模拟支付数字').fill('123456');
   await page.getByRole('button', { name: '确认支付' }).click();
   await expect(page).toHaveURL(`/payments/${orderNo}/result`);
   await expect(page.getByText('支付成功')).toBeVisible();
@@ -167,7 +167,7 @@ test('支付响应未知时只查询原支付结果，不重复发送支付 POST
   });
 
   await page.goto(`/payments/${orderNo}`);
-  await page.getByLabel('六位模拟支付密码').fill('123456');
+  await page.getByLabel('六位模拟支付数字').fill('123456');
   await page.getByRole('button', { name: '确认支付' }).click();
   await expect(page.getByRole('button', { name: '重新查询订单结果' })).toBeVisible();
   await page.getByRole('button', { name: '重新查询订单结果' }).click();
