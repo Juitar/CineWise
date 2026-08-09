@@ -111,7 +111,7 @@ export function useEmailCodeLogin() {
       try {
         const response = await sendEmailCode({ email: email.trim(), purpose: 'LOGIN' });
         setCooldownSeconds(Math.max(1, Math.ceil(response.cooldownSeconds)));
-        setSendCodeMessage(`验证码已发送，${Math.ceil(response.expiresInSeconds / 60)} 分钟内有效`);
+        setSendCodeMessage('请检查邮箱');
         setSendCodeStatus('idle');
       } catch (error) {
         if (error instanceof ApiError && error.isResultUnknown) {

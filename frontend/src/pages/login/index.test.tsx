@@ -214,6 +214,36 @@ describe('LoginPage', () => {
     expect(screen.getByRole('textbox', { name: '邮箱验证码' })).toHaveValue('');
   });
 
+  it('邮箱为空或格式不正确时禁用发送验证码按钮', () => {
+    render(<LoginPage />);
+    fireEvent.click(screen.getByRole('tab', { name: '验证码登录' }));
+
+    const sendCodeButton = screen.getByRole('button', { name: '获取验证码' });
+    expect(sendCodeButton).toBeDisabled();
+
+    fireEvent.change(screen.getByRole('textbox', { name: '邮箱' }), {
+      target: { value: 'invalid-email' },
+    });
+    expect(sendCodeButton).toBeDisabled();
+
+    fireEvent.change(screen.getByRole('textbox', { name: '邮箱' }), {
+      target: { value: ' user@cinewise.test ' },
+    });
+    expect(sendCodeButton).toBeEnabled();
+
+    fireEvent.click(sendCodeButton);
+    expect(mocks.emailCodeLogin.requestCode).toHaveBeenCalledWith('user@cinewise.test');
+  });
+
+  it('验证码发送接口返回后只提示检查邮箱', () => {
+    mocks.emailCodeLogin.sendCodeMessage = '请检查邮箱';
+    render(<LoginPage />);
+    fireEvent.click(screen.getByRole('tab', { name: '验证码登录' }));
+
+    expect(screen.getByRole('status')).toHaveTextContent('请检查邮箱');
+    expect(screen.queryByText(/验证码已发送/)).not.toBeInTheDocument();
+  });
+
   it('验证码登录提交前校验 6 位数字', () => {
     render(<LoginPage />);
     fireEvent.click(screen.getByRole('tab', { name: '验证码登录' }));
