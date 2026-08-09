@@ -38,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 class ShowQueryMySqlIntegrationTest {
 
     private static final String REQUIRED_DATABASE = "cinewise_ticketing_concurrency_check";
+    private static final int DEMO_SHOW_SEAT_COUNT = 40;
 
     @Autowired
     private ShowQueryService showQueryService;
@@ -101,9 +102,9 @@ class ShowQueryMySqlIntegrationTest {
 
         SeatMapView seatMap = seatQueryService.querySeatMap(showId);
         assertThat(seatMap.showId()).isEqualTo(showId);
-        assertThat(seatMap.seatCount()).isEqualTo(80);
-        assertThat(seatMap.seats()).hasSize(80);
-        assertThat(seatMap.availableSeatCount()).isEqualTo(80);
+        assertThat(seatMap.seatCount()).isEqualTo(DEMO_SHOW_SEAT_COUNT);
+        assertThat(seatMap.seats()).hasSize(DEMO_SHOW_SEAT_COUNT);
+        assertThat(seatMap.availableSeatCount()).isEqualTo(DEMO_SHOW_SEAT_COUNT);
     }
 
     @Test
