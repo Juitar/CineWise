@@ -8,13 +8,10 @@ import {
   Button as MobileButton,
   Empty as MobileEmpty,
   ErrorBlock as MobileErrorBlock,
-  Input as MobileInput,
   Skeleton as MobileSkeleton,
 } from 'antd-mobile';
 import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'umi';
-
-import { setPendingAgentDraft } from '../../modules/agent/entryDraft';
+import { Link, useLocation } from 'umi';
 
 import { getFreshnessNotices } from '../../modules/content/freshness';
 import { resolveDemoCity } from '../../modules/content/demoCities';
@@ -184,17 +181,10 @@ function HomeCinemaCard({ cinema }: { cinema: CinemaSummary }) {
 
 export default function HomePage() {
   const location = useLocation();
-  const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 1023px)');
-  const [mobileAgentDraft, setMobileAgentDraft] = useState('');
   const city = resolveDemoCity(new URLSearchParams(location.search).get('location'));
   const movies = useMovieList({ page: 1, size: 5 });
   const cinemas = useCinemaList({ location: city.code, page: 1, size: 3 });
-
-  const openAssistant = (draft: string) => {
-    setPendingAgentDraft(draft);
-    navigate('/recommendations');
-  };
 
   return (
     <div className="home-page-container">
@@ -208,33 +198,13 @@ export default function HomePage() {
               </div>
               <div className="home-mobile-agent-text">
                 <div className="home-mobile-agent-title">妙语 AI 助理</div>
-                <div className="home-mobile-agent-subtitle">告诉我你想看什么</div>
+                <div className="home-mobile-agent-subtitle">进入工作区开始规划</div>
               </div>
             </div>
 
-            <div className="home-mobile-agent-input-container">
-              <label className="visually-hidden" htmlFor="home-mobile-agent-input">
-                首页 Agent 输入
-              </label>
-              <MobileInput
-                className="home-mobile-agent-input"
-                id="home-mobile-agent-input"
-                maxLength={2000}
-                value={mobileAgentDraft}
-                onChange={setMobileAgentDraft}
-                placeholder="例如：周末有什么好看的动作片？"
-              />
-              <MobileButton
-                type="button"
-                className="home-mobile-agent-send-btn"
-                color="primary"
-                shape="rounded"
-                disabled={!mobileAgentDraft.trim()}
-                onClick={() => openAssistant(mobileAgentDraft)}
-              >
-                发送
-              </MobileButton>
-            </div>
+            <Link className="home-agent-entry-link" to="/recommendations">
+              进入智能购票之旅
+            </Link>
           </div>
         </div>
       )}
@@ -363,7 +333,7 @@ export default function HomePage() {
 
         {!isMobile && (
           <aside className="home-page-agent-sidebar">
-            <AgentCard onSubmit={openAssistant} />
+            <AgentCard />
           </aside>
         )}
       </div>
