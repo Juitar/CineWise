@@ -32,6 +32,13 @@ export default function OrderDetailPage() {
   );
   const movie = order ? content.moviesById.get(order.movieId) : undefined;
   const cinema = order ? content.cinemasById.get(order.cinemaId) : undefined;
+  const isContentLoading = Boolean(
+    order &&
+    (content.isLoading ||
+      (!content.hasUnavailableContent && (movie === undefined || cinema === undefined))),
+  );
+  const isPageLoading = orderQuery.loading || isContentLoading;
+  const shouldShowContentNotice = Boolean(order) && !isContentLoading;
   const canViewTravelAdvice = Boolean(
     order?.showStartTime && isTravelAdviceAvailable(order.showStartTime),
   );
@@ -86,11 +93,13 @@ export default function OrderDetailPage() {
         <TransactionBreadcrumb
           items={[{ label: '我的订单', to: '/orders' }, { label: '订单详情' }]}
         />
-        <OrderContentNotice
-          isLoading={content.isLoading}
-          hasUnavailableContent={content.hasUnavailableContent}
-          onRetry={content.refresh}
-        />
+        {shouldShowContentNotice ? (
+          <OrderContentNotice
+            isLoading={false}
+            hasUnavailableContent={content.hasUnavailableContent}
+            onRetry={content.refresh}
+          />
+        ) : null}
         <OrderDetail
           orderNo={order?.orderNo ?? orderNo}
           status={order?.status ?? 'PENDING_PAYMENT'}
@@ -107,7 +116,7 @@ export default function OrderDetailPage() {
           totalAmount={order?.totalAmount ?? '0.00'}
           expireTime={order?.expireTime ? formatOrderDateTime(order.expireTime) : undefined}
           updatedAt={order?.updatedAt ? formatOrderDateTime(order.updatedAt) : undefined}
-          loading={orderQuery.loading}
+          loading={isPageLoading}
           error={
             orderQuery.error?.message ?? cancellation.error?.message ?? paymentQuery.error?.message
           }
