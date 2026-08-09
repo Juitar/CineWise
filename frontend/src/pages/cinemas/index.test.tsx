@@ -133,6 +133,19 @@ describe('CinemasPage', () => {
     });
   });
 
+  it('未知城市代码降级为长沙，并只向后端查询长沙影院', () => {
+    pageMocks.search = 'location=310000';
+    render(<CinemasPage />);
+
+    expect(screen.getByText('当前城市：长沙。影院基础信息来自后端内容服务。')).toBeInTheDocument();
+    expect(pageMocks.useCinemaList).toHaveBeenCalledWith({
+      keyword: undefined,
+      location: '430100',
+      page: 1,
+      size: 20,
+    });
+  });
+
   it('加载、空结果和非法 URL 都有明确状态', () => {
     pageMocks.search = 'location=hangzhou&page=0';
     pageMocks.useCinemaList.mockReturnValue(cinemaListState({ data: null, isLoading: true }));
