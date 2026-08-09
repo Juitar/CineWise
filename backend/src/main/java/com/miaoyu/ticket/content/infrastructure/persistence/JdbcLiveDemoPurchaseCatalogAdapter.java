@@ -79,10 +79,8 @@ public class JdbcLiveDemoPurchaseCatalogAdapter implements LiveDemoPurchaseCatal
             // 目录时效按最早记录收敛，A 在该时间后不会继续把其中的旧资料当作有效资料。
             List<LocalDateTime> dataTimes = java.util.stream.Stream.concat(movieRows.stream().map(MovieRow::dataAt),
                     cinemaRows.stream().map(CinemaRow::dataAt)).toList();
-            List<LocalDateTime> expiresAts = java.util.stream.Stream.concat(movieRows.stream().map(MovieRow::expiresAt),
-                    cinemaRows.stream().map(CinemaRow::expiresAt)).toList();
             LocalDateTime dataAt = dataTimes.stream().min(LocalDateTime::compareTo).orElseThrow();
-            LocalDateTime expiresAt = expiresAts.stream().map(this::effectiveDemoReferenceExpiry)
+            LocalDateTime expiresAt = dataTimes.stream().map(this::effectiveDemoReferenceExpiry)
                     .min(LocalDateTime::compareTo).orElseThrow();
             return new ContentPurchaseQueryPort.DemoPurchaseCatalog(movieRows.stream().map(MovieRow::ref).toList(),
                     cinemaRows.stream().map(CinemaRow::ref).toList(), NETSTART_MAOYAN,

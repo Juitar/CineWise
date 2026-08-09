@@ -355,6 +355,7 @@ class RefundIntegrationTest {
         PaidOrder paidOrder = createPaidOrder("refund-alternatives", 1);
         long originalMovieId = movieId(paidOrder.order().showId());
         long originalCinemaId = cinemaId(paidOrder.order().showId());
+        insertAlternativeShow(paidOrder.order().showId(), originalMovieId, originalCinemaId);
 
         AlternativeShowsView result = refundApplicationService.queryAlternativeShows(
                 paidOrder.order().orderNo(),
@@ -427,6 +428,27 @@ class RefundIntegrationTest {
                  LIMIT ?
                 """, Long.class, showId, seatCount);
         return new ShowSeats(showId, seatIds);
+    }
+
+    /** 替补场次属于退款查询的独立契约，测试不依赖演示种子恰好分配到相同影片。 */
+    private void insertAlternativeShow(long originalShowId, long movieId, long cinemaId) {
+        long auditoriumId = jdbcTemplate.queryForObject(
+                "SELECT auditorium_id FROM movie_show WHERE id = ?", Long.class, originalShowId);
+        jdbcTemplate.update("""
+                INSERT INTO movie_show (
+                    id, movie_id, cinema_id, auditorium_id, start_time, end_time,
+                    language_version, base_price, data_type, source, status, version, create_time, update_time
+                ) VALUES (?, ?, ?, ?, '2026-08-03 14:00:00', '2026-08-03 16:00:00',
+                    '国语 2D', 39.90, 'MOCK', 'refund-test', 'ON_SALE', 0,
+                    '2026-08-02 08:00:00', '2026-08-02 08:00:00')
+                """, 9_700_000_001L, movieId, cinemaId, auditoriumId);
+        jdbcTemplate.update("""
+                INSERT INTO show_seat (
+                    id, show_id, row_no, seat_no, seat_label, status,
+                    lock_order_no, lock_expire_time, version, create_time, update_time
+                ) VALUES (?, ?, 'A', '01', 'A排1座', 'AVAILABLE', NULL, NULL, 0,
+                    '2026-08-02 08:00:00', '2026-08-02 08:00:00')
+                """, 9_700_000_002L, 9_700_000_001L);
     }
 
     private void assertMismatch(org.assertj.core.api.ThrowableAssert.ThrowingCallable callable) {

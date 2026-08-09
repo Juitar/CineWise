@@ -63,10 +63,10 @@ class JdbcLiveDemoPurchaseCatalogAdapterTest {
 
     @Test
     void givenExpiryEqualsNow_whenQuerying_thenItExcludesTheBoundaryRecord() {
-        insertMovie(1, "movie-now", 100, "2026-08-07 07:00:00", "2026-08-07 08:00:00");
-        insertCinema(1, "cinema-now", "2026-08-07 07:00:00", "2026-08-07 08:00:00");
-        insertMovie(2, "movie-later", 100, "2026-08-07 07:00:00", "2026-08-07 08:00:01");
-        insertCinema(2, "cinema-later", "2026-08-07 07:00:00", "2026-08-07 08:00:01");
+        insertMovie(1, "movie-now", 100, "2026-08-06 08:00:00", "2026-08-06 14:00:00");
+        insertCinema(1, "cinema-now", "2026-08-06 08:00:00", "2026-08-06 14:00:00");
+        insertMovie(2, "movie-later", 100, "2026-08-06 08:00:01", "2026-08-06 14:00:00");
+        insertCinema(2, "cinema-later", "2026-08-06 08:00:01", "2026-08-06 14:00:00");
 
         var result = adapter.findLiveCatalog("430100");
 
