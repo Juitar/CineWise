@@ -4,6 +4,8 @@
 
 新增 `/recommendations` 与 `/recommendations/:sessionId`，均使用 `RequireAuth`。无会话 ID 时复用 `useAgentSessionBootstrap` 创建会话，并替换为带 ID 的路由。`/assistant` 及其会话路由保持不变。
 
+首页不承载 Agent 消息输入。桌面端和移动端使用语义化链接进入 `/recommendations`，由现有登录守卫和会话创建页面继续处理认证与会话初始化。首页不写入待提交草稿，不触发消息提交或 SSE；`entryDraft` 兼容模块和工作区读取逻辑保持不变，避免扩大本次修改范围。
+
 ## 组件与状态
 
 扩展现有 `AgentWorkspace`，增加推荐工作区模式和路由前缀。组件内部仍只调用一次 `useAgentWorkspace(sessionId)`：
@@ -32,5 +34,5 @@
 
 - 组件测试覆盖真实方案字段、选择高亮、选中后的消息、二次调整、卡片更新、无方案和 `SELECT_SEATS`。
 - 页面测试覆盖会话创建后跳转至 recommendations 路由。
-- 首页测试覆盖入口改为 `/recommendations`。
+- 首页测试覆盖桌面端和移动端入口均指向 `/recommendations`，且不再展示首页 Agent 输入、发送按钮和静态推荐词。
 - 执行前端类型检查、相关 Vitest、构建、OpenSpec 严格校验和 `git diff --check`。

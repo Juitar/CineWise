@@ -9,7 +9,6 @@ import type { CinemaSummary, ContentPageResponse, MovieSummary } from '../../sha
 
 const pageMocks = vi.hoisted(() => ({
   isMobile: true,
-  navigate: vi.fn(),
   useCinemaList: vi.fn(),
   useMovieList: vi.fn(),
 }));
@@ -20,7 +19,6 @@ vi.mock('umi', () => ({
       {children}
     </a>
   ),
-  useNavigate: () => pageMocks.navigate,
 }));
 
 vi.mock('../../shared/hooks/useMediaQuery', () => ({
@@ -115,7 +113,6 @@ describe('HomePage', () => {
     pageMocks.isMobile = true;
     pageMocks.useMovieList.mockReset();
     pageMocks.useCinemaList.mockReset();
-    pageMocks.navigate.mockReset();
     pageMocks.useMovieList.mockReturnValue(movieState());
     pageMocks.useCinemaList.mockReturnValue(cinemaState());
   });
@@ -278,17 +275,22 @@ describe('HomePage', () => {
     expect(screen.queryByRole('button', { name: '开启个性化服务' })).not.toBeInTheDocument();
   });
 
-  it('首页 Agent 输入只保存内存草稿并跳转受保护工作区', () => {
-    const { container } = render(<HomePage />);
-    const agentInput = screen.getByLabelText('首页 Agent 输入');
-    expect(agentInput).toHaveClass('adm-input-element');
-    expect(container.querySelector('.home-mobile-agent-input')).toHaveClass('adm-input');
-    expect(container.querySelector('.home-mobile-agent-send-btn')).toHaveClass('adm-button');
-    fireEvent.change(agentInput, {
-      target: { value: '推荐一部电影' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
-    expect(pageMocks.navigate).toHaveBeenCalledWith('/recommendations');
+  it.each([
+    ['移动端', true],
+    ['PC 端', false],
+  ])('%s 首页只展示智能购票工作区入口', (_name, isMobile) => {
+    pageMocks.isMobile = isMobile;
+    render(<HomePage />);
+
+    expect(screen.getByRole('link', { name: '进入智能购票之旅' })).toHaveAttribute(
+      'href',
+      '/recommendations',
+    );
+    expect(screen.queryByLabelText('首页 Agent 输入')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '发送' })).not.toBeInTheDocument();
+    expect(screen.queryByText('可以问我：')).not.toBeInTheDocument();
+    expect(screen.queryByText('IMAX电影有哪些？')).not.toBeInTheDocument();
+    expect(screen.queryByText('带孩子看什么电影好？')).not.toBeInTheDocument();
   });
 
   it('PC Agent 入口不展示静态影片、影院、路线或价格', () => {
