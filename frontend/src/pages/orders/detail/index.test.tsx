@@ -86,7 +86,7 @@ describe('订单详情交易时间展示', () => {
     });
 
     render(<OrderDetailPage />);
-    fireEvent.click(screen.getByRole('button', { name: '查看出行建议' }));
+    fireEvent.click(await screen.findByRole('button', { name: '查看出行建议' }));
     await waitFor(() => expect(travelMocks.find).toHaveBeenCalledWith('1'));
     expect(routeMocks.historyPush).toHaveBeenCalledWith('/travel/90001');
   });
@@ -132,7 +132,7 @@ describe('订单详情交易时间展示', () => {
     expect(screen.queryByRole('button', { name: '查看出行建议' })).not.toBeInTheDocument();
   });
 
-  it('按固定业务时区展示支付截止和更新时间', () => {
+  it('按固定业务时区展示支付截止和更新时间', async () => {
     vi.mocked(useOrder).mockReturnValue({
       data: {
         orderId: '1',
@@ -170,7 +170,7 @@ describe('订单详情交易时间展示', () => {
 
     render(<OrderDetailPage />);
 
-    expect(screen.getByText('2026-08-10 14:00')).toBeInTheDocument();
+    expect(await screen.findByText('2026-08-10 14:00')).toBeInTheDocument();
     expect(screen.getByText('2026-08-05 12:00')).toBeInTheDocument();
     expect(screen.getByText('影院：影院信息暂不可用')).toBeInTheDocument();
     expect(screen.queryByText('2026-08-05T04:00:00Z')).not.toBeInTheDocument();
@@ -224,5 +224,69 @@ describe('订单详情交易时间展示', () => {
     expect(screen.getByText('影院：真实影院')).toBeInTheDocument();
     expect(screen.getByText('区域：岳麓区')).toBeInTheDocument();
     expect(screen.getByText('地址：测试路 1 号')).toBeInTheDocument();
+  });
+
+  it('影片影院资料首次加载期间持续显示骨架屏且不闪现兜底提示', async () => {
+    let resolveMovie: (value: { title: string; posterUrl: null }) => void = () => undefined;
+    let resolveCinema: (value: { name: string; area: string; address: string }) => void = () =>
+      undefined;
+    contentMocks.getMovieDetail.mockReturnValue(
+      new Promise((resolve) => {
+        resolveMovie = resolve;
+      }),
+    );
+    contentMocks.getCinemaDetail.mockReturnValue(
+      new Promise((resolve) => {
+        resolveCinema = resolve;
+      }),
+    );
+    vi.mocked(useOrder).mockReturnValue({
+      data: {
+        orderId: '1',
+        orderNo: 'CW1',
+        showId: '11',
+        movieId: '22',
+        cinemaId: '33',
+        showStartTime: '2026-08-10T14:30:00+08:00',
+        seatIds: ['101'],
+        ticketCount: 1,
+        unitPrice: '39.00',
+        totalAmount: '39.00',
+        status: 'PAID',
+        expireTime: '2026-08-10T14:00:00+08:00',
+        stateVersion: 1,
+        updatedAt: '2026-08-05T04:00:00Z',
+      },
+      loading: false,
+      error: null,
+      refresh: vi.fn(),
+    });
+    vi.mocked(useCancelOrder).mockReturnValue({
+      submitting: false,
+      resultUnknown: false,
+      error: null,
+      submit: vi.fn(),
+      recover: vi.fn(),
+    });
+    vi.mocked(usePaymentQuery).mockReturnValue({
+      payment: null,
+      querying: false,
+      error: null,
+      query: vi.fn(),
+    });
+
+    render(<OrderDetailPage />);
+
+    expect(screen.getByLabelText('订单详情加载中')).toBeInTheDocument();
+    expect(screen.queryByText('正在获取影片和影院信息')).not.toBeInTheDocument();
+    expect(screen.queryByText('影片信息暂不可用')).not.toBeInTheDocument();
+    expect(screen.queryByText('影院：影院信息暂不可用')).not.toBeInTheDocument();
+
+    resolveMovie({ title: '真实影片', posterUrl: null });
+    resolveCinema({ name: '真实影院', area: '岳麓区', address: '测试路 1 号' });
+
+    expect(await screen.findByText('真实影片')).toBeInTheDocument();
+    expect(screen.getByText('影院：真实影院')).toBeInTheDocument();
+    expect(screen.queryByLabelText('订单详情加载中')).not.toBeInTheDocument();
   });
 });

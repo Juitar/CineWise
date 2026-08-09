@@ -106,6 +106,17 @@
   min-width: 110px;
 }
 
+.order-detail-skeleton {
+  min-height: 560px;
+}
+
+.order-detail-skeleton-content {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 24px;
+}
+
 @media (max-width: 1023px) {
   .order-detail-container {
     padding: 16px;
@@ -123,16 +134,8 @@
     min-height: 44px;
     margin-left: 0;
   }
-}
 
-.mobile-loading-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  color: #999;
-}
-
-.mobile-spin-large {
-  --size: 48px;
+  .order-detail-skeleton {
+    min-height: 480px;
+  }
 }

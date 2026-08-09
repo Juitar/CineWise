@@ -97,10 +97,18 @@ describe('OrderDetail 组件', () => {
     expect(screen.queryByRole('button', { name: '返回首页' })).not.toBeInTheDocument();
   });
 
-  it('在移动端视图渲染 ErrorBlock、SpinLoading 以及 antd-mobile 按钮', () => {
+  it('桌面端和移动端加载时使用对应组件库的骨架屏', () => {
+    setMobileView(false);
+    const desktop = render(<OrderDetail {...defaultProps} loading={true} />);
+    expect(screen.getByLabelText('订单详情加载中')).toBeInTheDocument();
+    expect(desktop.container.querySelector('.ant-skeleton')).toBeInTheDocument();
+    expect(screen.queryByText('正在读取订单详细信息...')).not.toBeInTheDocument();
+    desktop.unmount();
+
     setMobileView(true);
     const { container, rerender } = render(<OrderDetail {...defaultProps} loading={true} />);
-    expect(container.querySelector('.adm-spin-loading')).toBeInTheDocument();
+    expect(container.querySelector('.adm-skeleton')).toBeInTheDocument();
+    expect(container.querySelector('.adm-spin-loading')).not.toBeInTheDocument();
 
     rerender(<OrderDetail {...defaultProps} error="测试错误" />);
     expect(container.querySelector('.adm-error-block')).toBeInTheDocument();

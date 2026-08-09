@@ -1,6 +1,6 @@
 import React from 'react';
-import { Button, Alert, Spin, Tag, Descriptions } from 'antd';
-import { Button as MobileButton, ErrorBlock, SpinLoading } from 'antd-mobile';
+import { Button, Alert, Skeleton as DesktopSkeleton, Tag, Descriptions } from 'antd';
+import { Button as MobileButton, ErrorBlock, Skeleton as MobileSkeleton } from 'antd-mobile';
 import { ORDER_STATUS_LABELS } from '../../modules/order/status-presentation';
 import type { OrderStatus } from '../../modules/order/types';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
@@ -71,14 +71,26 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
   const isMobile = useMediaQuery('(max-width: 1023px)');
   if (loading) {
     return (
-      <div className="order-detail-container">
+      <div
+        aria-label="订单详情加载中"
+        className="order-detail-container order-detail-skeleton"
+        role="status"
+      >
         {isMobile ? (
-          <div className="mobile-loading-wrapper">
-            <SpinLoading color="primary" />
-            <span>正在读取订单详细信息...</span>
+          <div className="order-detail-skeleton-content">
+            <MobileSkeleton.Title animated />
+            <MobileSkeleton.Paragraph animated lineCount={2} />
+            <MobileSkeleton.Title animated />
+            <MobileSkeleton.Paragraph animated lineCount={5} />
+            <MobileSkeleton.Title animated />
+            <MobileSkeleton.Paragraph animated lineCount={4} />
           </div>
         ) : (
-          <Spin tip="正在读取订单详细信息..." />
+          <div className="order-detail-skeleton-content">
+            <DesktopSkeleton active paragraph={{ rows: 2 }} />
+            <DesktopSkeleton active paragraph={{ rows: 5 }} />
+            <DesktopSkeleton active paragraph={{ rows: 4 }} />
+          </div>
         )}
       </div>
     );
