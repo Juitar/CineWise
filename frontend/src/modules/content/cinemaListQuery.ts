@@ -1,6 +1,7 @@
 import type { CinemaListQuery } from '../../shared/types/api';
+import { DEFAULT_DEMO_CITY, DEMO_CITY_OPTIONS } from './demoCities';
 
-export const DEFAULT_CINEMA_LOCATION = '430100';
+export const DEFAULT_CINEMA_LOCATION = DEFAULT_DEMO_CITY.code;
 export const DEFAULT_CINEMA_PAGE = 1;
 export const DEFAULT_CINEMA_PAGE_SIZE = 20;
 export const MAX_CINEMA_PAGE_SIZE = 50;
@@ -57,15 +58,25 @@ function parseKeyword(rawValue: string | null, issues: string[]): string | undef
   return keyword;
 }
 
+/**
+ * 影院浏览仅支持答辩开放的两个城市。
+ *
+ * URL 可以由分享或手工编辑产生；未知六位行政代码必须在请求前降级，
+ * 否则页面显示的默认城市会与实际向后端查询的城市不一致。
+ */
+function parseDemoCity(rawValue: string | null, issues: string[]): string {
+  const location = rawValue?.trim() || DEFAULT_CINEMA_LOCATION;
+  if (!DEMO_CITY_OPTIONS.some((city) => city.code === location)) {
+    issues.push('城市代码仅支持长沙或杭州');
+    return DEFAULT_CINEMA_LOCATION;
+  }
+  return location;
+}
+
 /** 将可修改的 URL 输入转换为后端接受的影院查询条件。 */
 export function parseCinemaListQuery(searchParams: URLSearchParams): CinemaListQueryParseResult {
   const issues: string[] = [];
-  const rawLocation = searchParams.get('location');
-  let location = rawLocation?.trim() || DEFAULT_CINEMA_LOCATION;
-  if (!/^\d{6}$/.test(location)) {
-    issues.push('城市代码必须是六位数字');
-    location = DEFAULT_CINEMA_LOCATION;
-  }
+  const location = parseDemoCity(searchParams.get('location'), issues);
 
   return {
     issues,

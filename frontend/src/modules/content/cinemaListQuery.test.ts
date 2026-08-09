@@ -33,6 +33,13 @@ describe('parseCinemaListQuery', () => {
     expect(result.issues).toHaveLength(3);
   });
 
+  it('将未知六位城市代码降级为长沙，保证显示与请求城市一致', () => {
+    const result = parseCinemaListQuery(new URLSearchParams('location=310000'));
+
+    expect(result.query.location).toBe(DEFAULT_CINEMA_LOCATION);
+    expect(result.issues).toContain('城市代码仅支持长沙或杭州');
+  });
+
   it('拒绝超长关键词', () => {
     const result = parseCinemaListQuery(
       new URLSearchParams({ keyword: '影'.repeat(101), location: '430100' }),

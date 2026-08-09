@@ -34,6 +34,10 @@
   margin: 0 0 16px;
 }
 
+.content-sync-city-select {
+  min-width: 128px;
+}
+
 .content-sync-loading {
   padding: 32px;
   text-align: center;

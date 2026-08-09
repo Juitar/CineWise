@@ -1,7 +1,8 @@
-import { Alert, Button, Empty, Input, Spin, Table, Tag, message } from 'antd';
+import { Alert, Button, Empty, Select, Spin, Table, Tag, message } from 'antd';
 import { useState } from 'react';
 
 import { useAdminContentSync } from '../../../modules/admin-content/hooks';
+import { DEMO_CITY_OPTIONS } from '../../../modules/content/demoCities';
 import './index.css';
 
 const format = (value: string | null) =>
@@ -48,11 +49,15 @@ export default function AdminContentPage() {
           />
         )}
         <div className="content-sync-action">
-          <Input
+          <Select
             aria-label="同步城市"
+            className="content-sync-city-select"
+            onChange={setCityName}
+            options={DEMO_CITY_OPTIONS.map((option) => ({
+              label: option.name,
+              value: option.name,
+            }))}
             value={cityName}
-            maxLength={64}
-            onChange={(event) => setCityName(event.target.value)}
           />
           <Button
             type="primary"

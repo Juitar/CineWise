@@ -11,6 +11,7 @@ import com.miaoyu.ticket.content.domain.ContentResourceType;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
 import com.miaoyu.ticket.content.domain.MovieContent;
 import com.miaoyu.ticket.content.domain.CinemaContent;
+import java.net.SocketTimeoutException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -26,6 +27,7 @@ import org.springframework.mock.env.MockEnvironment;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.http.HttpStatus;
 
 class NetStartContentProviderTest {
@@ -515,6 +517,18 @@ class NetStartContentProviderTest {
         AtomicInteger calls = new AtomicInteger();
         NetStartContentProvider provider = provider(query -> { calls.incrementAndGet();
             throw HttpServerErrorException.create(HttpStatus.BAD_GATEWAY, "upstream", null, null, null); });
+        assertThat(provider.query(movieDetail())).isEmpty();
+        assertThat(calls).hasValue(2);
+    }
+
+    @Test
+    void givenResponseReadTimeoutWrappedByRestClient_whenQuery_thenItRetriesOnceAndUsesConnectionFailure() {
+        AtomicInteger calls = new AtomicInteger();
+        NetStartContentProvider provider = provider(query -> {
+            calls.incrementAndGet();
+            throw new RestClientException("response read timeout", new SocketTimeoutException("read timed out"));
+        });
+
         assertThat(provider.query(movieDetail())).isEmpty();
         assertThat(calls).hasValue(2);
     }

@@ -168,16 +168,24 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   color: #1f2329;
+  font: inherit;
   font-weight: 500;
   cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 8px;
   transition: background-color 0.2s;
 }
 
 .desktop-location-selector:hover {
   background-color: #f5f7fa;
+}
+
+.desktop-location-selector:focus-visible {
+  outline: 2px solid #635bff;
+  outline-offset: 2px;
 }
 
 .desktop-top-bar-right {
@@ -281,4 +289,8 @@
 .mobile-user-title {
   font-size: 17px;
   font-weight: 600;
+}
+
+.mobile-city-dropdown {
+  min-width: 88px;
 }

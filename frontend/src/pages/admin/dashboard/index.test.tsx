@@ -65,8 +65,12 @@ describe('AdminContentPage', () => {
     });
     render(<AdminContentPage />);
 
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '同步城市' }));
+    fireEvent.click(document.querySelector('.ant-select-item-option[title="杭州"]') as HTMLElement);
+
     fireEvent.click(screen.getByRole('button', { name: '手动同步' }));
     await waitFor(() => expect(success).toHaveBeenCalledTimes(1));
+    expect(submit).toHaveBeenNthCalledWith(1, '杭州');
 
     fireEvent.click(screen.getByRole('button', { name: '手动同步' }));
     await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
