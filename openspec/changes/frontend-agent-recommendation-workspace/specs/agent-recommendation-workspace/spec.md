@@ -6,10 +6,16 @@
 
 系统 MUST 将首页 Agent 的正常用户入口指向受登录保护的推荐方案工作区，并保留 `/assistant` 作为开发调试页。
 
-#### Scenario: 从首页提交需求
+#### Scenario: 从首页进入工作区
 
-- **WHEN** 用户在首页 Agent 输入有效需求并提交
-- **THEN** 系统进入 `/recommendations`，创建会话后替换为 `/recommendations/:sessionId`，并只提交一次首页草稿
+- **WHEN** 用户在桌面端或移动端首页点击“进入智能购票之旅”
+- **THEN** 系统进入 `/recommendations`，创建会话后替换为 `/recommendations/:sessionId`
+- **AND** 首页不提交 Agent 消息或启动 SSE，用户在工作区内输入需求后才开始对话
+
+#### Scenario: 首页不展示对话输入和静态推荐词
+
+- **WHEN** 用户打开桌面端或移动端首页
+- **THEN** 页面不显示首页 Agent 输入框、发送按钮或“可以问我”静态推荐词
 
 ### Requirement: 真实方案与对话共用运行状态
 
