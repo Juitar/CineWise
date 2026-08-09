@@ -163,9 +163,8 @@ cinewise:
     max-page-size: 100
   security:
     cors:
-      allowed-origins:
-        - http://localhost:8000
-        - http://localhost:5173
+      # 生产/演示入口必须通过环境变量显式加入，不能用 * 配合 Cookie。
+      allowed-origins: ${CINEWISE_CORS_ALLOWED_ORIGINS:http://localhost:8000,http://localhost:5173}
   auth:
     jwt-secret: ${JWT_SECRET:}
     audit-hash-secret: ${AUTH_AUDIT_HASH_SECRET:${JWT_SECRET:}}
