@@ -7,7 +7,7 @@
 
 - [x] 2.1 扩展公开路线请求 DTO 与 Application 入口，分别校验浏览器坐标和手动地点，拒绝混合输入。
 - [x] 2.2 复用 `UserLocationAdapter.fromPlaceText()`，拒绝歧义、空结果和 CITY/DISTRICT，不返回或记录坐标与地点原文。
-- [x] 2.3 为正常、越权、未确认、歧义、粒度不足、Provider 失败和隐私边界补充测试与 OpenAPI。
+- [x] 2.3 P0 修复：在手动地点地理编码前完成任务归属、共享确认、影院终点与出行方式预检，并补充未调用 Adapter 的回归测试。
 
 ## 3. A 前端
 

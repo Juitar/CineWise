@@ -2,7 +2,9 @@ package com.miaoyu.ticket.travel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -45,7 +47,8 @@ class TravelRouteControllerTest {
 
     @Test
     void givenConfirmedDrivingRequest_whenPlanning_thenReturnRouteWithoutCoordinates() throws Exception {
-        when(routeService.planMyRoute(eq("90001"), any())).thenReturn(route());
+        when(routeService.prepareMyRoute(eq("90001"), eq(true), eq("DRIVING"))).thenReturn(preparation());
+        when(routeService.planPreparedMyRoute(any(), any())).thenReturn(route());
 
         mockMvc.perform(post("/api/v1/travel/tasks/90001/route")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -57,7 +60,7 @@ class TravelRouteControllerTest {
                 .andExpect(jsonPath("$.data.travelMode").value("DRIVING"))
                 .andExpect(jsonPath("$.data.longitude").doesNotExist())
                 .andExpect(jsonPath("$.data.latitude").doesNotExist());
-        verify(routeService).planMyRoute(eq("90001"), any());
+        verify(routeService).planPreparedMyRoute(any(), any());
     }
 
     @Test
@@ -69,22 +72,24 @@ class TravelRouteControllerTest {
                                 + "\"travelMode\":\"DRIVING\",\"thirdPartySharingConfirmed\":true}"))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.code").value(307001));
-        verify(routeService, never()).planMyRoute(any(), any());
+        verify(routeService, never()).planPreparedMyRoute(any(), any());
     }
 
     @Test
-    void givenTaskNotFoundOrSharingNotConfirmed_whenPlanning_thenKeepExistingErrorSemantics() throws Exception {
-        when(routeService.planMyRoute(eq("missing"), any()))
+    void givenTaskNotFoundOrSharingNotConfirmedManualPlace_whenPlanning_thenDoNotGeocode() throws Exception {
+        when(routeService.prepareMyRoute(eq("missing"), anyBoolean(), any()))
                 .thenThrow(new BusinessException(TravelErrorCode.TASK_NOT_FOUND));
-        when(routeService.planMyRoute(eq("90001"), any()))
+        when(routeService.prepareMyRoute(eq("90001"), anyBoolean(), any()))
                 .thenThrow(new BusinessException(TravelErrorCode.ROUTE_SHARING_NOT_CONFIRMED));
 
         mockMvc.perform(post("/api/v1/travel/tasks/missing/route")
-                        .contentType(MediaType.APPLICATION_JSON).content(request(true)))
+                        .contentType(MediaType.APPLICATION_JSON).content(manualPlaceRequest(true)))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value(207001));
         mockMvc.perform(post("/api/v1/travel/tasks/90001/route")
-                        .contentType(MediaType.APPLICATION_JSON).content(request(false)))
+                        .contentType(MediaType.APPLICATION_JSON).content(manualPlaceRequest(false)))
                 .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value(107002));
+        verify(manualPlaceLocationAdapter, never()).fromPlaceText(any());
+        verify(routeService, never()).planPreparedMyRoute(any(), any());
     }
 
     @Test
@@ -94,7 +99,8 @@ class TravelRouteControllerTest {
                 .thenReturn(new ResolvedGeoPoint(
                         new java.math.BigDecimal("112.938815"), new java.math.BigDecimal("28.228209"),
                         LocationGranularity.ADDRESS));
-        when(routeService.planMyRoute(eq("90001"), any())).thenReturn(route());
+        when(routeService.prepareMyRoute(eq("90001"), eq(true), eq("WALKING"))).thenReturn(preparation());
+        when(routeService.planPreparedMyRoute(any(), any())).thenReturn(route());
 
         mockMvc.perform(post("/api/v1/travel/tasks/90001/route")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -103,6 +109,10 @@ class TravelRouteControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.longitude").doesNotExist());
         verify(manualPlaceLocationAdapter).fromPlaceText("长沙市雨花区万家丽中路 1 号");
+        org.mockito.InOrder inOrder = inOrder(routeService, manualPlaceLocationAdapter);
+        inOrder.verify(routeService).prepareMyRoute("90001", true, "WALKING");
+        inOrder.verify(manualPlaceLocationAdapter).fromPlaceText("长沙市雨花区万家丽中路 1 号");
+        inOrder.verify(routeService).planPreparedMyRoute(any(), any());
     }
 
     @Test
@@ -128,7 +138,7 @@ class TravelRouteControllerTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value(107005));
 
-        verify(routeService, never()).planMyRoute(any(), any());
+        verify(routeService, never()).planPreparedMyRoute(any(), any());
     }
 
     @Test
@@ -150,7 +160,7 @@ class TravelRouteControllerTest {
                 .andExpect(jsonPath("$.code").value(107004));
 
         verify(manualPlaceLocationAdapter, never()).fromPlaceText(any());
-        verify(routeService, never()).planMyRoute(any(), any());
+        verify(routeService, never()).planPreparedMyRoute(any(), any());
     }
 
     @Test
@@ -173,9 +183,18 @@ class TravelRouteControllerTest {
                 + "\"travelMode\":\"WALKING\",\"thirdPartySharingConfirmed\":" + confirmed + "}";
     }
 
+    private String manualPlaceRequest(boolean confirmed) {
+        return "{\"originType\":\"MANUAL_PLACE\",\"placeText\":\"长沙市雨花区万家丽中路 1 号\","
+                + "\"travelMode\":\"WALKING\",\"thirdPartySharingConfirmed\":" + confirmed + "}";
+    }
+
     private BasicRouteResult route() {
         OffsetDateTime now = OffsetDateTime.parse("2026-08-08T10:00:00+08:00");
         return new BasicRouteResult("AMAP", "DRIVING", 20, now.plusMinutes(40), "AMAP_ROUTE", now,
                 now.plusMinutes(15), false, false, null);
+    }
+
+    private BasicRouteService.RoutePreparation preparation() {
+        return mock(BasicRouteService.RoutePreparation.class);
     }
 }

@@ -21,11 +21,11 @@
 
 浏览器定位使用 `originType: "CURRENT_LOCATION"` 并保留 `longitude`、`latitude`。同一请求中不得同时携带地点文本与坐标。
 
-后端 Controller 只调用 D 的 Application Adapter：
+后端按“应用服务预检 → 起点解析 → 应用服务执行”顺序调用公开 Application API：
 
-- `CURRENT_LOCATION` → `BrowserUserLocationAdapter.fromBrowser()`；
-- `MANUAL_PLACE` → `UserLocationAdapter.fromPlaceText()`；
-- 再把已校验的 `ResolvedGeoPoint` 交给现有 `BasicRouteService.planMyRoute()`。
+- Controller 先调用 `BasicRouteService.prepareMyRoute()`，在不持有起点的前提下依次确认任务归属、影院终点、第三方共享确认和出行方式；
+- 仅预检成功后，`CURRENT_LOCATION` 才调用 `BrowserUserLocationAdapter.fromBrowser()`，`MANUAL_PLACE` 才调用 `UserLocationAdapter.fromPlaceText()`；
+- 最后把只存在当前调用栈的 `ResolvedGeoPoint` 与预检上下文交给 `BasicRouteService.planPreparedMyRoute()`。
 
 地点编码结果为 0 或多个候选时，不返回坐标或候选原文；返回稳定“地点无法唯一确定”错误。`CITY`、`DISTRICT` 结果返回稳定“地点粒度不足”错误。具体错误码由 D 分配并由 C 同步到错误映射。
 
@@ -33,7 +33,7 @@
 
 路线请求是一次性写操作。请求中、结果未知或网络失败时禁用重复点击，不自动重发；用户可重新输入地点后主动再次提交。后端不记录坐标/地点文本，响应仍只返回路线摘要。
 
-所有起点方式均须在调用高德前确认第三方共享。当前定位失败不影响手动路线；手动编码失败不回退到设备定位。
+所有起点方式均须在调用高德前确认第三方共享。未确认共享、无权或不存在任务、缺少影院终点或非法出行方式时，系统必须在地点解析前失败，不调用 `UserLocationAdapter.fromPlaceText()`，也不得向高德发送地点。当前定位失败不影响手动路线；手动编码失败不回退到设备定位。
 
 ## 验证
 

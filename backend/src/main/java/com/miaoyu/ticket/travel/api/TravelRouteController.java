@@ -6,7 +6,6 @@ import com.miaoyu.ticket.geo.application.BrowserUserLocationAdapter;
 import com.miaoyu.ticket.geo.application.UserLocationAdapter;
 import com.miaoyu.ticket.geo.domain.LocationGranularity;
 import com.miaoyu.ticket.geo.domain.ResolvedGeoPoint;
-import com.miaoyu.ticket.travel.application.BasicRouteCommand;
 import com.miaoyu.ticket.travel.application.BasicRouteResult;
 import com.miaoyu.ticket.travel.application.BasicRouteService;
 import com.miaoyu.ticket.travel.application.TravelErrorCode;
@@ -61,9 +60,13 @@ public class TravelRouteController {
     })
     public Result<BasicRouteResult> planRoute(
             @PathVariable String taskId, @RequestBody PlanTravelRouteRequest request) {
+        if (request == null) {
+            throw new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE);
+        }
+        BasicRouteService.RoutePreparation preparation = basicRouteService.prepareMyRoute(
+                taskId, request.thirdPartySharingConfirmed(), request.travelMode());
         ResolvedGeoPoint origin = resolveOrigin(request);
-        BasicRouteResult route = basicRouteService.planMyRoute(
-                taskId, new BasicRouteCommand(origin, request.travelMode(), request.thirdPartySharingConfirmed()));
+        BasicRouteResult route = basicRouteService.planPreparedMyRoute(preparation, origin);
         return Result.success(route);
     }
 
