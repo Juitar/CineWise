@@ -11,9 +11,10 @@ import {
   Skeleton as MobileSkeleton,
 } from 'antd-mobile';
 import React, { useState } from 'react';
-import { Link } from 'umi';
+import { Link, useLocation } from 'umi';
 
 import { getFreshnessNotices } from '../../modules/content/freshness';
+import { resolveDemoCity } from '../../modules/content/demoCities';
 import { safePosterUrl } from '../../modules/content/poster';
 import { useCinemaList } from '../../modules/content/useCinemaList';
 import { useMovieList } from '../../modules/content/useMovieList';
@@ -25,8 +26,6 @@ import './index.css';
 
 const MOVIE_SKELETON_KEYS = ['movie-loading-1', 'movie-loading-2', 'movie-loading-3'];
 const CINEMA_SKELETON_KEYS = ['cinema-loading-1', 'cinema-loading-2', 'cinema-loading-3'];
-const DEFAULT_CITY_NAME = '长沙';
-const DEFAULT_CITY_CODE = '430100';
 
 function HomeOfflineNotice({ isMobile, message }: { isMobile: boolean; message: string }) {
   if (isMobile) {
@@ -181,9 +180,11 @@ function HomeCinemaCard({ cinema }: { cinema: CinemaSummary }) {
 }
 
 export default function HomePage() {
+  const location = useLocation();
   const isMobile = useMediaQuery('(max-width: 1023px)');
+  const city = resolveDemoCity(new URLSearchParams(location.search).get('location'));
   const movies = useMovieList({ page: 1, size: 5 });
-  const cinemas = useCinemaList({ location: DEFAULT_CITY_CODE, page: 1, size: 3 });
+  const cinemas = useCinemaList({ location: city.code, page: 1, size: 3 });
 
   return (
     <div className="home-page-container">
@@ -272,11 +273,11 @@ export default function HomePage() {
                 <div className="section-header">
                   <div>
                     <h2 className="home-section-title" id="home-cinemas-title">
-                      {DEFAULT_CITY_NAME}影院
+                      {city.name}影院
                     </h2>
                     <p className="home-section-description">不获取位置，不展示距离或距离排序</p>
                   </div>
-                  <Link className="section-link" to="/cinemas">
+                  <Link className="section-link" to={`/cinemas?location=${city.code}`}>
                     查看全部影院
                   </Link>
                 </div>
@@ -313,7 +314,10 @@ export default function HomePage() {
                   </div>
                 ) : null}
                 {!cinemas.isLoading && !cinemas.error && cinemas.data?.records.length === 0 ? (
-                  <HomeEmptyState description="长沙暂无可展示的影院" isMobile={isMobile} />
+                  <HomeEmptyState
+                    description={`${city.name}暂无可展示的影院`}
+                    isMobile={isMobile}
+                  />
                 ) : null}
                 {cinemas.data && cinemas.data.records.length > 0 ? (
                   <div className="cinemas-list" aria-live="polite">

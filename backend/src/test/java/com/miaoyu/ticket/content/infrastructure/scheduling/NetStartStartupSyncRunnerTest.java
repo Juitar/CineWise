@@ -3,6 +3,7 @@ package com.miaoyu.ticket.content.infrastructure.scheduling;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,6 +53,21 @@ class NetStartStartupSyncRunnerTest {
 
         verify(service).synchronizeCityCinemasWithResult(org.mockito.ArgumentMatchers.eq("长沙"),
                 org.mockito.ArgumentMatchers.eq("430100"), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void givenCityOnlyStartupSync_whenProviderBudgetIsReserved_thenItDoesNotRunMovieSyncFirst() {
+        ContentSyncService service = mock(ContentSyncService.class);
+        NetStartProperties properties = new NetStartProperties(true, true, "https://example.test", "0 0 3 * * *",
+                Duration.ofMillis(500), Duration.ofMillis(1500), 10, 1, Duration.ofMillis(200), List.of("330100"));
+        NetStartStartupSyncRunner runner = new NetStartStartupSyncRunner(properties, service,
+                new CityResolutionService(new ObjectMapper(), new DefaultResourceLoader()), false);
+
+        runner.synchronizeOnce();
+
+        verify(service).synchronizeCityCinemasWithResult(org.mockito.ArgumentMatchers.eq("杭州"),
+                org.mockito.ArgumentMatchers.eq("330100"), org.mockito.ArgumentMatchers.any());
+        verifyNoMoreInteractions(service);
     }
 
     private NetStartProperties properties(boolean enabled) {

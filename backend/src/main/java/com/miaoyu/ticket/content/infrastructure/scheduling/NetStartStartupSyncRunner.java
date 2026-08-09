@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -28,20 +29,28 @@ public class NetStartStartupSyncRunner implements ApplicationRunner {
     /** 应用服务负责事务、身份隔离和缓存提交顺序，Runner 不直接访问数据库或 Redis。 */
     private final ContentSyncService contentSyncService;
     private final CityResolutionService cityResolutionService;
+    private final boolean syncMoviesOnStartup;
 
     @org.springframework.beans.factory.annotation.Autowired
     public NetStartStartupSyncRunner(NetStartProperties properties, ContentSyncService contentSyncService,
-                                     CityResolutionService cityResolutionService) {
+                                     CityResolutionService cityResolutionService,
+                                     @Value("${cinewise.content.netstart.sync-movies-on-startup:true}")
+                                     boolean syncMoviesOnStartup) {
         this.properties = properties;
         this.contentSyncService = contentSyncService;
         this.cityResolutionService = cityResolutionService;
+        this.syncMoviesOnStartup = syncMoviesOnStartup;
     }
 
     /** 兼容旧单元测试；正式 Spring 构造器同时注入城市目录。 */
     NetStartStartupSyncRunner(NetStartProperties properties, ContentSyncService contentSyncService) {
-        this.properties = properties;
-        this.contentSyncService = contentSyncService;
-        this.cityResolutionService = null;
+        this(properties, contentSyncService, null, true);
+    }
+
+    /** 兼容既有城市同步测试；默认仍在启动窗口同步影片。 */
+    NetStartStartupSyncRunner(NetStartProperties properties, ContentSyncService contentSyncService,
+                              CityResolutionService cityResolutionService) {
+        this(properties, contentSyncService, cityResolutionService, true);
     }
 
     @Override
@@ -60,8 +69,9 @@ public class NetStartStartupSyncRunner implements ApplicationRunner {
             LOGGER.warn("NetStart 启动同步未执行：Provider 未开启");
             return;
         }
-        // 返回数量只用于测试窗口观察，不改变后续页面查询或票务事实。
-        int synchronizedCount = contentSyncService.synchronizeDailyContent();
+        // 影院搜索自身可能消耗完整十次分钟预算。只导入城市时不能先同步影片，
+        // 否则杭州请求会被本地限流拒绝并错误回退为 Mock 数据。
+        int synchronizedCount = syncMoviesOnStartup ? contentSyncService.synchronizeDailyContent() : 0;
         if (cityResolutionService != null) {
             properties.syncCities().forEach(cityCode -> cityResolutionService.findCityName(cityCode)
                     .ifPresent(cityName -> contentSyncService.synchronizeCityCinemasWithResult(
