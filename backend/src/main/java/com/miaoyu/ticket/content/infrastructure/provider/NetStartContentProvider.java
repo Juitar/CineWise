@@ -49,6 +49,10 @@ import org.springframework.web.client.RestClientResponseException;
  */
 public final class NetStartContentProvider implements LiveContentSyncPort {
     private static final String PROVIDER = "NETSTART_MAOYAN";
+    /**
+     * 内容同步按日运行，保留完整同步周期的有效期，避免凌晨同步后白天无法生成本地演示排期。
+     */
+    private static final int CONTENT_VALIDITY_HOURS = 24;
     // 对页面和快照使用国家行政区划代码，不能把 NetStart 的 ci 当成业务城市代码。
     private static final String CHANGSHA_CITY_CODE = "430100";
     private final NetStartProperties properties;
@@ -98,7 +102,7 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
         return mapper.map(query.resourceType(), raw, query.cityCode()).map(item -> {
             LocalDateTime dataTime = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
             return new ContentResult<>(List.of(item), new ContentSource(PROVIDER, ContentSourceType.LIVE), dataTime,
-                    dataTime.plusHours(6), false, false, null);
+                    dataTime.plusHours(CONTENT_VALIDITY_HOURS), false, false, null);
         });
     }
 
@@ -109,7 +113,7 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
         }
         LocalDateTime dataTime = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         return Optional.of(new ContentResult<>(items, new ContentSource(PROVIDER, ContentSourceType.LIVE), dataTime,
-                dataTime.plusHours(6), false, false, null));
+                dataTime.plusHours(CONTENT_VALIDITY_HOURS), false, false, null));
     }
 
     /**
@@ -265,7 +269,7 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
         }
         LocalDateTime dataTime = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         return Optional.of(new ContentResult<>(List.copyOf(mapped), new ContentSource(PROVIDER,
-                ContentSourceType.LIVE), dataTime, dataTime.plusHours(6), false, false, null));
+                ContentSourceType.LIVE), dataTime, dataTime.plusHours(CONTENT_VALIDITY_HOURS), false, false, null));
     }
 
     /**

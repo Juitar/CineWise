@@ -53,6 +53,7 @@ class NetStartContentProviderTest {
         assertThat(movie.releaseStatus()).isEqualTo("NOW_SHOWING");
         assertThat(result.source().type()).isEqualTo(ContentSourceType.LIVE);
         assertThat(result.degraded()).isFalse();
+        assertThat(result.expiresAt()).isEqualTo(LocalDateTime.of(2026, 8, 5, 16, 0));
     }
 
     @Test

@@ -19,17 +19,18 @@ import java.util.SplittableRandom;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 幂等补齐滚动七天的演示排期；已有座位只读取、不覆盖，避免破坏锁定或售出状态。 */
+/** 幂等补齐当天和次日的演示排期；已有座位只读取、不覆盖，避免破坏锁定或售出状态。 */
 @Service
 public class TicketingSeedApplicationService {
 
-    private static final int HALLS_PER_CINEMA = 2;
-    private static final int ROW_COUNT = 8;
-    private static final int SEATS_PER_ROW = 10;
-    private static final int DAYS = 7;
+    // 演示数据只需支撑购票主链路，控制启动时的数据库写入规模。
+    private static final int HALLS_PER_CINEMA = 1;
+    private static final int ROW_COUNT = 5;
+    private static final int SEATS_PER_ROW = 8;
+    private static final int DAYS = 2;
+    private static final int EXPIRED_DEMO_CLEANUP_BATCH_SIZE = 100;
     private static final List<LocalTime> SHOW_TIMES = List.of(
             LocalTime.of(9, 30),
-            LocalTime.of(14, 0),
             LocalTime.of(19, 30));
     private static final List<BigDecimal> PRICES = List.of(
             new BigDecimal("39.90"),
@@ -53,7 +54,7 @@ public class TicketingSeedApplicationService {
     }
 
     /**
-     * 为内容种子补齐每家影院的影厅、未来七天早中晚场次和完整座位图。
+     * 为内容种子补齐每家影院当天和次日的早晚场次及完整座位图。
      * 重复执行只插入缺失数据，不使用新的雪花 ID 改写已有业务数据。
      *
      * @param catalog 内容模块已确保存在的影片、影院标识
@@ -91,6 +92,13 @@ public class TicketingSeedApplicationService {
                         .map(cinema -> new ContentSeedCatalog.CinemaRef(cinema.cinemaId(), cinema.sourceCinemaId()))
                         .toList());
         return ensureSeed(references);
+    }
+
+    /** 每日任务只清理没有订单和锁座的已结束 Mock 场次，交易关联数据永远不在种子清理范围内。 */
+    @Transactional
+    public int cleanupExpiredDemoSchedules() {
+        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
+        return repository.deleteExpiredUnreferencedDemoShows(now, EXPIRED_DEMO_CLEANUP_BATCH_SIZE);
     }
 
     private TicketingSeedReport ensureSeed(ContentSeedCatalog catalog) {

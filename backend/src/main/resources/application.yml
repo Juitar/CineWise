@@ -126,9 +126,10 @@ cinewise:
       radius-min-meters: ${TRAVEL_FOOD_RADIUS_MIN_METERS:300}
       radius-max-meters: ${TRAVEL_FOOD_RADIUS_MAX_METERS:3000}
   seed:
-    # 演示数据必须显式开启，避免普通启动过程意外写入共享数据库。
+    # 演示数据必须显式开启；启动仅补齐固定 Demo，真实影院 Mock 由每日任务生成。
     enabled: ${SEED_ENABLED:false}
     fixed-value: ${SEED_FIXED_VALUE:20260802}
+    live-demo-cron: "${SEED_LIVE_DEMO_CRON:0 10 3 * * *}"
   transaction:
     ticket-lock-minutes: ${TICKET_LOCK_MINUTES:15}
     order-payment-minutes: ${ORDER_PAYMENT_MINUTES:15}

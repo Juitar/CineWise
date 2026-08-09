@@ -89,17 +89,17 @@ class DemoSeedInitializerTest {
         contentSnapshotPort.save(
                 new ContentQuery(ContentResourceType.CINEMA, null, "430100", null), cinemaResult);
 
-        initializer.initialize();
+        initializer.initializeLiveDemoSchedules();
 
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM movie_show WHERE cinema_id = ? AND source = 'demo-seed'",
-                Long.class, cinemaId)).isEqualTo(42L);
+                Long.class, cinemaId)).isEqualTo(4L);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM movie_show WHERE cinema_id = ? AND source = 'demo-seed'",
-                Long.class, secondCinemaId)).isEqualTo(42L);
+                Long.class, secondCinemaId)).isEqualTo(4L);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM auditorium WHERE cinema_id = ? AND data_type = 'MOCK'",
-                Long.class, cinemaId)).isEqualTo(2L);
+                Long.class, cinemaId)).isEqualTo(1L);
         // LIVE 扩展可以增加独立票务数据，但不能改变固定 Demo 种子的统计基线。
         assertSeedCounts();
         assertContentSourceIdentity();
@@ -107,7 +107,7 @@ class DemoSeedInitializerTest {
 
     @Test
     void givenExpiredLiveCatalog_whenSeedRuns_thenItDoesNotCreateNewMockSchedules() {
-        LocalDateTime dataTime = LocalDateTime.of(2026, 8, 2, 1, 0);
+        LocalDateTime dataTime = LocalDateTime.of(2026, 8, 1, 1, 0);
         long movieId = contentPersistencePort.ensureMovie(new ContentPersistencePort.MovieRow(
                 9_100_010L, "expired-live-movie", "过期影片", "[\"剧情\"]", 100,
                 new BigDecimal("8.0"), null, null, null, null, ContentSourceType.LIVE, "NETSTART_MAOYAN",
@@ -173,9 +173,9 @@ class DemoSeedInitializerTest {
     private void assertSeedCounts() {
         assertThat(countBySource("movie")).isEqualTo(10);
         assertThat(countBySource("cinema")).isEqualTo(4);
-        assertThat(countFixedAuditoriums()).isEqualTo(8);
-        assertThat(countFixedShows()).isEqualTo(168);
-        assertThat(countFixedSeats()).isEqualTo(13_440);
+        assertThat(countFixedAuditoriums()).isEqualTo(4);
+        assertThat(countFixedShows()).isEqualTo(16);
+        assertThat(countFixedSeats()).isEqualTo(640);
     }
 
     private void assertContentSourceIdentity() {
@@ -205,7 +205,7 @@ class DemoSeedInitializerTest {
                    AND ms.source = 'demo-seed'
                 """, Timestamp.class);
         assertThat(firstShow).isEqualTo(Timestamp.valueOf("2026-08-02 09:30:00"));
-        assertThat(lastShow).isEqualTo(Timestamp.valueOf("2026-08-08 19:30:00"));
+        assertThat(lastShow).isEqualTo(Timestamp.valueOf("2026-08-03 19:30:00"));
     }
 
     /** 固定种子与 LIVE 购票扩展共用票务表，测试只统计 DEMO_CONTENT 影院的票务数据。 */
