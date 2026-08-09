@@ -15,6 +15,7 @@
 - [x] 2.7 后端 Dockerfile 使用服务器 BuildKit Maven cache mount，部署构建输出 plain progress；GitHub Runner 的 Maven 缓存继续只服务质量门，新提交取消同组旧工作流。
 - [x] 2.8 A 修正生产 Nginx 的 API 优先级、静态资源 404 和 SPA 回退，并把真实生产镜像 Playwright 冒烟加入前端质量门。
 - [x] 2.9 A 将认证、票务时限和内容同步运行变量显式映射进公共 Compose；不使用 `env_file` 注入未声明凭据。
+- [x] 2.10 A 移除 Demo Deploy 的生产 E2E Job，保留后端 MySQL、Redis 集成质量门和独立前端 CI。
 
 ## 3. 文档与验证
 
