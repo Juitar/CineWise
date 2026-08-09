@@ -8,6 +8,12 @@ const indexPath = path.join(distDirectory, 'index.html');
 const hashPattern = /(?:^|[.-])[a-f0-9]{8,}(?=[.-])/i;
 
 const indexHtml = await readFile(indexPath, 'utf8');
+const pageTitle = indexHtml.match(/<title>([^<]*)<\/title>/i)?.[1]?.trim();
+
+if (pageTitle !== '妙语购票') {
+  throw new Error(`生产页面标题应为“妙语购票”，当前为：${pageTitle || '未设置'}`);
+}
+
 const scriptReferences = [
   ...indexHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi),
 ].map((match) => match[1]);
@@ -68,6 +74,7 @@ if (assetsWithoutHash.length > 0) {
 }
 
 console.log(
-  `生产构建检查通过：入口 ${entryScript}，HTML 引用 ${localAssets.length} 个本地 JS/CSS，` +
+  `生产构建检查通过：标题“${pageTitle}”，入口 ${entryScript}，` +
+    `HTML 引用 ${localAssets.length} 个本地 JS/CSS，` +
     `dist 共 ${productionAssets.length} 个带哈希 JS/CSS。`,
 );
