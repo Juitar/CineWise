@@ -40,9 +40,31 @@ function formatDataTime(value: string): string {
   }).format(new Date(value));
 }
 
-/** 后端来源标识用于存储和排障；页面只展示用户能理解的名称。 */
-function formatSource(source: string): string {
-  return SOURCE_LABELS[source.trim().toUpperCase()] ?? '内容服务';
+/** 后端来源标识用于存储和排障；普通用户页面只展示易理解的中文名称。 */
+export function formatContentSource(source: string | null | undefined): string {
+  const normalized = source?.trim().toUpperCase();
+  if (normalized === 'LIVE') {
+    return '实时内容';
+  }
+  if (normalized === 'MOCK') {
+    return '演示内容';
+  }
+  return (normalized && SOURCE_LABELS[normalized]) || '内容服务';
+}
+
+/** 将排期内部来源转换为普通用户能理解的中文标签。 */
+export function formatScheduleSource(source: string | null | undefined): string {
+  switch (source?.trim().toUpperCase()) {
+    case 'DEMO-SEED':
+    case 'MOCK':
+      return '演示排期';
+    case 'LIVE':
+      return '实时排期';
+    case 'SNAPSHOT':
+      return '历史排期';
+    default:
+      return '排期服务';
+  }
 }
 
 function fallbackLabel(fallbackType: ContentFallbackType): string {
@@ -143,8 +165,8 @@ export function getFreshnessNotices(
   ) {
     const sourceText =
       freshness.degraded === true
-        ? `原始来源：${formatSource(freshness.source)}，更新时间：${formatDataTime(freshness.dataTime)}`
-        : `来源：${formatSource(freshness.source)}，更新于 ${formatDataTime(freshness.dataTime)}`;
+        ? `原始来源：${formatContentSource(freshness.source)}，更新时间：${formatDataTime(freshness.dataTime)}`
+        : `来源：${formatContentSource(freshness.source)}，更新于 ${formatDataTime(freshness.dataTime)}`;
     notices.push({
       id: 'source',
       text: sourceText,

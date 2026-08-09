@@ -3,7 +3,11 @@ import React from 'react';
 import { Link, useLocation, useParams } from 'umi';
 import { workspacePath } from '../../modules/agent/workspaceRoute';
 
-import { getFreshnessNotices } from '../../modules/content/freshness';
+import {
+  formatContentSource,
+  formatScheduleSource,
+  getFreshnessNotices,
+} from '../../modules/content/freshness';
 import { safePosterUrl } from '../../modules/content/poster';
 import { useMovieDetail } from '../../modules/content/useMovieDetail';
 import { useAvailableCinemas } from '../../modules/ticketing/useAvailableCinemas';
@@ -99,11 +103,11 @@ function CinemaCard({ cinema, movieId }: { cinema: AvailableCinema; movieId: str
         <p>可选场次：{cinema.availableShowCount} 场</p>
         <p>最近开场：{formatDateTime(cinema.nearestStartTime)}</p>
         <p className="available-cinemas-data-time">
-          影片资料：{cinema.contentSource || '来源待确认'} ·{' '}
+          影片资料来源：{formatContentSource(cinema.contentSource)} · 更新时间：{' '}
           {formatDateTime(cinema.contentDataTime)}
         </p>
         <p className="available-cinemas-data-time">
-          排期来源：{cinema.scheduleSource || '来源待确认'} ·{' '}
+          排期来源：{formatScheduleSource(cinema.scheduleSource)} · 更新时间：{' '}
           {formatDateTime(cinema.scheduleDataTime)}
         </p>
       </div>
