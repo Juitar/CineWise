@@ -1,8 +1,10 @@
 .available-cinemas-page {
+  box-sizing: border-box;
   margin: 0 auto;
   max-width: 1120px;
   min-height: 420px;
   padding: 24px;
+  width: 100%;
 }
 
 .available-cinemas-breadcrumb {
@@ -28,10 +30,12 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 16px;
+  box-sizing: border-box;
   display: flex;
   gap: 20px;
   margin-bottom: 20px;
   padding: 20px;
+  width: 100%;
 }
 
 .movie-detail-card img {
@@ -48,6 +52,11 @@
 .movie-detail-card p {
   color: var(--color-text-secondary);
   margin: 8px 0 0;
+}
+
+.movie-detail-card > div {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .available-cinemas-notices {
