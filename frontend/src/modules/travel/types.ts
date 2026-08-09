@@ -60,12 +60,27 @@ export interface TravelTaskUpdate {
 
 export type TravelMode = 'DRIVING' | 'WALKING';
 
-export interface PlanTravelRouteRequest {
+export const MAX_MANUAL_PLACE_LENGTH = 200;
+
+export interface CurrentLocationRouteRequest {
+  originType: 'CURRENT_LOCATION';
   longitude: number;
   latitude: number;
+  placeText?: never;
   travelMode: TravelMode;
   thirdPartySharingConfirmed: true;
 }
+
+export interface ManualPlaceRouteRequest {
+  originType: 'MANUAL_PLACE';
+  placeText: string;
+  longitude?: never;
+  latitude?: never;
+  travelMode: TravelMode;
+  thirdPartySharingConfirmed: true;
+}
+
+export type PlanTravelRouteRequest = CurrentLocationRouteRequest | ManualPlaceRouteRequest;
 
 export interface TravelRoute {
   provider: string;

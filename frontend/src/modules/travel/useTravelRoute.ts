@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../shared/api/ApiError';
 import { planTravelRoute } from './api';
-import type { TravelMode, TravelRoute } from './types';
+import { MAX_MANUAL_PLACE_LENGTH, type TravelMode, type TravelRoute } from './types';
 
 export const ROUTE_UNAVAILABLE_MESSAGE = '路线暂不可用';
+export const CURRENT_LOCATION_UNAVAILABLE_MESSAGE = '当前站点无法获取当前位置，请手动输入出发地点';
 
 export interface CurrentCoordinates {
   longitude: number;
@@ -13,7 +14,11 @@ export interface CurrentCoordinates {
 export type TravelRoutePhase = 'idle' | 'locating' | 'planning';
 export type TravelRoutePlanOutcome = 'success' | 'failed' | 'task-unavailable';
 
-class BrowserLocationUnavailable extends Error {}
+class BrowserLocationUnavailable extends Error {
+  constructor(readonly insecureContext = false) {
+    super();
+  }
+}
 
 function validCoordinates(longitude: number, latitude: number): boolean {
   return (
@@ -31,6 +36,10 @@ function validCoordinates(longitude: number, latitude: number): boolean {
  */
 export function requestCurrentCoordinates(): Promise<CurrentCoordinates> {
   return new Promise((resolve, reject) => {
+    if (typeof window !== 'undefined' && window.isSecureContext === false) {
+      reject(new BrowserLocationUnavailable(true));
+      return;
+    }
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       reject(new BrowserLocationUnavailable());
       return;
@@ -54,8 +63,21 @@ function isTaskUnavailable(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 404 || error.code === 207001);
 }
 
+function routeFailureNotice(error: unknown): string {
+  if (error instanceof BrowserLocationUnavailable && error.insecureContext) {
+    return CURRENT_LOCATION_UNAVAILABLE_MESSAGE;
+  }
+  if (error instanceof ApiError && error.code === 107004) {
+    return '地点无法唯一确定，请补充更具体的地址';
+  }
+  if (error instanceof ApiError && error.code === 107005) {
+    return '请提供具体的地点或地址';
+  }
+  return ROUTE_UNAVAILABLE_MESSAGE;
+}
+
 /**
- * 管理一次性定位和路线 POST。精确坐标始终是 plan() 的局部变量，Hook state 不保存坐标。
+ * 管理一次性定位或地点输入和路线 POST。坐标及地点文本始终只存在当前调用栈，Hook state 不保存它们。
  */
 export function useTravelRoute(taskId: string) {
   const [route, setRoute] = useState<TravelRoute | null>(null);
@@ -99,6 +121,7 @@ export function useTravelRoute(taskId: string) {
         const nextRoute = await planTravelRoute(
           taskId,
           {
+            originType: 'CURRENT_LOCATION',
             longitude: coordinates.longitude,
             latitude: coordinates.latitude,
             travelMode,
@@ -111,7 +134,56 @@ export function useTravelRoute(taskId: string) {
         return 'success';
       } catch (error) {
         if (attemptRef.current !== attempt) return 'failed';
-        setNotice(ROUTE_UNAVAILABLE_MESSAGE);
+        setNotice(routeFailureNotice(error));
+        return isTaskUnavailable(error) ? 'task-unavailable' : 'failed';
+      } finally {
+        if (attemptRef.current === attempt) {
+          runningRef.current = false;
+          if (requestRef.current === controller) requestRef.current = null;
+          setPhase('idle');
+        }
+      }
+    },
+    [taskId],
+  );
+
+  const planFromManualPlace = useCallback(
+    async (
+      placeText: string,
+      travelMode: TravelMode,
+      sharingConfirmed: boolean,
+    ): Promise<TravelRoutePlanOutcome> => {
+      const normalizedPlaceText = placeText.trim();
+      if (runningRef.current || !sharingConfirmed || normalizedPlaceText.length === 0)
+        return 'failed';
+      if (normalizedPlaceText.length > MAX_MANUAL_PLACE_LENGTH) {
+        setNotice('地点不能超过 200 个字符');
+        return 'failed';
+      }
+      runningRef.current = true;
+      const attempt = ++attemptRef.current;
+      const controller = new AbortController();
+      requestRef.current = controller;
+      setRoute(null);
+      setNotice(null);
+      setPhase('planning');
+      try {
+        const nextRoute = await planTravelRoute(
+          taskId,
+          {
+            originType: 'MANUAL_PLACE',
+            placeText: normalizedPlaceText,
+            travelMode,
+            thirdPartySharingConfirmed: true,
+          },
+          controller.signal,
+        );
+        if (attemptRef.current !== attempt) return 'failed';
+        setRoute(nextRoute);
+        return 'success';
+      } catch (error) {
+        if (attemptRef.current !== attempt) return 'failed';
+        setNotice(routeFailureNotice(error));
         return isTaskUnavailable(error) ? 'task-unavailable' : 'failed';
       } finally {
         if (attemptRef.current === attempt) {
@@ -130,5 +202,6 @@ export function useTravelRoute(taskId: string) {
     phase,
     isPlanning: phase !== 'idle',
     plan,
+    planFromManualPlace,
   };
 }

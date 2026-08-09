@@ -6,6 +6,7 @@ const api = vi.hoisted(() => ({ planTravelRoute: vi.fn() }));
 vi.mock('./api', () => api);
 
 import {
+  CURRENT_LOCATION_UNAVAILABLE_MESSAGE,
   requestCurrentCoordinates,
   ROUTE_UNAVAILABLE_MESSAGE,
   useTravelRoute,
@@ -54,6 +55,7 @@ describe('useTravelRoute', () => {
     expect(api.planTravelRoute).toHaveBeenCalledWith(
       '90001',
       {
+        originType: 'CURRENT_LOCATION',
         longitude: 112.9388146,
         latitude: 28.2282085,
         travelMode: 'DRIVING',
@@ -72,6 +74,27 @@ describe('useTravelRoute', () => {
     await expect(result.current.plan('DRIVING', false)).resolves.toBe('failed');
     expect(getCurrentPosition).not.toHaveBeenCalled();
     expect(api.planTravelRoute).not.toHaveBeenCalled();
+  });
+
+  it('手动地点不申请浏览器定位，只提交一次地点路线请求', async () => {
+    const getCurrentPosition = geolocationSuccess();
+    const { result } = renderHook(() => useTravelRoute('90001'));
+
+    await act(async () => {
+      await result.current.planFromManualPlace('长沙市雨花区万家丽中路 1 号', 'WALKING', true);
+    });
+
+    expect(getCurrentPosition).not.toHaveBeenCalled();
+    expect(api.planTravelRoute).toHaveBeenCalledWith(
+      '90001',
+      {
+        originType: 'MANUAL_PLACE',
+        placeText: '长沙市雨花区万家丽中路 1 号',
+        travelMode: 'WALKING',
+        thirdPartySharingConfirmed: true,
+      },
+      expect.any(AbortSignal),
+    );
   });
 
   it('定位拒绝、浏览器无定位和非法坐标统一显示路线暂不可用', async () => {
@@ -102,6 +125,47 @@ describe('useTravelRoute', () => {
       unmount();
       vi.unstubAllGlobals();
     }
+  });
+
+  it('HTTP 非安全上下文不申请定位，并引导手动输入地点', async () => {
+    const getCurrentPosition = geolocationSuccess();
+    vi.stubGlobal('isSecureContext', false);
+    const { result } = renderHook(() => useTravelRoute('90001'));
+
+    await act(async () => {
+      await result.current.plan('DRIVING', true);
+    });
+
+    expect(getCurrentPosition).not.toHaveBeenCalled();
+    expect(api.planTravelRoute).not.toHaveBeenCalled();
+    expect(result.current.notice).toBe(CURRENT_LOCATION_UNAVAILABLE_MESSAGE);
+  });
+
+  it('手动地点过长时不发起路线请求', async () => {
+    const { result } = renderHook(() => useTravelRoute('90001'));
+
+    await act(async () => {
+      await result.current.planFromManualPlace('a'.repeat(201), 'DRIVING', true);
+    });
+
+    expect(api.planTravelRoute).not.toHaveBeenCalled();
+    expect(result.current.notice).toBe('地点不能超过 200 个字符');
+  });
+
+  it.each([
+    [107004, '地点无法唯一确定，请补充更具体的地址'],
+    [107005, '请提供具体的地点或地址'],
+  ])('手动地点错误码 %s 显示稳定提示', async (code, notice) => {
+    api.planTravelRoute.mockRejectedValue(
+      new ApiError('invalid place', { kind: 'HTTP', status: 422, code }),
+    );
+    const { result } = renderHook(() => useTravelRoute('90001'));
+
+    await act(async () => {
+      await result.current.planFromManualPlace('长沙市', 'DRIVING', true);
+    });
+
+    expect(result.current.notice).toBe(notice);
   });
 
   it('规划期间禁止重复提交', async () => {

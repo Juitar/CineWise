@@ -64,6 +64,7 @@ describe('出行 API', () => {
   it('路线规划只向正式路径发送一次性坐标和已确认方式', async () => {
     const signal = new AbortController().signal;
     const request = {
+      originType: 'CURRENT_LOCATION' as const,
       longitude: 112.9388146,
       latitude: 28.2282085,
       travelMode: 'DRIVING' as const,
