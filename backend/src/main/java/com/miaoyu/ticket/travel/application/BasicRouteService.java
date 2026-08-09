@@ -109,7 +109,11 @@ public class BasicRouteService {
         }
         OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         try {
-            return routeProvider.plan(checkedOrigin, checkedPreparation.destination(), checkedPreparation.travelMode(), now)
+            return routeProvider.plan(
+                            checkedOrigin,
+                            checkedPreparation.destination(),
+                            checkedPreparation.travelMode(),
+                            now)
                     .orElseThrow(() -> new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE));
         } catch (RuntimeException exception) {
             // Provider 异常与空结果对用户都表示路线暂不可用；异常中不得拼接 origin，防止位置泄漏。
