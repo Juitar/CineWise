@@ -28,6 +28,9 @@ public interface TicketingSeedRepository {
     /** 批量插入缺失座位；调用方不得传入已有座位以覆盖交易状态。 */
     void insertSeats(List<SeatSeed> rows);
 
+    /** 删除指定时间前已结束、未产生交易且没有锁座的演示场次，返回实际删除的场次数。 */
+    int deleteExpiredUnreferencedDemoShows(LocalDateTime endedBefore, int limit);
+
     record AuditoriumSeed(
             long id,
             long cinemaId,

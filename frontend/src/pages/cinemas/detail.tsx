@@ -143,7 +143,7 @@ export default function CinemaDetailPage() {
         <div className="cinema-detail-section-title">
           <div>
             <h2 id="available-movies-title">选择影片</h2>
-            <p>未来 7 天演示排期，场次和座位以后续页面实时查询为准。</p>
+            <p>未来可售演示排期，场次和座位以后续页面实时查询为准。</p>
           </div>
         </div>
         {scheduleState.isLoading ? <Skeleton active paragraph={{ rows: 4 }} /> : null}
@@ -159,7 +159,7 @@ export default function CinemaDetailPage() {
           />
         ) : null}
         {!scheduleState.isLoading && !scheduleState.error && scheduleState.movies.length === 0 ? (
-          <Empty description="未来 7 天暂无可售影片" />
+          <Empty description="未来暂无可售影片" />
         ) : null}
         {scheduleState.movies.length > 0 ? (
           <div className="cinema-detail-movie-list">

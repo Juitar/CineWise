@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /** 仅在显式开启时运行的固定演示数据启动初始化器。 */
@@ -34,7 +35,7 @@ public class DemoSeedInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments arguments) {
-        initialize();
+        initializeFixedSeed();
     }
 
     /**
@@ -43,6 +44,13 @@ public class DemoSeedInitializer implements ApplicationRunner {
      * @return 初始化完成后应达到的票务数据规模
      */
     public TicketingSeedReport initialize() {
+        TicketingSeedReport report = initializeFixedSeed();
+        initializeLiveDemoSchedules();
+        return report;
+    }
+
+    /** 启动时只保证固定 Demo 可用，避免重启时按真实影院目录批量写入场次和座位。 */
+    private TicketingSeedReport initializeFixedSeed() {
         // 内容数据必须先产生稳定主键，票务场次才能通过逻辑外键引用影片和影院。
         var catalog = contentSeedService.ensureFixedSeed();
         TicketingSeedReport report = ticketingSeedService.ensureFixedSeed(catalog);
@@ -53,9 +61,21 @@ public class DemoSeedInitializer implements ApplicationRunner {
                 report.auditoriumCount(),
                 report.showCount(),
                 report.seatCount());
+        return report;
+    }
+
+    /**
+     * 内容同步默认在 03:00 执行，本任务延后十分钟使用仍在六小时可信窗口内的目录生成本地 Mock。
+     */
+    @Scheduled(cron = "${cinewise.seed.live-demo-cron:0 10 3 * * *}")
+    public void initializeLiveDemoSchedules() {
+        int cleanedShowCount = ticketingSeedService.cleanupExpiredDemoSchedules();
+        if (cleanedShowCount > 0) {
+            LOGGER.info("已清理无交易关联的过期演示场次: count={}", cleanedShowCount);
+        }
         var liveCatalog = findLiveDemoCatalog();
         if (liveCatalog == null) {
-            return report;
+            return;
         }
         TicketingSeedReport liveReport = ticketingSeedService.ensureLiveDemoSeed(liveCatalog);
         if (liveReport.showCount() > 0) {
@@ -66,7 +86,6 @@ public class DemoSeedInitializer implements ApplicationRunner {
                     liveReport.showCount(),
                     liveReport.seatCount());
         }
-        return report;
     }
 
     /** 内容目录不可用不影响固定 Demo 的最小启动链路；其他业务异常仍交由启动器失败处理。 */

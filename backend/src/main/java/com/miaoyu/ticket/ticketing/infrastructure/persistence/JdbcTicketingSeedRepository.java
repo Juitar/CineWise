@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -144,6 +145,43 @@ public class JdbcTicketingSeedRepository implements TicketingSeedRepository {
                         return rows.size();
                     }
                 });
+    }
+
+    @Override
+    public int deleteExpiredUnreferencedDemoShows(LocalDateTime endedBefore, int limit) {
+        List<Long> showIds = jdbcTemplate.query("""
+                SELECT ms.id
+                  FROM movie_show ms
+                 WHERE ms.source = 'demo-seed'
+                   AND ms.end_time < ?
+                   AND NOT EXISTS (
+                       SELECT 1 FROM ticket_order orders WHERE orders.show_id = ms.id
+                   )
+                   AND NOT EXISTS (
+                       SELECT 1 FROM show_seat seats
+                        WHERE seats.show_id = ms.id
+                          AND (seats.status <> 'AVAILABLE'
+                               OR seats.lock_order_no IS NOT NULL
+                               OR seats.lock_expire_time IS NOT NULL)
+                   )
+                 ORDER BY ms.end_time ASC, ms.id ASC
+                 LIMIT ?
+                """, (resultSet, rowNumber) -> resultSet.getLong("id"),
+                Timestamp.valueOf(endedBefore), limit);
+        for (Long showId : showIds) {
+            // 候选场次已确认无订单和锁座，先删除可再生的座位图，再删除场次本身。
+            jdbcTemplate.update("DELETE FROM show_seat WHERE show_id = ?", showId);
+            jdbcTemplate.update("""
+                    DELETE FROM movie_show
+                     WHERE id = ?
+                       AND source = 'demo-seed'
+                       AND end_time < ?
+                       AND NOT EXISTS (
+                           SELECT 1 FROM ticket_order orders WHERE orders.show_id = movie_show.id
+                       )
+                    """, showId, Timestamp.valueOf(endedBefore));
+        }
+        return showIds.size();
     }
 
     private Long findAuditoriumId(long cinemaId, String name) {
