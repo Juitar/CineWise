@@ -2,6 +2,7 @@ import { defineConfig } from 'umi';
 
 export default defineConfig({
   hash: true,
+  title: '妙语购票',
   proxy: {
     '/api': {
       target: process.env.CINEWISE_API_PROXY_TARGET ?? 'http://127.0.0.1:8080',
