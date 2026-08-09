@@ -1,8 +1,12 @@
-import { Alert, Button, Card, Checkbox, Descriptions, Empty, Radio, Spin, Tag } from 'antd';
+import { Alert, Button, Card, Checkbox, Descriptions, Empty, Input, Radio, Spin, Tag } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { history, useParams } from 'umi';
 import { formatOrderDateTime, parseOrderDateTime } from '../../modules/order/formatters';
-import type { TravelMode, TravelTaskStatus } from '../../modules/travel/types';
+import {
+  MAX_MANUAL_PLACE_LENGTH,
+  type TravelMode,
+  type TravelTaskStatus,
+} from '../../modules/travel/types';
 import { useTravelTask } from '../../modules/travel/useTravelTask';
 import { useTravelRoute } from '../../modules/travel/useTravelRoute';
 import { isTravelAdviceAvailable } from '../../modules/travel/advice-availability';
@@ -22,6 +26,8 @@ const FALLBACK_LABELS: Record<string, string> = {
   DEMO: '当前展示已标明的演示天气，请出发前自行确认',
   NO_WEATHER: '天气暂不可用，通用交通建议仍可查看',
 };
+
+type RouteOriginChoice = 'CURRENT_LOCATION' | 'MANUAL_PLACE';
 
 function inputDateTime(value: string | null): string {
   return value?.slice(0, 16) ?? '';
@@ -45,6 +51,8 @@ export default function TravelPage() {
   const [triggerAt, setTriggerAt] = useState('');
   const [inputNotice, setInputNotice] = useState<string | null>(null);
   const [travelMode, setTravelMode] = useState<TravelMode>('DRIVING');
+  const [routeOrigin, setRouteOrigin] = useState<RouteOriginChoice>('CURRENT_LOCATION');
+  const [manualPlaceText, setManualPlaceText] = useState('');
   const [sharingConfirmed, setSharingConfirmed] = useState(false);
 
   useEffect(() => {
@@ -53,6 +61,8 @@ export default function TravelPage() {
 
   useEffect(() => {
     setTravelMode('DRIVING');
+    setRouteOrigin('CURRENT_LOCATION');
+    setManualPlaceText('');
     setSharingConfirmed(false);
   }, [taskId]);
 
@@ -140,9 +150,18 @@ export default function TravelPage() {
   };
 
   const handlePlanRoute = async () => {
-    const outcome = await travelRoute.plan(travelMode, sharingConfirmed);
+    const outcome =
+      routeOrigin === 'CURRENT_LOCATION'
+        ? await travelRoute.plan(travelMode, sharingConfirmed)
+        : await travelRoute.planFromManualPlace(manualPlaceText, travelMode, sharingConfirmed);
+    if (routeOrigin === 'MANUAL_PLACE') setManualPlaceText('');
     setSharingConfirmed(false);
     if (outcome === 'task-unavailable') await travel.reload();
+  };
+
+  const handleRouteOriginChange = (nextOrigin: RouteOriginChoice) => {
+    setRouteOrigin(nextOrigin);
+    if (nextOrigin === 'CURRENT_LOCATION') setManualPlaceText('');
   };
 
   return (
@@ -224,9 +243,11 @@ export default function TravelPage() {
         </Card>
       </section>
 
-      <Card title="按当前位置规划路线">
+      <Card title="规划前往影院的路线">
         <p className="travel-route-disclosure">
-          规划时会把本次浏览器定位的经纬度发送给高德路线服务，仅用于本次请求；页面不会保存当前位置。
+          {routeOrigin === 'CURRENT_LOCATION'
+            ? '规划时会把本次浏览器定位的经纬度发送给高德路线服务，仅用于本次请求；页面不会保存当前位置。'
+            : '规划时会把本次输入地点发送给高德路线服务，仅用于本次请求；页面不会保存该地点。'}
         </p>
         <div className="travel-route-controls">
           <Radio.Group
@@ -239,17 +260,46 @@ export default function TravelPage() {
               { label: '步行', value: 'WALKING' },
             ]}
           />
+          <Radio.Group
+            aria-label="出发位置方式"
+            value={routeOrigin}
+            disabled={isReadOnly || travelRoute.isPlanning}
+            onChange={(event) => handleRouteOriginChange(event.target.value as RouteOriginChoice)}
+            options={[
+              { label: '当前位置', value: 'CURRENT_LOCATION' },
+              { label: '手动输入地点', value: 'MANUAL_PLACE' },
+            ]}
+          />
+          {routeOrigin === 'MANUAL_PLACE' && (
+            <label className="travel-manual-place-field" htmlFor="travel-manual-place">
+              出发地点
+              <Input
+                id="travel-manual-place"
+                value={manualPlaceText}
+                maxLength={MAX_MANUAL_PLACE_LENGTH}
+                disabled={isReadOnly || travelRoute.isPlanning}
+                placeholder="例如：长沙市雨花区万家丽中路 1 号"
+                onChange={(event) => setManualPlaceText(event.target.value)}
+              />
+            </label>
+          )}
           <Checkbox
             checked={sharingConfirmed}
             disabled={isReadOnly || travelRoute.isPlanning}
             onChange={(event) => setSharingConfirmed(event.target.checked)}
           >
-            我确认将本次当前位置发送给路线服务
+            我确认将本次{routeOrigin === 'CURRENT_LOCATION' ? '当前位置' : '输入地点'}
+            发送给高德路线服务
           </Checkbox>
           <Button
             type="primary"
             loading={travelRoute.isPlanning}
-            disabled={isReadOnly || !sharingConfirmed || travelRoute.isPlanning}
+            disabled={
+              isReadOnly ||
+              !sharingConfirmed ||
+              travelRoute.isPlanning ||
+              (routeOrigin === 'MANUAL_PLACE' && manualPlaceText.trim().length === 0)
+            }
             onClick={() => void handlePlanRoute()}
           >
             规划路线

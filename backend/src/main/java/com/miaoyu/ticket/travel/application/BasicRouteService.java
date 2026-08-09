@@ -67,26 +67,53 @@ public class BasicRouteService {
      * 被发送出去；起点始终是方法局部变量，不进入持久化端口、异常信息或日志。</p>
      */
     public BasicRouteResult planMyRoute(String taskId, BasicRouteCommand command) {
+        RoutePreparation preparation = prepareMyRoute(
+                taskId, command.thirdPartySharingConfirmed(), command.travelMode());
+        return planPreparedMyRoute(preparation, command.origin());
+    }
+
+    /**
+     * 在读取浏览器坐标或向第三方发送手动地点前完成路线前置校验。
+     *
+     * <p>该预检必须由应用服务控制，不能由 HTTP 层自行假定通过。这样未确认共享、越权任务、缺少影院终点
+     * 或非法出行方式都会在 Controller 调用地点适配器前失败，避免把不应共享的地点发送给第三方。</p>
+     */
+    public RoutePreparation prepareMyRoute(
+            String taskId, boolean thirdPartySharingConfirmed, String travelMode) {
         TravelTaskRepository.TravelTaskSnapshot task = requireMyTask(taskId);
         if (task.cinemaId() == null) {
             // 历史任务没有可验证的影院终点，只能返回稳定的不可用结果，绝不能按区域名称猜测终点。
             throw new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE);
         }
-        if (!command.thirdPartySharingConfirmed()) {
+        if (!thirdPartySharingConfirmed) {
             throw new BusinessException(TravelErrorCode.ROUTE_SHARING_NOT_CONFIRMED);
         }
         ResolvedGeoPoint destination = cinemaLocationQuery.apply(task.cinemaId())
                 .orElseThrow(() -> new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE));
-        ResolvedGeoPoint origin = java.util.Objects.requireNonNull(command.origin(), "起点不能为空");
+        return new RoutePreparation(destination, requireTravelMode(travelMode));
+    }
+
+    /**
+     * 使用已经通过归属、共享和终点校验的上下文执行本次路线调用。
+     *
+     * <p>起点在此方法返回后即失去引用；不写入任务、日志、缓存或响应。保留此独立入口使 Controller 无法在
+     * 预检失败时先执行地理编码。</p>
+     */
+    public BasicRouteResult planPreparedMyRoute(RoutePreparation preparation, ResolvedGeoPoint origin) {
+        RoutePreparation checkedPreparation = Objects.requireNonNull(preparation, "路线预检不能为空");
+        ResolvedGeoPoint checkedOrigin = Objects.requireNonNull(origin, "起点不能为空");
         try {
-            origin.requirePersonalDistanceCapability();
+            checkedOrigin.requirePersonalDistanceCapability();
         } catch (IllegalArgumentException exception) {
             throw new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE);
         }
-        String mode = requireTravelMode(command.travelMode());
         OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
         try {
-            return routeProvider.plan(origin, destination, mode, now)
+            return routeProvider.plan(
+                            checkedOrigin,
+                            checkedPreparation.destination(),
+                            checkedPreparation.travelMode(),
+                            now)
                     .orElseThrow(() -> new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE));
         } catch (RuntimeException exception) {
             // Provider 异常与空结果对用户都表示路线暂不可用；异常中不得拼接 origin，防止位置泄漏。
@@ -94,6 +121,30 @@ public class BasicRouteService {
                 throw businessException;
             }
             throw new BusinessException(TravelErrorCode.ROUTE_SERVICE_UNAVAILABLE);
+        }
+    }
+
+    /**
+     * 预检成功后才可携带的短生命周期上下文。
+     *
+     * <p>构造器仅由本服务使用，防止 Web 层伪造未校验的终点或出行方式。</p>
+     */
+    public static final class RoutePreparation {
+
+        private final ResolvedGeoPoint destination;
+        private final String travelMode;
+
+        private RoutePreparation(ResolvedGeoPoint destination, String travelMode) {
+            this.destination = destination;
+            this.travelMode = travelMode;
+        }
+
+        private ResolvedGeoPoint destination() {
+            return destination;
+        }
+
+        private String travelMode() {
+            return travelMode;
         }
     }
 

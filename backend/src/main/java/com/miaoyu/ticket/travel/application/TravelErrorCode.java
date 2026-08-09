@@ -13,6 +13,8 @@ public enum TravelErrorCode implements ErrorCode {
     REFRESH_TOO_FREQUENT(107001, "建议刷新过于频繁，请稍后再试", HttpStatus.TOO_MANY_REQUESTS),
     ROUTE_SHARING_NOT_CONFIRMED(107002, "请先确认位置共享说明", HttpStatus.UNPROCESSABLE_ENTITY),
     FOOD_RADIUS_OUT_OF_RANGE(107003, "餐饮查询半径不在允许范围内", HttpStatus.BAD_REQUEST),
+    ROUTE_PLACE_UNRESOLVED(107004, "地点无法唯一确定，请补充更具体的地址", HttpStatus.UNPROCESSABLE_ENTITY),
+    ROUTE_PLACE_TOO_BROAD(107005, "请提供具体的地点或地址", HttpStatus.UNPROCESSABLE_ENTITY),
     ROUTE_SERVICE_UNAVAILABLE(307001, "路线服务暂不可用", HttpStatus.SERVICE_UNAVAILABLE);
 
     private final int code;

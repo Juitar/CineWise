@@ -89,7 +89,7 @@ class ShowControllerIntegrationTest {
         Map<String, Object> show = jdbcTemplate.queryForMap("""
                 SELECT movie_id, cinema_id
                   FROM movie_show
-                 WHERE start_time = '2026-08-02 14:00:00'
+                 WHERE start_time = '2026-08-02 09:30:00'
                  ORDER BY id
                  LIMIT 1
                 """);
@@ -100,8 +100,8 @@ class ShowControllerIntegrationTest {
                         .param("movieId", movieId)
                         .param("cinemaId", cinemaId)
                         .param("date", "2026-08-02")
-                        .param("timeFrom", "13:00")
-                        .param("timeTo", "15:00"))
+                        .param("timeFrom", "09:00")
+                        .param("timeTo", "10:00"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data").isNotEmpty())
@@ -110,8 +110,8 @@ class ShowControllerIntegrationTest {
                 .andExpect(jsonPath("$.data[*].showId", everyItem(matchesPattern("\\d+"))))
                 .andExpect(jsonPath("$.data[*].basePrice", everyItem(matchesPattern("\\d+\\.\\d{2}"))))
                 .andExpect(jsonPath("$.data[*].startTime", everyItem(endsWith("+08:00"))))
-                .andExpect(jsonPath("$.data[0].expiresAt").value("2026-08-02T14:00:00+08:00"))
-                .andExpect(jsonPath("$.data[0].startTime").value("2026-08-02T14:00:00+08:00"))
+                .andExpect(jsonPath("$.data[0].expiresAt").value("2026-08-02T09:30:00+08:00"))
+                .andExpect(jsonPath("$.data[0].startTime").value("2026-08-02T09:30:00+08:00"))
                 .andExpect(jsonPath("$.data[*].status", everyItem(matchesPattern("ON_SALE"))))
                 .andExpect(jsonPath("$.data[*].dataType", everyItem(matchesPattern("MOCK"))));
     }
@@ -283,10 +283,10 @@ class ShowControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.showId").value(showId.toString()))
-                .andExpect(jsonPath("$.data.rowCount").value(8))
-                .andExpect(jsonPath("$.data.seatCount").value(80))
-                .andExpect(jsonPath("$.data.availableSeatCount").value(80))
-                .andExpect(jsonPath("$.data.seats", hasSize(80)))
+                .andExpect(jsonPath("$.data.rowCount").value(5))
+                .andExpect(jsonPath("$.data.seatCount").value(40))
+                .andExpect(jsonPath("$.data.availableSeatCount").value(40))
+                .andExpect(jsonPath("$.data.seats", hasSize(40)))
                 .andExpect(jsonPath("$.data.seats[*].seatId", everyItem(matchesPattern("\\d+"))))
                 .andExpect(jsonPath("$.data.seats[0].rowNo").value("A"))
                 .andExpect(jsonPath("$.data.seats[0].seatNo").value("01"));

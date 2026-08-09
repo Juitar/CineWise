@@ -58,6 +58,7 @@ describe('useEmailCodeLogin', () => {
     });
     expect(result.current.cooldownSeconds).toBe(60);
     expect(result.current.isSendCodeDisabled).toBe(true);
+    expect(result.current.sendCodeMessage).toBe('请检查邮箱');
   });
 
   it('提交验证码登录并返回当前用户', async () => {
