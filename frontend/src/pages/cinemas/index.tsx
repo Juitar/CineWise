@@ -7,6 +7,7 @@ import {
   parseCinemaListQuery,
   type NormalizedCinemaListQuery,
 } from '../../modules/content/cinemaListQuery';
+import { resolveDemoCity } from '../../modules/content/demoCities';
 import { getFreshnessNotices } from '../../modules/content/freshness';
 import { useCinemaList } from '../../modules/content/useCinemaList';
 import { ChevronRightIcon, MapPinIcon } from '../../shared/components/icons/layout-icons';
@@ -61,6 +62,7 @@ export default function CinemasPage() {
     [searchParamsKey],
   );
   const { query } = parsedQuery;
+  const city = resolveDemoCity(query.location);
   const { data, error, isLoading, isOfflineSnapshot, isRefreshing, retry } = useCinemaList(query);
   const [keywordDraft, setKeywordDraft] = useState(query.keyword ?? '');
 
@@ -83,7 +85,7 @@ export default function CinemasPage() {
           <header className="cinemas-heading-row">
             <div>
               <h1>影院列表</h1>
-              <p>当前城市代码：{query.location}。影院基础信息来自后端内容服务。</p>
+              <p>当前城市：{city.name}。影院基础信息来自后端内容服务。</p>
             </div>
             <Search
               allowClear

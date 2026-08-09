@@ -120,6 +120,19 @@ describe('CinemasPage', () => {
     expect(nextParams.get('page')).toBeNull();
   });
 
+  it('使用固定城市代码显示对应的中文城市名', () => {
+    pageMocks.search = 'location=330100';
+    render(<CinemasPage />);
+
+    expect(screen.getByText('当前城市：杭州。影院基础信息来自后端内容服务。')).toBeInTheDocument();
+    expect(pageMocks.useCinemaList).toHaveBeenCalledWith({
+      keyword: undefined,
+      location: '330100',
+      page: 1,
+      size: 20,
+    });
+  });
+
   it('加载、空结果和非法 URL 都有明确状态', () => {
     pageMocks.search = 'location=hangzhou&page=0';
     pageMocks.useCinemaList.mockReturnValue(cinemaListState({ data: null, isLoading: true }));

@@ -10,6 +10,7 @@ import type { CinemaSummary, ContentPageResponse, MovieSummary } from '../../sha
 const pageMocks = vi.hoisted(() => ({
   isMobile: true,
   navigate: vi.fn(),
+  location: { pathname: '/', search: '' },
   useCinemaList: vi.fn(),
   useMovieList: vi.fn(),
 }));
@@ -21,6 +22,7 @@ vi.mock('umi', () => ({
     </a>
   ),
   useNavigate: () => pageMocks.navigate,
+  useLocation: () => pageMocks.location,
 }));
 
 vi.mock('../../shared/hooks/useMediaQuery', () => ({
@@ -116,6 +118,7 @@ describe('HomePage', () => {
     pageMocks.useMovieList.mockReset();
     pageMocks.useCinemaList.mockReset();
     pageMocks.navigate.mockReset();
+    pageMocks.location = { pathname: '/', search: '' };
     pageMocks.useMovieList.mockReturnValue(movieState());
     pageMocks.useCinemaList.mockReturnValue(cinemaState());
   });
@@ -190,6 +193,26 @@ describe('HomePage', () => {
     expect(screen.getByText('暂无可展示的影片')).toBeInTheDocument();
     expect(screen.getByText('长沙暂无可展示的影院')).toBeInTheDocument();
     expect(container.querySelectorAll('.adm-empty')).toHaveLength(2);
+  });
+
+  it('URL 指定杭州时只查询杭州影院并保留城市筛选链接', () => {
+    pageMocks.location = { pathname: '/', search: '?location=330100' };
+    pageMocks.useCinemaList.mockReturnValue(
+      cinemaState({ data: { ...cinemaResponse, records: [], total: 0 } }),
+    );
+    render(<HomePage />);
+
+    expect(screen.getByRole('heading', { level: 2, name: '杭州影院' })).toBeInTheDocument();
+    expect(screen.getByText('杭州暂无可展示的影院')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '查看全部影院' })).toHaveAttribute(
+      'href',
+      '/cinemas?location=330100',
+    );
+    expect(pageMocks.useCinemaList).toHaveBeenCalledWith({
+      location: '330100',
+      page: 1,
+      size: 3,
+    });
   });
 
   it('网络失败时显示问题编号并可分别重试', () => {

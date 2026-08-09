@@ -11,6 +11,7 @@ import com.miaoyu.ticket.content.domain.ContentResourceType;
 import com.miaoyu.ticket.content.domain.ContentSource;
 import com.miaoyu.ticket.content.domain.ContentSourceType;
 import com.miaoyu.ticket.content.domain.CinemaContent;
+import java.net.SocketTimeoutException;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -19,6 +20,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 import org.springframework.core.env.Environment;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 /**
@@ -135,8 +137,9 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
      */
     private boolean allowRequest() { return requestLimiter.allowRequest(); }
 
-    private boolean isRetryable(Exception exception) {
-        return exception instanceof ResourceAccessException || exception instanceof RestClientResponseException response
+    private boolean isRetryable(RestClientException exception) {
+        return exception instanceof ResourceAccessException || hasSocketTimeoutCause(exception)
+                || exception instanceof RestClientResponseException response
                 && response.getStatusCode().is5xxServerError();
     }
 
@@ -465,7 +468,7 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
         }
         try {
             return new RawFetchResult(request.get(), Outcome.SUCCESS, null);
-        } catch (ResourceAccessException | RestClientResponseException exception) {
+        } catch (RestClientException exception) {
             if (!isRetryable(exception) || !allowRequest()) {
                 return failureOf(exception);
             }
@@ -475,18 +478,32 @@ public final class NetStartContentProvider implements LiveContentSyncPort {
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 return new RawFetchResult(null, Outcome.CONNECTION_FAILED, null);
-            } catch (ResourceAccessException | RestClientResponseException retryFailure) {
+            } catch (RestClientException retryFailure) {
                 return failureOf(retryFailure);
             }
         }
     }
 
-    private RawFetchResult failureOf(Exception exception) {
+    private RawFetchResult failureOf(RestClientException exception) {
         if (exception instanceof RestClientResponseException response) {
             return new RawFetchResult(null, response.getStatusCode().value() == 429 ? Outcome.RATE_LIMITED
                     : Outcome.UPSTREAM_FAILED, response.getStatusCode().value());
         }
-        return new RawFetchResult(null, Outcome.CONNECTION_FAILED, null);
+        return new RawFetchResult(null, hasSocketTimeoutCause(exception)
+                || exception instanceof ResourceAccessException ? Outcome.CONNECTION_FAILED : Outcome.UPSTREAM_FAILED,
+                null);
+    }
+
+    /** RestClient 在响应体读取超时后会包装异常；必须沿因果链识别，不能让单条详情终止整批同步。 */
+    private boolean hasSocketTimeoutCause(Throwable exception) {
+        Throwable current = exception;
+        while (current != null) {
+            if (current instanceof SocketTimeoutException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private record RawFetchResult(JsonNode payload, Outcome outcome, Integer errorCode) { }
