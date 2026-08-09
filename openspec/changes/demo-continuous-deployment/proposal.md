@@ -5,10 +5,10 @@
 ## What Changes
 
 - 增加 `dev` 到演示服务器的自动部署工作流。
-- 部署前重新执行前后端质量门，只部署触发工作流的精确 Git SHA。
+- 部署前重新执行后端 MySQL、Redis 集成质量门，只部署触发工作流的精确 Git SHA。
 - 使用 GitHub `demo` Environment secrets 建立 SSH 连接，不向仓库写入服务器或业务凭据。
 - 使用 Docker Compose 构建并等待健康检查，失败时恢复部署前提交。
-- 在质量门中使用真实生产前端镜像验证 SPA 回退、静态资源 404、API 代理和资源 MIME，避免 Nginx 把缺失脚本伪装成 HTML 200。
+- 前端生产镜像验证继续由独立前端 CI 负责，避免 Nginx 把缺失脚本伪装成 HTML 200。
 - 演示应用通过服务器 `.env` 连接独立基础服务 ECS 上的 MySQL、Redis 和可选 MinIO，不在应用 Compose 中重复启动基础服务。
 - 保持一份公共 `compose.yaml`，显式传递后端实际使用的认证、票务时限和内容同步运行变量；以本地与服务器两份无密钥环境模板消除配置漂移。
 - 文档、OpenSpec、迁移记录和仅 Flyway SQL 的变更不触发应用部署。

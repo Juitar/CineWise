@@ -6,17 +6,22 @@
 
 ### Requirement: 应用变更通过质量门后部署
 
-系统 SHALL 在后端、前端或部署配置进入 `dev` 时执行后端和前端质量门，只有全部成功后才部署触发工作流的精确 Git 提交。
+系统 SHALL 在后端、前端或部署配置进入 `dev` 时执行后端 MySQL 和 Redis 集成质量门，只有全部成功后才部署触发工作流的精确 Git 提交。前端构建、检查和 E2E 由独立前端 CI 负责，Demo Deploy 不得重复运行生产浏览器测试。
 
 #### Scenario: PR 合并应用代码
 
 - **WHEN** 个人分支 PR 合并后使 `dev` 的应用代码发生变化
-- **THEN** 系统完成后端与前端验证，并在全部成功时部署该提交
+- **THEN** 系统完成后端 MySQL 与 Redis 集成验证，并在全部成功时部署该提交
 
 #### Scenario: 质量门失败
 
-- **WHEN** 后端验证、前端检查或 E2E 任一失败
+- **WHEN** 后端 MySQL 或 Redis 集成验证失败
 - **THEN** 系统不连接演示服务器执行部署
+
+#### Scenario: 独立前端 E2E 失败
+
+- **WHEN** 独立前端 CI 的生产 E2E 失败
+- **THEN** Demo Deploy 不重复执行该 E2E，且不因该 Job 阻断部署
 
 ### Requirement: 非应用变更不触发部署
 
