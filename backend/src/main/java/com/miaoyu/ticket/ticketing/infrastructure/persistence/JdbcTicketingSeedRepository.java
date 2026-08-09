@@ -151,9 +151,19 @@ public class JdbcTicketingSeedRepository implements TicketingSeedRepository {
     public int deleteExpiredUnreferencedDemoShows(LocalDateTime endedBefore, int limit) {
         List<Long> showIds = jdbcTemplate.query("""
                 SELECT ms.id
-                  FROM movie_show ms
+                 FROM movie_show ms
                  WHERE ms.source = 'demo-seed'
                    AND ms.end_time < ?
+                   AND NOT EXISTS (
+                       SELECT 1 FROM ticket_order orders WHERE orders.show_id = ms.id
+                   )
+                   AND NOT EXISTS (
+                       SELECT 1 FROM show_seat seats
+                        WHERE seats.show_id = ms.id
+                          AND (seats.status <> 'AVAILABLE'
+                               OR seats.lock_order_no IS NOT NULL
+                               OR seats.lock_expire_time IS NOT NULL)
+                   )
                  ORDER BY ms.end_time ASC, ms.id ASC
                  LIMIT ?
                 """, (resultSet, rowNumber) -> resultSet.getLong("id"),
