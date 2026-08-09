@@ -90,7 +90,7 @@ describe('CinemaDetailPage', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: '长沙演示影城' })).toBeInTheDocument();
     expect(screen.getByText('梅溪湖路 1 号')).toBeInTheDocument();
-    expect(screen.getByText('来源：猫眼，更新于 2026年8月5日 10:00')).toBeInTheDocument();
+    expect(screen.getByLabelText('影院资料来源')).toHaveTextContent('来源：猫眼');
     expect(screen.getByText('演示排期')).toBeInTheDocument();
     expect(screen.getByText(/影片资料来源：猫眼/)).toBeInTheDocument();
     expect(screen.getByText(/排期来源：演示排期/)).toBeInTheDocument();
