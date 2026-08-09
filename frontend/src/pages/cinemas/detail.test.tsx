@@ -90,10 +90,11 @@ describe('CinemaDetailPage', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: '长沙演示影城' })).toBeInTheDocument();
     expect(screen.getByText('梅溪湖路 1 号')).toBeInTheDocument();
-    expect(screen.getAllByText(/NETSTART_MAOYAN/)).toHaveLength(1);
+    expect(screen.getByText('来源：猫眼，更新于 2026年8月5日 10:00')).toBeInTheDocument();
     expect(screen.getByText('演示排期')).toBeInTheDocument();
-    expect(screen.getByText(/影片资料：NETSTART_MAOYAN/)).toBeInTheDocument();
-    expect(screen.getByText(/排期来源：demo-seed/)).toBeInTheDocument();
+    expect(screen.getByText(/影片资料来源：猫眼/)).toBeInTheDocument();
+    expect(screen.getByText(/排期来源：演示排期/)).toBeInTheDocument();
+    expect(screen.queryByText(/NETSTART_MAOYAN|demo-seed/)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '选择影片' })).toHaveAttribute(
       'href',
       '/shows?movieId=99001&cinemaId=88001',
