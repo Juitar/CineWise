@@ -76,6 +76,7 @@ function routeState(overrides: Record<string, unknown> = {}) {
     phase: 'idle',
     isPlanning: false,
     plan: vi.fn(),
+    planFromManualPlace: vi.fn(),
     ...overrides,
   };
 }
@@ -208,6 +209,29 @@ describe('观影出行建议页', () => {
 
     await waitFor(() => expect(plan).toHaveBeenCalledWith('WALKING', true));
     expect(screen.getByRole('checkbox', { name: /我确认将本次当前位置/ })).not.toBeChecked();
+  });
+
+  it('手动地点确认后只调用手动路线入口', async () => {
+    const planFromManualPlace = vi.fn().mockResolvedValue('success');
+    mocks.travel.mockReturnValue(state());
+    mocks.travelRoute.mockReturnValue(routeState({ planFromManualPlace }));
+    render(<TravelPage />);
+
+    fireEvent.click(screen.getByText('手动输入地点'));
+    fireEvent.change(screen.getByLabelText('出发地点'), {
+      target: { value: '长沙市雨花区万家丽中路 1 号' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: /输入地点/ }));
+    fireEvent.click(screen.getByRole('button', { name: '规划路线' }));
+
+    await waitFor(() =>
+      expect(planFromManualPlace).toHaveBeenCalledWith(
+        '长沙市雨花区万家丽中路 1 号',
+        'DRIVING',
+        true,
+      ),
+    );
+    expect(screen.getByLabelText('出发地点')).toHaveValue('');
   });
 
   it('展示后端返回的不含坐标路线摘要', () => {

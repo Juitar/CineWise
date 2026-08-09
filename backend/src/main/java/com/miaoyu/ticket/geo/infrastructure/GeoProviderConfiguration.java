@@ -13,6 +13,10 @@ public class GeoProviderConfiguration {
     @Bean
     PlaceGeocodingPort placeGeocodingPort(
             AmapWeatherProperties properties, org.springframework.web.client.RestClient externalRestClient) {
-        return new AmapPlaceGeocodingAdapter(properties, externalRestClient);
+        // 外部公共客户端没有 baseUrl；地点编码使用相对路径，必须在这里固定到高德域名。
+        // 保留 externalRestClient 已配置的超时和无重试策略，不能改用默认 RestClient。
+        return new AmapPlaceGeocodingAdapter(
+                properties,
+                externalRestClient.mutate().baseUrl("https://restapi.amap.com").build());
     }
 }

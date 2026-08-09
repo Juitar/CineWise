@@ -96,6 +96,13 @@
   min-height: 44px;
 }
 
+.travel-manual-place-field {
+  display: grid;
+  width: min(100%, 480px);
+  gap: 8px;
+  font-weight: 600;
+}
+
 .travel-route-notice,
 .travel-route-result {
   margin-top: 16px;
