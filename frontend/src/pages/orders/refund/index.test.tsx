@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { setupTestEnvironment } from '../../../features/test-utils';
 import { useRefundPage } from '../../../modules/order/transaction-hooks';
@@ -60,6 +60,15 @@ describe('退款页面时间展示', () => {
 
     render(<RefundPage />);
 
+    const breadcrumb = screen.getByRole('navigation', { name: '面包屑' });
+    expect(within(breadcrumb).getByRole('link', { name: '个人中心' })).toHaveAttribute(
+      'href',
+      '/profile',
+    );
+    expect(within(breadcrumb).getByRole('link', { name: '我的订单' })).toHaveAttribute(
+      'href',
+      '/orders',
+    );
     expect(screen.getByText('2026-08-10 14:30')).toBeInTheDocument();
     expect(screen.getByText('2026-08-11 19:00')).toBeInTheDocument();
     expect(screen.queryByText('2026-08-10T14:30:00+08:00')).not.toBeInTheDocument();

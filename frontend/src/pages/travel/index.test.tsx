@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import React from 'react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../shared/api/ApiError';
 import { setupTestEnvironment } from '../../features/test-utils';
@@ -7,6 +8,9 @@ const mocks = vi.hoisted(() => ({ historyPush: vi.fn(), travel: vi.fn(), travelR
 vi.mock('umi', () => ({
   history: { push: mocks.historyPush },
   useParams: () => ({ taskId: '90001' }),
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => (
+    <a href={to}>{children}</a>
+  ),
 }));
 vi.mock('../../modules/travel/useTravelTask', () => ({ useTravelTask: mocks.travel }));
 vi.mock('../../modules/travel/useTravelRoute', () => ({ useTravelRoute: mocks.travelRoute }));
@@ -92,6 +96,16 @@ describe('观影出行建议页', () => {
     render(<TravelPage />);
     expect(screen.getByText('正在加载出行建议')).toBeInTheDocument();
     expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true');
+    const breadcrumb = screen.getByRole('navigation', { name: '面包屑' });
+    expect(within(breadcrumb).getByRole('link', { name: '个人中心' })).toHaveAttribute(
+      'href',
+      '/profile',
+    );
+    expect(within(breadcrumb).getByRole('link', { name: '我的订单' })).toHaveAttribute(
+      'href',
+      '/orders',
+    );
+    expect(within(breadcrumb).queryByRole('link', { name: '订单详情' })).not.toBeInTheDocument();
   });
 
   it('只展示服务端返回的天气、建议、来源和影院数据', () => {
@@ -101,6 +115,12 @@ describe('观影出行建议页', () => {
     expect(screen.getByText(/AMAP_WEATHER/)).toBeInTheDocument();
     expect(screen.getByText('测试路 1 号')).toBeInTheDocument();
     expect(screen.queryByText(/km|餐饮|路线预览/)).not.toBeInTheDocument();
+    const breadcrumb = screen.getByRole('navigation', { name: '面包屑' });
+    expect(within(breadcrumb).getByRole('link', { name: '订单详情' })).toHaveAttribute(
+      'href',
+      '/orders/T001',
+    );
+    expect(within(breadcrumb).getByText('出行建议').closest('a')).toBeNull();
   });
 
   it.each([

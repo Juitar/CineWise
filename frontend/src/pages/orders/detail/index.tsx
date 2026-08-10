@@ -8,7 +8,11 @@ import {
   usePaymentQuery,
 } from '../../../modules/order/transaction-hooks';
 import { formatOrderDateTime } from '../../../modules/order/formatters';
-import { TransactionBreadcrumb } from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
+import {
+  ORDERS_BREADCRUMB_ITEM,
+  PROFILE_BREADCRUMB_ITEM,
+  TransactionBreadcrumb,
+} from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import { OrderContentNotice } from '../../../features/order-content-notice/OrderContentNotice';
 import { useOrderContentDetails } from '../../../modules/order/useOrderContentDetails';
 import { useTravelTaskByOrder } from '../../../modules/travel/useTravelTask';
@@ -91,7 +95,7 @@ export default function OrderDetailPage() {
     <div className="order-detail-page-wrapper">
       <div className="order-detail-page-content">
         <TransactionBreadcrumb
-          items={[{ label: '我的订单', to: '/orders' }, { label: '订单详情' }]}
+          items={[PROFILE_BREADCRUMB_ITEM, ORDERS_BREADCRUMB_ITEM, { label: '订单详情' }]}
         />
         {shouldShowContentNotice ? (
           <OrderContentNotice

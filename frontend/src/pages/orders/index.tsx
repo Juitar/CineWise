@@ -6,7 +6,10 @@ import { useOrders } from '../../modules/order/transaction-hooks';
 import { useOrderContentDetails } from '../../modules/order/useOrderContentDetails';
 import { formatOrderDateTime } from '../../modules/order/formatters';
 import type { OrderStatus } from '../../modules/order/types';
-import { TransactionBreadcrumb } from '../../features/transaction-breadcrumb/TransactionBreadcrumb';
+import {
+  PROFILE_BREADCRUMB_ITEM,
+  TransactionBreadcrumb,
+} from '../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import { OrderContentNotice } from '../../features/order-content-notice/OrderContentNotice';
 import './index.css';
 
@@ -67,7 +70,7 @@ export default function OrdersPage() {
   return (
     <div className="orders-page-wrapper">
       <div className="orders-page-content">
-        <TransactionBreadcrumb items={[{ label: '我的订单' }]} />
+        <TransactionBreadcrumb items={[PROFILE_BREADCRUMB_ITEM, { label: '我的订单' }]} />
         {shouldShowContentNotice && (
           <OrderContentNotice
             isLoading={false}
