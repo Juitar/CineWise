@@ -112,7 +112,9 @@ describe('观影出行建议页', () => {
     mocks.travel.mockReturnValue(state());
     render(<TravelPage />);
     expect(screen.getByText('提前到场')).toBeInTheDocument();
-    expect(screen.getByText(/AMAP_WEATHER/)).toBeInTheDocument();
+    expect(screen.getByText(/高德天气/)).toBeInTheDocument();
+    expect(screen.getByText('实时内容')).toBeInTheDocument();
+    expect(screen.queryByText('LIVE_CONTENT')).not.toBeInTheDocument();
     expect(screen.getByText('测试路 1 号')).toBeInTheDocument();
     expect(screen.queryByText(/km|餐饮|路线预览/)).not.toBeInTheDocument();
     const breadcrumb = screen.getByRole('navigation', { name: '面包屑' });
@@ -274,7 +276,7 @@ describe('观影出行建议页', () => {
     );
     render(<TravelPage />);
     expect(screen.getByText('20 分钟')).toBeInTheDocument();
-    expect(screen.getByText('AMAP_ROUTE')).toBeInTheDocument();
+    expect(screen.getByText('高德路线')).toBeInTheDocument();
     expect(screen.queryByText(/112\.938|28\.228/)).not.toBeInTheDocument();
   });
 
