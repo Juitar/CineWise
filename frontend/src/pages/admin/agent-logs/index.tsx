@@ -23,7 +23,6 @@ import {
   PageLoading,
   PageNotFound,
   PageRefreshErrorNotice,
-  PageRefreshingNotice,
 } from '../../../shared/components/page-state';
 import './index.css';
 
@@ -291,10 +290,6 @@ export default function AdminAgentRunsPage() {
         </p>
       ) : null}
 
-      {isRefreshing && data ? (
-        <PageRefreshingNotice description="正在更新运行记录，当前列表仍可查看。" />
-      ) : null}
-
       {error && data && !hasBlockingListError ? (
         <PageRefreshErrorNotice
           description="运行记录刷新失败，当前列表仍可查看。"
@@ -303,7 +298,7 @@ export default function AdminAgentRunsPage() {
         />
       ) : null}
 
-      {isLoading ? (
+      {isLoading || isRefreshing ? (
         <PageLoading label="Agent 轨迹加载中" />
       ) : error && (data === null || hasBlockingListError) ? (
         listErrorState === 'FORBIDDEN' ? (

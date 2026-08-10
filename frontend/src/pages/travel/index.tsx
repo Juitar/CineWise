@@ -10,6 +10,11 @@ import {
 import { useTravelTask } from '../../modules/travel/useTravelTask';
 import { useTravelRoute } from '../../modules/travel/useTravelRoute';
 import { isTravelAdviceAvailable } from '../../modules/travel/advice-availability';
+import {
+  ORDERS_BREADCRUMB_ITEM,
+  PROFILE_BREADCRUMB_ITEM,
+  TransactionBreadcrumb,
+} from '../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import './index.css';
 
 const STATUS_LABELS: Record<TravelTaskStatus, string> = {
@@ -66,9 +71,28 @@ export default function TravelPage() {
     setSharingConfirmed(false);
   }, [taskId]);
 
+  const breadcrumb = (
+    <TransactionBreadcrumb
+      items={
+        travel.task?.order.orderNo
+          ? [
+              PROFILE_BREADCRUMB_ITEM,
+              ORDERS_BREADCRUMB_ITEM,
+              {
+                label: '订单详情',
+                to: `/orders/${encodeURIComponent(travel.task.order.orderNo)}`,
+              },
+              { label: '出行建议' },
+            ]
+          : [PROFILE_BREADCRUMB_ITEM, ORDERS_BREADCRUMB_ITEM, { label: '出行建议' }]
+      }
+    />
+  );
+
   if (travel.isLoading) {
     return (
       <main className="travel-page" aria-busy="true">
+        {breadcrumb}
         <div className="travel-loading">
           <Spin size="large" />
           <span>正在加载出行建议</span>
@@ -81,6 +105,7 @@ export default function TravelPage() {
     const missing = travel.error.status === 404 || travel.error.code === 207001;
     return (
       <main className="travel-page">
+        {breadcrumb}
         <Alert
           type="error"
           showIcon
@@ -101,6 +126,7 @@ export default function TravelPage() {
   if (!travel.task) {
     return (
       <main className="travel-page">
+        {breadcrumb}
         <Empty description="暂无可查看的出行任务" />
       </main>
     );
@@ -112,6 +138,7 @@ export default function TravelPage() {
   if (!advice && isAdviceGenerationPending) {
     return (
       <main className="travel-page">
+        {breadcrumb}
         <header className="travel-header">
           <div>
             <h1>观影出行建议</h1>
@@ -131,6 +158,7 @@ export default function TravelPage() {
   if (!advice) {
     return (
       <main className="travel-page">
+        {breadcrumb}
         <Empty description="出行建议暂不可用，请稍后重试" />
       </main>
     );
@@ -166,6 +194,7 @@ export default function TravelPage() {
 
   return (
     <main className="travel-page">
+      {breadcrumb}
       <header className="travel-header">
         <div>
           <h1>观影出行建议</h1>

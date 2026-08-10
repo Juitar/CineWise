@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupTestEnvironment } from '../../../features/test-utils';
 import {
@@ -89,6 +89,15 @@ describe('订单详情交易时间展示', () => {
     const travelButton = await screen.findByRole('button', { name: '查看出行建议' });
     expect(screen.queryByText('场次编号：11')).not.toBeInTheDocument();
     expect(screen.queryByText(/座位编号[：:]/)).not.toBeInTheDocument();
+    const breadcrumb = screen.getByRole('navigation', { name: '面包屑' });
+    expect(within(breadcrumb).getByRole('link', { name: '个人中心' })).toHaveAttribute(
+      'href',
+      '/profile',
+    );
+    expect(within(breadcrumb).getByRole('link', { name: '我的订单' })).toHaveAttribute(
+      'href',
+      '/orders',
+    );
     fireEvent.click(travelButton);
     await waitFor(() => expect(travelMocks.find).toHaveBeenCalledWith('1'));
     expect(routeMocks.historyPush).toHaveBeenCalledWith('/travel/90001');

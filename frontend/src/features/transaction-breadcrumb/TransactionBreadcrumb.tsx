@@ -13,6 +13,18 @@ export interface TransactionBreadcrumbProps {
   items: TransactionBreadcrumbItem[];
 }
 
+/** 个人订单及其后续页面统一使用的个人中心根层级。 */
+export const PROFILE_BREADCRUMB_ITEM: TransactionBreadcrumbItem = {
+  label: '个人中心',
+  to: '/profile',
+};
+
+/** 订单详情、支付、电子票、退票和出行建议统一使用的订单列表层级。 */
+export const ORDERS_BREADCRUMB_ITEM: TransactionBreadcrumbItem = {
+  label: '我的订单',
+  to: '/orders',
+};
+
 /**
  * A 交易页复用 C 的原生语义化面包屑模式。
  *

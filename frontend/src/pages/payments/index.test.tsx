@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupTestEnvironment } from '../../features/test-utils';
 import { useOrder, usePaymentAction } from '../../modules/order/transaction-hooks';
@@ -64,6 +64,15 @@ describe('支付页面场次上下文', () => {
 
     render(<PaymentPage />);
 
+    const breadcrumb = screen.getByRole('navigation', { name: '面包屑' });
+    expect(within(breadcrumb).getByRole('link', { name: '个人中心' })).toHaveAttribute(
+      'href',
+      '/profile',
+    );
+    expect(within(breadcrumb).getByRole('link', { name: '我的订单' })).toHaveAttribute(
+      'href',
+      '/orders',
+    );
     expect(screen.getByText('2026-08-10 14:30')).toBeInTheDocument();
     expect(screen.getByText('1分00秒')).toBeInTheDocument();
     expect(screen.queryByText('15分00秒')).not.toBeInTheDocument();

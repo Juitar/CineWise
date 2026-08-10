@@ -17,7 +17,11 @@ import { formatOrderTime } from '../../../modules/order/formatters';
 import { buildOrderDetailPath, buildPaymentPath } from '../../../modules/order/routes';
 import { ApiError } from '../../../shared/api/ApiError';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
-import { TransactionBreadcrumb } from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
+import {
+  ORDERS_BREADCRUMB_ITEM,
+  PROFILE_BREADCRUMB_ITEM,
+  TransactionBreadcrumb,
+} from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import './index.css';
 
 /**
@@ -223,7 +227,8 @@ export default function OrderConfirmPage() {
         items={
           order
             ? [
-                { label: '我的订单', to: '/orders' },
+                PROFILE_BREADCRUMB_ITEM,
+                ORDERS_BREADCRUMB_ITEM,
                 { label: '订单详情', to: buildOrderDetailPath(order.orderNo) },
                 { label: '订单已创建' },
               ]
