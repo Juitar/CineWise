@@ -108,6 +108,8 @@ describe('AvailableCinemasPage', () => {
 
     expect(screen.getByRole('heading', { name: '妙语影城' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: '星河远征' })).toBeInTheDocument();
+    expect(screen.getByText(/影片资料来源：实时内容/)).toBeInTheDocument();
+    expect(screen.getByText(/排期来源：演示排期/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '选择妙语影城的场次' })).toHaveAttribute(
       'href',
       '/shows?movieId=10001&cinemaId=20001',

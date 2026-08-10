@@ -2,7 +2,11 @@ import { Alert, Button, Empty, Skeleton, Tag } from 'antd';
 import React, { useState } from 'react';
 import { Link, useParams } from 'umi';
 
-import { getFreshnessNotices } from '../../modules/content/freshness';
+import {
+  formatContentSource,
+  formatScheduleSource,
+  getFreshnessNotices,
+} from '../../modules/content/freshness';
 import { useCinemaDetail } from '../../modules/content/useCinemaDetail';
 import { useAvailableMovies } from '../../modules/ticketing/useAvailableMovies';
 import type { AvailableMovie } from '../../modules/ticketing/types';
@@ -54,10 +58,12 @@ function AvailableMovieCard({ cinemaId, movie }: { cinemaId: string; movie: Avai
         <p>{movie.showCount} 个可选场次</p>
         <p>最近开场：{formatDateTime(movie.nearestStartTime)}</p>
         <p className="cinema-detail-data-time">
-          影片资料：{movie.contentSource} · {formatDateTime(movie.contentDataTime)}
+          影片资料来源：{formatContentSource(movie.contentSource)} · 更新时间：
+          {formatDateTime(movie.contentDataTime)}
         </p>
         <p className="cinema-detail-data-time">
-          排期来源：{movie.scheduleSource} · {formatDateTime(movie.scheduleDataTime)}
+          排期来源：{formatScheduleSource(movie.scheduleSource)} · 更新时间：
+          {formatDateTime(movie.scheduleDataTime)}
         </p>
       </div>
       <Link
