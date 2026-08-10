@@ -96,12 +96,12 @@ describe('ProfilePage', () => {
     expect(screen.queryByText('我的观影记录')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'AI 观影画像' })).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('未开启画像数据使用');
-    expect(screen.getByRole('switch', { name: '使用用户画像' })).not.toBeChecked();
-    expect(screen.queryByRole('checkbox', { name: '开启个性化' })).not.toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: '记录画像标签' })).not.toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: '使用画像偏好' })).not.toBeInTheDocument();
     expect(screen.queryByText('星际穿越')).not.toBeInTheDocument();
   });
 
-  it('已同意时区分画像数据使用和个性化两个开关', () => {
+  it('已同意时区分画像数据使用和画像偏好使用两个开关', () => {
     mocks.profile.consentEnabled = true;
     mocks.profile.notice = null;
     mocks.profile.profile = {
@@ -112,8 +112,8 @@ describe('ProfilePage', () => {
     mocks.profile.state = 'ready';
     render(<ProfilePage />);
 
-    const consentToggle = screen.getByRole('switch', { name: '使用用户画像' });
-    const personalizationToggle = screen.getByRole('checkbox', { name: '开启个性化' });
+    const consentToggle = screen.getByRole('switch', { name: '记录画像标签' });
+    const personalizationToggle = screen.getByRole('checkbox', { name: '使用画像偏好' });
     expect(consentToggle).toBeChecked();
     expect(personalizationToggle).not.toBeChecked();
 
@@ -135,9 +135,23 @@ describe('ProfilePage', () => {
     mocks.profile.state = 'ready';
     render(<ProfilePage />);
 
-    expect(screen.getByRole('switch', { name: '使用用户画像' })).toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: '开启个性化' })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: '记录画像标签' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: '使用画像偏好' })).toBeDisabled();
     expect(screen.getByText('正在保存')).toBeInTheDocument();
+  });
+
+  it('关闭画像偏好时显示未启用状态', () => {
+    mocks.profile.consentEnabled = true;
+    mocks.profile.notice = null;
+    mocks.profile.profile = {
+      preference: { enabled: false, updatedAt: '2026-08-07T00:00:00Z', version: 3 },
+      tags: [],
+      total: 0,
+    };
+    mocks.profile.state = 'ready';
+    render(<ProfilePage />);
+
+    expect(screen.getByText('未启用')).toBeInTheDocument();
   });
 
   it('通过共享退出 Hook 执行退出并显示提交中状态', () => {

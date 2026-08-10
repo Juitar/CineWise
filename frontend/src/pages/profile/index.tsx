@@ -160,18 +160,18 @@ export default function ProfilePage() {
         <div className="profile-data-heading">
           <div>
             <h2 id="profile-data-title">AI 观影画像</h2>
-            <p>管理画像数据使用、长期偏好标签和个性化推荐。</p>
+            <p>管理画像数据使用、长期偏好标签和画像偏好的使用范围。</p>
           </div>
         </div>
 
         <div className="profile-consent-setting">
           <div>
-            <h3>使用用户画像</h3>
-            <p>开启后保存观影偏好；关闭后停止画像写入并清除当前页面画像。</p>
+            <h3>记录画像标签</h3>
+            <p>开启后，你可以手动添加和管理标签；关闭后停止画像记录，并清除当前页面显示的画像。</p>
           </div>
           <label className="profile-consent-toggle">
             <input
-              aria-label="使用用户画像"
+              aria-label="记录画像标签"
               checked={consentEnabled}
               disabled={!consentStateKnown || consentSaving || profileSaving}
               role="switch"
@@ -187,18 +187,20 @@ export default function ProfilePage() {
         {profile && (
           <div className="profile-personalization-setting">
             <div>
-              <h3>个性化推荐</h3>
-              <p>关闭后保留画像数据，但推荐时不使用画像偏好。</p>
+              <h3>使用画像偏好</h3>
+              <p>开启后，相关功能可以使用已保存的画像偏好；关闭后不使用画像偏好，但保留画像数据，你仍可以手动管理标签。</p>
             </div>
             <label className="profile-personalization-toggle">
               <input
-                aria-label="开启个性化"
+                aria-label="使用画像偏好"
                 checked={profile.preference.enabled}
                 disabled={profileSaving || consentSaving}
                 type="checkbox"
                 onChange={(event) => void setEnabled(event.target.checked)}
               />
-              <span>{profileSaving ? '正在保存' : '开启个性化'}</span>
+              <span>
+                {profileSaving ? '正在保存' : profile.preference.enabled ? '已启用' : '未启用'}
+              </span>
             </label>
           </div>
         )}
