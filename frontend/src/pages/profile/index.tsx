@@ -188,7 +188,9 @@ export default function ProfilePage() {
           <div className="profile-personalization-setting">
             <div>
               <h3>使用画像偏好</h3>
-              <p>开启后，相关功能可以使用已保存的画像偏好；关闭后不使用画像偏好，但保留画像数据，你仍可以手动管理标签。</p>
+              <p>
+                开启后，相关功能可以使用已保存的画像偏好；关闭后不使用画像偏好，但保留画像数据，你仍可以手动管理标签。
+              </p>
             </div>
             <label className="profile-personalization-toggle">
               <input
