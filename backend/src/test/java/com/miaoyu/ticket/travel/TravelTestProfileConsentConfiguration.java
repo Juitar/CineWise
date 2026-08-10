@@ -2,6 +2,8 @@ package com.miaoyu.ticket.travel;
 
 import com.miaoyu.ticket.profile.application.ProfileDataConsentQuery;
 import com.miaoyu.ticket.profile.application.ProfileDataConsentSnapshot;
+import com.miaoyu.ticket.content.application.CinemaLocationQueryService;
+import java.util.Optional;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -16,5 +18,21 @@ public class TravelTestProfileConsentConfiguration {
   @Primary
   ProfileDataConsentQuery travelTestProfileDataConsentQuery() {
     return userId -> new ProfileDataConsentSnapshot(true, 1L, 0L, null, null);
+  }
+
+  @Bean
+  @Primary
+  CinemaLocationQueryService travelTestCinemaLocationQueryService() {
+    return new CinemaLocationQueryService(null) {
+      @Override
+      public Optional<String> findAreaByCinemaId(long cinemaId) {
+        return cinemaId > 0 ? Optional.of("滨江区") : Optional.empty();
+      }
+
+      @Override
+      public Optional<com.miaoyu.ticket.geo.domain.ResolvedGeoPoint> findByCinemaId(long cinemaId) {
+        return Optional.empty();
+      }
+    };
   }
 }
