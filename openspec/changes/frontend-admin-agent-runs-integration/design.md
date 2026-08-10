@@ -36,15 +36,16 @@
 
 列表继续使用公共 `apiRequest<T>()`。公共客户端已跳过 `null/undefined` 查询值；模块在调用前再清理空白字符串，确保不会生成空筛选。
 
-列表 Hook 保留当前成功数据用于刷新，查询条件变化、翻页和手动刷新时取消旧请求并使用序号丢弃迟到响应。首次失败使用公共 `PageError`；已有数据刷新失败使用 `PageRefreshErrorNotice`。
+列表 Hook 在内存中保留当前成功数据用于刷新失败恢复，查询条件变化、翻页和手动刷新时取消旧请求并使用序号丢弃迟到响应。页面在刷新请求进行中使用公共 `PageLoading` 骨架屏覆盖旧列表；首次失败使用公共 `PageError`；已有数据刷新失败使用 `PageRefreshErrorNotice` 并恢复旧列表。
 
 详情 Hook 在 `runId` 为空、变化或重新加载时先清空 `data/error`，然后发请求。Drawer 关闭通过 `runId=null` 立即清理；请求序号和 AbortController 共同防止上一条详情回填。
 
 ## 页面状态
 
-页面复用 `PageLoading`、`PageEmpty`、`PageError`、`PageForbidden`、`PageNotFound`、`PageRefreshingNotice` 和 `PageRefreshErrorNotice`：
+页面复用 `PageLoading`、`PageEmpty`、`PageError`、`PageForbidden`、`PageNotFound` 和 `PageRefreshErrorNotice`：
 
 - 列表首次加载、成功空态、筛选空态、403、一般失败分别显示独立状态。
+- 已有列表刷新期间只显示骨架屏，不显示刷新提示条或旧列表；刷新失败后恢复旧列表和失败提示。
 - 401 由公共客户端和 `RequireAdmin` 处理，页面测试验证不会渲染业务数据。
 - 详情 404 使用固定文案“运行记录不存在或已失效”；403 使用无权限状态；5xx 显示 traceId 和重新加载。
 - 分页仍写入 URL；筛选变更回到第一页。
@@ -55,7 +56,7 @@
 - `api.test.ts`：六个请求参数、空值清理、ISO 时间、字符串 runId 编码、401/403/404/5xx 与 traceId。
 - `contract.test.ts`：两个 PR #170 固定夹具、可空字段、字符串 ID、白名单和敏感字段丢弃。
 - mapper/query/hook 测试：`WAITING_LOCATION`、未知状态、可空类型、旧响应丢弃、关闭与重新加载。
-- 页面测试：首次加载、空列表、筛选空态、刷新、翻页、401、403、详情 404、5xx、traceId、窄屏、未知状态和敏感内容。
+- 页面测试：首次加载、空列表、筛选空态、刷新骨架屏、刷新失败恢复、翻页、401、403、详情 404、5xx、traceId、窄屏、未知状态和敏感内容。
 - 完整执行 `pnpm check`、`git diff --check`、`openspec validate frontend-admin-agent-runs-integration --strict`。
 
 ## 真实联调与回退

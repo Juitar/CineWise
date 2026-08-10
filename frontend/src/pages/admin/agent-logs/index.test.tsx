@@ -241,6 +241,16 @@ describe('AdminAgentRunsPage', () => {
     expect(screen.getByText('筛选后无数据')).toBeInTheDocument();
   });
 
+  it('已有列表刷新时只显示骨架屏，不显示提示条或旧列表', () => {
+    mocks.listState.isRefreshing = true;
+
+    render(<AdminAgentRunsPage />);
+
+    expect(screen.getByText('Agent 轨迹加载中')).toBeInTheDocument();
+    expect(screen.queryByText('正在更新运行记录，当前列表仍可查看。')).not.toBeInTheDocument();
+    expect(screen.queryByText('run_01J4')).not.toBeInTheDocument();
+  });
+
   it.each([
     [401, '登录状态已失效，正在返回登录页。'],
     [403, '当前账号没有查看 Agent 轨迹的权限。'],
