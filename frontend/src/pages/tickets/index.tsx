@@ -3,7 +3,11 @@ import { useParams } from 'umi';
 import { ElectronicTicketCard } from '../../features/electronic-ticket-card/ElectronicTicketCard';
 import { useElectronicTicket, useOrder } from '../../modules/order/transaction-hooks';
 import { formatOrderDateTime } from '../../modules/order/formatters';
-import { TransactionBreadcrumb } from '../../features/transaction-breadcrumb/TransactionBreadcrumb';
+import {
+  ORDERS_BREADCRUMB_ITEM,
+  PROFILE_BREADCRUMB_ITEM,
+  TransactionBreadcrumb,
+} from '../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import { OrderContentNotice } from '../../features/order-content-notice/OrderContentNotice';
 import { useOrderContentDetails } from '../../modules/order/useOrderContentDetails';
 import './index.css';
@@ -34,11 +38,12 @@ export default function TicketPage() {
           items={
             order?.orderNo
               ? [
-                  { label: '我的订单', to: '/orders' },
+                  PROFILE_BREADCRUMB_ITEM,
+                  ORDERS_BREADCRUMB_ITEM,
                   { label: '订单详情', to: `/orders/${encodeURIComponent(order.orderNo)}` },
                   { label: '电子票' },
                 ]
-              : [{ label: '我的订单', to: '/orders' }, { label: '电子票' }]
+              : [PROFILE_BREADCRUMB_ITEM, ORDERS_BREADCRUMB_ITEM, { label: '电子票' }]
           }
         />
         <OrderContentNotice

@@ -1,10 +1,15 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupTestEnvironment } from '../../features/test-utils';
 import { useOrders } from '../../modules/order/transaction-hooks';
 
-vi.mock('umi', () => ({ history: { push: vi.fn() } }));
+vi.mock('umi', () => ({
+  history: { push: vi.fn() },
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => (
+    <a href={to}>{children}</a>
+  ),
+}));
 vi.mock('../../modules/order/transaction-hooks', () => ({ useOrders: vi.fn() }));
 const contentMocks = vi.hoisted(() => ({
   getMovieDetail: vi.fn(),
@@ -57,6 +62,12 @@ describe('个人订单列表场次上下文', () => {
 
     render(<OrdersPage />);
 
+    const breadcrumb = screen.getByRole('navigation', { name: '面包屑' });
+    expect(within(breadcrumb).getByRole('link', { name: '个人中心' })).toHaveAttribute(
+      'href',
+      '/profile',
+    );
+    expect(within(breadcrumb).getByText('我的订单').closest('a')).toBeNull();
     expect(await screen.findByText(/场次：2026-08-10 14:30/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('影片信息暂不可用')).toBeInTheDocument());
     expect(screen.getByText('影院：影院信息暂不可用')).toBeInTheDocument();

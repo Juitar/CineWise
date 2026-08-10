@@ -8,7 +8,11 @@ import {
   buildOrderDetailPath,
   buildPaymentPath,
 } from '../../../modules/order/routes';
-import { TransactionBreadcrumb } from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
+import {
+  ORDERS_BREADCRUMB_ITEM,
+  PROFILE_BREADCRUMB_ITEM,
+  TransactionBreadcrumb,
+} from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import './index.css';
 
 /**
@@ -30,7 +34,8 @@ export default function PaymentResultPage() {
       <div className="payment-result-page-content">
         <TransactionBreadcrumb
           items={[
-            { label: '我的订单', to: '/orders' },
+            PROFILE_BREADCRUMB_ITEM,
+            ORDERS_BREADCRUMB_ITEM,
             { label: '订单详情', to: buildOrderDetailPath(orderNo) },
             { label: '支付结果' },
           ]}

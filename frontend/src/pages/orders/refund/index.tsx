@@ -5,7 +5,11 @@ import { AlternativeShowList } from '../../../features/alternative-show-list/Alt
 import { useRefundPage } from '../../../modules/order/transaction-hooks';
 import { buildAlternativeShowSeatPath } from '../../../modules/order/routes';
 import { formatOrderDateTime } from '../../../modules/order/formatters';
-import { TransactionBreadcrumb } from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
+import {
+  ORDERS_BREADCRUMB_ITEM,
+  PROFILE_BREADCRUMB_ITEM,
+  TransactionBreadcrumb,
+} from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import './index.css';
 
 /**
@@ -44,7 +48,8 @@ export default function RefundPage() {
       <div className="refund-page-content">
         <TransactionBreadcrumb
           items={[
-            { label: '我的订单', to: '/orders' },
+            PROFILE_BREADCRUMB_ITEM,
+            ORDERS_BREADCRUMB_ITEM,
             { label: '订单详情', to: `/orders/${encodeURIComponent(orderNo)}` },
             { label: '申请退票' },
           ]}

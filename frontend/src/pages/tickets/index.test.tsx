@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupTestEnvironment } from '../../features/test-utils';
 import { useElectronicTicket, useOrder } from '../../modules/order/transaction-hooks';
@@ -76,6 +76,16 @@ describe('电子票页面场次上下文', () => {
     });
 
     render(<TicketPage />);
+
+    const breadcrumb = screen.getByRole('navigation', { name: '面包屑' });
+    expect(within(breadcrumb).getByRole('link', { name: '个人中心' })).toHaveAttribute(
+      'href',
+      '/profile',
+    );
+    expect(within(breadcrumb).getByRole('link', { name: '我的订单' })).toHaveAttribute(
+      'href',
+      '/orders',
+    );
 
     expect(useOrder).toHaveBeenCalledWith('CW1');
     expect(screen.getByText('2026-08-10 14:30')).toBeInTheDocument();
