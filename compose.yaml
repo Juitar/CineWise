@@ -91,6 +91,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        AMAP_WEB_JS_KEY: ${AMAP_WEB_JS_KEY:?AMAP_WEB_JS_KEY is required}
+        AMAP_WEB_SECURITY_JS_CODE: ${AMAP_WEB_SECURITY_JS_CODE:?AMAP_WEB_SECURITY_JS_CODE is required}
     depends_on:
       backend:
         condition: service_healthy
