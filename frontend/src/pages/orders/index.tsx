@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { history } from 'umi';
+import { history, useLocation } from 'umi';
 import { OrderList } from '../../features/order-list/OrderList';
 import type { OrderSummaryItem } from '../../features/order-list/OrderList';
 import { useOrders } from '../../modules/order/transaction-hooks';
@@ -11,6 +11,7 @@ import {
   TransactionBreadcrumb,
 } from '../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import { OrderContentNotice } from '../../features/order-content-notice/OrderContentNotice';
+import { workspacePath } from '../../modules/agent/workspaceRoute';
 import './index.css';
 
 /**
@@ -18,6 +19,7 @@ import './index.css';
  * 筛选和分页均查询服务端本人订单，不在浏览器伪造业务记录。
  */
 export default function OrdersPage() {
+  const location = useLocation();
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -95,7 +97,9 @@ export default function OrdersPage() {
             setCurrentPage(1);
           }}
           onPageChange={(page) => setCurrentPage(page)}
-          onOrderClick={(orderNo) => history.push(`/orders/${encodeURIComponent(orderNo)}`)}
+          onOrderClick={(orderNo) => history.push(
+            workspacePath(location.pathname, `/orders/${encodeURIComponent(orderNo)}`),
+          )}
         />
       </div>
     </div>

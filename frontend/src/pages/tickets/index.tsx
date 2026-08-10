@@ -1,15 +1,15 @@
 import React, { useMemo } from 'react';
-import { useParams } from 'umi';
+import { useLocation, useParams } from 'umi';
 import { ElectronicTicketCard } from '../../features/electronic-ticket-card/ElectronicTicketCard';
 import { useElectronicTicket, useOrder } from '../../modules/order/transaction-hooks';
 import { formatOrderDateTime } from '../../modules/order/formatters';
 import {
-  ORDERS_BREADCRUMB_ITEM,
   PROFILE_BREADCRUMB_ITEM,
   TransactionBreadcrumb,
 } from '../../features/transaction-breadcrumb/TransactionBreadcrumb';
 import { OrderContentNotice } from '../../features/order-content-notice/OrderContentNotice';
 import { useOrderContentDetails } from '../../modules/order/useOrderContentDetails';
+import { workspacePath } from '../../modules/agent/workspaceRoute';
 import './index.css';
 
 /**
@@ -18,6 +18,7 @@ import './index.css';
  */
 export default function TicketPage() {
   const { ticketId = '' } = useParams<{ ticketId: string }>();
+  const location = useLocation();
   const ticketQuery = useElectronicTicket(ticketId);
   const ticket = ticketQuery.data;
   const orderQuery = useOrder(ticket?.orderNo ?? '');
@@ -39,11 +40,11 @@ export default function TicketPage() {
             order?.orderNo
               ? [
                   PROFILE_BREADCRUMB_ITEM,
-                  ORDERS_BREADCRUMB_ITEM,
-                  { label: '订单详情', to: `/orders/${encodeURIComponent(order.orderNo)}` },
+                  { label: '我的订单', to: workspacePath(location.pathname, '/orders') },
+                  { label: '订单详情', to: workspacePath(location.pathname, `/orders/${encodeURIComponent(order.orderNo)}`) },
                   { label: '电子票' },
                 ]
-              : [PROFILE_BREADCRUMB_ITEM, ORDERS_BREADCRUMB_ITEM, { label: '电子票' }]
+              : [PROFILE_BREADCRUMB_ITEM, { label: '我的订单', to: workspacePath(location.pathname, '/orders') }, { label: '电子票' }]
           }
         />
         <OrderContentNotice

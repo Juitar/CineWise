@@ -63,8 +63,11 @@ export interface CinemaSummary {
   address: string | null;
 }
 
-/** 影院详情复用基础展示字段，并携带来源时效信息。 */
-export interface CinemaDetail extends CinemaSummary, ContentFreshness {}
+/** 影院详情复用基础展示字段，并携带用于地图标记的静态坐标和来源时效信息。 */
+export interface CinemaDetail extends CinemaSummary, ContentFreshness {
+  longitude: number | null;
+  latitude: number | null;
+}
 
 /** GET /api/v1/movies 的可选查询参数。 */
 export interface MovieListQuery {

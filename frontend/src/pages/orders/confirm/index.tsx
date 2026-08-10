@@ -18,7 +18,6 @@ import { buildOrderDetailPath, buildPaymentPath } from '../../../modules/order/r
 import { ApiError } from '../../../shared/api/ApiError';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import {
-  ORDERS_BREADCRUMB_ITEM,
   PROFILE_BREADCRUMB_ITEM,
   TransactionBreadcrumb,
 } from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
@@ -228,14 +227,14 @@ export default function OrderConfirmPage() {
           order
             ? [
                 PROFILE_BREADCRUMB_ITEM,
-                ORDERS_BREADCRUMB_ITEM,
-                { label: '订单详情', to: buildOrderDetailPath(order.orderNo) },
+                { label: '我的订单', to: workspacePath(location.pathname, '/orders') },
+                { label: '订单详情', to: workspacePath(location.pathname, buildOrderDetailPath(order.orderNo)) },
                 { label: '订单已创建' },
               ]
             : [
                 {
                   label: '选择场次',
-                  to: `/shows?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`,
+                  to: workspacePath(location.pathname, `/shows?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`),
                 },
                 { label: '选择座位', to: seatsPath },
                 { label: '确认订单' },

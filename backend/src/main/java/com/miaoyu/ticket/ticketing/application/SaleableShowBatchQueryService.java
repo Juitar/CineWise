@@ -22,7 +22,11 @@ public class SaleableShowBatchQueryService {
 
     public static final int MAX_LIMIT = 200;
     public static final int MAX_CINEMA_IDS = 100;
-    private static final long SNAPSHOT_TTL_SECONDS = 60;
+    /**
+     * 推荐卡片必须留出用户阅读并进入选座页的时间。最终下单前仍会由票务服务重新校验场次、价格和座位，
+     * 这个窗口只约束“这次查询结果”在 Agent 卡片中的可使用时间，并不承诺库存或价格锁定。
+     */
+    private static final long SNAPSHOT_TTL_SECONDS = 300;
     private static final int ROLLING_WINDOW_DAYS = 7;
 
     private final ShowQueryRepository repository;
@@ -96,7 +100,7 @@ public class SaleableShowBatchQueryService {
     }
 
     private SaleableShowView toView(ShowQueryRepository.ShowSnapshot snapshot, LocalDateTime dataAt) {
-        // 快照最多可被推荐层使用 60 秒；更早开场的场次以开场时刻为最终边界。
+        // 快照最多可被推荐层使用五分钟；更早开场的场次以开场时刻为最终边界。
         LocalDateTime expiresAt = snapshot.startTime().isBefore(dataAt.plusSeconds(SNAPSHOT_TTL_SECONDS))
                 ? snapshot.startTime()
                 : dataAt.plusSeconds(SNAPSHOT_TTL_SECONDS);

@@ -31,6 +31,67 @@ import type { AgentMessage, AgentSession, AgentStreamRequest } from './types';
 type LoadStatus = 'error' | 'loading' | 'ready';
 type AgentSubmissionEntry = 'question' | 'workspace';
 
+interface AgentWorkspaceCacheState {
+  sessions: readonly AgentSession[];
+  projection: AgentProjection;
+  loadStatus: LoadStatus;
+  feedback: string | null;
+}
+
+interface AgentWorkspaceRuntime {
+  readonly sessionId: string;
+  state: AgentWorkspaceCacheState;
+  controller: AbortController | null;
+  sequence: number;
+  inactivity: number | null;
+  loading: Promise<void> | null;
+  readonly subscribers: Set<() => void>;
+}
+
+/**
+ * 路由切换时 Agent 面板会短暂卸载；同一会话的投影和活动 SSE 不能跟着销毁。
+ * 这里仅保存页面内存，不写入 localStorage，也不把任何 Agent 数据扩散到 URL。
+ */
+const workspaceRuntimes = new Map<string, AgentWorkspaceRuntime>();
+
+function runtimeFor(sessionId: string): AgentWorkspaceRuntime {
+  const existing = workspaceRuntimes.get(sessionId);
+  if (existing !== undefined) return existing;
+  const runtime: AgentWorkspaceRuntime = {
+    sessionId,
+    state: {
+      sessions: [],
+      projection: createAgentProjection(sessionId),
+      loadStatus: 'loading',
+      feedback: null,
+    },
+    controller: null,
+    sequence: 0,
+    inactivity: null,
+    loading: null,
+    subscribers: new Set(),
+  };
+  workspaceRuntimes.set(sessionId, runtime);
+  return runtime;
+}
+
+function updateRuntime(
+  runtime: AgentWorkspaceRuntime,
+  update: Partial<AgentWorkspaceCacheState>,
+): void {
+  runtime.state = { ...runtime.state, ...update };
+  runtime.subscribers.forEach((subscriber) => subscriber());
+}
+
+/** 仅供 Hook 单测隔离模块级会话缓存，业务代码不得调用。 */
+export function resetAgentWorkspaceCacheForTest(): void {
+  workspaceRuntimes.forEach((runtime) => {
+    runtime.controller?.abort();
+    if (runtime.inactivity !== null) window.clearTimeout(runtime.inactivity);
+  });
+  workspaceRuntimes.clear();
+}
+
 function safeErrorMessage(error: unknown): string {
   if (error instanceof AgentContractError) return error.message;
   if (!(error instanceof ApiError)) return 'Agent 暂时不可用，请稍后重试';
@@ -132,46 +193,57 @@ function cardRecoveryRunIds(messages: readonly AgentMessage[]): readonly string[
  */
 export function useAgentWorkspace(sessionId: string) {
   const { status: authStatus } = useAuth();
-  const [sessions, setSessions] = useState<readonly AgentSession[]>([]);
-  const [projection, setProjection] = useState<AgentProjection>(() =>
-    createAgentProjection(sessionId),
-  );
-  const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading');
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const controllerRef = useRef<AbortController | null>(null);
-  const sequenceRef = useRef(0);
-  const inactivityRef = useRef<number | null>(null);
-  const projectionRef = useRef(projection);
+  const runtime = runtimeFor(sessionId);
+  const [, setRenderVersion] = useState(0);
+  const projectionRef = useRef(runtime.state.projection);
+  if (projectionRef.current.sessionId !== sessionId) {
+    projectionRef.current = runtime.state.projection;
+  }
   const confirmingActionIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
-    projectionRef.current = projection;
-  }, [projection]);
+    projectionRef.current = runtime.state.projection;
+    const subscriber = () => {
+      projectionRef.current = runtime.state.projection;
+      setRenderVersion((version) => version + 1);
+    };
+    runtime.subscribers.add(subscriber);
+    return () => {
+      runtime.subscribers.delete(subscriber);
+    };
+  }, [runtime]);
 
   const clearInactivity = useCallback(() => {
-    if (inactivityRef.current !== null) {
-      window.clearTimeout(inactivityRef.current);
-      inactivityRef.current = null;
+    const currentRuntime = runtimeFor(sessionId);
+    if (currentRuntime.inactivity !== null) {
+      window.clearTimeout(currentRuntime.inactivity);
+      currentRuntime.inactivity = null;
     }
-  }, []);
+  }, [sessionId]);
 
   const stopActiveStream = useCallback(() => {
-    sequenceRef.current += 1;
-    controllerRef.current?.abort();
-    controllerRef.current = null;
+    const currentRuntime = runtimeFor(sessionId);
+    currentRuntime.sequence += 1;
+    currentRuntime.controller?.abort();
+    currentRuntime.controller = null;
     clearInactivity();
-  }, [clearInactivity]);
+  }, [clearInactivity, sessionId]);
 
   const refreshSessions = useCallback(async () => {
     const page = await listAgentSessions();
-    setSessions(page.records);
-  }, []);
+    updateRuntime(runtimeFor(sessionId), { sessions: page.records });
+  }, [sessionId]);
 
   useEffect(() => {
-    let active = true;
-    stopActiveStream();
-    setLoadStatus('loading');
-    setFeedback(null);
+    const currentRuntime = runtimeFor(sessionId);
+    const hadCachedContent =
+      currentRuntime.state.loadStatus === 'ready' ||
+      currentRuntime.state.projection.items.length > 0 ||
+      currentRuntime.state.sessions.length > 0;
+    // 子路由回来时保留已显示的内容，在后台刷新即可；首次打开才显示加载态。
+    if (!hadCachedContent) updateRuntime(currentRuntime, { loadStatus: 'loading', feedback: null });
+    // 活动 SSE 是当前会话的最新来源，恢复历史不能覆盖它，也不能再开一条流。
+    if (currentRuntime.controller !== null) return undefined;
     const load = async () => {
       try {
         const [messages, sessionPage] = await Promise.all([
@@ -181,27 +253,40 @@ export function useAgentWorkspace(sessionId: string) {
         const snapshots = await Promise.all(
           cardRecoveryRunIds(messages.records).map((runId) => getAgentRun(runId)),
         );
-        if (!active) return;
+        if (currentRuntime.controller !== null) {
+          updateRuntime(currentRuntime, { sessions: sessionPage.records });
+          return;
+        }
         const next = deduplicateConfirmationItems(
           buildProjectionFromHistoryAndSnapshots(sessionId, messages.records, snapshots),
         );
         projectionRef.current = next;
-        setProjection(next);
-        setSessions(sessionPage.records);
-        setLoadStatus('ready');
+        updateRuntime(currentRuntime, {
+          projection: next,
+          sessions: sessionPage.records,
+          loadStatus: 'ready',
+          feedback: null,
+        });
       } catch (error) {
-        if (!active) return;
-        setProjection(createAgentProjection(sessionId));
-        setFeedback(safeErrorMessage(error));
-        setLoadStatus('error');
+        // 只读恢复失败不能把用户已经看到的会话清空或打回首页。
+        if (hadCachedContent) {
+          updateRuntime(currentRuntime, { feedback: safeErrorMessage(error) });
+        } else {
+          updateRuntime(currentRuntime, {
+            projection: createAgentProjection(sessionId),
+            feedback: safeErrorMessage(error),
+            loadStatus: 'error',
+          });
+        }
       }
     };
-    void load();
-    return () => {
-      active = false;
-      stopActiveStream();
-    };
-  }, [sessionId, stopActiveStream]);
+    if (currentRuntime.loading === null) {
+      currentRuntime.loading = load().finally(() => {
+        if (currentRuntime.loading !== null) currentRuntime.loading = null;
+      });
+    }
+    return undefined;
+  }, [sessionId]);
 
   useEffect(() => {
     if (authStatus !== 'authenticated') stopActiveStream();
@@ -212,24 +297,24 @@ export function useAgentWorkspace(sessionId: string) {
   const replaceProjection = useCallback((next: AgentProjection) => {
     const deduplicated = deduplicateConfirmationItems(next);
     projectionRef.current = deduplicated;
-    setProjection(deduplicated);
-  }, []);
+    updateRuntime(runtimeFor(sessionId), { projection: deduplicated });
+  }, [sessionId]);
 
   const recoverRun = useCallback(
     async (sequence: number, resume: (cursor: string) => Promise<void>) => {
       const current = projectionRef.current;
-      if (!current.runId || sequence !== sequenceRef.current) return;
+      if (!current.runId || sequence !== runtimeFor(sessionId).sequence) return;
       try {
         const [snapshot, history] = await Promise.all([
           getAgentRun(current.runId),
           listAgentMessages(current.sessionId),
         ]);
-        if (sequence !== sequenceRef.current) return;
+        if (sequence !== runtimeFor(sessionId).sequence) return;
         const rebuilt = buildProjectionFromSnapshot(snapshot, history.records);
         replaceProjection(rebuilt);
         if (snapshot.status === 'RUNNING') await resume(rebuilt.lastEventId);
       } catch (error) {
-        if (sequence !== sequenceRef.current) return;
+        if (sequence !== runtimeFor(sessionId).sequence) return;
         replaceProjection({
           ...projectionRef.current,
           status: 'RESULT_UNKNOWN',
@@ -259,23 +344,24 @@ export function useAgentWorkspace(sessionId: string) {
     async function connect(request: AgentStreamRequest, cursor: string | null, recovering = false) {
       stopActiveStream();
       const controller = new AbortController();
-      controllerRef.current = controller;
-      const sequence = sequenceRef.current;
+      const currentRuntime = runtimeFor(sessionId);
+      currentRuntime.controller = controller;
+      const sequence = currentRuntime.sequence;
       const localThinkingKey = `local-thinking:${request.clientRequestId}`;
       if (!recovering) {
         replaceProjection({ ...projectionRef.current, status: 'CONNECTING', safeError: null });
       }
 
       const resume = async (resumeCursor: string) => {
-        if (sequence !== sequenceRef.current) return;
+        if (sequence !== runtimeFor(sessionId).sequence) return;
         await connect(request, resumeCursor, true);
       };
       const armInactivity = () => {
         clearInactivity();
-        inactivityRef.current = window.setTimeout(() => {
-          if (sequence !== sequenceRef.current) return;
+        currentRuntime.inactivity = window.setTimeout(() => {
+          if (sequence !== runtimeFor(sessionId).sequence) return;
           controller.abort();
-          controllerRef.current = null;
+          currentRuntime.controller = null;
           void recoverRun(sequence, resume);
         }, 20_000);
       };
@@ -285,7 +371,7 @@ export function useAgentWorkspace(sessionId: string) {
         await postAgentStream(sessionId, request, cursor, controller.signal, {
           onHeartbeat: armInactivity,
           onEvent: async (event) => {
-            if (sequence !== sequenceRef.current || event.sessionId !== sessionId) return;
+            if (sequence !== runtimeFor(sessionId).sequence || event.sessionId !== sessionId) return;
             armInactivity();
             const current = withoutLocalThinking(projectionRef.current, localThinkingKey);
             const result = consumeAgentEvent(current, event);
@@ -297,7 +383,7 @@ export function useAgentWorkspace(sessionId: string) {
                   getRun: getAgentRun,
                   getMessages: (currentSessionId) => listAgentMessages(currentSessionId),
                 });
-                if (sequence !== sequenceRef.current) return;
+                if (sequence !== runtimeFor(sessionId).sequence) return;
                 replaceProjection(rebuilt);
                 if (rebuilt.status === 'STREAMING') await resume(rebuilt.lastEventId);
               } catch (error) {
@@ -312,12 +398,12 @@ export function useAgentWorkspace(sessionId: string) {
             replaceProjection(result.projection);
             if (isTerminal(result.projection.status)) {
               clearInactivity();
-              if (controllerRef.current === controller) controllerRef.current = null;
+              if (currentRuntime.controller === controller) currentRuntime.controller = null;
             }
           },
         });
         clearInactivity();
-        if (controllerRef.current === controller) controllerRef.current = null;
+        if (currentRuntime.controller === controller) currentRuntime.controller = null;
         const current = projectionRef.current;
         if (!isTerminal(current.status)) {
           if (current.runId) await recoverRun(sequence, resume);
@@ -331,8 +417,8 @@ export function useAgentWorkspace(sessionId: string) {
         }
       } catch (error) {
         clearInactivity();
-        if (sequence !== sequenceRef.current || controller.signal.aborted) return;
-        if (controllerRef.current === controller) controllerRef.current = null;
+        if (sequence !== runtimeFor(sessionId).sequence || controller.signal.aborted) return;
+        if (currentRuntime.controller === controller) currentRuntime.controller = null;
         const current = withoutLocalThinking(projectionRef.current, localThinkingKey);
         if (current.runId) await recoverRun(sequence, resume);
         else {
@@ -358,7 +444,7 @@ export function useAgentWorkspace(sessionId: string) {
       if (
         !normalized ||
         normalized.length > 2000 ||
-        controllerRef.current ||
+        runtimeFor(sessionId).controller !== null ||
         ['CONNECTING', 'STREAMING', 'WAITING_LOCATION', 'RESULT_UNKNOWN'].includes(
           projectionRef.current.status,
         )
@@ -477,7 +563,7 @@ export function useAgentWorkspace(sessionId: string) {
               ? updateConfirmationItem(projectionRef.current, itemKey, { status })
               : updateConfirmationItem(projectionRef.current, itemKey, { submitting: false }),
           );
-          setFeedback(confirmationErrorMessage(error));
+          updateRuntime(runtimeFor(sessionId), { feedback: confirmationErrorMessage(error) });
           if (error instanceof ApiError && [409, 422].includes(error.status ?? 0)) {
             await recoverConfirmation(action.actionId);
           }
@@ -492,24 +578,55 @@ export function useAgentWorkspace(sessionId: string) {
   const clearCurrent = useCallback(async () => {
     try {
       await clearAgentSession(sessionId);
-      setFeedback('当前会话已清空');
+      updateRuntime(runtimeFor(sessionId), { feedback: '当前会话已清空' });
       replaceProjection(createAgentProjection(sessionId));
       await refreshSessions();
       return true;
     } catch (error) {
-      setFeedback(safeErrorMessage(error));
+      updateRuntime(runtimeFor(sessionId), { feedback: safeErrorMessage(error) });
       return false;
     }
   }, [refreshSessions, replaceProjection, sessionId]);
 
+  /**
+   * 单条会话删除复用既有 DELETE /sessions/{sessionId} 接口。
+   * 后端会拒绝仍有运行中的会话，前端不把这个失败伪装成已删除。
+   */
+  const deleteSession = useCallback(
+    async (targetSessionId: string): Promise<boolean> => {
+      try {
+        await clearAgentSession(targetSessionId);
+        const targetRuntime = workspaceRuntimes.get(targetSessionId);
+        targetRuntime?.controller?.abort();
+        if (targetRuntime !== undefined && targetRuntime.inactivity !== null) {
+          window.clearTimeout(targetRuntime.inactivity);
+        }
+        if (targetSessionId === sessionId) {
+          replaceProjection(createAgentProjection(sessionId));
+        } else {
+          workspaceRuntimes.delete(targetSessionId);
+        }
+        updateRuntime(runtimeFor(sessionId), { feedback: '会话已删除' });
+        await refreshSessions();
+        return true;
+      } catch (error) {
+        updateRuntime(runtimeFor(sessionId), { feedback: safeErrorMessage(error) });
+        return false;
+      }
+    },
+    [refreshSessions, replaceProjection, sessionId],
+  );
+
   const clearAll = useCallback(async () => {
     try {
       const result = await clearAllAgentSessions();
-      setFeedback(`已清空 ${result.clearedCount} 个会话，跳过 ${result.skippedCount} 个运行中会话`);
+      updateRuntime(runtimeFor(sessionId), {
+        feedback: `已清空 ${result.clearedCount} 个会话，跳过 ${result.skippedCount} 个运行中会话`,
+      });
       await refreshSessions();
       return result;
     } catch (error) {
-      setFeedback(safeErrorMessage(error));
+      updateRuntime(runtimeFor(sessionId), { feedback: safeErrorMessage(error) });
       return null;
     }
   }, [refreshSessions]);
@@ -520,15 +637,17 @@ export function useAgentWorkspace(sessionId: string) {
       await refreshSessions();
       return created;
     } catch (error) {
-      setFeedback(safeErrorMessage(error));
+      updateRuntime(runtimeFor(sessionId), { feedback: safeErrorMessage(error) });
       return null;
     }
   }, [refreshSessions]);
 
+  const { feedback, loadStatus, projection, sessions } = runtimeFor(sessionId).state;
   return {
     cancel,
     clearAll,
     clearCurrent,
+    deleteSession,
     confirm,
     createNewSession,
     feedback,

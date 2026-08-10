@@ -10,7 +10,8 @@ public enum AgentErrorCode implements ErrorCode {
     AGENT_RESOURCE_NOT_FOUND(206005, "会话、运行或消息不存在", HttpStatus.NOT_FOUND),
     ACTION_CONFIRMING(206006, "正在确认操作结果，请勿重复提交", HttpStatus.CONFLICT),
     REQUEST_HASH_MISMATCH(206009, "重复请求参数不一致", HttpStatus.CONFLICT),
-    ACTIVE_RUN_CONFLICT(206008, "会话已有活动运行", HttpStatus.CONFLICT);
+    ACTIVE_RUN_CONFLICT(206008, "会话已有活动运行", HttpStatus.CONFLICT),
+    CITY_RESOLUTION_UNAVAILABLE(206010, "暂时无法识别当前位置城市，请手动输入城市", HttpStatus.SERVICE_UNAVAILABLE);
 
     private final int code;
     private final String message;

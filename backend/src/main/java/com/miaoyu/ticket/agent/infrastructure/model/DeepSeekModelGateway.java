@@ -63,8 +63,8 @@ public final class DeepSeekModelGateway implements ModelGateway {
             """;
     /** 最长禁止标识为 12 个字符，保留 16 个字符即可覆盖跨分片检测，避免明显拖慢首段显示。 */
     private static final int TEXT_STREAM_HOLDBACK = 16;
-    /** 避免一两个字就同步写一次远程数据库；达到该长度后仍在模型生成过程中立即推送。 */
-    private static final int TEXT_STREAM_MIN_CHUNK = 12;
+    /** 已保留跨分片安全尾部；首段无需再凑足一批字符，避免短回复直到生成结束才出现。 */
+    private static final int TEXT_STREAM_MIN_CHUNK = 1;
     private static final int MAX_TEXT_LENGTH = 4_000;
     private static final Set<String> FORBIDDEN_TEXT = Set.of(
             "traveltaskid", "userid", "runid", "actionid", "planid", "showid", "movieid", "cinemaid",
@@ -184,6 +184,11 @@ public final class DeepSeekModelGateway implements ModelGateway {
         } catch (RestClientException | JsonProcessingException exception) {
             throw new AgentModelGatewayException("模型调用失败", exception);
         }
+    }
+
+    @Override
+    public boolean emitsValidatedTextDeltas() {
+        return true;
     }
 
     private void readTextStream(java.io.InputStream body, SafeTextStream stream) {

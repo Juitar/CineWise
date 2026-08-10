@@ -203,6 +203,9 @@ public class AgentMessageSubmissionService {
         if (slots.values().containsKey("movieId")) {
             types.put("movieId", String.class);
         }
+        if (slots.values().containsKey("cinemaId")) {
+            types.put("cinemaId", String.class);
+        }
         if (slots.values().containsKey("timeFrom")) {
             types.put("timeFrom", LocalTime.class);
         }

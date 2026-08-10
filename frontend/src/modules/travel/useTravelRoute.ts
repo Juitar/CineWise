@@ -41,20 +41,29 @@ export function requestCurrentCoordinates(): Promise<CurrentCoordinates> {
       return;
     }
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      reject(new BrowserLocationUnavailable());
+      reject(new BrowserLocationUnavailable('当前浏览器不支持定位，请手动输入城市。'));
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { longitude, latitude } = position.coords;
         if (!validCoordinates(longitude, latitude)) {
-          reject(new BrowserLocationUnavailable());
+          reject(new BrowserLocationUnavailable('当前设备未提供有效位置，请手动输入城市。'));
           return;
         }
         resolve({ longitude, latitude });
       },
-      () => reject(new BrowserLocationUnavailable()),
-      { enableHighAccuracy: false, maximumAge: 0, timeout: 10_000 },
+      (error) => {
+        let message = '未能获取当前位置，请手动输入城市。';
+        if (error.code === error.PERMISSION_DENIED)
+          message = '浏览器未授予定位权限，请允许定位后重试。';
+        else if (error.code === error.POSITION_UNAVAILABLE)
+          message = '当前设备无法提供定位，请手动输入城市。';
+        else if (error.code === error.TIMEOUT) message = '定位超时，请手动输入城市。';
+        reject(new BrowserLocationUnavailable(message));
+      },
+      // 城市确认只需要市级精度。复用近期位置能显著减少桌面浏览器首次定位卡住的情况。
+      { enableHighAccuracy: false, maximumAge: 5 * 60 * 1000, timeout: 15_000 },
     );
   });
 }

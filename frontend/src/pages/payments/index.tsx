@@ -1,11 +1,11 @@
 import React from 'react';
-import { history, useParams } from 'umi';
+import { history, useLocation, useParams } from 'umi';
 import { PaymentPanel } from '../../features/payment-panel/PaymentPanel';
+import { workspacePath } from '../../modules/agent/workspaceRoute';
 import { useOrder, usePaymentAction } from '../../modules/order/transaction-hooks';
 import { formatOrderDateTime } from '../../modules/order/formatters';
 import { usePaymentDeadline } from '../../modules/order/payment-deadline';
 import {
-  ORDERS_BREADCRUMB_ITEM,
   PROFILE_BREADCRUMB_ITEM,
   TransactionBreadcrumb,
 } from '../../features/transaction-breadcrumb/TransactionBreadcrumb';
@@ -17,6 +17,7 @@ import './index.css';
  */
 export default function PaymentPage() {
   const { orderNo = '' } = useParams<{ orderNo: string }>();
+  const location = useLocation();
   const orderQuery = useOrder(orderNo);
   const paymentAction = usePaymentAction(orderNo);
   const isOrderNotPayable =
@@ -48,14 +49,14 @@ export default function PaymentPage() {
   const submitPayment = async () => {
     const payment = await paymentAction.submit();
     if (payment) {
-      history.push(`/payments/${encodeURIComponent(orderNo)}/result`);
+      history.push(workspacePath(location.pathname, `/payments/${encodeURIComponent(orderNo)}/result`));
     }
   };
 
   const queryPayment = async () => {
     const payment = await paymentAction.query();
     if (payment) {
-      history.push(`/payments/${encodeURIComponent(orderNo)}/result`);
+      history.push(workspacePath(location.pathname, `/payments/${encodeURIComponent(orderNo)}/result`));
     }
   };
   return (
@@ -64,8 +65,8 @@ export default function PaymentPage() {
         <TransactionBreadcrumb
           items={[
             PROFILE_BREADCRUMB_ITEM,
-            ORDERS_BREADCRUMB_ITEM,
-            { label: '订单详情', to: `/orders/${encodeURIComponent(orderNo)}` },
+            { label: '我的订单', to: workspacePath(location.pathname, '/orders') },
+            { label: '订单详情', to: workspacePath(location.pathname, `/orders/${encodeURIComponent(orderNo)}`) },
             { label: '支付订单' },
           ]}
         />
@@ -83,7 +84,7 @@ export default function PaymentPage() {
           }
           onPay={() => void submitPayment()}
           onQueryOrderResult={() => void queryPayment()}
-          onCancelPayment={() => history.push(`/orders/${encodeURIComponent(orderNo)}`)}
+          onCancelPayment={() => history.push(workspacePath(location.pathname, `/orders/${encodeURIComponent(orderNo)}`))}
         />
       </div>
     </div>

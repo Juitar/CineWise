@@ -22,6 +22,25 @@ import type {
 
 const basePath = '/api/v1/agent';
 
+export async function resolveBrowserCity(
+  longitude: number,
+  latitude: number,
+): Promise<string> {
+  // 浏览器可能返回 13 位以上小数；市级定位只需米级精度，避免触发后端 @Digits 校验。
+  const normalizedLongitude = Number(longitude.toFixed(6));
+  const normalizedLatitude = Number(latitude.toFixed(6));
+  const response = await apiRequest<{ city?: unknown }>(`${basePath}/location/city`, {
+    method: 'POST',
+    body: { longitude: normalizedLongitude, latitude: normalizedLatitude },
+    // 城市确认只是辅助输入；第三方服务不可用时尽快回到用户可手输的追问卡。
+    timeoutMs: 8_000,
+  });
+  if (typeof response.city !== 'string' || !response.city.trim()) {
+    throw new Error('当前位置无法识别城市，请手动输入城市。');
+  }
+  return response.city.trim();
+}
+
 export async function createAgentSession(): Promise<AgentSession> {
   return parseAgentSession(await apiRequest<unknown>(`${basePath}/sessions`, { method: 'POST' }));
 }

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { history, useParams } from 'umi';
+import { history, useLocation, useParams } from 'umi';
 import { message } from 'antd';
 import { OrderDetail } from '../../../features/order-detail/OrderDetail';
 import {
@@ -9,7 +9,6 @@ import {
 } from '../../../modules/order/transaction-hooks';
 import { formatOrderDateTime } from '../../../modules/order/formatters';
 import {
-  ORDERS_BREADCRUMB_ITEM,
   PROFILE_BREADCRUMB_ITEM,
   TransactionBreadcrumb,
 } from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
@@ -18,6 +17,7 @@ import { useOrderContentDetails } from '../../../modules/order/useOrderContentDe
 import { useTravelTaskByOrder } from '../../../modules/travel/useTravelTask';
 import { isTravelAdviceAvailable } from '../../../modules/travel/advice-availability';
 import { ApiError } from '../../../shared/api/ApiError';
+import { workspacePath } from '../../../modules/agent/workspaceRoute';
 import './index.css';
 
 /**
@@ -26,6 +26,7 @@ import './index.css';
  */
 export default function OrderDetailPage() {
   const { orderNo = '' } = useParams<{ orderNo: string }>();
+  const location = useLocation();
   const orderQuery = useOrder(orderNo);
   const cancellation = useCancelOrder(orderNo);
   const paymentQuery = usePaymentQuery(orderNo);
@@ -66,7 +67,7 @@ export default function OrderDetailPage() {
   const handleViewTicket = async () => {
     const payment = await paymentQuery.query();
     if (payment?.ticketId) {
-      history.push(`/tickets/${encodeURIComponent(payment.ticketId)}`);
+      history.push(workspacePath(location.pathname, `/tickets/${encodeURIComponent(payment.ticketId)}`));
       return;
     }
     if (!paymentQuery.error) {
@@ -95,7 +96,11 @@ export default function OrderDetailPage() {
     <div className="order-detail-page-wrapper">
       <div className="order-detail-page-content">
         <TransactionBreadcrumb
-          items={[PROFILE_BREADCRUMB_ITEM, ORDERS_BREADCRUMB_ITEM, { label: '订单详情' }]}
+          items={[
+            PROFILE_BREADCRUMB_ITEM,
+            { label: '我的订单', to: workspacePath(location.pathname, '/orders') },
+            { label: '订单详情' },
+          ]}
         />
         {shouldShowContentNotice ? (
           <OrderContentNotice
@@ -125,15 +130,15 @@ export default function OrderDetailPage() {
           onPay={() =>
             history.push(
               order?.status === 'PAYING'
-                ? `/payments/${encodeURIComponent(orderNo)}/result`
-                : `/payments/${encodeURIComponent(orderNo)}`,
+                ? workspacePath(location.pathname, `/payments/${encodeURIComponent(orderNo)}/result`)
+                : workspacePath(location.pathname, `/payments/${encodeURIComponent(orderNo)}`),
             )
           }
           onCancel={() => void handleCancel()}
           onViewTicket={() => void handleViewTicket()}
           onViewTravel={canViewTravelAdvice ? () => void handleViewTravel() : undefined}
           onApplyRefund={() => history.push(`/orders/${encodeURIComponent(orderNo)}/refund`)}
-          onViewOrders={() => history.push('/orders')}
+          onViewOrders={() => history.push(workspacePath(location.pathname, '/orders'))}
           cancelResultUnknown={cancellation.resultUnknown}
           onRecoverCancel={() => void recoverCancellation()}
         />

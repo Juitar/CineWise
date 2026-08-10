@@ -152,8 +152,8 @@ public class ContentController {
     /**
      * 查询影院详情。
      *
-     * <p>接口不暴露坐标、直线距离或路线时间，避免页面把静态内容误作路线事实。若用户需要路线，必须
-     * 由出行模块在用户主动发起后处理，不复用这里的公开内容响应。</p>
+     * <p>接口返回影院已有的静态坐标，供页面标记影院位置；不返回距离或路线时间。用户位置始终只在
+     * 浏览器内存中使用，路线仍由出行模块在用户主动发起后处理。</p>
      */
     @GetMapping("/cinemas/{cinemaId}")
     @Operation(summary = "查询影院详情")
@@ -297,6 +297,8 @@ public class ContentController {
                 cinema.cityCode(),
                 cinema.area(),
                 cinema.address(),
+                cinema.longitude(),
+                cinema.latitude(),
                 meta.source(),
                 meta.sourceType(),
                 meta.dataTime(),
@@ -461,6 +463,8 @@ public class ContentController {
             String cityCode,
             String area,
             String address,
+            BigDecimal longitude,
+            BigDecimal latitude,
             String source,
             String sourceType,
             OffsetDateTime dataTime,

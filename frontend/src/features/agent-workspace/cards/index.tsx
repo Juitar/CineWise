@@ -4,12 +4,15 @@ import Markdown, { defaultUrlTransform } from 'react-markdown';
 import { Link } from 'umi';
 
 import type { AgentDisplayItem } from '../../../modules/agent/projection';
+import { resolveCityFromCurrentLocation } from '../cinema-location-map';
 import './index.css';
 
 interface AgentDisplayItemViewProps {
   item: AgentDisplayItem;
   answerDisabled: boolean;
   planPresentation?: 'full' | 'summary';
+  planDetailPath?: string;
+  sessionId?: string;
   selectSeatsEnabled?: boolean;
   onAnswer(itemKey: string, answer: string): Promise<boolean>;
   onConfirm(itemKey: string, confirmed: boolean): void;
@@ -91,12 +94,18 @@ function QuestionCard({
   answerDisabled,
   item,
   onAnswer,
-}: Pick<AgentDisplayItemViewProps, 'answerDisabled' | 'item' | 'onAnswer'>) {
+  sessionId,
+}: Pick<AgentDisplayItemViewProps, 'answerDisabled' | 'item' | 'onAnswer' | 'sessionId'>) {
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [locatedCity, setLocatedCity] = useState<string | null>(null);
+  const [locationNotice, setLocationNotice] = useState<string | null>(null);
+  const [locating, setLocating] = useState(false);
+  const locationAttemptedRef = useRef(false);
   const expired = item.question ? Date.parse(item.question.expiresAt) <= Date.now() : true;
   const disabled = answerDisabled || expired || submitted || submitting;
+  const isCityQuestion = item.question?.kind === 'CITY';
 
   const submitAnswer = async (value: string) => {
     const normalized = value.trim();
@@ -116,6 +125,29 @@ function QuestionCard({
     }
   };
 
+  const locateCity = async () => {
+    if (!sessionId || disabled || locating) return;
+    setLocating(true);
+    setLocationNotice(null);
+    try {
+      setLocatedCity(await resolveCityFromCurrentLocation(sessionId));
+    } catch (error) {
+      setLocationNotice(error instanceof Error && error.message
+        ? error.message
+        : '未能获取当前位置，请手动输入城市。');
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  // 缺少城市时直接触发浏览器的标准定位授权。定位成功后仍必须由用户确认城市，
+  // 不能把坐标或解析城市偷偷写入 Agent 槽位。
+  useEffect(() => {
+    if (!isCityQuestion || !sessionId || disabled || locationAttemptedRef.current) return;
+    locationAttemptedRef.current = true;
+    void locateCity();
+  }, [disabled, isCityQuestion, sessionId]);
+
   return (
     <>
       <div className="agent-card-heading">
@@ -123,6 +155,24 @@ function QuestionCard({
         <strong>{item.title}</strong>
       </div>
       {item.text !== item.title && <p className="agent-card-text">{item.text}</p>}
+      {isCityQuestion && !locatedCity && (
+        <div className="agent-question-location">
+          <span>
+            {locationNotice ?? (locating ? '正在识别你的观影城市…' : '正在准备位置确认，也可以直接输入城市。')}
+          </span>
+        </div>
+      )}
+      {isCityQuestion && locatedCity && (
+        <div className="agent-question-location agent-question-location--confirmed">
+          <span>检测到你在 {locatedCity}，确认在这里观影吗？</span>
+          <Button disabled={disabled} onClick={() => void submitAnswer(locatedCity)} type="primary">
+            确认在 {locatedCity} 看
+          </Button>
+          <Button disabled={disabled} onClick={() => setLocatedCity(null)} type="text">
+            换城市
+          </Button>
+        </div>
+      )}
       {!!item.question?.options.length && (
         <div className="agent-question-options" aria-label="快捷答案">
           {item.question.options.map((option) => (
@@ -175,12 +225,27 @@ const PLAN_TYPE_TEXT: Readonly<Record<string, string>> = {
   TIME_FIRST: '时间优先',
 };
 
+function formatPlanReason(value: string): string {
+  const labels: Record<string, string> = {
+    COMPREHENSIVE: '综合条件更均衡',
+    LOW_PRICE: '当前价格更低',
+    EARLY_TIME: '开场时间更早',
+    TIME_FIRST: '开场时间更合适',
+    NEAREST: '距离影院更近',
+    '固定推荐结果': '符合当前可购条件',
+  };
+  const key = Object.keys(labels).find((candidate) => value.includes(candidate));
+  return key ? labels[key] : value;
+}
+
 function PlanCard({
   item,
   presentation,
+  planDetailPath,
 }: {
   item: AgentDisplayItem;
   presentation: 'full' | 'summary';
+  planDetailPath?: string;
 }) {
   if (presentation === 'summary') {
     const planCount = item.plans?.length ?? 0;
@@ -192,11 +257,32 @@ function PlanCard({
         </div>
         <p className="agent-card-text">
           {planCount > 0
-            ? `已生成 ${planCount} 个真实方案，请在左侧方案区选择后继续交流。`
+            ? `已生成 ${planCount} 个真实方案，请选择一个方案后继续购票。`
             : '当前条件下暂无可购场次，可以更换日期或城市后重试。'}
         </p>
         {item.relaxationSuggestion && (
           <p className="agent-card-status">可调整条件：{item.relaxationSuggestion}</p>
+        )}
+        {planCount > 0 && planDetailPath && (
+          <>
+            <div className="agent-card-mobile-plan-preview" aria-label="推荐方案">
+              {item.plans?.map((plan, index) => (
+                <Link
+                  className="agent-card-mobile-plan-option"
+                  key={`${plan.showId}:${index}`}
+                  to={`${planDetailPath}?plan=${index}`}
+                >
+                  <span>{PLAN_TYPE_TEXT[plan.planType] ?? `方案 ${index + 1}`}</span>
+                  <strong>{plan.movieName}</strong>
+                  <small>{plan.cinemaName} · {plan.startTime}</small>
+                  <b>{plan.currency === 'CNY' ? '¥' : `${plan.currency} `}{plan.price}</b>
+                </Link>
+              ))}
+            </div>
+            <Link className="agent-card-mobile-plan-link" to={planDetailPath}>
+              查看全部方案并选场次
+            </Link>
+          </>
         )}
       </>
     );
@@ -256,12 +342,14 @@ function PlanCard({
                 {!!plan.reasons.length && (
                   <ul className="agent-plan-reasons">
                     {plan.reasons.map((reason) => (
-                      <li key={reason}>{reason}</li>
+                      <li key={reason}>{formatPlanReason(reason)}</li>
                     ))}
                   </ul>
                 )}
                 {(expired || !plan.purchaseEligible) && (
-                  <p className="agent-card-status">{expired ? '方案已过期' : '当前不可购'}</p>
+                  <p className="agent-card-status">
+                    {expired ? '方案已过期' : '暂不可购买（场次或库存可能已变化）'}
+                  </p>
                 )}
               </section>
             );
@@ -411,6 +499,8 @@ export function AgentDisplayItemView({
   onAnswer,
   onConfirm,
   planPresentation = 'full',
+  planDetailPath,
+  sessionId,
   selectSeatsEnabled = true,
 }: AgentDisplayItemViewProps) {
   let content: React.ReactNode;
@@ -420,7 +510,7 @@ export function AgentDisplayItemView({
       content = <MessageBubble item={item} />;
       break;
     case 'question':
-      content = <QuestionCard item={item} answerDisabled={answerDisabled} onAnswer={onAnswer} />;
+      content = <QuestionCard item={item} answerDisabled={answerDisabled} onAnswer={onAnswer} sessionId={sessionId} />;
       break;
     case 'movie-card':
       content = <RecommendationCard item={item} />;
@@ -429,7 +519,7 @@ export function AgentDisplayItemView({
       content = item.confirmation ? (
         <RecommendationCard item={item} />
       ) : (
-        <PlanCard item={item} presentation={planPresentation} />
+        <PlanCard item={item} presentation={planPresentation} planDetailPath={planDetailPath} />
       );
       break;
     case 'travel-advice-card':

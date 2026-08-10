@@ -37,7 +37,11 @@ vi.mock('./api', () => ({
 
 vi.mock('./sse', () => ({ postAgentStream: mocks.postAgentStream }));
 
-import { useAgentSessionBootstrap, useAgentWorkspace } from './useAgentWorkspace';
+import {
+  resetAgentWorkspaceCacheForTest,
+  useAgentSessionBootstrap,
+  useAgentWorkspace,
+} from './useAgentWorkspace';
 
 const processingEvent = parseAgentEvent(processingEventFixture);
 const emptyMessages = { total: 0, page: 1, size: 100, records: [] };
@@ -97,6 +101,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  resetAgentWorkspaceCacheForTest();
   vi.clearAllMocks();
   vi.useRealTimers();
 });
@@ -202,11 +207,86 @@ describe('useAgentWorkspace 状态与恢复', () => {
     expect(result.current.feedback).toBe('网络连接失败，已保留当前内容');
   });
 
+  it('同一会话因子路由重新挂载时先复用已加载投影，后台读取失败不清空内容', async () => {
+    mocks.listAgentMessages.mockResolvedValue({
+      ...emptyMessages,
+      total: 1,
+      records: [
+        {
+          messageId: 'message-user-1',
+          runId: 'run-1',
+          role: 'USER',
+          type: 'TEXT',
+          text: '今天看电影',
+          payload: null,
+          status: 'COMPLETED',
+          completedAt: null,
+          createdAt: '2026-08-08T10:00:00+08:00',
+        },
+      ],
+    });
+    const first = renderHook(() => useAgentWorkspace('session-example-1'));
+    await waitFor(() => expect(first.result.current.loadStatus).toBe('ready'));
+    first.unmount();
+
+    mocks.listAgentMessages.mockRejectedValue(new ApiError('network', { kind: 'NETWORK' }));
+    const second = renderHook(() => useAgentWorkspace('session-example-1'));
+    expect(second.result.current.loadStatus).toBe('ready');
+    expect(second.result.current.projection.items).toContainEqual(
+      expect.objectContaining({ kind: 'user-text', text: '今天看电影' }),
+    );
+    await waitFor(() => expect(second.result.current.feedback).toBe('网络连接失败，已保留当前内容'));
+    expect(second.result.current.projection.items).toContainEqual(
+      expect.objectContaining({ kind: 'user-text', text: '今天看电影' }),
+    );
+  });
+
+  it('同一会话切换子路由不终止活动 SSE，也不会重复建立流', async () => {
+    let finish!: () => void;
+    mocks.postAgentStream.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const first = renderHook(() => useAgentWorkspace('session-example-1'));
+    await waitFor(() => expect(first.result.current.loadStatus).toBe('ready'));
+    let submission!: Promise<boolean>;
+    act(() => {
+      submission = first.result.current.submit('推荐电影');
+    });
+    await waitFor(() => expect(mocks.postAgentStream).toHaveBeenCalledOnce());
+    first.unmount();
+
+    const second = renderHook(() => useAgentWorkspace('session-example-1'));
+    expect(second.result.current.loadStatus).toBe('ready');
+    await expect(second.result.current.submit('第二条消息')).resolves.toBe(false);
+    expect(mocks.postAgentStream).toHaveBeenCalledOnce();
+
+    finish();
+    await act(async () => {
+      await submission;
+    });
+  });
+
   it('新工作区只创建一次会话', async () => {
     mocks.createAgentSession.mockResolvedValue(sessionPage.records[0]);
     const { result } = renderHook(() => useAgentSessionBootstrap(true));
     await waitFor(() => expect(result.current.createdSessionId).toBe('session-example-1'));
     expect(mocks.createAgentSession).toHaveBeenCalledOnce();
+  });
+
+  it('单条删除调用既有会话删除接口并刷新历史', async () => {
+    mocks.clearAgentSession.mockResolvedValue({ sessionId: 'session-example-1', cleared: true });
+    const { result } = renderHook(() => useAgentWorkspace('session-example-1'));
+    await waitFor(() => expect(result.current.loadStatus).toBe('ready'));
+
+    await act(async () => {
+      await expect(result.current.deleteSession('session-example-1')).resolves.toBe(true);
+    });
+
+    expect(mocks.clearAgentSession).toHaveBeenCalledWith('session-example-1');
+    expect(mocks.listAgentSessions).toHaveBeenCalledTimes(2);
   });
 
   it('首个事件前断线进入 RESULT_UNKNOWN，且不自动重发', async () => {

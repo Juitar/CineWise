@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     confirm: vi.fn(),
     clearAll: vi.fn(),
     clearCurrent: vi.fn(),
+    deleteSession: vi.fn(),
     createNewSession: vi.fn(),
     feedback: null as string | null,
     loadStatus: 'ready' as 'error' | 'loading' | 'ready',
@@ -196,6 +197,31 @@ describe('AgentWorkspace 页面', () => {
     fireEvent.click(screen.getByRole('button', { name: '历史会话' }));
     expect(screen.getAllByText('当前会话').length).toBeGreaterThan(0);
     expect(mocks.workspace.stopActiveStream).not.toHaveBeenCalled();
+  });
+
+  it('删除当前会话后新建会话并替换当前地址', async () => {
+    mocks.workspace.sessions = [
+      {
+        sessionId: 'session-example-1',
+        summary: '当前会话',
+        status: 'ACTIVE',
+        createdAt: '2026-08-05T10:00:00+08:00',
+        updatedAt: '2026-08-05T10:00:00+08:00',
+      },
+    ];
+    mocks.workspace.deleteSession.mockResolvedValue(true);
+    mocks.workspace.createNewSession.mockResolvedValue({
+      ...mocks.workspace.sessions[0],
+      sessionId: 'session-example-2',
+    });
+    render(<AgentWorkspace sessionId="session-example-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '删除会话：当前会话' }));
+
+    await vi.waitFor(() => {
+      expect(mocks.workspace.deleteSession).toHaveBeenCalledWith('session-example-1');
+      expect(mocks.navigate).toHaveBeenCalledWith('/assistant/session-example-2', { replace: true });
+    });
   });
 
   it('登录回跳后只提交一次首页内存草稿', async () => {

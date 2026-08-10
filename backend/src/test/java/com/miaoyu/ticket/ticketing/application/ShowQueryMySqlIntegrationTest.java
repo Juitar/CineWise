@@ -152,7 +152,7 @@ class ShowQueryMySqlIntegrationTest {
             assertThat(show.dataType()).isEqualTo("MOCK");
             assertThat(show.source()).isEqualTo("batch-query-test");
             assertThat(show.expiresAt()).isBeforeOrEqualTo(show.startTime());
-            assertThat(show.expiresAt()).isEqualTo(show.dataAt().plusSeconds(60));
+            assertThat(show.expiresAt()).isEqualTo(show.dataAt().plusSeconds(300));
         });
 
     }

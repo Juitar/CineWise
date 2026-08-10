@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.miaoyu.ticket.agent.application.AgentCityCodeResolver;
 import com.miaoyu.ticket.agent.application.model.AgentConversationContext;
 import com.miaoyu.ticket.agent.application.model.AgentIntent;
+import com.miaoyu.ticket.agent.application.tool.CinemaTitleResolutionTool;
+import com.miaoyu.ticket.agent.application.tool.MovieGenreResolutionTool;
 import com.miaoyu.ticket.agent.application.tool.MovieTitleResolutionTool;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
@@ -32,16 +34,32 @@ import org.springframework.beans.factory.annotation.Autowired;
 public class AgentConversationSlotService {
     private static final Pattern CITY_CODE = Pattern.compile("\\d{6}");
     private static final Pattern TICKET_COUNT_ANSWER = Pattern.compile(
-            "^(?<count>[1-9]|1\\d|20|[一二两三四五六七八九十]{1,3})(?:个?人|位|张(?:票)?|票)?$");
+            "^(?<count>[1-9]|1\\d|20|[一二两三四五六七八九十]{1,3}|(?i:one|two|three|four|five|six|seven|eight|nine|ten))"
+                    + "(?:个(?:人)?|人|位|张(?:票)?|票|(?i:person|people|tickets?))?$");
     private static final Pattern WEEKDAY_ANSWER = Pattern.compile(
             "^(?<week>本周|这周|下周)?(?:周|星期)(?<day>[一二三四五六日天])$");
+    private static final Pattern WEEKEND_ANSWER = Pattern.compile("^(?<week>本周|这周|下周)?(?:周末|末)$");
+    private static final Pattern ISO_DATE_ANSWER = Pattern.compile(
+            "^(?<year>\\d{4})-(?<month>\\d{1,2})-(?<day>\\d{1,2})$");
+    private static final Pattern MONTH_DAY_ANSWER = Pattern.compile(
+            "^(?<month>\\d{1,2})(?:月|[.．/])(?<day>\\d{1,2})(?:日|号)?$");
+    private static final Pattern CHINESE_MONTH_DAY_ANSWER = Pattern.compile(
+            "^(?<month>[一二两三四五六七八九十]{1,3})月(?<day>[一二三四五六七八九十]{1,3})(?:日|号)?$");
     private static final Pattern DATE_IN_TEXT = Pattern.compile(
-            "大后天|后天|明天|明晚|今天|今晚|(?:本周|这周|下周)?(?:周|星期)[一二三四五六日天]|\\d{4}-\\d{2}-\\d{2}");
+            "大后天|后天|明天|明晚|今天|今晚|(?:本周|这周|下周)?(?:周末|末)"
+                    + "|(?:本周|这周|下周)?(?:周|星期)[一二三四五六日天]"
+                    + "|(?<!\\d)\\d{4}-\\d{1,2}-\\d{1,2}(?!\\d)"
+                    + "|(?<!\\d)\\d{1,2}(?:月|[.．/])\\d{1,2}(?:日|号)?(?!\\d)"
+                    + "|[一二两三四五六七八九十]{1,3}月[一二三四五六七八九十]{1,3}(?:日|号)?");
     private static final Pattern TICKET_COUNT_IN_TEXT = Pattern.compile(
-            "(?<count>[1-9]|1\\d|20|[一二两三四五六七八九十]{1,3})(?:个?人|位|张(?:票)?|票)");
-    private static final Pattern HOUR_IN_TEXT = Pattern.compile("(?<period>上午|中午|下午|晚上|今晚)?(?<hour>\\d{1,2})点");
-    private static final List<String> SUPPORTED_GENRES = List.of(
-            "喜剧", "科幻", "动作", "爱情", "恐怖", "悬疑", "动画", "家庭", "剧情", "音乐", "冒险", "犯罪", "战争", "纪录");
+            "(?<count>[1-9]|1\\d|20|[一二两三四五六七八九十]{1,3}|(?i:one|two|three|four|five|six|seven|eight|nine|ten))"
+                    + "(?:个(?:人)?|人|位|张(?:票)?|票|(?i:person|people|tickets?))");
+    /** “我和一个人一起看”中的人数只表示同行者，总票数还要包含用户本人。 */
+    private static final Pattern COMPANION_COUNT_IN_TEXT = Pattern.compile(
+            "(?:和|跟|与)(?<count>[1-9]|1\\d|20|[一二两三四五六七八九十]{1,3})(?:个)?人(?:一起)?看");
+    private static final Pattern CLOCK_TIME_IN_TEXT = Pattern.compile(
+            "(?<period>上午|中午|下午|晚上|今晚)?(?<hour>\\d{1,2})[点时](?:(?<minute>\\d{1,2})分?)?"
+                    + "|(?<clockHour>\\d{1,2})[：:](?<clockMinute>\\d{2})");
     private static final Pattern ANSWER_SUFFIX = Pattern.compile("[啊呀吧呢哦啦了]+$");
     private static final Pattern ANSWER_PUNCTUATION = Pattern.compile("[，。！？!?~～]+$");
     private final CurrentUserAccessor currentUserAccessor;
@@ -52,12 +70,15 @@ public class AgentConversationSlotService {
     private final Clock clock;
     private final AgentCityCodeResolver cityCodeResolver;
     private final MovieTitleResolutionTool movieTitleResolutionTool;
+    private final CinemaTitleResolutionTool cinemaTitleResolutionTool;
+    private final MovieGenreResolutionTool movieGenreResolutionTool;
 
     @Autowired
     public AgentConversationSlotService(CurrentUserAccessor currentUserAccessor,
             AgentSessionRepository sessionRepository, AgentMessageRepository messageRepository,
             AgentConversationSlotRepository slotRepository, ObjectMapper objectMapper, Clock clock,
-            AgentCityCodeResolver cityCodeResolver, MovieTitleResolutionTool movieTitleResolutionTool) {
+            AgentCityCodeResolver cityCodeResolver, MovieTitleResolutionTool movieTitleResolutionTool,
+            CinemaTitleResolutionTool cinemaTitleResolutionTool, MovieGenreResolutionTool movieGenreResolutionTool) {
         this.currentUserAccessor = currentUserAccessor;
         this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
@@ -66,6 +87,8 @@ public class AgentConversationSlotService {
         this.clock = clock;
         this.cityCodeResolver = cityCodeResolver;
         this.movieTitleResolutionTool = movieTitleResolutionTool;
+        this.cinemaTitleResolutionTool = cinemaTitleResolutionTool;
+        this.movieGenreResolutionTool = movieGenreResolutionTool;
     }
 
     /** 保留现有轻量测试夹具；生产构造函数始终注入真实影片解析工具。 */
@@ -74,7 +97,7 @@ public class AgentConversationSlotService {
             AgentConversationSlotRepository slotRepository, ObjectMapper objectMapper, Clock clock,
             AgentCityCodeResolver cityCodeResolver) {
         this(currentUserAccessor, sessionRepository, messageRepository, slotRepository, objectMapper, clock,
-                cityCodeResolver, null);
+                cityCodeResolver, null, null, null);
     }
 
     /** 返回本轮唯一可用的服务端快照；无效回答保留旧值，由正常计划流程再次追问。 */
@@ -179,13 +202,23 @@ public class AgentConversationSlotService {
                 values.put("timeTo", timeRange[1]);
             }
         }
-        if (movieTitleResolutionTool != null) {
+        boolean explicitMovieRequest = slot == null && containsMovieRequest(value);
+        if (movieTitleResolutionTool != null && explicitMovieRequest) {
             var resolvedMovie = movieTitleResolutionTool.resolve(value);
             if (resolvedMovie.isPresent()) {
                 values.put("movieId", resolvedMovie.orElseThrow().movieId());
-            } else if (slot == null && containsMovieRequest(value)) {
+            } else {
                 // 新的观影请求没有唯一目录命中时，不能把上一部影片的内部 ID 偷带到本轮推荐里。
                 values.remove("movieId");
+            }
+        }
+        if (cinemaTitleResolutionTool != null && explicitMovieRequest && containsCinemaRequest(value)) {
+            String cityCodeForCinema = values.get("cityCode");
+            var resolvedCinema = cinemaTitleResolutionTool.resolve(value, cityCodeForCinema);
+            if (resolvedCinema.isPresent()) {
+                values.put("cinemaId", resolvedCinema.orElseThrow().cinemaId());
+            } else {
+                values.remove("cinemaId");
             }
         }
         // 没有待回答 QUESTION 时，这是新任务的原始语义；它单独保存，绝不混进可信槽位。
@@ -219,17 +252,12 @@ public class AgentConversationSlotService {
             case "明天", "明晚" -> today.plusDays(1L);
             case "后天" -> today.plusDays(2L);
             case "大后天" -> today.plusDays(3L);
-            default -> parseWeekday(text, today);
+            default -> parseNamedDate(text, today);
         };
         if (parsed != null) {
-            return parsed.toString();
+            return parsed.isBefore(today) ? null : parsed.toString();
         }
-        try {
-            LocalDate isoDate = LocalDate.parse(text);
-            return isoDate.isBefore(today) ? null : isoDate.toString();
-        } catch (java.time.format.DateTimeParseException exception) {
-            return null;
-        }
+        return null;
     }
 
     private String extractDate(String value) {
@@ -264,6 +292,56 @@ public class AgentConversationSlotService {
         return candidate.isBefore(today) ? null : candidate;
     }
 
+    /**
+     * 日期槽位统一保存为 ISO 日期。过去的月日不会自动滚到下一年，避免用户输入“8.8”
+     * 却被悄悄改成明年的同一天；要看明年时必须明确给出年份。
+     */
+    private static LocalDate parseNamedDate(String text, LocalDate today) {
+        LocalDate weekday = parseWeekday(text, today);
+        if (weekday != null) {
+            return weekday;
+        }
+        java.util.regex.Matcher weekend = WEEKEND_ANSWER.matcher(text);
+        if (weekend.matches()) {
+            LocalDate monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+            if ("下周".equals(weekend.group("week"))) {
+                monday = monday.plusWeeks(1L);
+            }
+            return monday.plusDays(5L);
+        }
+        java.util.regex.Matcher iso = ISO_DATE_ANSWER.matcher(text);
+        if (iso.matches()) {
+            return safeDate(iso.group("year"), iso.group("month"), iso.group("day"));
+        }
+        java.util.regex.Matcher monthDay = MONTH_DAY_ANSWER.matcher(text);
+        if (monthDay.matches()) {
+            return safeDate(Integer.toString(today.getYear()), monthDay.group("month"), monthDay.group("day"));
+        }
+        java.util.regex.Matcher chineseMonthDay = CHINESE_MONTH_DAY_ANSWER.matcher(text);
+        if (chineseMonthDay.matches()) {
+            Integer month = chineseOrArabicNumber(chineseMonthDay.group("month"));
+            Integer day = chineseOrArabicNumber(chineseMonthDay.group("day"));
+            return month == null || day == null ? null : safeDate(today.getYear(), month, day);
+        }
+        return null;
+    }
+
+    private static LocalDate safeDate(String year, String month, String day) {
+        try {
+            return LocalDate.of(Integer.parseInt(year), Integer.parseInt(month), Integer.parseInt(day));
+        } catch (NumberFormatException | java.time.DateTimeException exception) {
+            return null;
+        }
+    }
+
+    private static LocalDate safeDate(int year, int month, int day) {
+        try {
+            return LocalDate.of(year, month, day);
+        } catch (java.time.DateTimeException exception) {
+            return null;
+        }
+    }
+
     private static String normalizeTicketCount(String value) {
         String text = normalizeShortAnswer(value).replace(" ", "");
         java.util.regex.Matcher matcher = TICKET_COUNT_ANSWER.matcher(text);
@@ -275,7 +353,14 @@ public class AgentConversationSlotService {
     }
 
     private static String extractTicketCount(String value) {
-        java.util.regex.Matcher matcher = TICKET_COUNT_IN_TEXT.matcher(value.replace(" ", ""));
+        String normalized = value.replace(" ", "");
+        java.util.regex.Matcher companionMatcher = COMPANION_COUNT_IN_TEXT.matcher(normalized);
+        if (companionMatcher.find()) {
+            Integer companions = chineseOrArabicNumber(companionMatcher.group("count"));
+            int total = companions == null ? 0 : companions + 1;
+            return total >= 1 && total <= 20 ? Integer.toString(total) : null;
+        }
+        java.util.regex.Matcher matcher = TICKET_COUNT_IN_TEXT.matcher(normalized);
         if (!matcher.find()) {
             return null;
         }
@@ -284,15 +369,21 @@ public class AgentConversationSlotService {
     }
 
     private static String[] extractTimeRange(String value) {
-        java.util.regex.Matcher matcher = HOUR_IN_TEXT.matcher(value);
+        java.util.regex.Matcher matcher = CLOCK_TIME_IN_TEXT.matcher(value);
         if (matcher.find()) {
-            int hour = Integer.parseInt(matcher.group("hour"));
+            int hour = matcher.group("clockHour") == null
+                    ? Integer.parseInt(matcher.group("hour")) : Integer.parseInt(matcher.group("clockHour"));
+            int minute = matcher.group("clockMinute") == null
+                    ? matcher.group("minute") == null ? 0 : Integer.parseInt(matcher.group("minute"))
+                    : Integer.parseInt(matcher.group("clockMinute"));
             String period = matcher.group("period");
             if (("下午".equals(period) || "晚上".equals(period) || "今晚".equals(period)) && hour < 12) {
                 hour += 12;
             }
-            if (hour <= 23) {
-                return new String[] {String.format("%02d:00", hour), null};
+            if (hour <= 23 && minute <= 59) {
+                LocalTime time = LocalTime.of(hour, minute);
+                LocalTime end = time.equals(LocalTime.of(23, 59)) ? LocalTime.MAX : time.plusMinutes(1);
+                return new String[] {time.toString(), end.toString()};
             }
         }
         if (value.contains("下午")) {
@@ -316,7 +407,7 @@ public class AgentConversationSlotService {
     }
 
     private String extractGenres(String value) {
-        List<String> genres = SUPPORTED_GENRES.stream().filter(value::contains).toList();
+        List<String> genres = movieGenreResolutionTool == null ? List.of() : movieGenreResolutionTool.resolve(value);
         if (genres.isEmpty()) {
             return null;
         }
@@ -331,7 +422,28 @@ public class AgentConversationSlotService {
         return value.contains("看") || value.contains("电影") || value.contains("影片");
     }
 
+    private static boolean containsCinemaRequest(String value) {
+        return value.contains("影院") || value.contains("影城") || value.contains("电影院");
+    }
+
     private static Integer chineseOrArabicNumber(String value) {
+        String normalized = value.toLowerCase(java.util.Locale.ROOT);
+        Integer english = switch (normalized) {
+            case "one" -> 1;
+            case "two" -> 2;
+            case "three" -> 3;
+            case "four" -> 4;
+            case "five" -> 5;
+            case "six" -> 6;
+            case "seven" -> 7;
+            case "eight" -> 8;
+            case "nine" -> 9;
+            case "ten" -> 10;
+            default -> null;
+        };
+        if (english != null) {
+            return english;
+        }
         if (value.chars().allMatch(Character::isDigit)) {
             return Integer.valueOf(value);
         }
@@ -383,7 +495,7 @@ public class AgentConversationSlotService {
             JsonNode root = objectMapper.readTree(json);
             long version = root.path("version").canConvertToLong() ? root.path("version").asLong() : 0L;
             Map<String, String> values = new LinkedHashMap<>();
-            for (String slot : List.of("cityCode", "date", "ticketCount", "genres", "movieId", "timeFrom", "timeTo")) {
+            for (String slot : List.of("cityCode", "date", "ticketCount", "genres", "movieId", "cinemaId", "timeFrom", "timeTo")) {
                 String value = root.path("values").path(slot).isTextual()
                         ? normalizePersistedValue(slot, root.path("values").path(slot).asText()) : null;
                 if (value != null) {
@@ -437,8 +549,11 @@ public class AgentConversationSlotService {
                 }
                 List<String> normalized = new java.util.ArrayList<>();
                 genres.forEach(genre -> {
-                    if (genre.isTextual() && SUPPORTED_GENRES.contains(genre.asText())) {
-                        normalized.add(genre.asText());
+                    if (genre.isTextual()) {
+                        String genreValue = genre.asText().strip();
+                        if (!genreValue.isEmpty() && genreValue.length() <= 64) {
+                            normalized.add(genreValue);
+                        }
                     }
                 });
                 return normalized.isEmpty() ? null : objectMapper.writeValueAsString(normalized);
@@ -446,7 +561,7 @@ public class AgentConversationSlotService {
                 return null;
             }
         }
-        if ("movieId".equals(slot)) {
+        if ("movieId".equals(slot) || "cinemaId".equals(slot)) {
             return value.matches("[1-9]\\d*") ? value : null;
         }
         if ("timeFrom".equals(slot) || "timeTo".equals(slot)) {

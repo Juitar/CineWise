@@ -47,7 +47,7 @@ public final class MultiToolSupervisor {
     /** 明确的观影表达先由服务端判定，避免模型超时或偶发误判把购票请求降级成闲聊。 */
     private static final List<String> MOVIE_INTENT_TERMS = List.of(
             "看电影", "想看", "要看", "推荐电影", "推荐影片", "场次", "影院", "影城", "购票", "买票", "选座",
-            "排片", "排场", "有场次", "哪里有", "哪有", "喜剧", "科幻", "动作片", "爱情片", "恐怖片", "悬疑片", "动画片");
+            "排片", "排场", "有场次", "哪里有", "哪有", "一起看", "喜剧", "科幻", "动作片", "爱情片", "恐怖片", "惊悚", "悬疑片", "动画片");
     /** 与真实网关的跨分片隔离一致，保证替换 ModelGateway 时也不会直接把模型原文写入 SSE。 */
     private static final int TEXT_DELTA_HOLDBACK = 16;
     private static final Set<String> FORBIDDEN_GENERAL_TEXT = Set.of(
@@ -172,8 +172,12 @@ public final class MultiToolSupervisor {
                 slotReference("cityCode"), slotReference("date"), slotReference("ticketCount")));
         String genres = validationContext.slotSnapshot().values().get("genres");
         String movieId = validationContext.slotSnapshot().values().get("movieId");
+        String cinemaId = validationContext.slotSnapshot().values().get("cinemaId");
         if (movieId != null && !movieId.isBlank()) {
             inputs.add(slotReference("movieId"));
+        }
+        if (cinemaId != null && !cinemaId.isBlank()) {
+            inputs.add(slotReference("cinemaId"));
         }
         if (genres != null && !genres.isBlank()) {
             inputs.add(slotReference("genres"));
@@ -360,7 +364,10 @@ public final class MultiToolSupervisor {
     private StreamedReply generalChatReply(
             MultiToolSupervisorRequest request, Consumer<String> onTextDelta) {
         try {
-            SafeTextDeltaForwarder forwarder = new SafeTextDeltaForwarder(onTextDelta);
+            // DeepSeek 已在网关内完成跨分片禁止词检查；这里不再重复保留 16 个字符，
+            // 否则短文本要累计 32 个字符后页面才首次收到 delta。其他/旧网关保持原保护。
+            SafeTextDeltaForwarder forwarder = new SafeTextDeltaForwarder(
+                    onTextDelta, modelGateway.emitsValidatedTextDeltas() ? 0 : TEXT_DELTA_HOLDBACK);
             var reply = modelGateway.generateReplyStream(new ReplyGenerationRequest(
                     request.clientRequestId(), request.input(), AgentReplyMessageType.TEXT, new TextReplyFacts()),
                     forwarder::append);
@@ -396,11 +403,13 @@ public final class MultiToolSupervisor {
      */
     private static final class SafeTextDeltaForwarder {
         private final Consumer<String> consumer;
+        private final int holdback;
         private final StringBuilder text = new StringBuilder();
         private int emittedLength;
 
-        private SafeTextDeltaForwarder(Consumer<String> consumer) {
+        private SafeTextDeltaForwarder(Consumer<String> consumer, int holdback) {
             this.consumer = Objects.requireNonNull(consumer, "文本分片回调不能为空");
+            this.holdback = holdback;
         }
 
         private void append(String delta) {
@@ -411,7 +420,7 @@ public final class MultiToolSupervisor {
             if (containsForbiddenGeneralText(text)) {
                 throw new IllegalArgumentException("模型文本不符合安全要求");
             }
-            emitUntil(Math.max(0, text.length() - TEXT_DELTA_HOLDBACK));
+            emitUntil(Math.max(0, text.length() - holdback));
         }
 
         private void complete() {
@@ -455,7 +464,14 @@ public final class MultiToolSupervisor {
         if (request.inheritedIntent() == AgentIntent.MOVIE || isExplicitMovieRequest(request.input())) {
             return AgentIntent.MOVIE;
         }
-        return modelGateway.classifyIntent(new IntentClassificationRequest(request.input()));
+        try {
+            AgentIntent classified = modelGateway.classifyIntent(new IntentClassificationRequest(request.input()));
+            // 网关实现或测试替身返回 null 时，也必须按不确定意图处理，不能扩大工具范围。
+            return classified == null ? AgentIntent.GENERAL_CHAT : classified;
+        } catch (RuntimeException exception) {
+            // 分类服务异常只允许安全降级为普通文本，不能让异常进入计划或工具执行路径。
+            return AgentIntent.GENERAL_CHAT;
+        }
     }
 
     private static boolean isExplicitMovieRequest(String input) {

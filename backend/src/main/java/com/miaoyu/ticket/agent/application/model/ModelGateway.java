@@ -26,4 +26,14 @@ public interface ModelGateway {
         Objects.requireNonNull(onTextDelta, "文本分片回调不能为空").accept(response.text());
         return response;
     }
+
+    /**
+     * 当前网关是否已经在每个回调前完成跨分片安全检查。
+     *
+     * <p>默认 {@code false}，使旧实现仍由主控保留尾部字符再下发；真实流式网关可显式返回
+     * {@code true}，避免同一段文本在两层各等待一次而延后首个可见字符。</p>
+     */
+    default boolean emitsValidatedTextDeltas() {
+        return false;
+    }
 }

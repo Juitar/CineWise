@@ -1,5 +1,5 @@
 import React from 'react';
-import { history, useParams } from 'umi';
+import { history, useLocation, useParams } from 'umi';
 import { PaymentResult } from '../../../features/payment-result/PaymentResult';
 import { useOrder, usePaymentResult } from '../../../modules/order/transaction-hooks';
 import { resolvePaymentResultStatus } from './payment-result-status';
@@ -9,10 +9,10 @@ import {
   buildPaymentPath,
 } from '../../../modules/order/routes';
 import {
-  ORDERS_BREADCRUMB_ITEM,
   PROFILE_BREADCRUMB_ITEM,
   TransactionBreadcrumb,
 } from '../../../features/transaction-breadcrumb/TransactionBreadcrumb';
+import { workspacePath } from '../../../modules/agent/workspaceRoute';
 import './index.css';
 
 /**
@@ -21,6 +21,7 @@ import './index.css';
  */
 export default function PaymentResultPage() {
   const { orderNo = '' } = useParams<{ orderNo: string }>();
+  const location = useLocation();
   const orderQuery = useOrder(orderNo);
   const paymentAction = usePaymentResult(orderNo);
   const status = resolvePaymentResultStatus(
@@ -35,8 +36,8 @@ export default function PaymentResultPage() {
         <TransactionBreadcrumb
           items={[
             PROFILE_BREADCRUMB_ITEM,
-            ORDERS_BREADCRUMB_ITEM,
-            { label: '订单详情', to: buildOrderDetailPath(orderNo) },
+            { label: '我的订单', to: workspacePath(location.pathname, '/orders') },
+            { label: '订单详情', to: workspacePath(location.pathname, buildOrderDetailPath(orderNo)) },
             { label: '支付结果' },
           ]}
         />
@@ -49,12 +50,12 @@ export default function PaymentResultPage() {
           onViewTicket={() => {
             const ticketId = paymentAction.payment?.ticketId;
             if (status === 'SUCCESS' && ticketId) {
-              history.push(buildElectronicTicketPath(ticketId));
+              history.push(workspacePath(location.pathname, buildElectronicTicketPath(ticketId)));
             }
           }}
-          onViewOrder={() => history.push(buildOrderDetailPath(orderNo))}
+          onViewOrder={() => history.push(workspacePath(location.pathname, buildOrderDetailPath(orderNo)))}
           onRetryQuery={() => void paymentAction.query()}
-          onRetryPay={() => history.push(buildPaymentPath(orderNo))}
+          onRetryPay={() => history.push(workspacePath(location.pathname, buildPaymentPath(orderNo)))}
         />
       </div>
     </div>

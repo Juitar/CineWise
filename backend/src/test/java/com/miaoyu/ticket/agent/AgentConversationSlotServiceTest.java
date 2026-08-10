@@ -12,6 +12,7 @@ import com.miaoyu.ticket.agent.application.persistence.AgentConversationSlotServ
 import com.miaoyu.ticket.agent.application.AgentCityCodeResolver;
 import com.miaoyu.ticket.agent.application.persistence.AgentMessageRepository;
 import com.miaoyu.ticket.agent.application.persistence.AgentSessionRepository;
+import com.miaoyu.ticket.agent.application.tool.MovieGenreResolutionTool;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessage;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessageRole;
 import com.miaoyu.ticket.agent.domain.persistence.AgentMessageStatus;
@@ -133,8 +134,50 @@ class AgentConversationSlotServiceTest {
                 .containsEntry("ticketCount", "2");
         assertThat(prepareAnswer("TICKET_COUNT", "2人", persistedContext()).values())
                 .containsEntry("ticketCount", "2");
+        assertThat(prepareAnswer("TICKET_COUNT", "一个", persistedContext()).values())
+                .containsEntry("ticketCount", "1");
+        assertThat(prepareAnswer("TICKET_COUNT", "1个", persistedContext()).values())
+                .containsEntry("ticketCount", "1");
+        assertThat(prepareAnswer("TICKET_COUNT", "two people", persistedContext()).values())
+                .containsEntry("ticketCount", "2");
         assertThat(prepareAnswer("TICKET_COUNT", "两张票吧", persistedContext()).values())
                 .containsEntry("ticketCount", "2");
+    }
+
+    @Test
+    void shouldNormalizeCommonExactAndWeekendDateAnswersWithoutRepeatedQuestions() {
+        assertThat(prepareAnswer("DATE", "今天", persistedContext()).values())
+                .containsEntry("date", "2026-08-07");
+        assertThat(prepareAnswer("DATE", "今晚", persistedContext()).values())
+                .containsEntry("date", "2026-08-07");
+        assertThat(prepareAnswer("DATE", "8.8", persistedContext()).values())
+                .containsEntry("date", "2026-08-08");
+        assertThat(prepareAnswer("DATE", "8月8日", persistedContext()).values())
+                .containsEntry("date", "2026-08-08");
+        assertThat(prepareAnswer("DATE", "八月八号", persistedContext()).values())
+                .containsEntry("date", "2026-08-08");
+        assertThat(prepareAnswer("DATE", "2026-08-08", persistedContext()).values())
+                .containsEntry("date", "2026-08-08");
+        assertThat(prepareAnswer("DATE", "本周周末", persistedContext()).values())
+                .containsEntry("date", "2026-08-08");
+        assertThat(prepareAnswer("DATE", "下周周末", persistedContext()).values())
+                .containsEntry("date", "2026-08-15");
+        assertThat(prepareAnswer("DATE", "我明天和两个人一起看", persistedContext()).values())
+                .containsEntry("date", "2026-08-08")
+                .containsEntry("ticketCount", "3");
+        assertThat(prepareAnswer("DATE", "我今天和一个人一起看", persistedContext()).values())
+                .containsEntry("date", "2026-08-07")
+                .containsEntry("ticketCount", "2");
+        assertThat(prepareAnswer("DATE", "我想看惊悚的", persistedContext()).values())
+                .containsEntry("genres", "[\"惊悚\"]");
+    }
+
+    @Test
+    void shouldRejectPastExactDateAnswers() {
+        assertThat(prepareAnswer("DATE", "8.6", persistedContext()).values())
+                .doesNotContainKey("date");
+        assertThat(prepareAnswer("DATE", "2026-08-06", persistedContext()).values())
+                .doesNotContainKey("date");
     }
 
     @Test
@@ -210,8 +253,14 @@ class AgentConversationSlotServiceTest {
 
     private static AgentConversationSlotService service(CurrentUserAccessor users, AgentSessionRepository sessions,
             AgentMessageRepository messages, AgentConversationSlotRepository slots) {
+        MovieGenreResolutionTool genres = mock(MovieGenreResolutionTool.class);
+        when(genres.resolve(org.mockito.ArgumentMatchers.anyString())).thenAnswer(invocation -> {
+            String input = invocation.getArgument(0, String.class);
+            return List.of("动作", "惊悚").stream().filter(input::contains).toList();
+        });
         return new AgentConversationSlotService(users, sessions, messages, slots, new ObjectMapper(),
-                Clock.fixed(Instant.parse("2026-08-07T02:00:00Z"), ZoneId.of("Asia/Shanghai")), cityResolver());
+                Clock.fixed(Instant.parse("2026-08-07T02:00:00Z"), ZoneId.of("Asia/Shanghai")), cityResolver(),
+                null, null, genres);
     }
 
     private static AgentCityCodeResolver cityResolver() {

@@ -30,6 +30,7 @@ export interface AgentDisplayItem {
   fields?: readonly { label: string; value: string }[];
   question?: {
     questionId: string;
+    kind?: string;
     options: readonly { optionId: string; label: string; value: string }[];
     allowFreeText: boolean;
     expiresAt: string;
@@ -263,6 +264,7 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
       fields: locationState ? [{ label: '位置授权', value: locationState }] : undefined,
       question: {
         questionId: event.payload.questionId as string,
+        kind: event.payload.questionKind as string,
         options: options.map((option) => ({
           optionId: option.optionId as string,
           label: option.label as string,
@@ -303,7 +305,6 @@ function typedCard(event: AgentEvent): AgentDisplayItem {
     const weather = event.payload.weather as Record<string, unknown> | null;
     const advice = event.payload.advice as readonly Record<string, unknown>[];
     const fields: Array<{ label: string; value: string }> = [
-      { label: '出行任务', value: event.payload.taskId as string },
       { label: '任务状态', value: event.payload.taskStatus as string },
     ];
     if (weather !== null) {
@@ -673,7 +674,19 @@ function itemFromHistory(message: AgentMessage): AgentDisplayItem | null {
     };
   }
   if (type === 'QUESTION') {
-    return { key: `message:${message.messageId}`, kind: 'question', text: message.text };
+    const questionKind = typeof payload.questionKind === 'string' ? payload.questionKind : null;
+    return {
+      key: `message:${message.messageId}`,
+      kind: 'question',
+      text: message.text,
+      question: questionKind === null ? undefined : {
+        questionId: typeof payload.questionId === 'string' ? payload.questionId : message.messageId,
+        kind: questionKind,
+        options: [],
+        allowFreeText: payload.allowFreeText !== false,
+        expiresAt: typeof payload.expiresAt === 'string' ? payload.expiresAt : '',
+      },
+    };
   }
   if (type === 'ERROR') {
     return {
@@ -694,6 +707,18 @@ export function buildProjectionFromHistory(
   sessionId: string,
   messages: readonly AgentMessage[],
 ): AgentProjection {
+  // 追问一旦被后续回答、方案或新请求覆盖，就只是审计历史，不应继续占据当前会话区。
+  // 否则用户进入选座再返回时会同时看到已过期的追问和新方案，误以为还需要补答。
+  const latestActionableQuestionMessageId = (() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message.type.toUpperCase() !== 'QUESTION') continue;
+      const hasLaterAssistantResult = messages.slice(index + 1).some((following) =>
+        following.role.toUpperCase() !== 'USER' && following.type.toUpperCase() !== 'PROGRESS');
+      if (!hasLaterAssistantResult) return message.messageId;
+    }
+    return null;
+  })();
   let latestPlanMessageId: string | null = null;
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
@@ -708,6 +733,12 @@ export function buildProjectionFromHistory(
   return {
     ...createAgentProjection(sessionId),
     items: messages.flatMap((message) => {
+      if (
+        message.type.toUpperCase() === 'QUESTION' &&
+        message.messageId !== latestActionableQuestionMessageId
+      ) {
+        return [];
+      }
       if (
         message.type.toUpperCase() === 'PLAN_CARD' &&
         typeof message.payload?.actionId !== 'string' &&
@@ -742,6 +773,14 @@ export function deduplicateConfirmationItems(projection: AgentProjection): Agent
     }
     items[previousIndex] = item;
     items[index] = null;
+  });
+  // 非确认方案卡是一次推荐的最终展示。SSE 断线恢复和历史快照可能同时带回同一结果，
+  // 此处只保留最后一张，避免用户看到连续重复的“推荐场次”卡片。
+  let latestPlanIndex: number | null = null;
+  items.forEach((item, index) => {
+    if (item?.kind !== 'plan-card' || item.confirmation) return;
+    if (latestPlanIndex !== null) items[latestPlanIndex] = null;
+    latestPlanIndex = index;
   });
   const deduplicatedItems = items.filter((item): item is AgentDisplayItem => item !== null);
   return deduplicatedItems.length === projection.items.length

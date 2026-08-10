@@ -3,6 +3,16 @@ import { defineConfig } from 'umi';
 export default defineConfig({
   hash: true,
   title: '妙语购票',
+  define: {
+    'process.env.AMAP_WEB_JS_KEY': JSON.stringify(
+      process.env.AMAP_WEB_JS_KEY ?? process.env.UMI_APP_AMAP_WEB_JS_KEY ?? '',
+    ),
+    'process.env.AMAP_WEB_SECURITY_JS_CODE': JSON.stringify(
+      process.env.AMAP_WEB_SECURITY_JS_CODE
+        ?? process.env.UMI_APP_AMAP_WEB_SECURITY_JS_CODE
+        ?? '',
+    ),
+  },
   proxy: {
     '/api': {
       target: process.env.CINEWISE_API_PROXY_TARGET ?? 'http://127.0.0.1:8080',
@@ -53,7 +63,7 @@ export default defineConfig({
           wrappers: ['@/shared/auth/RequireAuth'],
         },
         {
-          path: '/recommendations/:sessionId',
+          path: '/recommendations/:sessionId/plan',
           component: '@/pages/recommendations',
           wrappers: ['@/shared/auth/RequireAuth'],
         },
@@ -78,12 +88,32 @@ export default defineConfig({
           wrappers: ['@/shared/auth/RequireAuth'],
         },
         {
+          path: '/recommendations/:sessionId/orders',
+          component: '@/pages/recommendations',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
           path: '/recommendations/:sessionId/orders/:orderNo',
           component: '@/pages/recommendations',
           wrappers: ['@/shared/auth/RequireAuth'],
         },
         {
+          path: '/recommendations/:sessionId/payments/:orderNo/result',
+          component: '@/pages/recommendations',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
           path: '/recommendations/:sessionId/payments/:orderNo',
+          component: '@/pages/recommendations',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
+          path: '/recommendations/:sessionId/tickets/:ticketId',
+          component: '@/pages/recommendations',
+          wrappers: ['@/shared/auth/RequireAuth'],
+        },
+        {
+          path: '/recommendations/:sessionId',
           component: '@/pages/recommendations',
           wrappers: ['@/shared/auth/RequireAuth'],
         },

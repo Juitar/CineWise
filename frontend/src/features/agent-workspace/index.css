@@ -30,16 +30,13 @@
 .agent-session-item {
   display: flex;
   min-height: 52px;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 8px 12px;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 5px 4px 12px;
   border: 1px solid transparent;
   border-radius: 10px;
   background: #f7f8fb;
   color: #202634;
-  cursor: pointer;
-  text-align: left;
 }
 
 .agent-session-item.is-active {
@@ -47,9 +44,40 @@
   background: #f1efff;
 }
 
-.agent-session-item small {
+.agent-session-select {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  min-height: 42px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.agent-session-select > span {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-session-select small {
   margin-top: 3px;
   color: #7b8291;
+}
+
+.agent-session-delete {
+  flex: 0 0 auto;
+}
+
+.agent-session-delete svg {
+  width: 15px;
+  height: 15px;
 }
 
 .agent-workspace-main {
@@ -63,7 +91,10 @@
 
 .agent-workspace--recommendations {
   gap: 0;
-  min-height: calc(100vh - 72px);
+  height: calc(100vh - 72px);
+  height: calc(100dvh - 72px);
+  min-height: 0;
+  overflow: hidden;
   background: #f6f5fb;
 }
 
@@ -75,6 +106,7 @@
 
 .agent-workspace--recommendations .agent-workspace-main {
   width: min(35vw, 470px);
+  min-height: 0;
   flex: 0 0 min(35vw, 470px);
   gap: 14px;
   padding: 18px;
@@ -84,6 +116,7 @@
 
 .agent-workspace--recommendations .agent-message-area {
   min-height: 0;
+  overflow-y: auto;
 }
 
 .agent-recommendation-pane {
@@ -284,8 +317,9 @@
 
 .agent-recommendation-option {
   position: relative;
-  display: block;
+  display: flex;
   width: 100%;
+  gap: 16px;
   padding: 20px;
   border: 1px solid #e1e4ec;
   border-radius: 18px;
@@ -297,6 +331,29 @@
     border-color 0.2s ease,
     box-shadow 0.2s ease,
     transform 0.2s ease;
+}
+
+.agent-recommendation-option-poster {
+  display: grid;
+  width: 82px;
+  min-width: 82px;
+  height: 116px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #ece9f7;
+  color: #7568d5;
+}
+
+.agent-recommendation-option-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.agent-recommendation-option-content {
+  min-width: 0;
+  flex: 1;
 }
 
 .agent-recommendation-option:hover:not(:disabled) {
@@ -665,6 +722,350 @@
   text-align: center;
 }
 
+.agent-card-mobile-plan-link,
+.agent-card-mobile-plan-preview,
+.agent-mobile-return-link {
+  display: none;
+}
+
+/* 方案详情是工作区内的任务页，不使用票务独立页面的全站导航。 */
+.agent-plan-detail {
+  display: flex;
+  max-width: 1180px;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 18px;
+  margin: 0 auto;
+  padding: 24px 28px 36px;
+}
+
+.agent-task-header {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e7e3f1;
+}
+
+.agent-task-shell {
+  display: flex;
+  max-width: 1180px;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 18px;
+  margin: 0 auto;
+  padding: 24px 28px 36px;
+}
+
+/* 原票务页的全站面包屑会离开 Agent；任务区只保留统一步骤头部。 */
+.agent-workspace--recommendations .agent-task-shell .transaction-breadcrumb {
+  display: none;
+}
+
+.agent-task-back {
+  color: #5146bb;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.agent-task-steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #918ca3;
+  font-size: 13px;
+}
+
+.agent-task-steps span:not(:last-child)::after {
+  margin-left: 10px;
+  color: #c4bfce;
+  content: '›';
+}
+
+.agent-task-steps .is-current {
+  color: #584bdd;
+  font-weight: 800;
+}
+
+.agent-plan-detail-hero {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 24px;
+  padding: 22px;
+  border: 1px solid #e1dcf3;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 12px 34px rgba(54, 43, 110, 0.06);
+}
+
+.agent-plan-detail-poster {
+  min-height: 270px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #e9e6f6;
+}
+
+.agent-plan-detail-poster img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.agent-plan-detail-poster .agent-plan-detail-poster-skeleton {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: inherit;
+}
+
+.agent-plan-detail-poster .agent-plan-detail-poster-skeleton .ant-skeleton-image {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: inherit;
+  border-radius: 14px;
+}
+
+.agent-plan-detail-poster-fallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  place-items: center;
+  color: #756f88;
+}
+
+.agent-plan-detail-summary h1 {
+  margin: 10px 0 8px;
+  color: #252036;
+  font-size: clamp(28px, 3vw, 38px);
+  letter-spacing: -0.04em;
+}
+
+.agent-plan-detail-meta,
+.agent-plan-detail-description,
+.agent-plan-detail-show p,
+.agent-plan-location p,
+.agent-plan-detail-actions p {
+  margin: 0;
+  color: #6f6a80;
+  line-height: 1.65;
+}
+
+.agent-plan-detail-rating {
+  margin: 12px 0;
+  color: #d27a19;
+  font-weight: 800;
+}
+
+.agent-plan-detail-description {
+  max-width: 720px;
+  margin-top: 14px;
+}
+
+.agent-plan-detail-section,
+.agent-plan-location {
+  padding: 20px 22px;
+  border: 1px solid #e7e3f1;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.agent-section-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: #7567db;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.agent-plan-detail-section h2,
+.agent-plan-location h2 {
+  margin: 0 0 10px;
+  color: #2e2940;
+  font-size: 20px;
+}
+
+.agent-plan-detail-show {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-color: #d9d2ff;
+  background: #fbfaff;
+}
+
+.agent-plan-detail-price {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.agent-plan-detail-price strong {
+  color: #4e3fd3;
+  font-size: 30px;
+}
+
+.agent-plan-detail-price span {
+  color: #847d98;
+  font-size: 12px;
+}
+
+.agent-plan-detail-reasons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 24px;
+  margin: 0;
+  padding-left: 20px;
+  color: #4d4760;
+  line-height: 1.6;
+}
+
+.agent-plan-detail-reasons li::marker {
+  color: #6b5ce7;
+}
+
+.agent-plan-location {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.1fr);
+  align-items: stretch;
+  gap: 20px;
+}
+
+.agent-plan-location-map-shell {
+  min-width: 0;
+}
+
+.agent-plan-location-map {
+  position: relative;
+  display: grid;
+  min-height: 160px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #dce5e9;
+  border-radius: 14px;
+  background-color: #eef4f2;
+  background-image:
+    linear-gradient(
+      30deg,
+      transparent 46%,
+      rgba(137, 170, 160, 0.17) 47%,
+      rgba(137, 170, 160, 0.17) 53%,
+      transparent 54%
+    ),
+    linear-gradient(
+      120deg,
+      transparent 46%,
+      rgba(137, 170, 160, 0.15) 47%,
+      rgba(137, 170, 160, 0.15) 53%,
+      transparent 54%
+    );
+}
+
+.agent-plan-location-map--empty {
+  color: #66717a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.agent-plan-location-map span {
+  padding: 7px 10px;
+  border: 1px solid rgba(91, 105, 115, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.76);
+  color: #66717a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.agent-plan-location-map-action {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 9px;
+  color: #716c81;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.agent-plan-location-map-action .ant-btn {
+  flex: 0 0 auto;
+}
+
+.agent-plan-location-note {
+  margin-top: 10px !important;
+  color: #8a839b !important;
+  font-size: 13px;
+}
+
+.agent-plan-alternative-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agent-plan-alternative {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 14px;
+  padding: 13px 14px;
+  border: 1px solid #e4e0ef;
+  border-radius: 12px;
+  background: #fdfcff;
+  color: #3d374e;
+  text-decoration: none;
+}
+
+.agent-plan-alternative:hover {
+  border-color: #9486eb;
+  background: #f7f5ff;
+}
+
+.agent-plan-alternative span:last-of-type {
+  color: #777084;
+  font-size: 12px;
+}
+
+.agent-plan-alternative strong {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: #5144c7;
+}
+
+.agent-plan-detail-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-bottom: 10px;
+}
+
+.agent-plan-detail-primary {
+  display: inline-flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 28px;
+  border-radius: 13px;
+  background: #5d4ed4;
+  box-shadow: 0 10px 20px rgba(86, 67, 190, 0.2);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.agent-plan-detail-primary:hover {
+  background: #4f40c5;
+  color: #fff;
+}
+
 @media (max-width: 1023px) {
   .agent-workspace {
     min-height: calc(100vh - 112px);
@@ -675,7 +1076,9 @@
   }
 
   .agent-workspace--recommendations {
+    height: auto;
     display: block;
+    overflow: visible;
   }
 
   .agent-workspace-business-pane {
@@ -702,6 +1105,24 @@
     overflow: visible;
   }
 
+  .agent-plan-detail {
+    padding: 18px 14px 30px;
+  }
+
+  .agent-task-shell {
+    padding: 18px 14px 30px;
+  }
+
+  .agent-plan-detail-hero {
+    grid-template-columns: 142px minmax(0, 1fr);
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .agent-plan-detail-poster {
+    min-height: 210px;
+  }
+
   .agent-recommendation-header h1 {
     font-size: 23px;
   }
@@ -709,6 +1130,12 @@
   .agent-recommendation-option {
     min-height: 44px;
     padding: 16px;
+  }
+
+  .agent-recommendation-option-poster {
+    width: 68px;
+    min-width: 68px;
+    height: 96px;
   }
 
   .agent-workspace-header {
@@ -743,5 +1170,285 @@
 
   .agent-confirmation-actions .ant-btn {
     min-height: 44px;
+  }
+}
+
+/* 手机端只保留一列 Agent 对话；方案和票务操作进入 Agent 内的二级业务页。 */
+@media (max-width: 767px) {
+  .agent-workspace--recommendations {
+    display: flex;
+    height: calc(100dvh - 72px);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .agent-workspace--recommendations .agent-workspace-business-pane {
+    display: none;
+  }
+
+  .agent-workspace--recommendations .agent-workspace-main {
+    display: flex;
+    width: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+    gap: 10px;
+    padding: 14px 12px max(12px, env(safe-area-inset-bottom));
+    border: 0;
+  }
+
+  .agent-workspace--recommendations .agent-workspace-header {
+    min-height: 52px;
+    align-items: center;
+    flex-direction: row;
+    padding: 0 2px 10px;
+  }
+
+  .agent-workspace--recommendations .agent-workspace-brand {
+    gap: 8px;
+  }
+
+  .agent-workspace--recommendations .agent-workspace-brand-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 13px;
+  }
+
+  .agent-workspace--recommendations .agent-workspace-header h2 {
+    max-width: 176px;
+    margin: 0 0 3px;
+    overflow: hidden;
+    font-size: 18px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .agent-workspace--recommendations .agent-workspace-status {
+    font-size: 11px;
+  }
+
+  .agent-workspace--recommendations .agent-workspace-actions {
+    width: auto;
+    flex-wrap: nowrap;
+    gap: 2px;
+  }
+
+  .agent-workspace--recommendations .agent-workspace-actions .ant-btn {
+    width: 40px;
+    min-height: 40px;
+  }
+
+  .agent-workspace--recommendations .agent-history-collapse {
+    flex: 0 0 auto;
+  }
+
+  .agent-workspace--recommendations .agent-history-collapse .agent-session-list {
+    max-height: min(42dvh, 320px);
+  }
+
+  .agent-workspace--recommendations .agent-message-area {
+    min-height: 0;
+    padding: 8px 2px;
+  }
+
+  .agent-workspace--recommendations .agent-message-list {
+    gap: 10px;
+    padding: 0 2px 8px;
+  }
+
+  .agent-workspace--recommendations .agent-message-item {
+    max-width: 90%;
+    border-radius: 16px;
+  }
+
+  .agent-workspace--recommendations .agent-composer {
+    flex: 0 0 auto;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 16px;
+    box-shadow: 0 -10px 28px rgba(68, 52, 121, 0.06);
+  }
+
+  .agent-workspace--recommendations .agent-composer .ant-btn {
+    min-width: 58px;
+    min-height: 44px;
+  }
+
+  .agent-card-mobile-plan-link {
+    display: inline-flex;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: #635bff;
+    color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .agent-card-mobile-plan-preview {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .agent-card-mobile-plan-option {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    min-height: 128px;
+    flex-direction: column;
+    gap: 5px;
+    padding: 10px;
+    overflow: hidden;
+    border: 1px solid #e1dfff;
+    border-radius: 12px;
+    background: #faf9ff;
+    color: #26233a;
+    text-decoration: none;
+  }
+
+  .agent-card-mobile-plan-option > span {
+    color: #6759d6;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .agent-card-mobile-plan-option > strong,
+  .agent-card-mobile-plan-option > small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .agent-card-mobile-plan-option > strong {
+    font-size: 13px;
+  }
+
+  .agent-card-mobile-plan-option > small {
+    color: #737082;
+    font-size: 11px;
+  }
+
+  .agent-card-mobile-plan-option > b {
+    margin-top: auto;
+    color: #443a9b;
+    font-size: 14px;
+  }
+
+  .agent-task-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .agent-task-steps {
+    width: 100%;
+    justify-content: space-between;
+    gap: 4px;
+    font-size: 11px;
+  }
+
+  .agent-task-steps span:not(:last-child)::after {
+    margin-left: 4px;
+  }
+
+  .agent-plan-detail-hero {
+    grid-template-columns: 104px minmax(0, 1fr);
+    gap: 13px;
+    padding: 13px;
+  }
+
+  .agent-plan-detail-poster {
+    min-height: 154px;
+  }
+
+  .agent-plan-detail-summary h1 {
+    font-size: 24px;
+  }
+
+  .agent-plan-detail-description {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .agent-plan-detail-show {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .agent-plan-detail-price {
+    align-items: flex-start;
+  }
+
+  .agent-plan-detail-reasons,
+  .agent-plan-alternative-list,
+  .agent-plan-location {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-plan-location-map {
+    min-height: 150px;
+  }
+
+  .agent-plan-detail-primary {
+    align-self: stretch;
+  }
+
+  .agent-workspace--recommendations.agent-workspace--mobile-business-detail
+    .agent-workspace-business-pane {
+    position: fixed;
+    z-index: 30;
+    inset: 0;
+    display: flex;
+    min-height: 100dvh;
+    flex-direction: column;
+    overflow-y: auto;
+    background: #f6f5fb;
+    animation: agent-task-sheet-enter 180ms ease-out;
+  }
+
+  .agent-mobile-return-link {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    align-self: flex-start;
+    margin: 12px 14px 0;
+    padding: 0 12px;
+    border: 1px solid #e1dfff;
+    border-radius: 10px;
+    color: #594bd1;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .agent-workspace--recommendations.agent-workspace--mobile-business-detail
+    .agent-recommendation-pane,
+  .agent-workspace--recommendations.agent-workspace--mobile-business-detail .agent-discovery-pane {
+    padding: 18px 14px calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .agent-workspace--recommendations.agent-workspace--mobile-business-detail .agent-plan-detail {
+    padding: 16px 14px calc(30px + env(safe-area-inset-bottom));
+  }
+
+  .agent-workspace--recommendations.agent-workspace--mobile-business-detail .agent-task-shell {
+    padding: 16px 14px calc(30px + env(safe-area-inset-bottom));
+  }
+
+  @keyframes agent-task-sheet-enter {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }

@@ -9,6 +9,7 @@ import com.miaoyu.ticket.content.application.ContentResult;
 import com.miaoyu.ticket.content.domain.ContentFallbackType;
 import com.miaoyu.ticket.content.domain.ContentItem;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -31,10 +32,14 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class RedisContentCacheAdapter implements ContentCachePort {
 
+    private static final long FAILURE_COOLDOWN_NANOS = Duration.ofSeconds(30).toNanos();
+
     private final StringRedisTemplate redisTemplate;
     private final ContentResultCodec codec;
     private final ContentProperties properties;
     private final Clock clock;
+    /** Redis 只是加速层；连续故障期间直接走 MySQL 快照，避免每次页面请求重复等待连接超时。 */
+    private volatile long redisDisabledUntilNanos;
 
     /** Clock 与查询服务共用，防止缓存边界在不同服务器时区下判断不一致。 */
     /** Codec 只处理标准内容，Redis 不需要了解影片和影院的业务字段。 */
@@ -53,6 +58,9 @@ public class RedisContentCacheAdapter implements ContentCachePort {
      */
     @Override
     public Optional<ContentResult<List<? extends ContentItem>>> find(ContentQuery query) {
+        if (System.nanoTime() < redisDisabledUntilNanos) {
+            return Optional.empty();
+        }
         try {
             String payload = redisTemplate.opsForValue().get(ContentCacheKeyFactory.create(query));
             if (payload == null) {
@@ -70,6 +78,7 @@ public class RedisContentCacheAdapter implements ContentCachePort {
             return Optional.of(current);
         } catch (DataAccessException | IllegalStateException exception) {
             // 包括连接断开和损坏 JSON，统一让调用方继续走快照。
+            redisDisabledUntilNanos = System.nanoTime() + FAILURE_COOLDOWN_NANOS;
             return Optional.empty();
         }
     }
@@ -81,12 +90,16 @@ public class RedisContentCacheAdapter implements ContentCachePort {
      */
     @Override
     public void save(ContentQuery query, ContentResult<List<? extends ContentItem>> result) {
+        if (System.nanoTime() < redisDisabledUntilNanos) {
+            return;
+        }
         // 由配置控制 TTL，部署环境无需重新编译即可调整缓存占用。
         try {
             redisTemplate.opsForValue().set(
                     ContentCacheKeyFactory.create(query), codec.write(result), properties.cacheTtl());
         } catch (DataAccessException | IllegalStateException ignored) {
             // Redis 是可选加速层，写失败不可改变内容查询结果。
+            redisDisabledUntilNanos = System.nanoTime() + FAILURE_COOLDOWN_NANOS;
         }
     }
 }

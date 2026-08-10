@@ -139,8 +139,8 @@ class DeepSeekModelGatewayTest {
         HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
         server.createContext("/chat/completions", exchange -> {
             body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            byte[] response = ("data: {\"choices\":[{\"delta\":{\"content\":\"你好，\"}}]}\n\n"
-                    + "data: {\"choices\":[{\"delta\":{\"content\":\"想看什么电影？\"}}]}\n\n"
+            byte[] response = ("data: {\"choices\":[{\"delta\":{\"content\":\"你好，我可以帮你找电影，也可以查询场次，\"}}]}\n\n"
+                    + "data: {\"choices\":[{\"delta\":{\"content\":\"说说你的需求。\"}}]}\n\n"
                     + "data: [DONE]\n\n").getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
             exchange.sendResponseHeaders(200, 0);
@@ -160,8 +160,9 @@ class DeepSeekModelGatewayTest {
             var reply = gateway.generateReplyStream(new ReplyGenerationRequest(
                     "request-stream", "你好", AgentReplyMessageType.TEXT, new TextReplyFacts()), deltas::add);
 
-            assertThat(reply.text()).isEqualTo("你好，想看什么电影？");
+            assertThat(reply.text()).isEqualTo("你好，我可以帮你找电影，也可以查询场次，说说你的需求。");
             assertThat(String.join("", deltas)).isEqualTo(reply.text());
+            assertThat(deltas).hasSizeGreaterThanOrEqualTo(2);
             assertThat(body.get()).contains("\"stream\":true").doesNotContain("json_object");
         } finally {
             server.stop(0);

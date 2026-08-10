@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 
 import com.miaoyu.ticket.agent.application.model.ModelGateway;
 import com.miaoyu.ticket.agent.application.model.AgentIntent;
+import com.miaoyu.ticket.agent.application.model.PlanGenerationRequest;
 import com.miaoyu.ticket.agent.application.model.PlanGenerationResponse;
 import com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse;
 import com.miaoyu.ticket.agent.application.reply.AgentReplyMessageType;
@@ -72,6 +73,58 @@ class MultiToolSupervisorTest {
         assertThat(result.safeNextAction()).isEqualTo("GENERAL_CHAT");
         assertThat(result.generatedReply().messageType()).isEqualTo(AgentReplyMessageType.TEXT);
         Mockito.verify(gateway, never()).generatePlan(any());
+        Mockito.verify(adapter, never()).execute(any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class));
+    }
+
+    @Test
+    void shouldForwardValidatedGeneralChatDeltasWithoutASecondHoldback() {
+        ToolRegistry registry = new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan()));
+        PlanSchemaValidator validator = new PlanSchemaValidator(registry);
+        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry);
+        RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
+        when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
+        when(adapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
+        ModelGateway gateway = new ModelGateway() {
+            @Override
+            public AgentIntent classifyIntent(com.miaoyu.ticket.agent.application.model.IntentClassificationRequest request) {
+                return AgentIntent.GENERAL_CHAT;
+            }
+
+            @Override
+            public PlanGenerationResponse generatePlan(PlanGenerationRequest request) {
+                throw new AssertionError("普通对话不应生成计划");
+            }
+
+            @Override
+            public ReplyGenerationResponse generateReply(
+                    com.miaoyu.ticket.agent.application.model.ReplyGenerationRequest request) {
+                return new ReplyGenerationResponse("你好，想看什么电影？", AgentReplyMessageType.TEXT,
+                        new TextReplyFacts());
+            }
+
+            @Override
+            public ReplyGenerationResponse generateReplyStream(
+                    com.miaoyu.ticket.agent.application.model.ReplyGenerationRequest request,
+                    java.util.function.Consumer<String> onTextDelta) {
+                onTextDelta.accept("你好，");
+                onTextDelta.accept("想看什么电影？");
+                return generateReply(request);
+            }
+
+            @Override
+            public boolean emitsValidatedTextDeltas() {
+                return true;
+            }
+        };
+        MultiToolSupervisor supervisor = new MultiToolSupervisor(gateway, registry, validator, stateMachine,
+                List.of(adapter));
+        List<String> deltas = new java.util.ArrayList<>();
+
+        supervisor.run(new MultiToolSupervisorRequest(
+                "general-stream", "你好", context(), "run-general-stream", "trace-general-stream", 3_000L),
+                deltas::add);
+
+        assertThat(deltas).containsExactly("你好，", "想看什么电影？");
         Mockito.verify(adapter, never()).execute(any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class));
     }
 
@@ -194,6 +247,32 @@ class MultiToolSupervisorTest {
                 "null-intent", "这啥", context(), "run-null", "trace-null", 3_000L));
 
         assertThat(result.generatedReply().messageType()).isEqualTo(AgentReplyMessageType.TEXT);
+        Mockito.verify(gateway, never()).generatePlan(any());
+        Mockito.verify(adapter, never()).execute(any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class));
+    }
+
+    @Test
+    void shouldTreatIntentClassificationFailureAsGeneralChatWithoutPlanOrTool() {
+        ToolRegistry registry = new ToolRegistry(List.of(
+                AgentToolDefinitions.rankMoviePlan(), AgentToolDefinitions.getTravelAdvice()));
+        PlanSchemaValidator validator = new PlanSchemaValidator(registry);
+        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry);
+        ModelGateway gateway = Mockito.mock(ModelGateway.class);
+        when(gateway.classifyIntent(any())).thenThrow(new IllegalStateException("provider timeout"));
+        when(gateway.generateReply(any())).thenReturn(new ReplyGenerationResponse(
+                "我可以帮你找电影。", AgentReplyMessageType.TEXT, new TextReplyFacts()));
+        RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
+        when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
+        when(adapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
+        MultiToolSupervisor supervisor = new MultiToolSupervisor(gateway, registry, validator, stateMachine,
+                List.of(adapter));
+
+        var result = supervisor.run(new MultiToolSupervisorRequest(
+                "intent-failure", "这啥", context(), "run-intent-failure", "trace-intent-failure", 3_000L));
+
+        assertThat(result.safeNextAction()).isEqualTo("GENERAL_CHAT");
+        assertThat(result.generatedReply().messageType()).isEqualTo(AgentReplyMessageType.TEXT);
+        assertThat(result.toolResults()).isEmpty();
         Mockito.verify(gateway, never()).generatePlan(any());
         Mockito.verify(adapter, never()).execute(any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class));
     }
