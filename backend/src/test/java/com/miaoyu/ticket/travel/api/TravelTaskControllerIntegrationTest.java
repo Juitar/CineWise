@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.miaoyu.ticket.auth.application.CurrentUser;
 import com.miaoyu.ticket.auth.application.RoleCode;
 import com.miaoyu.ticket.order.event.PaymentSucceededEvent;
+import com.miaoyu.ticket.travel.TravelTestProfileConsentConfiguration;
 import com.miaoyu.ticket.travel.application.TravelAdviceService;
 import com.miaoyu.ticket.travel.application.TravelErrorCode;
 import com.miaoyu.ticket.travel.application.TravelTaskApplicationService;
@@ -26,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -41,6 +43,7 @@ import org.springframework.test.web.servlet.MockMvc;
     "cinewise.transaction.refunded-travel-reconciliation.enabled=false",
     "management.health.redis.enabled=false"
 })
+@Import(TravelTestProfileConsentConfiguration.class)
 @AutoConfigureMockMvc
 class TravelTaskControllerIntegrationTest {
 

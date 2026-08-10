@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.miaoyu.ticket.order.event.OrderInvalidated;
 import com.miaoyu.ticket.order.event.PaymentSucceededEvent;
+import com.miaoyu.ticket.travel.TravelTestProfileConsentConfiguration;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -37,6 +39,7 @@ import org.springframework.transaction.support.TransactionTemplate;
     "cinewise.transaction.refunded-travel-reconciliation.enabled=false",
     "management.health.redis.enabled=false"
 })
+@Import(TravelTestProfileConsentConfiguration.class)
 class TravelTaskPaymentEventIntegrationTest {
 
     private static final String REQUIRED_DATABASE = "cinewise_ticketing_concurrency_check";

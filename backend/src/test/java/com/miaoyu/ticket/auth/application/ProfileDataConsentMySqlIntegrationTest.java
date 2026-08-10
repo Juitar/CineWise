@@ -4,12 +4,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.miaoyu.ticket.profile.application.ProfileDataConsentWithdrawnEvent;
+import com.miaoyu.ticket.profile.application.ProfileDataConsentSnapshot;
 import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +31,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.ContextConfiguration;
 
@@ -50,6 +59,7 @@ class ProfileDataConsentMySqlIntegrationTest {
     private static final long SUCCESS_USER_ID = 9_717_000_001L;
     private static final long ROLLBACK_USER_ID = 9_717_000_002L;
     private static final long CAS_USER_ID = 9_717_000_003L;
+    private static final long CONCURRENCY_USER_ID = 9_717_000_004L;
     private static final long PREEXISTING_OUTBOX_ID = 9_717_100_001L;
     private static final LocalDateTime GRANTED_AT = LocalDateTime.of(2026, 8, 7, 0, 0);
 
@@ -64,6 +74,9 @@ class ProfileDataConsentMySqlIntegrationTest {
 
     @Autowired
     private ProfileDataConsentOutboxDeliveryService deliveryService;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Autowired
     private ControllablePublisher publisher;
@@ -155,6 +168,63 @@ class ProfileDataConsentMySqlIntegrationTest {
                 CAS_USER_ID)).isZero();
     }
 
+    @Test
+    void shouldBlockRegrantUntilWithdrawalCleanupTransactionReleasesConsentLock() throws Exception {
+        insertGranted(CONCURRENCY_USER_ID);
+        consentService.withdraw(CONCURRENCY_USER_ID);
+        ProfileDataConsentWithdrawnEvent event = publisher.publishedEvents().isEmpty()
+                ? withdrawalEventFromOutbox(CONCURRENCY_USER_ID)
+                : publisher.publishedEvents().getFirst();
+        CountDownLatch cleanupEntered = new CountDownLatch(1);
+        CountDownLatch releaseCleanup = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Boolean> withdrawal = executor.submit(() -> new TransactionTemplate(transactionManager)
+                    .execute(status -> consentService.executeIfCurrent(event, () -> {
+                        cleanupEntered.countDown();
+                        await(releaseCleanup);
+                    })));
+            assertThat(cleanupEntered.await(5, TimeUnit.SECONDS)).isTrue();
+
+            Future<ProfileDataConsentSnapshot> regrant = executor.submit(
+                    () -> consentService.grant(CONCURRENCY_USER_ID, "2026-08"));
+            assertThatThrownBy(() -> regrant.get(300, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
+
+            releaseCleanup.countDown();
+            assertThat(withdrawal.get(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(regrant.get(5, TimeUnit.SECONDS).granted()).isTrue();
+            assertThat(consentState(CONCURRENCY_USER_ID)).containsExactly("GRANTED", 3L, 6L);
+        } finally {
+            releaseCleanup.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    private ProfileDataConsentWithdrawnEvent withdrawalEventFromOutbox(long userId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT event_id, user_id, consent_version, consent_record_version,
+                       occurred_at, trace_id
+                  FROM sys_profile_data_consent_outbox
+                 WHERE user_id = ?
+                """, (resultSet, rowNum) -> new ProfileDataConsentWithdrawnEvent(
+                resultSet.getString("event_id"),
+                resultSet.getLong("user_id"),
+                resultSet.getLong("consent_version"),
+                resultSet.getLong("consent_record_version"),
+                resultSet.getTimestamp("occurred_at").toInstant(),
+                resultSet.getString("trace_id")), userId);
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("等待并发测试释放信号时被中断", exception);
+        }
+    }
+
     private void insertGranted(long userId) {
         jdbcTemplate.update("""
                 INSERT INTO sys_profile_data_consent (
@@ -195,12 +265,12 @@ class ProfileDataConsentMySqlIntegrationTest {
     private void cleanupFixtures() {
         jdbcTemplate.update("""
                 DELETE FROM sys_profile_data_consent_outbox
-                 WHERE user_id IN (?, ?, ?)
-                """, SUCCESS_USER_ID, ROLLBACK_USER_ID, CAS_USER_ID);
+                 WHERE user_id IN (?, ?, ?, ?)
+                """, SUCCESS_USER_ID, ROLLBACK_USER_ID, CAS_USER_ID, CONCURRENCY_USER_ID);
         jdbcTemplate.update("""
                 DELETE FROM sys_profile_data_consent
-                 WHERE user_id IN (?, ?, ?)
-                """, SUCCESS_USER_ID, ROLLBACK_USER_ID, CAS_USER_ID);
+                 WHERE user_id IN (?, ?, ?, ?)
+                """, SUCCESS_USER_ID, ROLLBACK_USER_ID, CAS_USER_ID, CONCURRENCY_USER_ID);
     }
 
     @TestConfiguration(proxyBeanMethods = false)

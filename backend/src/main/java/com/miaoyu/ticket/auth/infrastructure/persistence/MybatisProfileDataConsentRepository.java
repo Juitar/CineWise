@@ -22,6 +22,11 @@ public class MybatisProfileDataConsentRepository implements ProfileDataConsentRe
   }
 
   @Override
+  public Optional<ConsentRecord> findByUserIdForUpdate(long userId) {
+    return Optional.ofNullable(mapper.findByUserIdForUpdate(userId)).map(this::toRecord);
+  }
+
+  @Override
   public void insertGranted(long id, long userId, String privacyPolicyVersion, Instant now) {
     if (mapper.insertGranted(id, userId, privacyPolicyVersion, toLocal(now)) != 1) {
       throw new IllegalStateException("画像数据保存同意写入行数异常");
