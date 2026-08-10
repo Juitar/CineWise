@@ -1,0 +1,28 @@
+# auth-page-navigation Specification
+
+## Purpose
+TBD - created by archiving change fix-privacy-register-navigation. Update Purpose after archive.
+## Requirements
+### Requirement: 隐私政策页返回来源页面
+
+隐私政策页 SHALL 显示文案为“返回”的操作，并通过浏览历史回到用户进入该页前的页面，不得将来源固定为注册页。
+
+#### Scenario: 用户从注册页查看隐私政策
+
+- **WHEN** 用户从注册页进入隐私政策页并点击“返回”
+- **THEN** 页面回到注册页
+
+#### Scenario: 用户从其他页面查看隐私政策
+
+- **WHEN** 用户从个人中心或其他站内页面进入隐私政策页并点击“返回”
+- **THEN** 页面回到对应来源页面，不跳转到注册页
+
+### Requirement: 移动端注册页提供首页入口
+
+注册页 SHALL 在桌面端和移动端均显示文案为“返回首页”的链接，并跳转到 `/`。移动端入口的触控高度 SHALL 不小于 44px。
+
+#### Scenario: 用户在移动端打开注册页
+
+- **WHEN** 页面宽度小于 1024px
+- **THEN** 注册页头部显示“返回首页”链接，点击后进入 `/`
+

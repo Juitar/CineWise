@@ -1,0 +1,88 @@
+# cinema-detail-purchase-entry Specification
+
+## Purpose
+TBD - created by archiving change cinema-detail-purchase-entry. Update Purpose after archive.
+## Requirements
+### Requirement: 影院列表必须提供可访问的详情入口
+
+系统 SHALL 将影院列表卡片作为指向 `/cinemas/:cinemaId` 的语义化链接。链接必须使用 API 返回的影院内部 ID，支持键盘访问和新标签页打开，不得使用只有鼠标点击事件的 `div`。
+
+#### Scenario: 用户从长沙影院列表进入详情
+
+- **GIVEN** `/cinemas` 已展示 API 返回的长沙影院
+- **WHEN** 用户点击影院卡片或通过键盘激活链接
+- **THEN** 浏览器进入对应 `/cinemas/:cinemaId`
+- **AND** 页面刷新后根据 URL 中的 `cinemaId` 重新查询，不依赖列表页内存状态
+
+### Requirement: 影院详情必须分别处理基础资料和排期状态
+
+系统 SHALL 在 `/cinemas/:cinemaId` 并行读取影院详情和可售影片。影院区域展示名称、区域、地址、内容来源和更新时间；影片区域展示标题、海报、场次数、最近开场时间、排期来源和数据时间。两个请求的加载、失败和重试状态必须相互独立。
+
+#### Scenario: 影院详情和可售影片均成功
+
+- **GIVEN** 影院详情接口和可售影片接口均返回成功
+- **WHEN** 用户打开影院详情页
+- **THEN** 页面展示影院基础资料及未来可售影片
+- **AND** 不展示服务端未返回的距离、路线、起价、余座或影厅标签
+
+#### Scenario: 影院不存在
+
+- **GIVEN** 影院详情接口返回 HTTP 404
+- **WHEN** 页面处理该响应
+- **THEN** 页面显示“影院不存在或已下线”
+- **AND** 提供返回影院列表的链接，不把可售影片响应当作有效影院详情
+
+#### Scenario: 排期请求失败但影院详情成功
+
+- **GIVEN** 影院详情已经成功，且可售影片请求失败
+- **WHEN** 页面完成本次加载
+- **THEN** 页面保留影院基础资料，在影片区域说明加载失败并提供单独重试
+- **AND** 不用旧排期、写死影片或推断价格填充失败区域
+
+#### Scenario: 影院没有未来可售影片
+
+- **GIVEN** 影院详情成功且可售影片接口返回 `movies=[]`
+- **WHEN** 页面渲染影片区域
+- **THEN** 页面保留影院详情并显示“未来 7 天暂无可售影片”
+- **AND** 不显示价格、余座或购票按钮
+
+#### Scenario: 快速切换影院产生响应竞态
+
+- **GIVEN** 用户在前一个影院请求完成前进入另一个影院 URL
+- **WHEN** 前一个影院的响应晚于当前请求返回
+- **THEN** 页面只展示当前 URL 对应影院的数据
+- **AND** 旧响应不得覆盖当前影院详情或影片列表
+
+### Requirement: 演示排期必须在页面明确标识
+
+页面 SHALL 分别展示可售影片响应中的内容资料来源和排期来源。`scheduleSource` 为 `demo-seed` 或其他 Mock 来源时必须显示“演示排期”；`contentSource/contentDataTime` 与 `scheduleSource/scheduleDataTime` 必须分别说明，不得合并描述为真实可售排期或实时库存。
+
+#### Scenario: LIVE 影院返回 demo-seed 排期
+
+- **GIVEN** 影院和影片基础资料来源为 LIVE，`scheduleSource` 为 `demo-seed`
+- **WHEN** 页面展示该影片入口
+- **THEN** 影院资料继续显示其真实内容来源
+- **AND** 影片区域明确显示“演示排期”，不称为真实排期或实时库存
+
+### Requirement: 选择影片后必须进入现有购票流程并重新查询
+
+系统 SHALL 将可售影片入口指向 `/shows?movieId={movieId}&cinemaId={cinemaId}`。演示排期允许继续完成选场次、选座、建单和模拟支付；详情页的场次数和最近开场时间只用于选择提示，场次页、选座页和建单接口必须重新读取服务端状态，不得信任详情页快照。
+
+#### Scenario: 用户选择有可售排期的影片
+
+- **GIVEN** 影院详情页展示一部可选影片
+- **WHEN** 用户激活该影片的购票入口
+- **THEN** 浏览器进入包含对应 `movieId` 和 `cinemaId` 的 `/shows` URL
+- **AND** 现有场次页重新请求可售场次，后续选座和建单继续重新校验价格、状态与库存
+
+### Requirement: PC 和移动端必须共享查询实现并可正常操作
+
+系统 SHALL 在 PC 和移动端共享同一套 API、DTO、Hook 和状态处理，只调整页面布局。移动端触控目标不得小于 44px，键盘访问必须保留可见焦点，海报缺失或加载失败时必须显示占位。
+
+#### Scenario: 用户在移动端打开影院详情
+
+- **GIVEN** 用户使用窄屏设备访问影院详情页
+- **WHEN** 影院资料和影片列表加载完成
+- **THEN** 页面不发生阻塞主要操作的横向溢出
+- **AND** 返回、重试和影片入口均可通过不小于 44px 的触控目标操作
+
