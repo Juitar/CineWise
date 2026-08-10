@@ -34,20 +34,17 @@ interface AMapApi {
   }) => AMapMarker;
 }
 
-interface AMapLoaderApi {
-  load(options: { key: string; version: '2.0' }): Promise<AMapApi>;
-}
-
 declare global {
   interface Window {
     AMap?: AMapApi;
-    AMapLoader?: AMapLoaderApi;
     _AMapSecurityConfig?: { securityJsCode: string };
+    __cinewiseAmapReady?: () => void;
   }
 }
 
 let amapPromise: Promise<AMapApi> | null = null;
 const deviceLocationBySession = new Map<string, DeviceCoordinates>();
+const AMAP_READY_CALLBACK = '__cinewiseAmapReady';
 
 class CinemaLocationMapError extends Error {}
 
@@ -76,53 +73,59 @@ export function loadAmap(): Promise<AMapApi> {
 
   const pendingLoad = new Promise<AMapApi>((resolve, reject) => {
     window._AMapSecurityConfig = { securityJsCode };
-    let existing = document.getElementById('cinewise-amap-loader') as HTMLScriptElement | null;
+    let existing = document.getElementById('cinewise-amap-script') as HTMLScriptElement | null;
     // 失败的 script 节点不会再次触发 load/error；移除后允许本次进入详情页重新请求。
-    if (existing && !window.AMapLoader?.load) {
+    if (existing && !window.AMap?.Map) {
       existing.remove();
       existing = null;
     }
-    const initializeMap = () => {
-      if (!window.AMapLoader?.load) {
-        reject(new CinemaLocationMapError('地图服务初始化失败'));
-        return;
+    const resolveMap = () => {
+      if (window.AMap?.Map) {
+        resolve(window.AMap);
+      } else {
+        reject(new CinemaLocationMapError('地图初始化回调已执行，但未得到地图对象。'));
       }
-      window.AMapLoader.load({ key, version: '2.0' }).then(
-        (amap) => {
-          if (!amap?.Map) {
-            reject(new CinemaLocationMapError('地图服务初始化失败'));
-            return;
-          }
-          resolve(amap);
-        },
-        () => reject(new CinemaLocationMapError('地图服务加载失败')),
-      );
     };
     if (existing) {
-      if (window.AMapLoader?.load) {
-        initializeMap();
+      if (window.AMap?.Map) {
+        resolveMap();
         return;
       }
-      existing.addEventListener('load', initializeMap, { once: true });
+      existing.addEventListener('load', resolveMap, { once: true });
       existing.addEventListener(
         'error',
-        () => reject(new CinemaLocationMapError('地图服务加载失败')),
+        () => reject(new CinemaLocationMapError('地图脚本请求失败，请检查网络、域名白名单或浏览器拦截设置。')),
         { once: true },
       );
       return;
     }
     const script = document.createElement('script');
-    script.id = 'cinewise-amap-loader';
+    script.id = 'cinewise-amap-script';
     script.async = true;
-    script.src = 'https://webapi.amap.com/loader.js';
-    script.addEventListener('load', initializeMap, { once: true });
-    script.addEventListener('error', () => reject(new CinemaLocationMapError('地图服务加载失败')), {
+    script.charset = 'utf-8';
+    window[AMAP_READY_CALLBACK] = resolveMap;
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(key)}&callback=${AMAP_READY_CALLBACK}`;
+    // 高德回调是地图对象完成初始化的时点；若脚本已返回却未触发回调，不能无限等待。
+    script.addEventListener('load', () => {
+      window.setTimeout(() => {
+        if (window.AMap?.Map) {
+          resolveMap();
+          return;
+        }
+        delete window[AMAP_READY_CALLBACK];
+        reject(new CinemaLocationMapError('高德地图拒绝当前 Web Key，请检查 Key 状态和域名白名单。'));
+      }, 0);
+    }, { once: true });
+    script.addEventListener('error', () => {
+      delete window[AMAP_READY_CALLBACK];
+      reject(new CinemaLocationMapError('地图脚本请求失败，请检查网络、域名白名单或浏览器拦截设置。'));
+    }, {
       once: true,
     });
     document.head.appendChild(script);
   });
-  // 外层组件超时不能结束 pendingLoad；必须在这里主动拒绝并清掉缓存，重试才会重新请求。
-  amapPromise = withTimeout(pendingLoad, '地图加载超时，请稍后重试。', 8_000);
+  // 高德异步脚本在部分网络下超过 8 秒仍会继续初始化，不能提前丢弃它的回调。
+  amapPromise = pendingLoad;
   void amapPromise.catch(() => {
     // 网络或配置临时失败时允许用户点击后重新加载，而不是永久缓存失败结果。
     amapPromise = null;
@@ -200,7 +203,7 @@ export function CinemaLocationMap({ cinemaName, latitude, longitude, sessionId }
       if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
         throw new CinemaLocationMapError('影院暂未提供地图坐标');
       }
-      const amap = await withTimeout(loadAmap(), '地图加载超时，请稍后重试。', 8_000);
+      const amap = await loadAmap();
       const cinemaCoordinates: Coordinates = [longitude, latitude];
       mapRef.current?.destroy();
       const map = new amap.Map(containerRef.current, {

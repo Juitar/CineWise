@@ -1,17 +1,19 @@
 import { defineConfig } from 'umi';
 
+const amapWebKey = process.env.AMAP_WEB_JS_KEY ?? process.env.UMI_APP_AMAP_WEB_JS_KEY ?? '';
+const amapSecurityJsCode = process.env.AMAP_WEB_SECURITY_JS_CODE
+  ?? process.env.UMI_APP_AMAP_WEB_SECURITY_JS_CODE
+  ?? '';
+
 export default defineConfig({
   hash: true,
   title: '妙语购票',
+  headScripts: amapSecurityJsCode
+    ? [{ content: `window._AMapSecurityConfig = { securityJsCode: ${JSON.stringify(amapSecurityJsCode)} };` }]
+    : [],
   define: {
-    'process.env.AMAP_WEB_JS_KEY': JSON.stringify(
-      process.env.AMAP_WEB_JS_KEY ?? process.env.UMI_APP_AMAP_WEB_JS_KEY ?? '',
-    ),
-    'process.env.AMAP_WEB_SECURITY_JS_CODE': JSON.stringify(
-      process.env.AMAP_WEB_SECURITY_JS_CODE
-        ?? process.env.UMI_APP_AMAP_WEB_SECURITY_JS_CODE
-        ?? '',
-    ),
+    'process.env.AMAP_WEB_JS_KEY': amapWebKey,
+    'process.env.AMAP_WEB_SECURITY_JS_CODE': amapSecurityJsCode,
   },
   proxy: {
     '/api': {
