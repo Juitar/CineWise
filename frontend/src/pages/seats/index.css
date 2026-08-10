@@ -56,6 +56,19 @@
 }
 
 @media (max-width: 1023px) {
+  .seats-page-container {
+    padding: 16px 12px;
+  }
+
+  .seats-page-header {
+    margin-bottom: 12px;
+  }
+
+  .seats-main-area {
+    margin-bottom: 12px;
+    padding: 8px;
+  }
+
   .seats-back-button,
   .seats-retry-button {
     min-height: 44px;

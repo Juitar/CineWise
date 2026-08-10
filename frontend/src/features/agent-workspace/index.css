@@ -983,6 +983,23 @@
   font-weight: 700;
 }
 
+.agent-plan-location-map-skeleton {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(100deg, #e8eef1 28%, #f7fafb 46%, #e8eef1 64%);
+  background-size: 220% 100%;
+  animation: agent-map-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.agent-plan-location-map-skeleton::after {
+  position: absolute;
+  inset: 22% 18%;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.38);
+  content: '';
+}
+
 .agent-plan-location-map-action {
   display: flex;
   align-items: center;
@@ -995,6 +1012,16 @@
 
 .agent-plan-location-map-action .ant-btn {
   flex: 0 0 auto;
+}
+
+@keyframes agent-map-skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -120% 0;
+  }
 }
 
 .agent-plan-location-note {
@@ -1345,14 +1372,27 @@
   }
 
   .agent-task-steps {
-    width: 100%;
-    justify-content: space-between;
-    gap: 4px;
-    font-size: 11px;
+    width: auto;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .agent-task-steps span {
+    flex: 0 0 auto;
+    padding: 4px 6px;
+    border-radius: 6px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .agent-task-steps .is-current {
+    background: #eeecff;
   }
 
   .agent-task-steps span:not(:last-child)::after {
-    margin-left: 4px;
+    display: none;
   }
 
   .agent-plan-detail-hero {
@@ -1403,11 +1443,13 @@
     .agent-workspace-business-pane {
     position: fixed;
     z-index: 30;
-    inset: 0;
+    inset: 0 0 calc(80px + env(safe-area-inset-bottom));
     display: flex;
-    min-height: 100dvh;
+    min-height: 0;
     flex-direction: column;
     overflow-y: auto;
+    box-sizing: border-box;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
     background: #f6f5fb;
     animation: agent-task-sheet-enter 180ms ease-out;
   }
@@ -1433,11 +1475,11 @@
   }
 
   .agent-workspace--recommendations.agent-workspace--mobile-business-detail .agent-plan-detail {
-    padding: 16px 14px calc(30px + env(safe-area-inset-bottom));
+    padding: 16px 14px calc(104px + env(safe-area-inset-bottom));
   }
 
   .agent-workspace--recommendations.agent-workspace--mobile-business-detail .agent-task-shell {
-    padding: 16px 14px calc(30px + env(safe-area-inset-bottom));
+    padding: 16px 14px calc(104px + env(safe-area-inset-bottom));
   }
 
   @keyframes agent-task-sheet-enter {

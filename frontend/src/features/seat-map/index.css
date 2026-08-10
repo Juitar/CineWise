@@ -6,8 +6,7 @@
   width: 100%;
   padding: 16px 0;
   user-select: none;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow-x: hidden;
 }
 
 .seat-map-screen-wrapper {
@@ -80,13 +79,18 @@
   padding: 12px;
   background-color: #fafafa;
   border-radius: 8px;
-  min-width: min-content;
+  width: min(100%, 600px);
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .seat-map-row {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
+  min-width: 0;
 }
 
 .seat-map-row-label {
@@ -99,13 +103,20 @@
 
 .seat-map-row-seats {
   display: flex;
-  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  gap: clamp(3px, 1vw, 10px);
 }
 
-/* 确保移动触控区域 >= 44px */
+/* 座位宽度随座位表容器变化；宽屏最多保持 44px，小屏整行始终完整显示。 */
 .seat-button {
-  width: 44px;
-  height: 44px;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  max-width: 44px;
+  flex: 1 1 0;
+  aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -155,4 +166,56 @@
 .seat-map-empty {
   color: #8c8c8c;
   padding: 32px 0;
+}
+
+/* 手机上按当前行座位数均分宽度，整行无需横向滑动。 */
+@media (max-width: 1023px) {
+  .seat-map-container {
+    padding: 12px 0;
+  }
+
+  .seat-map-screen-wrapper {
+    margin-bottom: 16px;
+  }
+
+  .seat-map-legend {
+    width: 100%;
+    gap: 10px;
+    margin-bottom: 16px;
+    font-size: 12px;
+  }
+
+  .legend-item {
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .legend-box {
+    width: 16px;
+    height: 16px;
+  }
+
+  .seat-map-grid {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .seat-map-row {
+    gap: 6px;
+  }
+
+  .seat-map-row-label {
+    width: 18px;
+    flex: 0 0 18px;
+    font-size: 12px;
+  }
+
+  .seat-map-row-seats {
+    gap: 4px;
+  }
+
+  .seat-button {
+    border-radius: 5px;
+    font-size: 11px;
+  }
 }

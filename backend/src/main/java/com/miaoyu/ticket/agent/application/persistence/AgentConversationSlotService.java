@@ -195,14 +195,18 @@ public class AgentConversationSlotService {
         if (genres != null) {
             values.put("genres", genres);
         }
+        boolean explicitMovieRequest = slot == null && containsMovieRequest(value);
         String[] timeRange = extractTimeRange(value);
         if (timeRange != null) {
             values.put("timeFrom", timeRange[0]);
             if (timeRange[1] != null) {
                 values.put("timeTo", timeRange[1]);
             }
+        } else if (explicitMovieRequest) {
+            // 新观影请求未说明时段时，不能把上一次的上午、下午或具体钟点继续套用。
+            values.remove("timeFrom");
+            values.remove("timeTo");
         }
-        boolean explicitMovieRequest = slot == null && containsMovieRequest(value);
         if (movieTitleResolutionTool != null && explicitMovieRequest) {
             var resolvedMovie = movieTitleResolutionTool.resolve(value);
             if (resolvedMovie.isPresent()) {
@@ -220,6 +224,9 @@ public class AgentConversationSlotService {
             } else {
                 values.remove("cinemaId");
             }
+        } else if (explicitMovieRequest) {
+            // 用户没有指定影院时，应在当前城市范围内重新找场次，不能沿用上一方案的影院 ID。
+            values.remove("cinemaId");
         }
         // 没有待回答 QUESTION 时，这是新任务的原始语义；它单独保存，绝不混进可信槽位。
         String originalRequest = slot == null ? value : current.originalRequest();

@@ -178,6 +178,7 @@ export function RecommendationPlanDetail({
       <section className="agent-plan-location" aria-labelledby="agent-plan-location-title">
         <CinemaLocationMap
           cinemaName={cinema.data?.name ?? plan.cinemaName}
+          cinemaLoading={cinema.isLoading}
           latitude={cinema.data?.latitude}
           longitude={cinema.data?.longitude}
           sessionId={sessionId}

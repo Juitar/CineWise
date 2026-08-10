@@ -182,13 +182,20 @@ function mapFailureNotice(error: unknown): string {
 
 interface CinemaLocationMapProps {
   cinemaName: string;
+  cinemaLoading: boolean;
   latitude: number | null | undefined;
   longitude: number | null | undefined;
   sessionId: string;
 }
 
 /** 影院静态坐标来自已加载的详情；用户坐标只留在当前页面内存中。 */
-export function CinemaLocationMap({ cinemaName, latitude, longitude, sessionId }: CinemaLocationMapProps) {
+export function CinemaLocationMap({
+  cinemaName,
+  cinemaLoading,
+  latitude,
+  longitude,
+  sessionId,
+}: CinemaLocationMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<AMapInstance | null>(null);
   const [notice, setNotice] = useState('正在加载影院位置');
@@ -248,17 +255,22 @@ export function CinemaLocationMap({ cinemaName, latitude, longitude, sessionId }
 
   useEffect(() => {
     // 进入详情页后直接展示影院并请求一次浏览器定位；拒绝定位只影响距离，不移除影院地图。
+    if (cinemaLoading) return undefined;
     void showMap();
     return () => mapRef.current?.destroy();
-  }, [cinemaName, latitude, longitude, sessionId]);
+  }, [cinemaLoading, cinemaName, latitude, longitude, sessionId]);
 
   return (
     <div className="agent-plan-location-map-shell">
       <div className="agent-plan-location-map" ref={containerRef} aria-label="影院位置地图">
-        {!shown && <span>{loading ? <Spin size="small" /> : '影院位置'}</span>}
+        {cinemaLoading ? (
+          <div className="agent-plan-location-map-skeleton" aria-label="正在加载影院位置" />
+        ) : (
+          !shown && <span>{loading ? <Spin size="small" /> : '影院位置'}</span>
+        )}
       </div>
       <div className="agent-plan-location-map-action">
-        <span>{notice}</span>
+        <span>{cinemaLoading ? '正在加载影院位置' : notice}</span>
       </div>
     </div>
   );
