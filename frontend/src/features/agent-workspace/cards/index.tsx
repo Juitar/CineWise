@@ -132,9 +132,11 @@ function QuestionCard({
     try {
       setLocatedCity(await resolveCityFromCurrentLocation(sessionId));
     } catch (error) {
-      setLocationNotice(error instanceof Error && error.message
-        ? error.message
-        : '未能获取当前位置，请手动输入城市。');
+      setLocationNotice(
+        error instanceof Error && error.message
+          ? error.message
+          : '未能获取当前位置，请手动输入城市。',
+      );
     } finally {
       setLocating(false);
     }
@@ -158,7 +160,8 @@ function QuestionCard({
       {isCityQuestion && !locatedCity && (
         <div className="agent-question-location">
           <span>
-            {locationNotice ?? (locating ? '正在识别你的观影城市…' : '正在准备位置确认，也可以直接输入城市。')}
+            {locationNotice ??
+              (locating ? '正在识别你的观影城市…' : '正在准备位置确认，也可以直接输入城市。')}
           </span>
         </div>
       )}
@@ -232,7 +235,7 @@ function formatPlanReason(value: string): string {
     EARLY_TIME: '开场时间更早',
     TIME_FIRST: '开场时间更合适',
     NEAREST: '距离影院更近',
-    '固定推荐结果': '符合当前可购条件',
+    固定推荐结果: '符合当前可购条件',
   };
   const key = Object.keys(labels).find((candidate) => value.includes(candidate));
   return key ? labels[key] : value;
@@ -274,8 +277,13 @@ function PlanCard({
                 >
                   <span>{PLAN_TYPE_TEXT[plan.planType] ?? `方案 ${index + 1}`}</span>
                   <strong>{plan.movieName}</strong>
-                  <small>{plan.cinemaName} · {plan.startTime}</small>
-                  <b>{plan.currency === 'CNY' ? '¥' : `${plan.currency} `}{plan.price}</b>
+                  <small>
+                    {plan.cinemaName} · {plan.startTime}
+                  </small>
+                  <b>
+                    {plan.currency === 'CNY' ? '¥' : `${plan.currency} `}
+                    {plan.price}
+                  </b>
                 </Link>
               ))}
             </div>
@@ -510,7 +518,14 @@ export function AgentDisplayItemView({
       content = <MessageBubble item={item} />;
       break;
     case 'question':
-      content = <QuestionCard item={item} answerDisabled={answerDisabled} onAnswer={onAnswer} sessionId={sessionId} />;
+      content = (
+        <QuestionCard
+          item={item}
+          answerDisabled={answerDisabled}
+          onAnswer={onAnswer}
+          sessionId={sessionId}
+        />
+      );
       break;
     case 'movie-card':
       content = <RecommendationCard item={item} />;

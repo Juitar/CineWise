@@ -37,7 +37,10 @@ export default function PaymentResultPage() {
           items={[
             PROFILE_BREADCRUMB_ITEM,
             { label: '我的订单', to: workspacePath(location.pathname, '/orders') },
-            { label: '订单详情', to: workspacePath(location.pathname, buildOrderDetailPath(orderNo)) },
+            {
+              label: '订单详情',
+              to: workspacePath(location.pathname, buildOrderDetailPath(orderNo)),
+            },
             { label: '支付结果' },
           ]}
         />
@@ -53,9 +56,13 @@ export default function PaymentResultPage() {
               history.push(workspacePath(location.pathname, buildElectronicTicketPath(ticketId)));
             }
           }}
-          onViewOrder={() => history.push(workspacePath(location.pathname, buildOrderDetailPath(orderNo)))}
+          onViewOrder={() =>
+            history.push(workspacePath(location.pathname, buildOrderDetailPath(orderNo)))
+          }
           onRetryQuery={() => void paymentAction.query()}
-          onRetryPay={() => history.push(workspacePath(location.pathname, buildPaymentPath(orderNo)))}
+          onRetryPay={() =>
+            history.push(workspacePath(location.pathname, buildPaymentPath(orderNo)))
+          }
         />
       </div>
     </div>

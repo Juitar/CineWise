@@ -41,11 +41,13 @@ public class EmailDeliveryApplicationService implements EmailDeliveryPort {
 
     @Override
     public EmailDeliveryResult send(EmailDeliveryCommand command) {
+        // 入参先做严格格式校验，公共邮件入口不接受任意模板、用户标识或追踪号。
         if (!isValid(command)) {
             return EmailDeliveryResult.failed(INVALID_COMMAND);
         }
         Optional<EmailTemplateRegistry.RenderedEmail> rendered =
                 templateRegistry.render(command.templateCode(), command.variables());
+        // 模板不可用时不触发 Provider 调用，避免向用户发送未经批准的内容。
         if (rendered.isEmpty()) {
             return EmailDeliveryResult.failed(TEMPLATE_REJECTED);
         }
@@ -60,6 +62,7 @@ public class EmailDeliveryApplicationService implements EmailDeliveryPort {
                 .filter(AuthUser::isActive)
                 .filter(AuthUser::emailVerified)
                 .filter(user -> user.role() == RoleCode.USER);
+        // 只向普通、已激活且已验证邮箱的用户投递，管理员和禁用账号不在此入口发送。
         if (candidate.isEmpty()) {
             return EmailDeliveryResult.failed(RECIPIENT_UNAVAILABLE);
         }
@@ -73,6 +76,7 @@ public class EmailDeliveryApplicationService implements EmailDeliveryPort {
                 command.traceId()));
         LOGGER.info(
                 "公共邮件投递完成, deliveryKeyHash={}, templateCode={}, status={}, errorCode={}, traceId={}",
+                // 日志写投递键摘要，不能记录可用于查询 Provider 结果的原始 deliveryKey。
                 hashKey(command.deliveryKey()),
                 command.templateCode(),
                 result.status(),
@@ -83,6 +87,7 @@ public class EmailDeliveryApplicationService implements EmailDeliveryPort {
 
     @Override
     public EmailDeliveryResult query(String deliveryKey) {
+        // 查询键同样校验格式，避免把任意字符串转发给外部邮件 Provider。
         if (deliveryKey == null || !DELIVERY_KEY.matcher(deliveryKey).matches()) {
             return EmailDeliveryResult.failed(INVALID_COMMAND);
         }
@@ -90,6 +95,7 @@ public class EmailDeliveryApplicationService implements EmailDeliveryPort {
     }
 
     private boolean isValid(EmailDeliveryCommand command) {
+        // 每个字段均采用白名单格式，模板变量由 registry 的模板渲染规则另行限制。
         return command != null
                 && command.deliveryKey() != null
                 && DELIVERY_KEY.matcher(command.deliveryKey()).matches()
@@ -102,6 +108,7 @@ public class EmailDeliveryApplicationService implements EmailDeliveryPort {
     }
 
     private String hashKey(String deliveryKey) {
+        // 仅取摘要前缀用于关联日志；它不参与任何鉴权或幂等判断。
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")
                     .digest(deliveryKey.getBytes(StandardCharsets.UTF_8));

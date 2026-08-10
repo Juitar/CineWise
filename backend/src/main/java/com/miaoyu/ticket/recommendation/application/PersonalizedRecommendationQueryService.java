@@ -6,6 +6,11 @@ import com.miaoyu.ticket.content.application.ContentQuery;
 import com.miaoyu.ticket.content.application.ContentQueryService;
 import com.miaoyu.ticket.content.domain.ContentResourceType;
 import com.miaoyu.ticket.content.domain.MovieContent;
+import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
+import com.miaoyu.ticket.profile.application.ProfileQueryService;
+import com.miaoyu.ticket.profile.application.ProfileSummary;
+import com.miaoyu.ticket.profile.domain.ProfileTagPolarity;
+import com.miaoyu.ticket.profile.domain.ProfileTagType;
 import com.miaoyu.ticket.recommendation.domain.RankedRecommendationCandidate;
 import com.miaoyu.ticket.recommendation.domain.CinemaDistanceSelector;
 import com.miaoyu.ticket.recommendation.domain.RecommendationConstraints;
@@ -45,6 +50,8 @@ public class PersonalizedRecommendationQueryService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final DistanceContextService distanceContextService;
+    private final ProfileQueryService profileQueryService;
+    private final CurrentUserAccessor currentUserAccessor;
 
     @Autowired
     public PersonalizedRecommendationQueryService(
@@ -53,8 +60,30 @@ public class PersonalizedRecommendationQueryService {
             RecommendationBatchShowtimeQueryPort showtimeQueryPort,
             RecommendationMetricsRecorder metricsRecorder,
             ObjectMapper objectMapper,
+            Clock clock,
+            DistanceContextService distanceContextService,
+            ProfileQueryService profileQueryService,
+            CurrentUserAccessor currentUserAccessor) {
+        this.cinemaQueryService = cinemaQueryService;
+        this.contentQueryService = contentQueryService;
+        this.showtimeQueryPort = showtimeQueryPort;
+        this.metricsRecorder = metricsRecorder;
+        this.objectMapper = objectMapper;
+        this.clock = clock;
+        this.distanceContextService = distanceContextService;
+        this.profileQueryService = profileQueryService;
+        this.currentUserAccessor = currentUserAccessor;
+    }
+
+    public PersonalizedRecommendationQueryService(
+            RecommendationContentCandidateQueryService cinemaQueryService,
+            ContentQueryService contentQueryService,
+            RecommendationBatchShowtimeQueryPort showtimeQueryPort,
+            RecommendationMetricsRecorder metricsRecorder,
+            ObjectMapper objectMapper,
             Clock clock) {
-        this(cinemaQueryService, contentQueryService, showtimeQueryPort, metricsRecorder, objectMapper, clock, null);
+        this(cinemaQueryService, contentQueryService, showtimeQueryPort, metricsRecorder, objectMapper, clock,
+                null, null, null);
     }
 
     /** 生产入口额外接入一次性距离上下文；普通推荐仍可使用旧构造器。 */
@@ -66,13 +95,8 @@ public class PersonalizedRecommendationQueryService {
             ObjectMapper objectMapper,
             Clock clock,
             DistanceContextService distanceContextService) {
-        this.cinemaQueryService = cinemaQueryService;
-        this.contentQueryService = contentQueryService;
-        this.showtimeQueryPort = showtimeQueryPort;
-        this.metricsRecorder = metricsRecorder;
-        this.objectMapper = objectMapper;
-        this.clock = clock;
-        this.distanceContextService = distanceContextService;
+        this(cinemaQueryService, contentQueryService, showtimeQueryPort, metricsRecorder, objectMapper, clock,
+                distanceContextService, null, null);
     }
 
     /**
@@ -155,10 +179,12 @@ public class PersonalizedRecommendationQueryService {
                     null));
         }
 
-        List<RecommendationPlan> plans = RecommendationPlanRanker.rank(candidates, constraints, clock);
+        ProfileUsage profileUsage = profileUsage(constraints);
+        RecommendationConstraints effectiveConstraints = profileUsage.applyTo(constraints);
+        List<RecommendationPlan> plans = RecommendationPlanRanker.rank(candidates, effectiveConstraints, clock);
         if (!distanceMeters.isEmpty()) {
             RecommendationPlan nearest = RecommendationPlanRanker.nearest(
-                    candidates, distanceMeters, constraints, clock);
+                    candidates, distanceMeters, effectiveConstraints, clock);
             if (nearest != null) {
                 plans = java.util.stream.Stream.concat(
                         java.util.stream.Stream.of(nearest),
@@ -176,8 +202,33 @@ public class PersonalizedRecommendationQueryService {
         var suggestion = plans.isEmpty()
                 ? RecommendationRelaxationAdvisor.suggest(candidates, constraints, clock).orElse(null) : null;
         String source = candidates.getFirst().source();
-        return record(new RecommendationPlanResult(ALGORITHM_VERSION, plans, missingFactors, suggestion, source,
-                dataAt, expiresAt, batch.truncated() || plans.isEmpty()));
+        return record(new RecommendationPlanResult("1.0", ALGORITHM_VERSION, plans, missingFactors, suggestion,
+                profileUsage.applied(), source, dataAt, expiresAt, batch.truncated() || plans.isEmpty()));
+    }
+
+    /** 只有本轮未指定影片类型时才采用画像，用户临时明确要求始终优先。 */
+    private ProfileUsage profileUsage(RecommendationConstraints constraints) {
+        if (!constraints.genres().isEmpty() || profileQueryService == null || currentUserAccessor == null) {
+            return ProfileUsage.none();
+        }
+        ProfileSummary summary = profileQueryService.assembleSummary(currentUserAccessor.requireCurrentUserId());
+        if (!summary.enabled()) {
+            return ProfileUsage.none();
+        }
+        List<String> liked = summary.tags().stream()
+                .filter(tag -> tag.type() == ProfileTagType.MOVIE_GENRE)
+                .filter(tag -> tag.polarity() == ProfileTagPolarity.LIKE)
+                .map(ProfileSummary.Tag::value)
+                .distinct().toList();
+        List<String> disliked = summary.tags().stream()
+                .filter(tag -> tag.type() == ProfileTagType.MOVIE_GENRE)
+                .filter(tag -> tag.polarity() == ProfileTagPolarity.DISLIKE)
+                .map(ProfileSummary.Tag::value)
+                .distinct().toList();
+        if (liked.isEmpty() && disliked.isEmpty()) {
+            return ProfileUsage.none();
+        }
+        return new ProfileUsage(liked, disliked);
     }
 
     private RecommendationPlanResult record(RecommendationPlanResult result) {
@@ -224,5 +275,27 @@ public class PersonalizedRecommendationQueryService {
             RelaxationSuggestion suggestion) {
         return new RecommendationPlanResult(ALGORITHM_VERSION, List.of(), missingFactors, suggestion, source,
                 dataAt, expiresAt, degraded);
+    }
+
+    private record ProfileUsage(List<String> liked, List<String> disliked) {
+        private static ProfileUsage none() {
+            return new ProfileUsage(List.of(), List.of());
+        }
+
+        private boolean applied() {
+            return !liked.isEmpty() || !disliked.isEmpty();
+        }
+
+        private RecommendationConstraints applyTo(RecommendationConstraints constraints) {
+            if (!applied()) {
+                return constraints;
+            }
+            List<String> excluded = java.util.stream.Stream.concat(
+                    constraints.excludedGenres().stream(), disliked.stream()).distinct().toList();
+            return new RecommendationConstraints(
+                    constraints.cityCode(), constraints.date(), constraints.ticketCount(), constraints.movieId(),
+                    constraints.cinemaId(), liked, constraints.timeFrom(), constraints.timeTo(),
+                    constraints.latestEndTime(), constraints.budget(), excluded, constraints.maxDistanceMeters());
+        }
     }
 }

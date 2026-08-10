@@ -44,6 +44,7 @@ import com.miaoyu.ticket.profile.infrastructure.tool.GetProfileSummaryTool;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -86,7 +87,8 @@ class MultiToolSupervisorTest {
         when(adapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
         ModelGateway gateway = new ModelGateway() {
             @Override
-            public AgentIntent classifyIntent(com.miaoyu.ticket.agent.application.model.IntentClassificationRequest request) {
+            public AgentIntent classifyIntent(
+                    com.miaoyu.ticket.agent.application.model.IntentClassificationRequest request) {
                 return AgentIntent.GENERAL_CHAT;
             }
 
@@ -617,6 +619,34 @@ class MultiToolSupervisorTest {
         Mockito.verify(gateway, never()).classifyIntent(any());
         Mockito.verify(gateway, never()).generatePlan(any());
         Mockito.verify(adapter).execute(any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class));
+    }
+
+    @Test
+    void shouldKeepExplicitMorningRangeWhenUserAsksForShowtimes() {
+        ToolRegistry registry = new ToolRegistry(List.of(AgentToolDefinitions.rankMoviePlan()));
+        PlanSchemaValidator validator = new PlanSchemaValidator(registry);
+        ExecutionPlanStateMachine stateMachine = new ExecutionPlanStateMachine(registry);
+        RankMoviePlanExecutionAdapter adapter = Mockito.mock(RankMoviePlanExecutionAdapter.class);
+        when(adapter.targetName()).thenReturn(RankMoviePlanTool.TARGET_NAME);
+        when(adapter.definition()).thenReturn(AgentToolDefinitions.rankMoviePlan());
+        when(adapter.execute(any(ReadOnlyToolExecutionAdapter.ExecutionRequest.class)))
+                .thenAnswer(invocation -> successfulExecution(stateMachine, invocation.getArgument(0)));
+        MultiToolSupervisor supervisor = new MultiToolSupervisor(
+                movieGateway(), registry, validator, stateMachine, List.of(adapter));
+        PlanValidationContext morningContext = new PlanValidationContext(
+                Map.of("cityCode", String.class, "date", LocalDate.class, "ticketCount", Integer.class,
+                        "timeFrom", LocalTime.class, "timeTo", LocalTime.class),
+                Map.of(), new SlotSnapshot(2L, Map.of(
+                        "cityCode", "430100", "date", "2026-08-10", "ticketCount", "1",
+                        "timeFrom", "06:00", "timeTo", "12:00")));
+
+        var result = supervisor.run(new MultiToolSupervisorRequest(
+                "request-morning-shows", "我要看上午的排场", morningContext,
+                "run-morning-shows", "trace-morning-shows", 3_000L));
+
+        assertThat(result.candidatePlan().nodes().getFirst().inputRefs())
+                .extracting(InputReference::inputName)
+                .contains("timeFrom", "timeTo");
     }
 
     @Test

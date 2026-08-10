@@ -1,8 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import processingEventFixture from '../../../../backend/src/test/resources/fixtures/agent/c/processing-event.json';
-import orderConfirmCardFixture from '../../../../backend/src/test/resources/fixtures/agent/c/order-confirm-card.json';
+import processingEventFixture from
+  '../../../../backend/src/test/resources/fixtures/agent/c/processing-event.json';
+import orderConfirmCardFixture from
+  '../../../../backend/src/test/resources/fixtures/agent/c/order-confirm-card.json';
 import { ApiError } from '../../shared/api/ApiError';
 import { notifySessionEnding } from '../../shared/auth/sessionLifecycle';
 import { parseAgentEvent } from './contract';
@@ -180,7 +182,6 @@ describe('useAgentWorkspace 状态与恢复', () => {
     await waitFor(() => expect(result.current.loadStatus).toBe('ready'));
     expect(result.current.projection.items).toEqual([
       expect.objectContaining({ kind: 'user-text', text: '推荐电影' }),
-      expect.objectContaining({ kind: 'question', text: '请补充观影偏好' }),
     ]);
     expect(result.current.projection.safeError).toBeNull();
   });
@@ -235,7 +236,9 @@ describe('useAgentWorkspace 状态与恢复', () => {
     expect(second.result.current.projection.items).toContainEqual(
       expect.objectContaining({ kind: 'user-text', text: '今天看电影' }),
     );
-    await waitFor(() => expect(second.result.current.feedback).toBe('网络连接失败，已保留当前内容'));
+    await waitFor(() =>
+      expect(second.result.current.feedback).toBe('网络连接失败，已保留当前内容'),
+    );
     expect(second.result.current.projection.items).toContainEqual(
       expect.objectContaining({ kind: 'user-text', text: '今天看电影' }),
     );

@@ -40,6 +40,7 @@ public class AgentSessionManagementService {
 
     @Transactional(readOnly = true)
     public SessionPage listMySessions(int page, int size) {
+        // 分页参数先限制范围，再用认证用户过滤，避免把其他用户的会话暴露给前端。
         int safeSize = checkedSize(size);
         int safePage = checkedPage(page);
         long userId = currentUserAccessor.requireCurrentUserId();
@@ -50,6 +51,7 @@ public class AgentSessionManagementService {
 
     @Transactional(readOnly = true)
     public MessagePage listMySessionMessages(String sessionId, int page, int size) {
+        // 先验证会话归属，再查询消息和运行号；两次查询都带 userId/sessionId 防止越权拼接。
         int safeSize = checkedSize(size);
         int safePage = checkedPage(page);
         long userId = currentUserAccessor.requireCurrentUserId();
@@ -68,6 +70,7 @@ public class AgentSessionManagementService {
 
     @Transactional
     public ClearResult clearMySession(String sessionId) {
+        // 有活动运行时拒绝清理，避免 SSE 仍在写入时把当前会话标记为历史。
         long userId = currentUserAccessor.requireCurrentUserId();
         AgentSession session = requireActiveSession(sessionId, userId);
         if (session.activeRunId() != null) {
@@ -81,6 +84,7 @@ public class AgentSessionManagementService {
 
     @Transactional
     public BulkClearResult clearMySessions() {
+        // 批量清理只处理没有活动运行的会话，跳过项由调用方展示给用户。
         long userId = currentUserAccessor.requireCurrentUserId();
         int clearedCount = 0;
         int skippedCount = 0;
@@ -95,6 +99,7 @@ public class AgentSessionManagementService {
     }
 
     private boolean clear(AgentSession session, long userId) {
+        // 条件更新提供并发保护；成功后才过期关联消息、运行和事件数据。
         LocalDateTime now = now();
         if (!sessionRepository.clearIfActiveAndInactive(session.id(), userId, now)) {
             return false;
@@ -104,6 +109,7 @@ public class AgentSessionManagementService {
     }
 
     private BusinessException resultAfterClearRace(String sessionId, long userId) {
+        // 条件更新失败可能是并发启动运行，重新读取用于返回准确的冲突错误。
         AgentSession current = sessionRepository.findBySessionIdAndUserId(sessionId, userId)
                 .orElseThrow(() -> new BusinessException(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND));
         if (current.status() == AgentSessionStatus.ACTIVE && current.activeRunId() != null) {
@@ -113,6 +119,7 @@ public class AgentSessionManagementService {
     }
 
     private AgentSession requireActiveSession(String sessionId, long userId) {
+        // 已清理会话统一返回资源不存在，避免泄露历史会话的状态细节。
         AgentSession session = sessionRepository.findBySessionIdAndUserId(sessionId, userId)
                 .orElseThrow(() -> new BusinessException(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND));
         if (session.status() != AgentSessionStatus.ACTIVE) {
@@ -136,10 +143,12 @@ public class AgentSessionManagementService {
     }
 
     private static int offset(int page, int size) {
+        // 使用精确乘法，页码溢出时直接失败而不是查询错误位置。
         return Math.multiplyExact(page - 1, size);
     }
 
     private static String requiredRunId(AgentMessage message, Map<Long, String> publicRunIds) {
+        // 历史消息必须能映射到同一用户、同一会话的公开 runId，否则视为数据隔离异常。
         String runId = publicRunIds.get(message.runId());
         if (runId == null) {
             throw new IllegalStateException("历史消息关联的运行不属于当前用户或会话");

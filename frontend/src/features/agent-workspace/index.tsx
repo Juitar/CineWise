@@ -56,9 +56,7 @@ function SessionList({
             </button>
             <Tooltip
               title={
-                current && activeSessionBusy
-                  ? '当前会话正在运行，结束后才能删除'
-                  : '删除此会话'
+                current && activeSessionBusy ? '当前会话正在运行，结束后才能删除' : '删除此会话'
               }
             >
               <Button
@@ -144,7 +142,9 @@ function AgentTaskShell({
           <span className={title === '选择场次' ? 'is-current' : undefined}>场次</span>
           <span className={title === '选座' ? 'is-current' : undefined}>选座</span>
           <span className={title === '确认订单' ? 'is-current' : undefined}>确认订单</span>
-          <span className={title === '支付' || title === '支付结果' ? 'is-current' : undefined}>支付</span>
+          <span className={title === '支付' || title === '支付结果' ? 'is-current' : undefined}>
+            支付
+          </span>
         </nav>
       </header>
       {children}
@@ -423,7 +423,7 @@ export function AgentWorkspace({
   const detailPlan =
     selectedIndex === null || latestPlanItem?.plans === undefined
       ? null
-      : latestPlanItem.plans[selectedIndex] ?? null;
+      : (latestPlanItem.plans[selectedIndex] ?? null);
 
   const selectSession = (nextSessionId: string) => {
     workspace.stopActiveStream();
@@ -441,10 +441,9 @@ export function AgentWorkspace({
 
     const created = await workspace.createNewSession();
     workspace.stopActiveStream();
-    navigate(
-      created ? `${routeBase}/${encodeURIComponent(created.sessionId)}` : routeBase,
-      { replace: true },
-    );
+    navigate(created ? `${routeBase}/${encodeURIComponent(created.sessionId)}` : routeBase, {
+      replace: true,
+    });
   };
 
   const clearAllSessions = async () => {
@@ -453,10 +452,9 @@ export function AgentWorkspace({
 
     const created = await workspace.createNewSession();
     workspace.stopActiveStream();
-    navigate(
-      created ? `${routeBase}/${encodeURIComponent(created.sessionId)}` : routeBase,
-      { replace: true },
-    );
+    navigate(created ? `${routeBase}/${encodeURIComponent(created.sessionId)}` : routeBase, {
+      replace: true,
+    });
   };
 
   const deleteSession = async (targetSessionId: string) => {
@@ -468,10 +466,9 @@ export function AgentWorkspace({
 
       const created = await workspace.createNewSession();
       workspace.stopActiveStream();
-      navigate(
-        created ? `${routeBase}/${encodeURIComponent(created.sessionId)}` : routeBase,
-        { replace: true },
-      );
+      navigate(created ? `${routeBase}/${encodeURIComponent(created.sessionId)}` : routeBase, {
+        replace: true,
+      });
     } finally {
       setDeletingSessionId(null);
     }
@@ -504,8 +501,8 @@ export function AgentWorkspace({
 
   useEffect(() => {
     if (
-      initialSelectedPlanIndex === undefined
-      || !latestPlanItem?.plans?.[initialSelectedPlanIndex]
+      initialSelectedPlanIndex === undefined ||
+      !latestPlanItem?.plans?.[initialSelectedPlanIndex]
     ) {
       return;
     }
@@ -533,7 +530,9 @@ export function AgentWorkspace({
 
   return (
     <section
-      className={`agent-workspace agent-workspace--${variant}${mobileBusinessDetail ? ' agent-workspace--mobile-business-detail' : ''}`}
+      className={`agent-workspace agent-workspace--${variant}${
+        mobileBusinessDetail ? ' agent-workspace--mobile-business-detail' : ''
+      }`}
       aria-label="妙语 Agent 工作区"
     >
       {variant === 'debug' && <aside className="agent-workspace-sidebar">{sessionHistory}</aside>}
@@ -670,9 +669,11 @@ export function AgentWorkspace({
                   item={item}
                   sessionId={sessionId}
                   planPresentation={variant === 'recommendations' ? 'summary' : 'full'}
-                  planDetailPath={variant === 'recommendations'
-                    ? `${routeBase}/${encodeURIComponent(sessionId)}/plan`
-                    : undefined}
+                  planDetailPath={
+                    variant === 'recommendations'
+                      ? `${routeBase}/${encodeURIComponent(sessionId)}/plan`
+                      : undefined
+                  }
                   selectSeatsEnabled={variant === 'debug' || index > latestPlanIndex}
                   answerDisabled={busy}
                   onAnswer={(_itemKey, answer) => workspace.submitQuestionAnswer(answer)}

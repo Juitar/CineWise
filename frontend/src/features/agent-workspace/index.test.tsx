@@ -220,7 +220,9 @@ describe('AgentWorkspace 页面', () => {
 
     await vi.waitFor(() => {
       expect(mocks.workspace.deleteSession).toHaveBeenCalledWith('session-example-1');
-      expect(mocks.navigate).toHaveBeenCalledWith('/assistant/session-example-2', { replace: true });
+      expect(mocks.navigate).toHaveBeenCalledWith('/assistant/session-example-2', {
+        replace: true,
+      });
     });
   });
 

@@ -50,6 +50,7 @@ public class AdminAgentRunQueryService {
 
     @Transactional(readOnly = true)
     public AdminAgentRunPageView queryRuns(AdminAgentRunListQuery query) {
+        // 管理接口先在服务层复核角色，再读取轨迹，不能仅依赖控制器的权限标注。
         requireAdmin();
         NormalizedQuery normalized = normalize(query);
         Set<Long> userIds = resolveUserIds(normalized.userKeyword());
@@ -72,6 +73,7 @@ public class AdminAgentRunQueryService {
 
     @Transactional(readOnly = true)
     public AdminAgentRunView queryRun(String runId) {
+        // 详情查询只返回脱敏后的摘要和节点状态，不返回用户输入、槽位快照或工具原始响应。
         requireAdmin();
         AgentRun run = repository.findByRunId(requiredRunId(runId))
                 .orElseThrow(() -> new BusinessException(AgentErrorCode.AGENT_RESOURCE_NOT_FOUND));
@@ -83,6 +85,7 @@ public class AdminAgentRunQueryService {
 
     private AdminAgentRunView summary(AgentRun run, UserAdminQueryPort.UserAdminSummary user,
             AdminAgentRunQueryRepository.NodeStats nodeStats, List<AdminAgentRunView.NodeView> nodes) {
+        // 会话可能已按保留期删除；审计页此时保留 runId 但不伪造 sessionId。
         Long duration = duration(run.startedAt(), run.finishedAt());
         String sessionId = sessionRepository.findById(run.sessionId())
                 .map(session -> session.sessionId())
@@ -94,6 +97,7 @@ public class AdminAgentRunQueryService {
     }
 
     private static AdminAgentRunQueryRepository.NodeStats nodeStats(List<AdminAgentRunView.NodeView> nodes) {
+        // 节点统计从本次已读取的节点计算，避免详情页再查询一次持久化层。
         int completed = (int) nodes.stream()
                 .filter(node -> node.status().equals(PlanNodeStatus.SUCCESS.name()))
                 .count();
@@ -104,6 +108,7 @@ public class AdminAgentRunQueryService {
     }
 
     private AdminAgentRunView.NodeView node(AgentRunStep step) {
+        // 节点详情只映射执行状态和时间；输入引用、失败堆栈等敏感内容保持为空。
         return new AdminAgentRunView.NodeView(step.nodeId(), step.nodeType().name(), null,
                 step.status().name(), step.attemptCount(), step.startedAt(), step.finishedAt(),
                 duration(step.startedAt(), step.finishedAt()), null, null, null,
@@ -111,6 +116,7 @@ public class AdminAgentRunQueryService {
     }
 
     private Map<Long, UserAdminQueryPort.UserAdminSummary> users(List<AgentRun> runs) {
+        // 使用有序去重集合批量查询用户目录，避免列表页产生 N+1 查询。
         Set<Long> ids = runs.stream().map(AgentRun::userId)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         return ids.isEmpty()
@@ -119,6 +125,7 @@ public class AdminAgentRunQueryService {
     }
 
     private Set<Long> resolveUserIds(String keyword) {
+        // 关键字搜索结果限制数量，防止用户目录返回异常大集合直接拼进 SQL IN 条件。
         if (keyword == null) {
             return Set.of();
         }
@@ -130,6 +137,7 @@ public class AdminAgentRunQueryService {
     }
 
     private NormalizedQuery normalize(AdminAgentRunListQuery query) {
+        // 所有筛选、时间范围和分页都在这里归一化，仓储层只接收已经验证的 Criteria。
         if (query == null) {
             throw new BusinessException(CommonErrorCode.INVALID_PARAMETER);
         }
@@ -153,6 +161,7 @@ public class AdminAgentRunQueryService {
     }
 
     private static AgentRunStatus parseStatus(String raw) {
+        // 状态值只能是枚举，非法字符串统一按请求参数错误处理。
         if (raw == null || raw.isBlank()) {
             return null;
         }
@@ -164,6 +173,7 @@ public class AdminAgentRunQueryService {
     }
 
     private static String requiredRunId(String runId) {
+        // 公开 runId 仅允许有限长度的非空值，避免无意义查询和日志污染。
         if (runId == null || runId.isBlank() || runId.length() > 64) {
             throw new BusinessException(CommonErrorCode.INVALID_PARAMETER);
         }
@@ -171,6 +181,7 @@ public class AdminAgentRunQueryService {
     }
 
     private void requireAdmin() {
+        // 再次从认证上下文取角色，不信任调用方传递的任何管理员标志。
         CurrentUser user = currentUserAccessor.requireCurrentUser();
         if (user.role() != RoleCode.ADMIN) {
             throw new BusinessException(CommonErrorCode.FORBIDDEN);
@@ -178,10 +189,12 @@ public class AdminAgentRunQueryService {
     }
 
     private static Long duration(LocalDateTime started, LocalDateTime finished) {
+        // 运行未结束时不展示虚假的耗时，前端据此显示进行中状态。
         return finished == null ? null : Duration.between(started, finished).toMillis();
     }
 
     private static LocalDateTime toBusinessTime(java.time.OffsetDateTime value) {
+        // API 时间统一转换为业务时区后再交给数据库筛选，避免浏览器时区影响审计结果。
         return value == null ? null : value.atZoneSameInstant(ZoneId.of("Asia/Shanghai")).toLocalDateTime();
     }
 

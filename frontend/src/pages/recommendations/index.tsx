@@ -43,7 +43,8 @@ export default function RecommendationsPage() {
     else if (/\/orders\/confirm$/.test(location.pathname)) businessContent = <OrderConfirmPage />;
     else if (/\/orders$/.test(location.pathname)) businessContent = <OrdersPage />;
     else if (/\/orders\/[^/]+$/.test(location.pathname)) businessContent = <OrderDetailPage />;
-    else if (/\/payments\/[^/]+\/result$/.test(location.pathname)) businessContent = <PaymentResultPage />;
+    else if (/\/payments\/[^/]+\/result$/.test(location.pathname))
+      businessContent = <PaymentResultPage />;
     else if (/\/payments\/[^/]+$/.test(location.pathname)) businessContent = <PaymentPage />;
     else if (/\/tickets\/[^/]+$/.test(location.pathname)) businessContent = <TicketPage />;
     return (

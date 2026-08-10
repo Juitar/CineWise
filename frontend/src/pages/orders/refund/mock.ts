@@ -1,5 +1,7 @@
 import type { RefundVisualStatus } from '../../../features/refund-confirmation/RefundConfirmation';
-import type { AlternativeShowItem } from '../../../features/alternative-show-list/AlternativeShowList';
+import type {
+  AlternativeShowItem,
+} from '../../../features/alternative-show-list/AlternativeShowList';
 
 export interface RefundPageMockData {
   orderNo: string;

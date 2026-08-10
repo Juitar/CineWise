@@ -117,7 +117,8 @@ function CinemaCard({ cinema, movieId }: { cinema: AvailableCinema; movieId: str
           className="available-cinemas-purchase-link"
           to={workspacePath(
             location.pathname,
-            `/shows?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinema.cinemaId)}`,
+            `/shows?movieId=${encodeURIComponent(movieId)}` +
+              `&cinemaId=${encodeURIComponent(cinema.cinemaId)}`,
           )}
         >
           选择影院

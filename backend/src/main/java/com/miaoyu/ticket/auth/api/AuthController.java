@@ -38,13 +38,21 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 public class AuthController {
 
+    /** 密码、验证码和当前用户查询都经过应用服务，控制器不直接访问数据库。 */
     private final AuthApplicationService authService;
+    /** 验证码发送单独封装，便于统一限流并隐藏账号是否存在。 */
     private final EmailCodeApplicationService emailCodeService;
+    /** 注册流程负责校验验证码、邀请码和隐私政策后创建会话。 */
     private final RegistrationApplicationService registrationService;
+    /** 密码重置成功后由应用服务使旧凭证失效。 */
     private final PasswordResetApplicationService passwordResetService;
+    /** 当前用户读取器只从已认证上下文取得用户，不信任请求体中的 userId。 */
     private final CurrentUserAccessor currentUserAccessor;
+    /** 统一写入和清理 HttpOnly 访问令牌 Cookie。 */
     private final AuthCookieManager cookieManager;
+    /** 登录成功后清掉旧 CSRF Token，促使客户端使用与新会话匹配的 Token。 */
     private final CsrfTokenRepository csrfTokenRepository;
+    /** CSRF 响应头名称来自配置，避免前后端硬编码不一致。 */
     private final AuthProperties properties;
 
     public AuthController(
@@ -83,6 +91,7 @@ public class AuthController {
             @Valid @RequestBody PasswordLoginRequest request,
             HttpServletRequest servletRequest,
             HttpServletResponse servletResponse) {
+        // 普通用户和管理员共用登录写 Cookie 逻辑，只通过 LoginType 区分权限校验。
         return login(request, LoginType.PASSWORD, servletRequest, servletResponse);
     }
 
@@ -96,6 +105,7 @@ public class AuthController {
     })
     public Result<SendEmailCodeResponse> sendEmailCode(
             @Valid @RequestBody SendEmailCodeRequest request, HttpServletRequest servletRequest) {
+        // 传入远端地址和 traceId，限流与审计在应用层完成，响应不泄露账号是否存在。
         return Result.success(SendEmailCodeResponse.from(emailCodeService.send(new SendEmailCodeCommand(
                 request.email(),
                 request.purpose(),
@@ -204,6 +214,7 @@ public class AuthController {
         @ApiResponse(responseCode = "401", description = "201006 Cookie 会话缺失或已经失效")
     })
     public Result<CurrentUserResponse> currentUser() {
+        // 用户身份取自认证上下文，不能由客户端参数替换。
         long userId = currentUserAccessor.requireCurrentUserId();
         return Result.success(CurrentUserResponse.from(authService.getCurrentUser(userId)));
     }
@@ -222,6 +233,7 @@ public class AuthController {
         @ApiResponse(responseCode = "403", description = "201009 CSRF Token 缺失或无效")
     })
     public Result<LogoutResponse> logout(HttpServletRequest request, HttpServletResponse response) {
+        // 清理动作保持幂等：即使 Cookie 已过期，也要清掉浏览器残留凭证和 CSRF Token。
         currentUserAccessor.findCurrentUser().ifPresent(authService::logout);
         cookieManager.clearAccessToken(response);
         csrfTokenRepository.saveToken(null, request, response);
@@ -230,6 +242,7 @@ public class AuthController {
 
     @GetMapping("/auth/csrf")
     public Result<CsrfTokenResponse> csrf(CsrfToken csrfToken) {
+        // 只返回 CSRF Token 和约定的请求头名，不返回访问令牌等敏感认证信息。
         return Result.success(new CsrfTokenResponse(csrfToken.getToken(), properties.csrfHeaderName()));
     }
 
@@ -238,6 +251,7 @@ public class AuthController {
             LoginType loginType,
             HttpServletRequest servletRequest,
             HttpServletResponse servletResponse) {
+        // 将客户端请求号、来源地址和 User-Agent 一并交给应用服务处理重放与审计。
         LoginResult result = authService.login(new LoginCommand(
                 request.clientRequestId(),
                 request.email(),
@@ -252,6 +266,7 @@ public class AuthController {
 
     private void writeLoginResult(
             LoginResult result, HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
+        // 先写入新访问令牌，再清除旧 CSRF Token，避免登录切换账号时复用旧会话状态。
         cookieManager.writeAccessToken(servletResponse, result.accessToken());
         csrfTokenRepository.saveToken(null, servletRequest, servletResponse);
     }

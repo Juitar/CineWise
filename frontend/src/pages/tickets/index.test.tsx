@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupTestEnvironment } from '../../features/test-utils';
 import { useElectronicTicket, useOrder } from '../../modules/order/transaction-hooks';
+import { useSeatMap } from '../../modules/ticketing/hooks';
 
 vi.mock('umi', () => ({
   useParams: () => ({ ticketId: '99' }),
@@ -13,6 +14,9 @@ vi.mock('umi', () => ({
 vi.mock('../../modules/order/transaction-hooks', () => ({
   useElectronicTicket: vi.fn(),
   useOrder: vi.fn(),
+}));
+vi.mock('../../modules/ticketing/hooks', () => ({
+  useSeatMap: vi.fn(),
 }));
 const contentMocks = vi.hoisted(() => ({
   getMovieDetail: vi.fn(),
@@ -31,6 +35,31 @@ describe('电子票页面场次上下文', () => {
     contentMocks.getCinemaDetail.mockReset();
     contentMocks.getMovieDetail.mockRejectedValue(new Error('内容夹具未提供影片资料'));
     contentMocks.getCinemaDetail.mockRejectedValue(new Error('内容夹具未提供影院资料'));
+    vi.mocked(useSeatMap).mockReturnValue({
+      loading: false,
+      seatMap: {
+        showId: '11',
+        auditoriumId: '44',
+        auditoriumName: '1号厅',
+        rowCount: 10,
+        seatCount: 100,
+        availableSeatCount: 99,
+        stateVersion: 1,
+        updatedAt: '2026-08-05T12:00:00+08:00',
+        seats: [
+          {
+            seatId: '101',
+            rowNo: '5',
+            seatNo: '10',
+            seatLabel: '5排10座',
+            status: 'SOLD',
+            stateVersion: 1,
+          },
+        ],
+      },
+      error: null,
+      refetch: vi.fn(),
+    });
   });
 
   it('使用票据 orderNo 查询订单并展示权威开场时间', () => {
@@ -93,6 +122,8 @@ describe('电子票页面场次上下文', () => {
     expect(screen.getByText('影片信息暂不可用')).toBeInTheDocument();
     expect(screen.getByText('影院信息暂不可用')).toBeInTheDocument();
     expect(screen.queryByText(/场次时间请在/)).not.toBeInTheDocument();
+    expect(screen.getByText('5排10座')).toBeInTheDocument();
+    expect(screen.queryByText('11')).not.toBeInTheDocument();
   });
 
   it('通过电子票关联订单后展示 D 的影片与影院资料', async () => {

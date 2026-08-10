@@ -97,9 +97,9 @@ export default function OrdersPage() {
             setCurrentPage(1);
           }}
           onPageChange={(page) => setCurrentPage(page)}
-          onOrderClick={(orderNo) => history.push(
-            workspacePath(location.pathname, `/orders/${encodeURIComponent(orderNo)}`),
-          )}
+          onOrderClick={(orderNo) =>
+            history.push(workspacePath(location.pathname, `/orders/${encodeURIComponent(orderNo)}`))
+          }
         />
       </div>
     </div>

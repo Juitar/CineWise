@@ -97,6 +97,12 @@ public final class MultiToolSupervisor {
     public MultiToolSupervisorResult run(MultiToolSupervisorRequest request, Consumer<String> onTextDelta) {
         MultiToolSupervisorRequest supervisorRequest = Objects.requireNonNull(request, "请求不能为空");
         Consumer<String> textDeltaConsumer = Objects.requireNonNull(onTextDelta, "文本分片回调不能为空");
+        String preferenceReply = profilePreferenceReply(supervisorRequest.validationContext().slotSnapshot().values());
+        if (preferenceReply != null) {
+            boolean pending = supervisorRequest.validationContext().slotSnapshot().values()
+                    .containsKey("profilePreference.value");
+            return safePreferenceResult(supervisorRequest, preferenceReply, pending);
+        }
         if (supervisorRequest.trustedContextReply() != null) {
             return trustedContextText(supervisorRequest);
         }
@@ -132,8 +138,10 @@ public final class MultiToolSupervisor {
         if (intent == AgentIntent.MOVIE && allowedToolNames.contains("rankMoviePlan")) {
             // 用户追问“哪里有场次/给几个排片”时，上一轮的上午、下午等时间条件只是
             // 查不到结果的原因，不应继续锁死本轮查询；城市、日期、影片和人数仍然保留。
+            boolean includeTimeConstraints = !isShowtimeDiscoveryRequest(supervisorRequest.input())
+                    || hasExplicitTimeRequest(supervisorRequest.input());
             var moviePlan = trustedMovieRecommendationPlan(
-                    supervisorRequest.validationContext(), !isShowtimeDiscoveryRequest(supervisorRequest.input()));
+                    supervisorRequest.validationContext(), includeTimeConstraints);
             PlanValidationResult movieValidation = validateForAllowedTools(
                     moviePlan, supervisorRequest.validationContext(), allowedToolNames);
             return execute(supervisorRequest, moviePlan, movieValidation,
@@ -162,6 +170,41 @@ public final class MultiToolSupervisor {
                 serverValidation,
                 stateMachine.initialize(serverValidation.executionPlan().orElseThrow()),
                 new ArrayList<>(), allowedToolNames);
+    }
+
+    /** 画像确认直接生成固定结果，避免“确认”再次进入模型意图分类。 */
+    private MultiToolSupervisorResult safePreferenceResult(
+            MultiToolSupervisorRequest request, String text, boolean pending) {
+        var emptyPlan = new com.miaoyu.ticket.agent.domain.plan.CandidatePlan(
+                UUID.randomUUID().toString(), 1, List.of());
+        PlanValidationResult validation = planSchemaValidator.validate(emptyPlan, request.validationContext());
+        return new MultiToolSupervisorResult(emptyPlan, validation,
+                stateMachine.initialize(validation.executionPlan().orElseThrow()), List.of(), false,
+                SAFE_GENERAL_CHAT, new com.miaoyu.ticket.agent.application.model.ReplyGenerationResponse(
+                        text, pending ? AgentReplyMessageType.QUESTION : AgentReplyMessageType.TEXT,
+                        pending ? new com.miaoyu.ticket.agent.application.reply.QuestionReplyFacts(
+                                com.miaoyu.ticket.agent.application.reply.QuestionReplyFacts.QuestionKind
+                                        .PROFILE_PREFERENCE,
+                                "偏好确认") : new TextReplyFacts()), false);
+    }
+
+    /** 只读取受控画像槽位，不回读用户原句，防止旧偏好干扰新推荐。 */
+    private static String profilePreferenceReply(java.util.Map<String, String> slots) {
+        String result = slots.get("profilePreference.result");
+        if ("SAVED".equals(result)) {
+            return "已保存为长期观影偏好，之后推荐会参考它。";
+        }
+        if ("DISCARDED".equals(result)) {
+            return "好的，这次不保存为长期偏好。";
+        }
+        String value = slots.get("profilePreference.value");
+        String polarity = slots.get("profilePreference.polarity");
+        if (value == null || polarity == null) {
+            return null;
+        }
+        return "DISLIKE".equals(polarity)
+                ? "要把“不喜欢 " + value + "”保存为长期观影偏好吗？回复“确认”保存，回复“不保存”取消。"
+                : "要把“喜欢 " + value + "”保存为长期观影偏好吗？回复“确认”保存，回复“不保存”取消。";
     }
 
     /** 追问已由服务端补齐三个可信槽位后，固定执行推荐工具，不再为同一主流程再次等待模型规划。 */
@@ -213,6 +256,7 @@ public final class MultiToolSupervisor {
      * <p>写节点由状态机保持等待确认，因此这里没有任何路径会因为模型、断线或超时再次调用
      * {@code createOrder}。重规划仅复用原运行标识和请求标识，持久化层仍须以 CAS 接收返回快照。</p>
      */
+    /** 每轮重新从状态机选择节点，避免重规划后复用旧节点列表导致重复执行。 */
     private MultiToolSupervisorResult execute(
             MultiToolSupervisorRequest request,
             com.miaoyu.ticket.agent.domain.plan.CandidatePlan candidatePlan,
@@ -337,6 +381,7 @@ public final class MultiToolSupervisor {
                 awaitingConfirmation ? SAFE_AWAITING_CONFIRMATION : null);
     }
 
+    /** 电影工具白名单由服务端固定，模型不能通过计划名称扩大调用范围。 */
     private Set<String> allowedMovieToolNames() {
         return toolRegistry.definitions().keySet().stream()
                 .filter(MOVIE_TOOL_NAMES::contains)
@@ -344,6 +389,7 @@ public final class MultiToolSupervisor {
     }
 
     /** 已持久化卡片的解释由服务端确定性生成；这里仅建立一个空计划完成本轮，不调用模型或 Tool。 */
+    /** 已验证上下文只生成固定文本，不让模型接触内部任务标识。 */
     private MultiToolSupervisorResult trustedContextText(MultiToolSupervisorRequest request) {
         var emptyPlan = new com.miaoyu.ticket.agent.domain.plan.CandidatePlan(
                 UUID.randomUUID().toString(), 1, List.of());
@@ -361,6 +407,7 @@ public final class MultiToolSupervisor {
                 .toList();
     }
 
+    /** 闲聊只允许安全文本进入 SSE，计划和工具原始响应保持结构化输出。 */
     private StreamedReply generalChatReply(
             MultiToolSupervisorRequest request, Consumer<String> onTextDelta) {
         try {
@@ -460,6 +507,7 @@ public final class MultiToolSupervisor {
     }
 
     /** QUESTION 的回答沿用服务端上一轮意图，不再把“明天”“两个人”单独交给模型重新分类。 */
+    /** 已继承的电影意图优先于模型分类，保证追问答案不会退化成闲聊。 */
     private AgentIntent resolvedIntent(MultiToolSupervisorRequest request) {
         if (request.inheritedIntent() == AgentIntent.MOVIE || isExplicitMovieRequest(request.input())) {
             return AgentIntent.MOVIE;
@@ -500,6 +548,19 @@ public final class MultiToolSupervisor {
                 || normalized.contains("排场");
     }
 
+    /** 本句话重新声明了时间时必须保留新时间，不能被“排场/排片”的放宽规则覆盖。 */
+    private static boolean hasExplicitTimeRequest(String input) {
+        if (input == null || input.isBlank()) {
+            return false;
+        }
+        String normalized = input.replaceAll("\\s+", "");
+        return normalized.contains("上午")
+                || normalized.contains("下午")
+                || normalized.contains("晚上")
+                || normalized.contains("今晚")
+                || normalized.matches(".*\\d{1,2}(?:点|时|[:：])(?:\\d{1,2})?.*");
+    }
+
     private static boolean hasTrustedTravelTaskContext(
             com.miaoyu.ticket.agent.domain.plan.PlanValidationContext context) {
         String taskId = context.slotSnapshot().values().get(TRAVEL_TASK_ID);
@@ -507,6 +568,7 @@ public final class MultiToolSupervisor {
         return taskId != null && !taskId.isBlank() && context.slotTypes().get(TRAVEL_TASK_ID) == String.class;
     }
 
+    /** 先检查工具白名单，再校验计划结构，失败时不触发任何工具。 */
     private PlanValidationResult validateForAllowedTools(
             com.miaoyu.ticket.agent.domain.plan.CandidatePlan candidatePlan,
             com.miaoyu.ticket.agent.domain.plan.PlanValidationContext context,

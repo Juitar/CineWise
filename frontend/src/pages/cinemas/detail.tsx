@@ -68,7 +68,10 @@ function AvailableMovieCard({ cinemaId, movie }: { cinemaId: string; movie: Avai
       </div>
       <Link
         className="cinema-detail-purchase-link"
-        to={`/shows?movieId=${encodeURIComponent(movie.movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`}
+        to={
+          `/shows?movieId=${encodeURIComponent(movie.movieId)}` +
+          `&cinemaId=${encodeURIComponent(cinemaId)}`
+        }
       >
         选择影片
       </Link>

@@ -85,11 +85,29 @@ function updateRuntime(
 
 /** 仅供 Hook 单测隔离模块级会话缓存，业务代码不得调用。 */
 export function resetAgentWorkspaceCacheForTest(): void {
+  clearAgentWorkspacePrivateState();
+  workspaceRuntimes.clear();
+}
+
+/**
+ * 登录结束时必须同时取消所有会话流并丢弃内存投影。
+ * 否则下一个账号可能看到上一个账号的会话列表或继续使用旧 SSE 游标。
+ */
+function clearAgentWorkspacePrivateState(): void {
   workspaceRuntimes.forEach((runtime) => {
+    runtime.sequence += 1;
     runtime.controller?.abort();
     if (runtime.inactivity !== null) window.clearTimeout(runtime.inactivity);
+    runtime.controller = null;
+    runtime.inactivity = null;
+    runtime.loading = null;
+    updateRuntime(runtime, {
+      sessions: [],
+      projection: createAgentProjection(runtime.sessionId),
+      loadStatus: 'loading',
+      feedback: null,
+    });
   });
-  workspaceRuntimes.clear();
 }
 
 function safeErrorMessage(error: unknown): string {
@@ -156,7 +174,13 @@ function createClientRequestId(): string {
   bytes[6] = (bytes[6] & 0x0f) | 0x40;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
   const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    hex.slice(12, 16),
+    hex.slice(16, 20),
+    hex.slice(20),
+  ].join('-');
 }
 
 function isTerminal(status: AgentProjection['status']): boolean {
@@ -174,8 +198,12 @@ function withoutLocalThinking(
 }
 
 function cardRecoveryRunIds(messages: readonly AgentMessage[]): readonly string[] {
+  // 最后一条消息也要恢复运行快照：它的最新 SSE 游标决定后续连接从哪里续传，不能只看卡片消息。
+  // 历史消息本身没有 eventId；补拉最后一次运行才能获得下一条 SSE 的正确起点。
+  const latestRunId = messages.length === 0 ? null : messages[messages.length - 1].runId;
   return Array.from(
     new Set([
+      ...(latestRunId === null ? [] : [latestRunId]),
       ...messages
         .filter((message) => typeof message.payload?.actionId === 'string')
         .map((message) => message.runId),
@@ -244,7 +272,8 @@ export function useAgentWorkspace(sessionId: string) {
     if (!hadCachedContent) updateRuntime(currentRuntime, { loadStatus: 'loading', feedback: null });
     // 活动 SSE 是当前会话的最新来源，恢复历史不能覆盖它，也不能再开一条流。
     if (currentRuntime.controller !== null) return undefined;
-    const load = async () => {
+  const load = async () => {
+        // 历史消息和会话列表并行读取；卡片快照随后按 runId 恢复，避免旧 SSE 从 0 重放。
       try {
         const [messages, sessionPage] = await Promise.all([
           listAgentMessages(sessionId),
@@ -260,6 +289,7 @@ export function useAgentWorkspace(sessionId: string) {
         const next = deduplicateConfirmationItems(
           buildProjectionFromHistoryAndSnapshots(sessionId, messages.records, snapshots),
         );
+        // 只读历史恢复不能覆盖同一会话正在运行的 SSE；流事件才是最新页面状态。
         projectionRef.current = next;
         updateRuntime(currentRuntime, {
           projection: next,
@@ -292,13 +322,16 @@ export function useAgentWorkspace(sessionId: string) {
     if (authStatus !== 'authenticated') stopActiveStream();
   }, [authStatus, stopActiveStream]);
 
-  useEffect(() => registerSessionEndHandler(stopActiveStream), [stopActiveStream]);
+  useEffect(() => registerSessionEndHandler(clearAgentWorkspacePrivateState), []);
 
-  const replaceProjection = useCallback((next: AgentProjection) => {
-    const deduplicated = deduplicateConfirmationItems(next);
-    projectionRef.current = deduplicated;
-    updateRuntime(runtimeFor(sessionId), { projection: deduplicated });
-  }, [sessionId]);
+  const replaceProjection = useCallback(
+    (next: AgentProjection) => {
+      const deduplicated = deduplicateConfirmationItems(next);
+      projectionRef.current = deduplicated;
+      updateRuntime(runtimeFor(sessionId), { projection: deduplicated });
+    },
+    [sessionId],
+  );
 
   const recoverRun = useCallback(
     async (sequence: number, resume: (cursor: string) => Promise<void>) => {
@@ -342,6 +375,7 @@ export function useAgentWorkspace(sessionId: string) {
 
   const startStream = useCallback(
     async function connect(request: AgentStreamRequest, cursor: string | null, recovering = false) {
+      // sequence 用于丢弃旧连接迟到的事件；重连只复用同一请求和服务端游标，不重新发起写请求。
       stopActiveStream();
       const controller = new AbortController();
       const currentRuntime = runtimeFor(sessionId);
@@ -353,6 +387,7 @@ export function useAgentWorkspace(sessionId: string) {
       }
 
       const resume = async (resumeCursor: string) => {
+        // stream.reset 后先按服务端快照重建投影，再用返回的最新游标继续连接。
         if (sequence !== runtimeFor(sessionId).sequence) return;
         await connect(request, resumeCursor, true);
       };
@@ -371,7 +406,8 @@ export function useAgentWorkspace(sessionId: string) {
         await postAgentStream(sessionId, request, cursor, controller.signal, {
           onHeartbeat: armInactivity,
           onEvent: async (event) => {
-            if (sequence !== runtimeFor(sessionId).sequence || event.sessionId !== sessionId) return;
+            if (sequence !== runtimeFor(sessionId).sequence || event.sessionId !== sessionId)
+              return;
             armInactivity();
             const current = withoutLocalThinking(projectionRef.current, localThinkingKey);
             const result = consumeAgentEvent(current, event);
@@ -466,12 +502,14 @@ export function useAgentWorkspace(sessionId: string) {
         kind: 'thinking',
         text: '正在理解你的需求',
       };
+      // 本地用户消息和“正在思考”仅作即时反馈；收到服务端事件后必须由投影替换，不能持久化为历史事实。
       const previous = projectionRef.current;
       const visibleItems =
         entry === 'workspace'
           ? previous.items.filter((item) => item.kind !== 'question')
           : previous.items;
       const cursor = previous.lastEventId;
+      // 新运行必须从已恢复游标继续。游标退回 0 会重放最早的偏好卡并污染当前运行。
       // eventId 是会话级递增游标，而 runId/planVersion 只属于一次运行。
       // 终态后发送新消息必须解除旧运行绑定，否则新运行的全部事件都会被 reducer 忽略。
       replaceProjection({

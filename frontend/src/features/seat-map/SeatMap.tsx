@@ -105,7 +105,9 @@ export const SeatMap: React.FC<SeatMapProps> = ({
                     type="button"
                     role="checkbox"
                     aria-checked={isSelected}
-                    aria-label={`${seat.seatLabel} ${isSelected ? '已先选' : seat.status === 'AVAILABLE' ? '可选' : '不可选'}`}
+                    aria-label={`${seat.seatLabel} ${
+                      isSelected ? '已先选' : seat.status === 'AVAILABLE' ? '可选' : '不可选'
+                    }`}
                     disabled={!isAvailable}
                     className={`seat-button ${statusClass}`}
                     onClick={() => handleSeatClick(seat)}

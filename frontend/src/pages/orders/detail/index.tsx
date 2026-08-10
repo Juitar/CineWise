@@ -15,6 +15,7 @@ import {
 import { OrderContentNotice } from '../../../features/order-content-notice/OrderContentNotice';
 import { useOrderContentDetails } from '../../../modules/order/useOrderContentDetails';
 import { useTravelTaskByOrder } from '../../../modules/travel/useTravelTask';
+import { useSeatMap } from '../../../modules/ticketing/hooks';
 import { isTravelAdviceAvailable } from '../../../modules/travel/advice-availability';
 import { ApiError } from '../../../shared/api/ApiError';
 import { workspacePath } from '../../../modules/agent/workspaceRoute';
@@ -32,6 +33,12 @@ export default function OrderDetailPage() {
   const paymentQuery = usePaymentQuery(orderNo);
   const travelTaskQuery = useTravelTaskByOrder();
   const order = orderQuery.data;
+  const seatMap = useSeatMap(order?.showId);
+  const seatLabels = order
+    ? order.seatIds.map((seatId) =>
+        seatMap.seatMap?.seats.find((seat) => seat.seatId === seatId)?.seatLabel,
+      ).filter((label): label is string => label !== undefined)
+    : [];
   const content = useOrderContentDetails(
     useMemo(() => (order ? [{ movieId: order.movieId, cinemaId: order.cinemaId }] : []), [order]),
   );
@@ -67,7 +74,9 @@ export default function OrderDetailPage() {
   const handleViewTicket = async () => {
     const payment = await paymentQuery.query();
     if (payment?.ticketId) {
-      history.push(workspacePath(location.pathname, `/tickets/${encodeURIComponent(payment.ticketId)}`));
+      history.push(
+        workspacePath(location.pathname, `/tickets/${encodeURIComponent(payment.ticketId)}`),
+      );
       return;
     }
     if (!paymentQuery.error) {
@@ -118,6 +127,7 @@ export default function OrderDetailPage() {
           cinemaName={cinema?.name ?? '影院信息暂不可用'}
           cinemaArea={cinema?.area ?? undefined}
           cinemaAddress={cinema?.address ?? undefined}
+          seatLabels={seatLabels}
           ticketCount={order?.ticketCount ?? 0}
           unitPrice={order?.unitPrice ?? '0.00'}
           totalAmount={order?.totalAmount ?? '0.00'}
@@ -130,7 +140,10 @@ export default function OrderDetailPage() {
           onPay={() =>
             history.push(
               order?.status === 'PAYING'
-                ? workspacePath(location.pathname, `/payments/${encodeURIComponent(orderNo)}/result`)
+                ? workspacePath(
+                    location.pathname,
+                    `/payments/${encodeURIComponent(orderNo)}/result`,
+                  )
                 : workspacePath(location.pathname, `/payments/${encodeURIComponent(orderNo)}`),
             )
           }

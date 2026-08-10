@@ -31,7 +31,8 @@ public class CinemaTitleResolutionTool {
             List<ResolvedCinema> matches = new ArrayList<>();
             catalog.data().stream().map(CinemaContent.class::cast)
                     .filter(cinema -> cinema.cinemaId() != null && matchesName(input, cinema.name()))
-                    .forEach(cinema -> matches.add(new ResolvedCinema(Long.toString(cinema.cinemaId()), cinema.name())));
+                    .forEach(cinema -> matches.add(
+                            new ResolvedCinema(Long.toString(cinema.cinemaId()), cinema.name())));
             return matches.size() == 1 ? Optional.of(matches.getFirst()) : Optional.empty();
         } catch (RuntimeException exception) {
             return Optional.empty();

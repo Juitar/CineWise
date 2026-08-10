@@ -37,7 +37,7 @@ function formatPlanReason(value: string): string {
     EARLY_TIME: '开场时间更早',
     TIME_FIRST: '开场时间更合适',
     NEAREST: '距离影院更近',
-    '固定推荐结果': '符合当前可购条件',
+    固定推荐结果: '符合当前可购条件',
   };
   const key = Object.keys(labels).find((candidate) => value.includes(candidate));
   return key ? labels[key] : value;
@@ -218,7 +218,11 @@ export function RecommendationPlanDetail({
               <Link
                 className="agent-plan-alternative"
                 key={show.showId}
-                to={`${sessionWorkspaceBase}${buildAgentSelectSeatsPath(show.showId, show.movieId, show.cinemaId)}`}
+                      to={`${sessionWorkspaceBase}${buildAgentSelectSeatsPath(
+                        show.showId,
+                        show.movieId,
+                        show.cinemaId,
+                      )}`}
               >
                 <span>{formatDateTime(show.startTime)}</span>
                 <span>

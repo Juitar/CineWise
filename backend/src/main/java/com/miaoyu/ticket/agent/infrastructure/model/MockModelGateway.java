@@ -219,6 +219,7 @@ public final class MockModelGateway implements ModelGateway {
             case CITY -> "你想在哪个城市看电影？";
             case DATE -> "你想在哪天看电影？";
             case TICKET_COUNT -> "一共几个人观看？";
+            case PROFILE_PREFERENCE -> "是否保存这项长期观影偏好？";
         };
     }
 

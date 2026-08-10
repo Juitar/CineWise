@@ -169,6 +169,8 @@ describe('公开内容接口响应契约', () => {
         cityCode: '330100',
         area: '滨江区',
         address: '江南大道88号',
+        longitude: null,
+        latitude: null,
         source: 'DEMO_CONTENT',
         sourceType: 'MOCK',
         dataTime: '2026-08-04T09:02:03+08:00',

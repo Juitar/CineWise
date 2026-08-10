@@ -109,7 +109,8 @@ export async function postAgentStream(
   handlers: AgentStreamHandlers,
 ): Promise<void> {
   const headers = await getCsrfRequestHeaders();
-  headers.set('Accept', 'text/event-stream');
+  // 成功响应读取 SSE；业务拒绝仍允许后端返回标准 JSON 错误，避免被 Spring 转成 406。
+  headers.set('Accept', 'text/event-stream, application/json');
   headers.set('Content-Type', 'application/json');
   if (lastEventId && lastEventId !== '0') headers.set('Last-Event-ID', lastEventId);
 

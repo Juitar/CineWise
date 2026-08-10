@@ -9,7 +9,8 @@ import org.springframework.web.client.RestClient;
 /** 高德反向地理编码适配器；失败只返回空结果，绝不记录精确位置或外部异常。 */
 final class AmapBrowserCityResolver implements BrowserCityResolver {
 
-    private static final String REVERSE_GEOCODE_ENDPOINT = "/v3/geocode/regeo?location={longitude},{latitude}&key={key}";
+    private static final String REVERSE_GEOCODE_ENDPOINT = "/v3/geocode/regeo?"
+            + "location={longitude},{latitude}&key={key}";
 
     private final RestClient restClient;
     private final String key;

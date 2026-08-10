@@ -1,19 +1,29 @@
 import { describe, expect, it } from 'vitest';
 
-import duplicateEvent from '../../../../backend/src/test/resources/fixtures/agent/c/duplicate-event.json';
+import duplicateEvent from
+  '../../../../backend/src/test/resources/fixtures/agent/c/duplicate-event.json';
 import errorEvent from '../../../../backend/src/test/resources/fixtures/agent/c/error-event.json';
 import errorCard from '../../../../backend/src/test/resources/fixtures/agent/c/error-card.json';
-import locationPermissionQuestion from '../../../../backend/src/test/resources/fixtures/agent/c/location-permission-question.json';
-import orderConfirmCard from '../../../../backend/src/test/resources/fixtures/agent/c/order-confirm-card.json';
-import travelAdviceCard from '../../../../backend/src/test/resources/fixtures/agent/c/travel-advice-card.json';
-import movieCard from '../../../../backend/src/test/resources/fixtures/agent/c/recommendation-card.json';
+import locationPermissionQuestion from
+  '../../../../backend/src/test/resources/fixtures/agent/c/location-permission-question.json';
+import orderConfirmCard from
+  '../../../../backend/src/test/resources/fixtures/agent/c/order-confirm-card.json';
+import travelAdviceCard from
+  '../../../../backend/src/test/resources/fixtures/agent/c/travel-advice-card.json';
+import movieCard from
+  '../../../../backend/src/test/resources/fixtures/agent/c/recommendation-card.json';
 import planCard from '../../../../backend/src/test/resources/fixtures/agent/c/plan-card.json';
-import processingEvent from '../../../../backend/src/test/resources/fixtures/agent/c/processing-event.json';
-import progressCard from '../../../../backend/src/test/resources/fixtures/agent/c/progress-card.json';
-import questionCard from '../../../../backend/src/test/resources/fixtures/agent/c/question-card.json';
+import processingEvent from
+  '../../../../backend/src/test/resources/fixtures/agent/c/processing-event.json';
+import progressCard from
+  '../../../../backend/src/test/resources/fixtures/agent/c/progress-card.json';
+import questionCard from
+  '../../../../backend/src/test/resources/fixtures/agent/c/question-card.json';
 import textCard from '../../../../backend/src/test/resources/fixtures/agent/c/text-card.json';
-import unknownEventType from '../../../../backend/src/test/resources/fixtures/agent/c/unknown-event-type.json';
-import unknownPayloadType from '../../../../backend/src/test/resources/fixtures/agent/c/unknown-payload-type.json';
+import unknownEventType from
+  '../../../../backend/src/test/resources/fixtures/agent/c/unknown-event-type.json';
+import unknownPayloadType from
+  '../../../../backend/src/test/resources/fixtures/agent/c/unknown-payload-type.json';
 import { parseAgentEvent } from './contract';
 import {
   buildProjectionFromHistoryAndSnapshots,
@@ -102,9 +112,7 @@ describe('Agent 事件投影', () => {
 
     expect(projection.items).toEqual([
       expect.objectContaining({ kind: 'user-text', text: '推荐电影' }),
-      expect.objectContaining({ kind: 'question', text: '请补充观影偏好' }),
     ]);
-    expect(projection.items[1].question).toBeUndefined();
   });
 
   it('按任意长度十进制字符串比较游标', () => {
@@ -633,6 +641,7 @@ describe('Agent 事件投影', () => {
     ]);
 
     expect(projection.items).toHaveLength(3);
+    expect(projection.lastEventId).toBe('90003');
     expect(projection.items[0].confirmation?.status).toBe('SUCCEEDED');
     expect(projection.items[1]).toMatchObject({
       kind: 'card-placeholder',

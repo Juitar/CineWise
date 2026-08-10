@@ -260,7 +260,7 @@ class AgentConversationSlotServiceTest {
         });
         return new AgentConversationSlotService(users, sessions, messages, slots, new ObjectMapper(),
                 Clock.fixed(Instant.parse("2026-08-07T02:00:00Z"), ZoneId.of("Asia/Shanghai")), cityResolver(),
-                null, null, genres);
+                null, null, genres, null);
     }
 
     private static AgentCityCodeResolver cityResolver() {

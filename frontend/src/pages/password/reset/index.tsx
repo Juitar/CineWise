@@ -84,7 +84,9 @@ export default function PasswordResetPage() {
 
   return (
     <div
-      className={`login-page-container password-reset-page ${isMobile ? 'login-page--mobile' : 'login-page--desktop'}`}
+      className={`login-page-container password-reset-page ${
+        isMobile ? 'login-page--mobile' : 'login-page--desktop'
+      }`}
     >
       <header className="login-header">
         <Link to="/" className="login-header-logo">

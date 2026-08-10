@@ -34,6 +34,7 @@ public class OrderQueryService {
 
     /** 分页查订单后一次批量加载本页座位，不对每行执行N+1查询。 */
     @Transactional(readOnly = true)
+    /** 分页查询先按当前用户过滤，再批量收集座位，避免把其他用户的座位或内部标识带入页面。 */
     public OrderPageView queryOrders(OrderListQuery query) {
         long currentUserId = currentUserAccessor.requireCurrentUserId();
         OrderRepository.OrderListCriteria criteria = toCriteria(currentUserId, query);
@@ -53,6 +54,7 @@ public class OrderQueryService {
 
     /** 先按当前用户过滤再查订单号，跨用户查询与不存在统一返回404。 */
     @Transactional(readOnly = true)
+    /** 订单详情只返回本人资源；座位展示应使用下单时保存的快照，而不是重新推测。 */
     public OrderQueryView queryOrder(String orderNo) {
         validateOrderNo(orderNo);
         long currentUserId = currentUserAccessor.requireCurrentUserId();
@@ -94,6 +96,7 @@ public class OrderQueryService {
                 size);
     }
 
+    /** 列表查询只组装受控座位引用，交易状态和座位可售性仍由票务查询负责。 */
     private Map<Long, List<Long>> groupSeatIds(List<OrderRepository.OrderQuerySnapshot> orders) {
         List<Long> orderIds = orders.stream()
                 .map(OrderRepository.OrderQuerySnapshot::orderId)
@@ -107,6 +110,7 @@ public class OrderQueryService {
     }
 
     /** 只组装查询字段，不把展示投影转换成可用于交易状态迁移的OrderSnapshot。 */
+    /** 映射层不把订单只读视图转换成可用于支付、取消或退款的交易对象。 */
     private OrderQueryView toView(
             OrderRepository.OrderQuerySnapshot order,
             List<Long> seatIds) {
@@ -127,6 +131,7 @@ public class OrderQueryService {
                 order.updatedAt());
     }
 
+    /** 订单号是用户可见查询条件，先限制长度和空值，避免把任意文本送入持久层。 */
     private String normalizeOptionalOrderNo(String orderNo) {
         if (orderNo == null || orderNo.isBlank()) {
             return null;

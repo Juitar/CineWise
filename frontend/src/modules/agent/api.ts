@@ -22,10 +22,7 @@ import type {
 
 const basePath = '/api/v1/agent';
 
-export async function resolveBrowserCity(
-  longitude: number,
-  latitude: number,
-): Promise<string> {
+export async function resolveBrowserCity(longitude: number, latitude: number): Promise<string> {
   // 浏览器可能返回 13 位以上小数；市级定位只需米级精度，避免触发后端 @Digits 校验。
   const normalizedLongitude = Number(longitude.toFixed(6));
   const normalizedLatitude = Number(latitude.toFixed(6));

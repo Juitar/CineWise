@@ -65,6 +65,7 @@ public class ProfileManagementService {
 
   @Transactional
   public TagView createMyManualTag(CreateTagCommand command) {
+    // 手工标签必须在同意有效、版本匹配和幂等键校验后写入，写入成功才清理画像缓存。
     long userId = requireConsentAndUser();
     validateKey(command.idempotencyKey());
     String hash = ProfileRequestHasher.sha256(command.canonicalValue());
@@ -90,8 +91,41 @@ public class ProfileManagementService {
     return view;
   }
 
+  /**
+   * 仅供 Agent 在用户明确确认后写入长期对话偏好。
+   * 该入口自行读取版本，调用方不能伪造用户、画像版本或标签来源。
+   */
+  @Transactional
+  public TagView saveMyConversationPreference(ConversationPreferenceCommand command) {
+    // Agent 只有在用户确认后才能调用此入口；来源固定为 CONVERSATION，不能由请求指定。
+    long userId = requireConsentAndUser();
+    validateKey(command.idempotencyKey());
+    String hash = ProfileRequestHasher.sha256(command.canonicalValue());
+    WriteReplay replay = findReplay(userId, "SAVE_CONVERSATION_PREFERENCE", command.idempotencyKey(), hash);
+    if (replay != null) {
+      return deserialize(replay.responseJson(), TagView.class);
+    }
+    ProfilePreferenceRepository.Snapshot preference = requirePreference(userId);
+    validateConversation(command.type(), command.value(), command.polarity());
+    String value = normalizeValue(command.value());
+    LocalDateTime now = now();
+    TagView view = new TagView(
+        idGenerator.nextId(), command.type(), value, command.polarity(), BigDecimal.ONE, BigDecimal.ONE,
+        ProfileTagSource.CONVERSATION, ProfileTagStatus.ACTIVE, null, 0, now);
+    try {
+      tagRepository.insert(view.toNewTag(userId, now));
+    } catch (DuplicateKeyException exception) {
+      throw new BusinessException(ProfileErrorCode.DUPLICATE_TAG);
+    }
+    advancePreferenceOrConflict(userId, preference.version(), now);
+    summaryCache.invalidateUser(userId);
+    saveReplay(userId, "SAVE_CONVERSATION_PREFERENCE", command.idempotencyKey(), hash, 201, serialize(view), now);
+    return view;
+  }
+
   @Transactional
   public TagView updateMyTag(String tagId, UpdateTagCommand command) {
+    // 只允许修改本人创建的手工标签；画像版本和标签版本同时参与并发控制。
     long userId = requireConsentAndUser();
     long parsedTagId = parseId(tagId);
     validateKey(command.idempotencyKey());
@@ -140,6 +174,7 @@ public class ProfileManagementService {
       UpdateTagCommand command,
       String hash,
       LocalDateTime now) {
+    // 启用/停用是独立动作，不允许同一个请求夹带极性或权重变化。
     if ((command.status() != ProfileTagStatus.ACTIVE && command.status() != ProfileTagStatus.DISABLED)
         || command.polarity() != null || command.weight() != null) {
       throw new BusinessException(ProfileErrorCode.INVALID_TAG);
@@ -159,6 +194,7 @@ public class ProfileManagementService {
 
   @Transactional
   public void deleteMyTag(String tagId, DeleteTagCommand command) {
+    // 删除采用软删除并推进画像版本，历史推荐仍可审计但不再读取该标签。
     long userId = requireConsentAndUser();
     long parsedTagId = parseId(tagId);
     validateKey(command.idempotencyKey());
@@ -181,6 +217,7 @@ public class ProfileManagementService {
 
   @Transactional
   public PreferenceView updateMyPersonalization(UpdatePersonalizationCommand command) {
+    // 个性化开关与标签共用画像版本，关闭后推荐服务应读取最新开关状态。
     long userId = requireConsentAndUser();
     validateKey(command.idempotencyKey());
     String hash = ProfileRequestHasher.sha256("PERSONALIZATION|" + command.enabled());
@@ -201,6 +238,7 @@ public class ProfileManagementService {
   }
 
   public ProfilePage listMyTags(int page, int size) {
+    // 列表只返回当前用户的有效画像设置和标签，分页上限防止一次拉取过大。
     long userId = requireConsentAndUser();
     if (page < 1 || size < 1 || size > 100) {
       throw new BusinessException(ProfileErrorCode.INVALID_TAG);
@@ -215,6 +253,7 @@ public class ProfileManagementService {
   }
 
   private long requireConsentAndUser() {
+    // 先取认证用户再检查同意记录；不接受客户端传入 userId 绕过隐私授权。
     long userId = currentUserAccessor.requireCurrentUserId();
     if (!consentQuery.findByUserId(userId).granted()) {
       throw new BusinessException(ProfileErrorCode.PROFILE_DATA_CONSENT_REQUIRED);
@@ -223,6 +262,7 @@ public class ProfileManagementService {
   }
 
   private ProfilePreferenceRepository.Snapshot requirePreference(long userId) {
+    // 首次访问惰性创建默认画像设置，保证后续版本更新始终有基线。
     return preferenceRepository.findByUserId(userId).orElseGet(() -> createDefaultPreference(userId));
   }
 
@@ -237,6 +277,7 @@ public class ProfileManagementService {
   }
 
   private void advancePreferenceOrConflict(long userId, long expectedVersion, LocalDateTime now) {
+    // 版本推进使用条件更新，失败说明另一个请求先修改过画像，不能覆盖其结果。
     if (!preferenceRepository.incrementVersionIfMatches(userId, expectedVersion, now)) {
       throw new BusinessException(ProfileErrorCode.PROFILE_VERSION_CONFLICT);
     }
@@ -255,11 +296,13 @@ public class ProfileManagementService {
   }
 
   private WriteReplay findReplay(long userId, String operation, String key, String hash) {
+    // 幂等记录按用户、操作和键查询，找到记录后还要校验参数哈希。
     return writeRequestRepository.findByUserIdAndOperationAndIdempotencyKey(userId, operation, key)
         .map(row -> decideReplay(row, hash)).orElse(null);
   }
 
   private WriteReplay decideReplay(ProfileWriteRequestRepository.Snapshot row, String hash) {
+    // 同一幂等键提交不同参数必须报错，禁止返回与本次请求不匹配的旧响应。
     if (ProfileWriteRequestDecision.decide(row.requestHash(), hash)
         == ProfileWriteRequestDecision.REJECT_PARAMETER_MISMATCH) {
       throw new BusinessException(ProfileErrorCode.IDEMPOTENCY_PARAMETER_MISMATCH);
@@ -275,11 +318,13 @@ public class ProfileManagementService {
       int status,
       String response,
       LocalDateTime now) {
+    // 保存完整响应供客户端重试复用，保留期与画像写入审计周期一致。
     writeRequestRepository.insert(new ProfileWriteRequestRepository.NewRequest(
         idGenerator.nextId(), userId, operation, key, hash, status, response, now, now.plusDays(30)));
   }
 
   private String serialize(Object value) {
+    // 幂等响应使用明确 DTO 序列化，不保存模型原文或请求中的额外字段。
     try {
       return objectMapper.writeValueAsString(value);
     } catch (JsonProcessingException exception) {
@@ -296,6 +341,7 @@ public class ProfileManagementService {
   }
 
   private void validateManual(ProfileTagType type, String value, ProfileTagPolarity polarity, BigDecimal weight) {
+    // 手工标签沿用 ProfileTagPolicy，确保来源、权重和字段长度规则只有一份。
     try {
       normalizeValue(value);
       if (type == null || polarity == null
@@ -307,7 +353,21 @@ public class ProfileManagementService {
     }
   }
 
+  private void validateConversation(ProfileTagType type, String value, ProfileTagPolarity polarity) {
+    // 对话偏好固定置信度和来源，只验证允许的类型、文本和极性。
+    try {
+      normalizeValue(value);
+      if (type == null || polarity == null
+          || !ProfileTagPolicy.isWeightValid(ProfileTagSource.CONVERSATION, BigDecimal.ONE, null)) {
+        throw new IllegalArgumentException("对话标签参数不合法");
+      }
+    } catch (IllegalArgumentException exception) {
+      throw new BusinessException(ProfileErrorCode.INVALID_TAG);
+    }
+  }
+
   private String normalizeValue(String value) {
+    // 统一去除首尾空白并执行标签值长度校验，避免同义文本产生重复标签。
     return new ProfileTagValue(value).value();
   }
 
@@ -337,6 +397,11 @@ public class ProfileManagementService {
       long expectedVersion, String idempotencyKey, ProfileTagType type, String value,
       ProfileTagPolarity polarity, BigDecimal weight) {
     String canonicalValue() { return type + "|" + value + "|" + polarity + "|" + weight; }
+  }
+
+  public record ConversationPreferenceCommand(
+      String idempotencyKey, ProfileTagType type, String value, ProfileTagPolarity polarity) {
+    String canonicalValue() { return type + "|" + value + "|" + polarity; }
   }
 
   public record UpdateTagCommand(

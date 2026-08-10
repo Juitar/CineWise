@@ -94,7 +94,12 @@ export function loadAmap(): Promise<AMapApi> {
       existing.addEventListener('load', resolveMap, { once: true });
       existing.addEventListener(
         'error',
-        () => reject(new CinemaLocationMapError('地图脚本请求失败，请检查网络、域名白名单或浏览器拦截设置。')),
+        () =>
+          reject(
+            new CinemaLocationMapError(
+              '地图脚本请求失败，请检查网络、域名白名单或浏览器拦截设置。',
+            ),
+          ),
         { once: true },
       );
       return;
@@ -104,24 +109,41 @@ export function loadAmap(): Promise<AMapApi> {
     script.async = true;
     script.charset = 'utf-8';
     window[AMAP_READY_CALLBACK] = resolveMap;
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(key)}&callback=${AMAP_READY_CALLBACK}`;
-    // 高德回调是地图对象完成初始化的时点；若脚本已返回却未触发回调，不能无限等待。
-    script.addEventListener('load', () => {
-      window.setTimeout(() => {
-        if (window.AMap?.Map) {
-          resolveMap();
-          return;
-        }
-        delete window[AMAP_READY_CALLBACK];
-        reject(new CinemaLocationMapError('高德地图拒绝当前 Web Key，请检查 Key 状态和域名白名单。'));
-      }, 0);
-    }, { once: true });
-    script.addEventListener('error', () => {
-      delete window[AMAP_READY_CALLBACK];
-      reject(new CinemaLocationMapError('地图脚本请求失败，请检查网络、域名白名单或浏览器拦截设置。'));
-    }, {
-      once: true,
+    const query = new URLSearchParams({
+      v: '2.0',
+      key,
+      callback: AMAP_READY_CALLBACK,
     });
+    script.src = `https://webapi.amap.com/maps?${query.toString()}`;
+    // 高德回调是地图对象完成初始化的时点；若脚本已返回却未触发回调，不能无限等待。
+    script.addEventListener(
+      'load',
+      () => {
+        window.setTimeout(() => {
+          if (window.AMap?.Map) {
+            resolveMap();
+            return;
+          }
+          delete window[AMAP_READY_CALLBACK];
+          reject(
+            new CinemaLocationMapError('高德地图拒绝当前 Web Key，请检查 Key 状态和域名白名单。'),
+          );
+        }, 0);
+      },
+      { once: true },
+    );
+    script.addEventListener(
+      'error',
+      () => {
+        delete window[AMAP_READY_CALLBACK];
+        reject(
+          new CinemaLocationMapError('地图脚本请求失败，请检查网络、域名白名单或浏览器拦截设置。'),
+        );
+      },
+      {
+        once: true,
+      },
+    );
     document.head.appendChild(script);
   });
   // 高德异步脚本在部分网络下超过 8 秒仍会继续初始化，不能提前丢弃它的回调。
@@ -136,10 +158,7 @@ export function loadAmap(): Promise<AMapApi> {
 async function requestDeviceCoordinates(sessionId: string): Promise<DeviceCoordinates> {
   const cached = deviceLocationBySession.get(sessionId);
   if (cached) return cached;
-  const coordinates = await withTimeout(
-    requestCurrentCoordinates(),
-    '定位超时，请手动输入城市。',
-  );
+  const coordinates = await withTimeout(requestCurrentCoordinates(), '定位超时，请手动输入城市。');
   deviceLocationBySession.set(sessionId, coordinates);
   return coordinates;
 }
@@ -163,9 +182,11 @@ function calculateDistance(amap: AMapApi, first: Coordinates, second: Coordinate
   const radians = Math.PI / 180;
   const latitudeDelta = (second[1] - first[1]) * radians;
   const longitudeDelta = (second[0] - first[0]) * radians;
-  const a = Math.sin(latitudeDelta / 2) ** 2
-    + Math.cos(first[1] * radians) * Math.cos(second[1] * radians)
-    * Math.sin(longitudeDelta / 2) ** 2;
+  const a =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(first[1] * radians) *
+      Math.cos(second[1] * radians) *
+      Math.sin(longitudeDelta / 2) ** 2;
   return 6_371_000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
@@ -207,7 +228,12 @@ export function CinemaLocationMap({
     setLoading(true);
     setNotice('正在加载影院位置');
     try {
-      if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+      if (
+        typeof longitude !== 'number' ||
+        typeof latitude !== 'number' ||
+        !Number.isFinite(longitude) ||
+        !Number.isFinite(latitude)
+      ) {
         throw new CinemaLocationMapError('影院暂未提供地图坐标');
       }
       const amap = await loadAmap();

@@ -35,11 +35,13 @@ public class AgentPlanCardFollowUpResolver {
 
     /** 非方案解释请求返回空；命中后无论卡片是否存在都返回安全 TEXT，避免误走推荐流程。 */
     public Optional<ReplyGenerationResponse> resolve(long sessionId, long userId, String input) {
+        // 只解析“第几个方案”的解释请求；普通聊天必须继续走正常意图识别。
         Integer requestedIndex = referencedPlanIndex(input);
         if (requestedIndex == null) {
             return Optional.empty();
         }
         var latest = messageRepository.findLatestPlanCardBySessionIdAndUserId(sessionId, userId);
+        // 查询携带 userId，不能从相同 sessionId 的其他账号读取方案卡。
         if (latest.isEmpty() || latest.get().payload() == null) {
             return Optional.of(text("当前会话里没有可解释的推荐方案，请先生成一组推荐。"));
         }
@@ -56,6 +58,7 @@ public class AgentPlanCardFollowUpResolver {
     }
 
     private static Integer referencedPlanIndex(String input) {
+        // 先要求存在解释语义再匹配序号，避免用户单独提到“第一个”时误进入该分支。
         if (input == null || input.isBlank() || !EXPLANATION_REQUEST.matcher(input).find()) {
             return null;
         }
@@ -67,6 +70,7 @@ public class AgentPlanCardFollowUpResolver {
     }
 
     private static Integer parsePositiveNumber(String value) {
+        // 支持常用阿拉伯数字和中文十以内/十位表达，不接受模糊或负数索引。
         if (value.chars().allMatch(Character::isDigit)) {
             return Integer.valueOf(value);
         }
@@ -99,6 +103,7 @@ public class AgentPlanCardFollowUpResolver {
     }
 
     private JsonNode readPayload(String json) {
+        // 历史数据可能经历过 JSON 二次编码；读取失败返回空对象，不能抛异常中断整次会话。
         try {
             JsonNode root = objectMapper.readTree(json);
             return root.isTextual() ? objectMapper.readTree(root.asText()) : root;
@@ -108,6 +113,7 @@ public class AgentPlanCardFollowUpResolver {
     }
 
     private static String explain(int index, JsonNode plan, JsonNode card) {
+        // 说明文本只引用卡片中已有公开字段，不重新调用模型、推荐服务或读取私有上下文。
         List<String> facts = new ArrayList<>();
         addFact(facts, "影片", displayText(plan, "movieName"));
         addFact(facts, "影院", displayText(plan, "cinemaName"));
@@ -131,6 +137,7 @@ public class AgentPlanCardFollowUpResolver {
                 || card.path("expired").asBoolean(false)
                 || plan.path("expired").asBoolean(false)
                 || !plan.path("purchaseEligible").asBoolean(false);
+        // 降级、过期或不可购票的方案只能建议重算，不能把过期信息包装成可下单建议。
         reply.append(shouldAdjust
                 ? "这个方案需要继续调整或重新生成后再决定。"
                 : "当前信息下不必继续调整；如果时间、影院或预算不合适，再修改条件即可。");
@@ -138,6 +145,7 @@ public class AgentPlanCardFollowUpResolver {
     }
 
     private static String displayInstant(JsonNode node, String field) {
+        // 时间仅接受标准 Instant；异常格式按缺失字段处理而不是猜测时区。
         String value = displayText(node, field);
         if (value == null) {
             return null;
@@ -159,6 +167,7 @@ public class AgentPlanCardFollowUpResolver {
     }
 
     private static List<String> reasons(JsonNode reasons) {
+        // 推荐原因限制数量和文本长度，防止历史载荷在普通文本回复中无限膨胀。
         if (!reasons.isArray()) {
             return List.of();
         }
@@ -186,6 +195,7 @@ public class AgentPlanCardFollowUpResolver {
     }
 
     private static String safeDisplayText(String value) {
+        // 清理控制字符并截断展示文本，避免卡片载荷直接影响聊天布局或日志可读性。
         if (value == null || value.isBlank()) {
             return null;
         }

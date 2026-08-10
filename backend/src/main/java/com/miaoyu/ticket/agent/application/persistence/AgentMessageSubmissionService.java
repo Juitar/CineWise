@@ -22,10 +22,13 @@ import java.util.function.Consumer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** 已校验计划的提交外层；主控调用刻意位于初始数据库短事务之外。 */
 @Service
 public class AgentMessageSubmissionService {
+    private static final Logger log = LoggerFactory.getLogger(AgentMessageSubmissionService.class);
     private final CurrentUserAccessor currentUserAccessor;
     private final AgentInitialRunTransaction initialRunTransaction;
     private final AgentConcurrentRequestLookupTransaction concurrentRequestLookupTransaction;
@@ -181,6 +184,8 @@ public class AgentMessageSubmissionService {
             return new AgentMessageSubmissionResult(snapshot(recordedRun, userId), false);
         } catch (RuntimeException exception) {
             // 仅持久化稳定失败事实；异常原文不能进入 Agent 表。
+            log.warn("Agent 会话执行失败，runId={}，exception={}", initial.run().runId(),
+                    exception.getClass().getName(), exception);
             runResultTransaction.recordFailure(initial.run());
             throw new AgentFailurePersistedException();
         }

@@ -132,7 +132,8 @@ export default function OrderConfirmPage() {
 
   const seatsPath = workspacePath(
     location.pathname,
-    `/shows/${encodeURIComponent(showId)}/seats?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`,
+    `/shows/${encodeURIComponent(showId)}/seats?movieId=${encodeURIComponent(movieId)}` +
+      `&cinemaId=${encodeURIComponent(cinemaId)}`,
   );
 
   const handleReturnToSeats = () => {
@@ -228,13 +229,20 @@ export default function OrderConfirmPage() {
             ? [
                 PROFILE_BREADCRUMB_ITEM,
                 { label: '我的订单', to: workspacePath(location.pathname, '/orders') },
-                { label: '订单详情', to: workspacePath(location.pathname, buildOrderDetailPath(order.orderNo)) },
+                {
+                  label: '订单详情',
+                  to: workspacePath(location.pathname, buildOrderDetailPath(order.orderNo)),
+                },
                 { label: '订单已创建' },
               ]
             : [
                 {
                   label: '选择场次',
-                  to: workspacePath(location.pathname, `/shows?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`),
+                  to: workspacePath(
+                    location.pathname,
+                    `/shows?movieId=${encodeURIComponent(movieId)}`
+                      + `&cinemaId=${encodeURIComponent(cinemaId)}`,
+                  ),
                 },
                 { label: '选择座位', to: seatsPath },
                 { label: '确认订单' },

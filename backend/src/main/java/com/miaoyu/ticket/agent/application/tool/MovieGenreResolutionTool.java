@@ -18,6 +18,9 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class MovieGenreResolutionTool {
+    /** 画像可保存的常用影片类型，不应因当天目录暂时没有该类型而无法表达长期偏好。 */
+    private static final List<String> PROFILE_MOVIE_GENRES = List.of(
+            "动作", "喜剧", "爱情", "科幻", "动画", "悬疑", "剧情", "恐怖");
     private final ContentQueryService contentQueryService;
     private final ObjectMapper objectMapper;
 
@@ -32,21 +35,20 @@ public class MovieGenreResolutionTool {
         if (input.isEmpty()) {
             return List.of();
         }
+        Set<String> knownGenres = new LinkedHashSet<>(PROFILE_MOVIE_GENRES);
         try {
             var catalog = contentQueryService.queryLocalMovies(null, null);
-            if (catalog.isEmpty()) {
-                return List.of();
+            if (catalog.isPresent()) {
+                catalog.orElseThrow().data().stream().map(MovieContent.class::cast)
+                        .forEach(movie -> collectGenres(movie.genresJson(), knownGenres));
             }
-            Set<String> knownGenres = new LinkedHashSet<>();
-            catalog.orElseThrow().data().stream().map(MovieContent.class::cast)
-                    .forEach(movie -> collectGenres(movie.genresJson(), knownGenres));
-            return knownGenres.stream()
-                    .filter(genre -> normalize(genre).length() >= 2 && input.contains(normalize(genre)))
-                    .sorted(Comparator.comparingInt(String::length).reversed().thenComparing(String::compareTo))
-                    .toList();
         } catch (RuntimeException exception) {
-            return List.of();
+            // 目录短暂不可用时仍可识别画像支持的常用类型，不能让用户明确表达被吞掉。
         }
+        return knownGenres.stream()
+                .filter(genre -> normalize(genre).length() >= 2 && input.contains(normalize(genre)))
+                .sorted(Comparator.comparingInt(String::length).reversed().thenComparing(String::compareTo))
+                .toList();
     }
 
     private void collectGenres(String genresJson, Set<String> knownGenres) {

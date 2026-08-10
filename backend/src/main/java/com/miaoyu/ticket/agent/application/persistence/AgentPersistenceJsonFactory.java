@@ -73,15 +73,20 @@ public class AgentPersistenceJsonFactory {
             OffsetDateTime expiresAt = occurredAt.plusMinutes(10L)
                     .atZone(ClockConfiguration.BUSINESS_ZONE_ID).toOffsetDateTime();
             Map<String, Object> input = Map.of("name", facts.inputLabel(), "type", "TEXT");
+            boolean preferenceConfirmation = facts.kind() == QuestionReplyFacts.QuestionKind.PROFILE_PREFERENCE;
+            List<Map<String, String>> options = preferenceConfirmation ? List.of(
+                    Map.of("optionId", UUID.randomUUID().toString(), "label", "保存偏好", "value", "确认"),
+                    Map.of("optionId", UUID.randomUUID().toString(), "label", "不保存", "value", "不保存"))
+                    : List.of();
             return write(Map.of(
                     "type", "QUESTION",
                     "questionId", UUID.randomUUID().toString(),
                     "questionKind", facts.kind().name(),
                     "message", reply.text(),
-                    "options", List.of(),
-                    "allowFreeText", true,
+                    "options", options,
+                    "allowFreeText", !preferenceConfirmation,
                     "input", input,
-                    "requiresConfirmation", false,
+                    "requiresConfirmation", preferenceConfirmation,
                     "expiresAt", expiresAt.toString()));
         }
         if (reply.payload() instanceof SelectSeatsReplyFacts) {

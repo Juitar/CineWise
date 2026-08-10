@@ -13,11 +13,13 @@ import org.apache.ibatis.annotations.Update;
 /** B 的四张 Agent 表 Mapper；所有 SQL 参数均使用 MyBatis 绑定，禁止拼接用户输入。 */
 @Mapper
 public interface AgentPersistenceMapper {
+    /** 会话读取不带槽位 JSON，避免普通列表把历史输入全文带入内存。 */
     String SESSION_COLUMNS = """
             id, session_id AS sessionId, user_id AS userId, summary, status,
             active_run_id AS activeRunId, version, create_time AS createTime,
             update_time AS updateTime, expire_at AS expireAt
             """;
+    /** 运行记录保留请求摘要和追踪标识，供恢复与审计使用，不直接用于展示用户输入。 */
     String RUN_COLUMNS = """
             id, run_id AS runId, session_id AS sessionId, user_id AS userId,
             client_request_id AS clientRequestId, request_hash_version AS requestHashVersion,
@@ -25,11 +27,13 @@ public interface AgentPersistenceMapper {
             started_at AS startedAt, finished_at AS finishedAt, version, create_time AS createTime,
             update_time AS updateTime, expire_at AS expireAt
             """;
+    /** 消息记录同时归属会话、运行和用户，三个条件缺一不可，防止跨会话恢复。 */
     String MESSAGE_COLUMNS = """
             id, message_id AS messageId, session_id AS sessionId, run_id AS runId, user_id AS userId, role,
             message_type AS messageType, text, payload_json AS payloadJson, status, completed_at AS completedAt,
             create_time AS createTime, expire_at AS expireAt
             """;
+    /** 节点快照用于断流恢复；它保存受控输入引用，不保存工具的完整外部响应。 */
     String STEP_COLUMNS = """
             id, run_id AS runId, plan_version AS planVersion, node_id AS nodeId, node_type AS nodeType,
             depends_on_json AS dependsOnJson, input_refs_json AS inputRefsJson, status,
@@ -39,15 +43,18 @@ public interface AgentPersistenceMapper {
             started_at AS startedAt, finished_at AS finishedAt, version, create_time AS createTime,
             update_time AS updateTime, expire_at AS expireAt
             """;
+    /** 事件序号是会话流的恢复游标，前端必须按十进制字符串比较，不能转为 JavaScript 数字。 */
     String EVENT_COLUMNS = """
             event_id AS eventId, session_id AS sessionId, run_id AS runId, event_type AS eventType,
             payload_json AS payloadJson, expire_at AS expireAt, create_time AS createTime
             """;
+    /** 游标同时记录最早保留事件，用于服务端判断客户端是否需要全量重置。 */
     String EVENT_CURSOR_COLUMNS = """
             session_id AS sessionId, last_committed_event_id AS lastCommittedEventId,
             first_retained_event_id AS firstRetainedEventId, version, expire_at AS expireAt,
             create_time AS createTime, update_time AS updateTime
             """;
+    /** 确认动作保存参数哈希和恢复提示，重复确认只能查询原动作，不能重建写请求。 */
     String ACTION_COLUMNS = """
             id, action_id AS actionId, user_id AS userId, agent_session_id AS agentSessionId,
             agent_run_id AS agentRunId, run_id AS runId, plan_id AS planId, plan_version AS planVersion,
@@ -59,11 +66,13 @@ public interface AgentPersistenceMapper {
             recovery_until AS recoveryUntil, version, create_time AS createTime, update_time AS updateTime
             """;
 
+    /** 按公开会话号和所属用户读取会话，是所有用户侧读取的基础隔离条件。 */
     @Select("SELECT " + SESSION_COLUMNS + " FROM agent_session WHERE session_id = #{sessionId}"
             + " AND user_id = #{userId} LIMIT 1")
     AgentSessionEntity findSessionBySessionIdAndUserId(
             @Param("sessionId") String sessionId, @Param("userId") long userId);
 
+    /** 在启动或清理运行的事务中锁定会话，禁止两个请求同时占用 active_run_id。 */
     @Select("SELECT " + SESSION_COLUMNS + " FROM agent_session WHERE session_id = #{sessionId}"
             + " AND user_id = #{userId} LIMIT 1 FOR UPDATE")
     AgentSessionEntity findSessionBySessionIdAndUserIdForUpdate(
@@ -72,10 +81,12 @@ public interface AgentPersistenceMapper {
     @Select("SELECT " + SESSION_COLUMNS + " FROM agent_session WHERE id = #{id} AND user_id = #{userId} LIMIT 1")
     AgentSessionEntity findSessionByIdAndUserId(@Param("id") long id, @Param("userId") long userId);
 
+    /** 槽位快照按用户读取，模型和 SSE 只能使用经过白名单序列化的这份数据。 */
     @Select("SELECT slot_snapshot_json FROM agent_session WHERE session_id = #{sessionId}"
             + " AND user_id = #{userId} LIMIT 1")
     String findSessionSlotSnapshot(@Param("sessionId") String sessionId, @Param("userId") long userId);
 
+    /** 更新槽位时同时校验版本和活动状态，过期或被清除会话不能复活旧条件。 */
     @Update("UPDATE agent_session SET slot_snapshot_json = #{slotSnapshotJson}, version = version + 1"
             + " WHERE id = #{sessionId} AND user_id = #{userId} AND version = #{expectedVersion}"
             + " AND status = 'ACTIVE'")
@@ -85,6 +96,7 @@ public interface AgentPersistenceMapper {
     @Select("SELECT " + SESSION_COLUMNS + " FROM agent_session WHERE id = #{id} LIMIT 1")
     AgentSessionEntity findSessionById(@Param("id") long id);
 
+    /** 用户会话列表固定按最近更新时间排序，分页排序必须稳定以避免重复或漏项。 */
     @Select("SELECT " + SESSION_COLUMNS + " FROM agent_session WHERE user_id = #{userId} AND status = 'ACTIVE'"
             + " ORDER BY update_time DESC, id DESC LIMIT #{limit} OFFSET #{offset}")
     List<AgentSessionEntity> findActiveSessionsByUserId(
@@ -97,6 +109,7 @@ public interface AgentPersistenceMapper {
             + " ORDER BY id ASC")
     List<AgentSessionEntity> findAllActiveSessionsByUserId(@Param("userId") long userId);
 
+    /** 新建会话只写基础元数据；槽位快照由后续受控更新填充。 */
     @Insert("""
             INSERT INTO agent_session (
                 id, session_id, user_id, summary, status, active_run_id, version, create_time, update_time, expire_at
@@ -108,6 +121,7 @@ public interface AgentPersistenceMapper {
             """)
     void insertSession(@Param("session") AgentSessionEntity session);
 
+    /** 以 active_run_id 为空作为互斥条件，返回零行代表已有运行占用该会话。 */
     @Update("""
             UPDATE agent_session
                SET active_run_id = #{runId}, expire_at = GREATEST(expire_at, #{runExpireAt}), version = version + 1
@@ -119,6 +133,7 @@ public interface AgentPersistenceMapper {
             @Param("runId") long runId,
             @Param("runExpireAt") LocalDateTime runExpireAt);
 
+    /** 摘要只允许从空值写入，不能让较晚完成的运行覆盖已有会话摘要。 */
     @Update("""
             UPDATE agent_session
                SET summary = #{summary}, update_time = #{now}
@@ -131,6 +146,7 @@ public interface AgentPersistenceMapper {
             @Param("summary") String summary,
             @Param("now") LocalDateTime now);
 
+    /** 释放运行必须匹配原 runId，避免旧运行结束时清掉新运行的占用标记。 */
     @Update("""
             UPDATE agent_session
                SET active_run_id = NULL, version = version + 1
@@ -138,6 +154,7 @@ public interface AgentPersistenceMapper {
             """)
     int releaseActiveRun(@Param("sessionId") long sessionId, @Param("runId") long runId);
 
+    /** 会话清理只能处理无活动运行的会话，随后统一缩短关联记录保留时间。 */
     @Update("""
             UPDATE agent_session
                SET status = 'CLEARED', active_run_id = NULL, expire_at = #{now}, update_time = #{now},
@@ -147,9 +164,11 @@ public interface AgentPersistenceMapper {
     int clearActiveInactiveSession(
             @Param("sessionId") long sessionId, @Param("userId") long userId, @Param("now") LocalDateTime now);
 
+    /** 清理会话时过期该会话的运行记录，不直接物理删除以保留事务内一致性。 */
     @Update("UPDATE agent_run SET expire_at = #{now} WHERE session_id = #{sessionId}")
     int expireRunsBySessionId(@Param("sessionId") long sessionId, @Param("now") LocalDateTime now);
 
+    /** 消息与会话同步过期，历史查询不能在会话清理后继续返回正文。 */
     @Update("UPDATE agent_message SET expire_at = #{now} WHERE session_id = #{sessionId}")
     int expireMessagesBySessionId(@Param("sessionId") long sessionId, @Param("now") LocalDateTime now);
 
@@ -173,12 +192,14 @@ public interface AgentPersistenceMapper {
             """)
     int deleteSessionIfEmptyAndInactive(@Param("sessionId") long sessionId);
 
+    /** 用户侧按公开 runId 查询必须附带 userId，管理员查询使用单独方法和权限入口。 */
     @Select("SELECT " + RUN_COLUMNS + " FROM agent_run WHERE run_id = #{runId} AND user_id = #{userId} LIMIT 1")
     AgentRunEntity findRunByRunIdAndUserId(@Param("runId") String runId, @Param("userId") long userId);
 
     @Select("SELECT " + RUN_COLUMNS + " FROM agent_run WHERE run_id = #{runId} LIMIT 1")
     AgentRunEntity findAdminRunByRunId(@Param("runId") String runId);
 
+    /** 管理审计筛选仅接受结构化 Criteria，动态条件仍使用 MyBatis 参数绑定。 */
     @Select({"<script>", "SELECT COUNT(*) FROM agent_run WHERE 1 = 1",
             "<if test='criteria.status != null'> AND status = #{criteria.status}</if>",
             "<if test='criteria.userIds != null'> AND user_id IN",
@@ -188,6 +209,7 @@ public interface AgentPersistenceMapper {
             "<if test='criteria.startedTo != null'> AND started_at &lt; #{criteria.startedTo}</if>", "</script>"})
     long countAdminRuns(@Param("criteria") Criteria criteria);
 
+    /** 审计分页与统计使用相同筛选条件，调用方应先保证管理员权限。 */
     @Select({"<script>", "SELECT " + RUN_COLUMNS + " FROM agent_run WHERE 1 = 1",
             "<if test='criteria.status != null'> AND status = #{criteria.status}</if>",
             "<if test='criteria.userIds != null'> AND user_id IN",
@@ -206,6 +228,7 @@ public interface AgentPersistenceMapper {
             "#{runId}</foreach> GROUP BY run_id", "</script>"})
     List<AdminAgentRunStepStatsRow> findAdminRunStepStatsByRunIds(@Param("runIds") List<Long> runIds);
 
+    /** 客户端请求号仅在同一用户和会话内幂等，不能跨会话命中旧运行。 */
     @Select("SELECT " + RUN_COLUMNS + " FROM agent_run WHERE user_id = #{userId} AND session_id = #{sessionId}"
             + " AND client_request_id = #{clientRequestId} LIMIT 1")
     AgentRunEntity findRunByClientRequestId(
@@ -220,6 +243,7 @@ public interface AgentPersistenceMapper {
     List<AgentRunEntity> findRunsByIdsAndUserIdAndSessionId(
             @Param("runIds") List<Long> runIds, @Param("userId") long userId, @Param("sessionId") long sessionId);
 
+    /** 定时恢复只扫描超时未更新的运行，避免把仍在执行的运行误判为失联。 */
     @Select("SELECT " + RUN_COLUMNS + " FROM agent_run WHERE status = 'RUNNING'"
             + " AND update_time <= #{cutoff} ORDER BY update_time ASC LIMIT #{limit}")
     List<AgentRunEntity> findStaleRunningBefore(@Param("cutoff") LocalDateTime cutoff, @Param("limit") int limit);
@@ -229,6 +253,7 @@ public interface AgentPersistenceMapper {
             + " ORDER BY update_time ASC LIMIT #{limit}")
     List<AgentRunEntity> findExpiredWaitingLocationByUser(@Param("userId") long userId, @Param("limit") int limit);
 
+    /** 常规运行在会话占用成功后写入；写入失败会由外层事务回滚占用。 */
     @Insert("""
             INSERT INTO agent_run (
                 id, run_id, session_id, user_id, client_request_id, request_hash_version, request_hash,
@@ -243,6 +268,7 @@ public interface AgentPersistenceMapper {
             """)
     void insertRun(@Param("run") AgentRunEntity run);
 
+    /** 等待定位运行不保存经纬度，只保存恢复所需的运行元数据。 */
     @Insert("""
             INSERT INTO agent_run (
                 id, run_id, session_id, user_id, client_request_id, request_hash_version, request_hash,
@@ -256,6 +282,7 @@ public interface AgentPersistenceMapper {
             """)
     void insertWaitingLocation(@Param("run") AgentRunEntity run);
 
+    /** 计划版本更新使用 CAS，防止旧节点结果覆盖已重新规划的运行。 */
     @Update("""
             UPDATE agent_run
                SET plan_id = #{run.planId}, plan_version = #{run.planVersion}, version = version + 1,
@@ -264,6 +291,7 @@ public interface AgentPersistenceMapper {
             """)
     int updateRunRunningPlanWithCas(@Param("run") AgentRunEntity run, @Param("expectedVersion") long expectedVersion);
 
+    /** 终态写入只接受 RUNNING，取消或失败后不能再改回完成状态。 */
     @Update("""
             UPDATE agent_run
                SET plan_id = #{run.planId}, plan_version = #{run.planVersion}, status = #{run.status},
@@ -272,6 +300,7 @@ public interface AgentPersistenceMapper {
             """)
     int updateRunTerminalWithCas(@Param("run") AgentRunEntity run, @Param("expectedVersion") long expectedVersion);
 
+    /** 通用状态迁移显式传入期望状态，调用方不得跳过状态机规则。 */
     @Update("""
             UPDATE agent_run
                SET plan_id = #{run.planId}, plan_version = #{run.planVersion}, status = #{run.status},
@@ -283,6 +312,7 @@ public interface AgentPersistenceMapper {
             @Param("expectedVersion") long expectedVersion,
             @Param("expectedStatus") String expectedStatus);
 
+    /** 等待定位超过约定时间才允许恢复，避免浏览器定位仍在授权时重复执行。 */
     @Update("""
             UPDATE agent_run
                SET plan_id = #{run.planId}, plan_version = #{run.planVersion}, status = 'RUNNING',
@@ -303,6 +333,7 @@ public interface AgentPersistenceMapper {
     @Select("SELECT COUNT(*) FROM agent_run WHERE session_id = #{sessionId}")
     int countRunsBySessionId(@Param("sessionId") long sessionId);
 
+    /** 每条消息与所属用户、会话和运行同时绑定，恢复历史时可验证完整归属。 */
     @Insert("""
             INSERT INTO agent_message (
                 id, message_id, session_id, run_id, user_id, role, message_type, text, payload_json,

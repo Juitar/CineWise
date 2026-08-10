@@ -73,7 +73,10 @@ export default function AdminContentPage() {
             type="info"
             showIcon
             message={`同步任务：${state.task.status}`}
-            description={`成功 ${state.task.successCount} 条，失败 ${state.task.failureCount} 条${state.task.failureCategory ? `；${state.task.failureCategory}` : ''}`}
+            description={
+              `成功 ${state.task.successCount} 条，失败 ${state.task.failureCount} 条` +
+              (state.task.failureCategory ? `；${state.task.failureCategory}` : '')
+            }
           />
         )}
         {state.loading && (

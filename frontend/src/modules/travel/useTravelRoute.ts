@@ -15,8 +15,8 @@ export type TravelRoutePhase = 'idle' | 'locating' | 'planning';
 export type TravelRoutePlanOutcome = 'success' | 'failed' | 'task-unavailable';
 
 class BrowserLocationUnavailable extends Error {
-  constructor(readonly insecureContext = false) {
-    super();
+  constructor(message: string, readonly insecureContext = false) {
+    super(message);
   }
 }
 
@@ -37,7 +37,7 @@ function validCoordinates(longitude: number, latitude: number): boolean {
 export function requestCurrentCoordinates(): Promise<CurrentCoordinates> {
   return new Promise((resolve, reject) => {
     if (typeof window !== 'undefined' && window.isSecureContext === false) {
-      reject(new BrowserLocationUnavailable(true));
+      reject(new BrowserLocationUnavailable(CURRENT_LOCATION_UNAVAILABLE_MESSAGE, true));
       return;
     }
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -76,6 +76,7 @@ function routeFailureNotice(error: unknown): string {
   if (error instanceof BrowserLocationUnavailable && error.insecureContext) {
     return CURRENT_LOCATION_UNAVAILABLE_MESSAGE;
   }
+  if (error instanceof BrowserLocationUnavailable) return error.message;
   if (error instanceof ApiError && error.code === 107004) {
     return '地点无法唯一确定，请补充更具体的地址';
   }

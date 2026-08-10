@@ -13,7 +13,6 @@ describe('ElectronicTicketCard 组件', () => {
         ticketCode="202608051234"
         orderNo="202608050001"
         showTitle="流浪地球3"
-        showId="1001"
         showTime="2026-08-10T14:30:00+08:00"
         cinemaName="妙语影城（大悦城店）"
         seatLabels={['5排10座', '5排11座']}
@@ -22,9 +21,9 @@ describe('ElectronicTicketCard 组件', () => {
       />,
     );
     expect(screen.getByText('流浪地球3')).toBeInTheDocument();
-    expect(screen.getByText(/座位编号[：:]/)).toBeInTheDocument();
+    expect(screen.getByText(/座位[：:]/)).toBeInTheDocument();
     expect(screen.getByText(/5排10座\s+5排11座/)).toBeInTheDocument();
-    expect(screen.getByText('1001')).toBeInTheDocument();
+    expect(screen.queryByText('1001')).not.toBeInTheDocument();
     expect(screen.getByText('202608051234')).toBeInTheDocument();
     expect(screen.getByLabelText('有效电子票二维码')).toBeInTheDocument();
     expect(screen.getByText('有效票可入场')).toBeInTheDocument();

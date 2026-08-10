@@ -225,12 +225,12 @@ public class AgentRunResultTransaction {
         AgentStoredJson replyEventPayload = replyEvent == AgentEventType.CARD
                 ? jsonFactory.cardPayload(result.reply(), now)
                 : jsonFactory.eventPayload(Map.of("messageType", replyType.name()));
+        List<AgentRuntimeEvent> completionEvents = new ArrayList<>();
         if (replyType == AgentReplyMessageType.TEXT && !replyTextStreamed) {
-            runtimeEventService.append(session, run, AgentEventType.MESSAGE_DELTA,
-                    jsonFactory.eventPayload(Map.of("text", result.reply().text())));
+            completionEvents.add(runtimeEventService.append(session, run, AgentEventType.MESSAGE_DELTA,
+                    jsonFactory.eventPayload(Map.of("text", result.reply().text()))));
         }
         AgentRuntimeEvent replyCompleted = runtimeEventService.append(session, run, replyEvent, replyEventPayload);
-        List<AgentRuntimeEvent> completionEvents = new ArrayList<>();
         if (replyType == AgentReplyMessageType.TEXT) {
             completionEvents.add(replyCompleted);
         }

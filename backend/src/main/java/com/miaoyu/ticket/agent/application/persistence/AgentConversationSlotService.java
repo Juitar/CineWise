@@ -13,6 +13,9 @@ import com.miaoyu.ticket.agent.domain.persistence.AgentSession;
 import com.miaoyu.ticket.agent.domain.persistence.AgentSessionStatus;
 import com.miaoyu.ticket.agent.domain.plan.SlotSnapshot;
 import com.miaoyu.ticket.auth.application.CurrentUserAccessor;
+import com.miaoyu.ticket.profile.application.ProfileManagementService;
+import com.miaoyu.ticket.profile.domain.ProfileTagPolarity;
+import com.miaoyu.ticket.profile.domain.ProfileTagType;
 import com.miaoyu.ticket.common.config.ClockConfiguration;
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.agent.application.AgentErrorCode;
@@ -72,13 +75,15 @@ public class AgentConversationSlotService {
     private final MovieTitleResolutionTool movieTitleResolutionTool;
     private final CinemaTitleResolutionTool cinemaTitleResolutionTool;
     private final MovieGenreResolutionTool movieGenreResolutionTool;
+    private final ProfileManagementService profileManagementService;
 
     @Autowired
     public AgentConversationSlotService(CurrentUserAccessor currentUserAccessor,
             AgentSessionRepository sessionRepository, AgentMessageRepository messageRepository,
             AgentConversationSlotRepository slotRepository, ObjectMapper objectMapper, Clock clock,
             AgentCityCodeResolver cityCodeResolver, MovieTitleResolutionTool movieTitleResolutionTool,
-            CinemaTitleResolutionTool cinemaTitleResolutionTool, MovieGenreResolutionTool movieGenreResolutionTool) {
+            CinemaTitleResolutionTool cinemaTitleResolutionTool, MovieGenreResolutionTool movieGenreResolutionTool,
+            ProfileManagementService profileManagementService) {
         this.currentUserAccessor = currentUserAccessor;
         this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
@@ -89,6 +94,7 @@ public class AgentConversationSlotService {
         this.movieTitleResolutionTool = movieTitleResolutionTool;
         this.cinemaTitleResolutionTool = cinemaTitleResolutionTool;
         this.movieGenreResolutionTool = movieGenreResolutionTool;
+        this.profileManagementService = profileManagementService;
     }
 
     /** 保留现有轻量测试夹具；生产构造函数始终注入真实影片解析工具。 */
@@ -97,7 +103,7 @@ public class AgentConversationSlotService {
             AgentConversationSlotRepository slotRepository, ObjectMapper objectMapper, Clock clock,
             AgentCityCodeResolver cityCodeResolver) {
         this(currentUserAccessor, sessionRepository, messageRepository, slotRepository, objectMapper, clock,
-                cityCodeResolver, null, null, null);
+                cityCodeResolver, null, null, null, null);
     }
 
     /** 返回本轮唯一可用的服务端快照；无效回答保留旧值，由正常计划流程再次追问。 */
@@ -141,6 +147,9 @@ public class AgentConversationSlotService {
         }
     }
 
+    /**
+     * 仅接受会话最后一条 QUESTION，避免用户的新请求被更早的追问错误解释成答案。
+     */
     private String latestQuestionSlot(AgentSession session, long userId) {
         return messageRepository.findBySessionIdAndUserId(session.id(), userId, 1).stream()
                 .findFirst().filter(message -> message.type().name().equals("QUESTION"))
@@ -148,6 +157,9 @@ public class AgentConversationSlotService {
                 .map(this::questionSlot).orElse(null);
     }
 
+    /**
+     * QUESTION 载荷来自服务器持久化记录，解析失败时宁可不填槽位，也不信任自由字段名。
+     */
     private String questionSlot(String payload) {
         try {
             JsonNode root = objectMapper.readTree(payload);
@@ -167,11 +179,30 @@ public class AgentConversationSlotService {
         }
     }
 
+    /**
+     * 合并本轮输入时只改受控槽位；原始文本仅用于下一轮意图判断，不能变成工具参数。
+     */
     private PersistedConversation accepted(PersistedConversation current, String slot, String value) {
         if (value == null) {
             return current;
         }
         Map<String, String> values = new LinkedHashMap<>(current.values());
+        if (values.containsKey("profilePreference.value")) {
+            if (isPreferenceConfirmation(value)) {
+                savePendingPreference(values, current.version());
+                values.remove("profilePreference.value");
+                values.remove("profilePreference.polarity");
+                values.put("profilePreference.result", "SAVED");
+            } else if (isPreferenceRejection(value)) {
+                values.remove("profilePreference.value");
+                values.remove("profilePreference.polarity");
+                values.put("profilePreference.result", "DISCARDED");
+            } else {
+                values.remove("profilePreference.result");
+            }
+        } else {
+            values.remove("profilePreference.result");
+        }
         if (slot != null) {
             String normalized = normalizeUserAnswer(slot, value);
             if (normalized != null) {
@@ -193,7 +224,17 @@ public class AgentConversationSlotService {
         }
         String genres = extractGenres(value);
         if (genres != null) {
-            values.put("genres", genres);
+            List<String> resolved = movieGenreResolutionTool.resolve(value);
+            java.util.Optional<ProfileTagPolarity> polarity = preferencePolarity(value);
+            if (polarity.isPresent() && resolved.size() == 1) {
+                // “喜欢/不喜欢某类型”是画像写入请求，不是本轮找片条件。
+                // 一旦识别为偏好，就只保留待确认画像，不再把这句话里的类型交给推荐工具。
+                values.remove("genres");
+                values.put("profilePreference.value", resolved.getFirst());
+                values.put("profilePreference.polarity", polarity.orElseThrow().name());
+            } else {
+                values.put("genres", genres);
+            }
         }
         boolean explicitMovieRequest = slot == null && containsMovieRequest(value);
         String[] timeRange = extractTimeRange(value);
@@ -236,6 +277,52 @@ public class AgentConversationSlotService {
         return new PersistedConversation(current.version() + 1, values, originalRequest);
     }
 
+    /**
+     * 偏好写入沿用画像服务的幂等与同意校验，Agent 不直接操作画像持久层。
+     */
+    private void savePendingPreference(Map<String, String> values, long version) {
+        if (profileManagementService == null) {
+            return;
+        }
+        String value = values.get("profilePreference.value");
+        String polarity = values.get("profilePreference.polarity");
+        if (value == null || polarity == null) {
+            return;
+        }
+        profileManagementService.saveMyConversationPreference(
+                new ProfileManagementService.ConversationPreferenceCommand(
+                        "agent-profile-" + version + "-" + value + "-" + polarity,
+                        ProfileTagType.MOVIE_GENRE, value, ProfileTagPolarity.valueOf(polarity)));
+    }
+
+    /**
+     * 只有明确的好恶表达才触发长期画像，单纯提到影片类型仍是一次性推荐条件。
+     */
+    private static java.util.Optional<ProfileTagPolarity> preferencePolarity(String value) {
+        if (value.contains("不喜欢") || value.contains("不想看") || value.contains("讨厌")) {
+            return java.util.Optional.of(ProfileTagPolarity.DISLIKE);
+        }
+        if (value.contains("喜欢") || value.contains("爱看")) {
+            return java.util.Optional.of(ProfileTagPolarity.LIKE);
+        }
+        return java.util.Optional.empty();
+    }
+
+    private static boolean isPreferenceConfirmation(String value) {
+        String normalized = normalizeShortAnswer(value);
+        return "确认".equals(normalized) || "保存".equals(normalized) || "好的".equals(normalized)
+                || "好".equals(normalized) || "是".equals(normalized);
+    }
+
+    private static boolean isPreferenceRejection(String value) {
+        String normalized = normalizeShortAnswer(value);
+        return "不保存".equals(normalized) || "取消".equals(normalized) || "不用".equals(normalized)
+                || "否".equals(normalized) || "不是".equals(normalized);
+    }
+
+    /**
+     * 追问答案按问题类型单独收敛，禁止把任意文本写入城市、日期或人数槽位。
+     */
     private String normalizeUserAnswer(String slot, String value) {
         String text = value.trim();
         return switch (slot) {
@@ -375,6 +462,9 @@ public class AgentConversationSlotService {
         return count != null && count >= 1 && count <= 20 ? Integer.toString(count) : null;
     }
 
+    /**
+     * 时段统一转换为闭合的服务端时间范围，推荐器据此做硬过滤而不是仅调整排序。
+     */
     private static String[] extractTimeRange(String value) {
         java.util.regex.Matcher matcher = CLOCK_TIME_IN_TEXT.matcher(value);
         if (matcher.find()) {
@@ -413,6 +503,9 @@ public class AgentConversationSlotService {
         }
     }
 
+    /**
+     * 类型解析只使用内容目录允许的名称，避免模型或用户输入生成不存在的筛选类型。
+     */
     private String extractGenres(String value) {
         List<String> genres = movieGenreResolutionTool == null ? List.of() : movieGenreResolutionTool.resolve(value);
         if (genres.isEmpty()) {
@@ -497,12 +590,17 @@ public class AgentConversationSlotService {
         return java.time.LocalDateTime.ofInstant(clock.instant(), ClockConfiguration.BUSINESS_ZONE_ID);
     }
 
+    /**
+     * 会话 JSON 是历史输入，读取时重新校验每个字段，防止旧版本或损坏数据绕过当前约束。
+     */
     private PersistedConversation read(String json) {
         try {
             JsonNode root = objectMapper.readTree(json);
             long version = root.path("version").canConvertToLong() ? root.path("version").asLong() : 0L;
             Map<String, String> values = new LinkedHashMap<>();
-            for (String slot : List.of("cityCode", "date", "ticketCount", "genres", "movieId", "cinemaId", "timeFrom", "timeTo")) {
+            for (String slot : List.of(
+                    "cityCode", "date", "ticketCount", "genres", "movieId", "cinemaId", "timeFrom", "timeTo",
+                    "profilePreference.value", "profilePreference.polarity", "profilePreference.result")) {
                 String value = root.path("values").path(slot).isTextual()
                         ? normalizePersistedValue(slot, root.path("values").path(slot).asText()) : null;
                 if (value != null) {
@@ -517,6 +615,9 @@ public class AgentConversationSlotService {
         }
     }
 
+    /**
+     * 仅序列化白名单槽位和最小上下文，不把用户全文或工具原始响应持久化到会话快照。
+     */
     private String write(PersistedConversation conversation) {
         try {
             Map<String, Object> persisted = new LinkedHashMap<>();
@@ -545,6 +646,20 @@ public class AgentConversationSlotService {
     }
 
     private String normalizePersistedValue(String slot, String value) {
+        if ("profilePreference.value".equals(slot)) {
+            String normalized = value.strip();
+            if (normalized.isEmpty() || normalized.length() > 64 || movieGenreResolutionTool == null) {
+                return null;
+            }
+            List<String> resolved = movieGenreResolutionTool.resolve(normalized);
+            return resolved.size() == 1 && normalized.equals(resolved.getFirst()) ? normalized : null;
+        }
+        if ("profilePreference.polarity".equals(slot)) {
+            return "LIKE".equals(value) || "DISLIKE".equals(value) ? value : null;
+        }
+        if ("profilePreference.result".equals(slot)) {
+            return "SAVED".equals(value) || "DISCARDED".equals(value) ? value : null;
+        }
         if ("cityCode".equals(slot)) {
             return CITY_CODE.matcher(value).matches() ? value : null;
         }

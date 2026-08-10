@@ -22,11 +22,13 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
         AgentCardPayloadResponse.ConfirmationCard, AgentCardPayloadResponse.Unknown {
 
     static AgentCardPayloadResponse from(JsonNode payload) {
+        // 持久化载荷可能来自历史版本，解析失败必须降级为 Unknown，不能把未校验字段下发给前端。
         if (payload == null || !payload.isObject()) {
             return new Unknown(payload);
         }
         String type = text(payload, "type");
         if ("QUESTION".equals(type)) {
+            // 问题卡缺少任一必填字段时不创建半成品卡，前端只渲染完整的可交互结构。
             List<QuestionOption> options = questionOptions(payload.path("options"));
             QuestionInput input = questionInput(payload.path("input"));
             if (hasText(payload, "questionId") && hasText(payload, "questionKind") && hasText(payload, "message")
@@ -38,6 +40,7 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
             }
         }
         if ("BUSINESS_INTENT".equals(type) && payload.path("payload").isObject()) {
+            // 业务跳转只认展示所需的三个公开引用，禁止从 JSON 透传内部数据库主键。
             JsonNode details = payload.path("payload");
             JsonNode reference = details.path("businessRef");
             if (hasText(details, "intent") && hasText(reference, "showId") && hasText(reference, "movieId")
@@ -48,6 +51,7 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
             }
         }
         if ("PLAN_CARD".equals(type) && hasText(payload, "actionId")) {
+            // 有 actionId 的 PLAN_CARD 是确认卡，必须先于普通推荐卡判断。
             List<String> displayLines = strings(payload.path("displayLines"));
             List<PlanItem> plans = planItems(payload.path("plans"));
             if (hasText(payload, "actionType") && hasText(payload, "status") && hasText(payload, "expireAt")
@@ -59,6 +63,7 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
             }
         }
         if ("TRAVEL_ADVICE_CARD".equals(type)) {
+            // 出行建议允许 weather 为 null，但 available 为 true 时必须说明数据来源。
             TravelWeather weather = travelWeather(payload.path("weather"));
             List<TravelAdviceItem> advice = travelAdvice(payload.path("advice"));
             boolean available = payload.path("available").isBoolean() && payload.path("available").asBoolean();
@@ -74,6 +79,7 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
             }
         }
         if ("PLAN_CARD".equals(type)) {
+            // 普通推荐卡只有所有计划项和时效字段有效时才可恢复。
             List<PlanItem> plans = planItems(payload.path("plans"));
             List<String> missingFactors = strings(payload.path("missingFactors"));
             RelaxationSuggestion relaxation = relaxation(payload.path("relaxationSuggestion"));
@@ -94,6 +100,7 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
     }
 
     private static List<QuestionOption> questionOptions(JsonNode value) {
+        // 选项数组任意一项非法即整体拒绝，避免前端把错误选项提交为有效槽位值。
         if (!value.isArray()) {
             return null;
         }
@@ -108,11 +115,13 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
     }
 
     private static QuestionInput questionInput(JsonNode value) {
+        // 输入定义只暴露 name/type 白名单，具体校验仍由后端回复入口执行。
         return hasText(value, "name") && hasText(value, "type")
                 ? new QuestionInput(text(value, "name"), text(value, "type")) : null;
     }
 
     private static List<PlanItem> planItems(JsonNode value) {
+        // 计划项必须完整校验；推荐卡不能依赖前端猜测影院、电影或场次信息。
         if (!value.isArray()) {
             return null;
         }
@@ -137,6 +146,7 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
     }
 
     private static List<String> strings(JsonNode value) {
+        // 不接受混合数组，保证前端渲染原因和缺失因素时无需处理非文本值。
         if (!value.isArray()) {
             return null;
         }
@@ -151,6 +161,7 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
     }
 
     private static TravelWeather travelWeather(JsonNode value) {
+        // 天气字段可为空，空值表示上游不可用而不是构造假的天气结果。
         if (value.isNull()) {
             return null;
         }
@@ -160,6 +171,7 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
     }
 
     private static List<TravelAdviceItem> travelAdvice(JsonNode value) {
+        // 建议项限定 type/text 两个展示字段，避免历史 JSON 带入未定义结构。
         if (!value.isArray()) {
             return null;
         }
@@ -174,6 +186,7 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
     }
 
     private static RelaxationSuggestion relaxation(JsonNode value) {
+        // 放宽建议为可选内容，null 代表本次没有放宽推荐条件。
         if (value.isNull()) {
             return null;
         }
@@ -182,6 +195,7 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
     }
 
     private static boolean relaxationValid(JsonNode value, RelaxationSuggestion relaxation) {
+        // JSON 显式 null 与缺失后解析出的 null 都按无放宽建议处理。
         return value.isNull() || relaxation != null;
     }
 
@@ -190,6 +204,7 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
     }
 
     private static String nullableText(JsonNode value, String name) {
+        // 只有 JSON 明确为 null 才返回 null；其他非文本值交给 text 判为无效。
         return value.path(name).isNull() ? null : text(value, name);
     }
 
@@ -218,6 +233,7 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
             boolean requiresConfirmation, String expiresAt) implements AgentCardPayloadResponse {
     }
 
+    /** 问题选项的 value 是后端槽位值，label 仅供界面展示，二者不能混用。 */
     record QuestionOption(String optionId, String label, String value) {
     }
 
@@ -230,12 +246,14 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
             implements AgentCardPayloadResponse {
     }
 
+    /** 单个推荐计划保存公开内容 ID、展示文本、时效和是否允许购票，不保存内部订单数据。 */
     record PlanItem(String planType, String movieId, String movieName, String cinemaId, String cinemaName,
             String showId, String price, String currency, String startTime, String rating, Double score,
             List<String> reasons, String source, String dataAt, String expiresAt, boolean expired,
             boolean purchaseEligible, Integer distanceMeters) {
     }
 
+    /** 出行卡可以是降级结果；available 与 expired 由服务端决定，前端不能自行改写。 */
     record TravelAdviceCard(String type, String taskId, String taskStatus, boolean available, TravelWeather weather,
             List<TravelAdviceItem> advice, String source, boolean degraded, String fallbackType, String dataAt,
             String expiresAt,
@@ -251,6 +269,7 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
     record RelaxationSuggestion(String factor, String message) {
     }
 
+    /** 业务意图卡只携带跳转引用，不应被当作普通聊天文本重新送入模型。 */
     record BusinessIntent(String type, BusinessIntentDetails payload) implements AgentCardPayloadResponse {
     }
 
@@ -266,6 +285,7 @@ public sealed interface AgentCardPayloadResponse permits AgentCardPayloadRespons
             String dataAt, String expiresAt, Boolean degraded) implements AgentCardPayloadResponse {
     }
 
+    /** 无法识别的历史载荷保留原始 JSON 供兼容处理，但调用方不得按业务卡渲染。 */
     record Unknown(@JsonValue JsonNode value) implements AgentCardPayloadResponse {
     }
 }

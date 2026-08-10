@@ -594,11 +594,9 @@ export function consumeAgentEvent(
   const itemsWithoutThinking = clearsThinking(event, item)
     ? removeThinkingForRun(projection.items, event.runId)
     : projection.items;
+  const replacesQuestion = item !== null && !['thinking', 'user-text'].includes(item.kind);
   const itemsWithoutSupersededCards = itemsWithoutThinking.filter((candidate) => {
-    if (
-      (item?.kind === 'question' || item?.kind === 'plan-card' || item?.kind === 'movie-card') &&
-      candidate.kind === 'question'
-    ) {
+    if (replacesQuestion && candidate.kind === 'question') {
       return false;
     }
     return !(
@@ -679,13 +677,17 @@ function itemFromHistory(message: AgentMessage): AgentDisplayItem | null {
       key: `message:${message.messageId}`,
       kind: 'question',
       text: message.text,
-      question: questionKind === null ? undefined : {
-        questionId: typeof payload.questionId === 'string' ? payload.questionId : message.messageId,
-        kind: questionKind,
-        options: [],
-        allowFreeText: payload.allowFreeText !== false,
-        expiresAt: typeof payload.expiresAt === 'string' ? payload.expiresAt : '',
-      },
+      question:
+        questionKind === null
+          ? undefined
+          : {
+              questionId:
+                typeof payload.questionId === 'string' ? payload.questionId : message.messageId,
+              kind: questionKind,
+              options: [],
+              allowFreeText: payload.allowFreeText !== false,
+              expiresAt: typeof payload.expiresAt === 'string' ? payload.expiresAt : '',
+            },
     };
   }
   if (type === 'ERROR') {
@@ -713,9 +715,9 @@ export function buildProjectionFromHistory(
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const message = messages[index];
       if (message.type.toUpperCase() !== 'QUESTION') continue;
-      const hasLaterAssistantResult = messages.slice(index + 1).some((following) =>
-        following.role.toUpperCase() !== 'USER' && following.type.toUpperCase() !== 'PROGRESS');
-      if (!hasLaterAssistantResult) return message.messageId;
+      // QUESTION 后只要已有任何新消息，就说明它已被回答或被新请求覆盖。
+      // 恢复过程中不能把旧问题重新变成可点击卡片，否则旧答案会被提交给最新槽位。
+      if (index === messages.length - 1) return message.messageId;
     }
     return null;
   })();
@@ -880,8 +882,19 @@ export function buildProjectionFromHistoryAndSnapshots(
   const latest = latestConfirmationEvents(snapshots);
   const latestTravelAdvice = latestTravelAdviceEvents(snapshots);
   const latestRecommendations = latestRecommendationEvents(snapshots);
+  const lastEventId = snapshots
+    .filter((snapshot) => snapshot.sessionId === sessionId)
+    .map((snapshot) => snapshot.lastEventId)
+    .reduce(
+      (latestCursor, cursor) =>
+        compareDecimalStrings(cursor, latestCursor) > 0 ? cursor : latestCursor,
+      '0',
+    );
   return {
     ...historyProjection,
+    // 历史消息没有事件游标。恢复后必须从最新运行快照继续，否则下一次 POST SSE 会从 0
+    // 重放整段会话，并把最早的偏好卡错误绑定成当前运行。
+    lastEventId,
     items: historyProjection.items.map((item) => {
       const message = historyByItemKey.get(item.key);
       const key = message === undefined ? null : confirmationKey(message.runId, message.payload);

@@ -8,7 +8,8 @@ import type { OrderResponse } from './types';
  * 分类规则：
  * 1. 满足 RESULT_UNKNOWN 的情况：
  *    - 写请求发生网络断开或请求超时（公共 API 抛出的 ApiError 携带 isResultUnknown: true）；
- *    - 代理层返回 502 Bad Gateway 或 504 Gateway Timeout（需要根据 status === 502 || status === 504 显式识别），此时无法确认后端是否已经收到并执行事务；
+ *    - 代理层返回 502 Bad Gateway 或 504 Gateway Timeout（需要根据
+ *      `status === 502 || status === 504` 显式识别），此时无法确认后端是否已经收到并执行事务；
  *    - 请求发往服务端但未收到合法确认响应包。
  * 2. 明确不得列入 RESULT_UNKNOWN 的情况：
  *    - HTTP 状态码为 400, 401, 403, 404, 409, 422；

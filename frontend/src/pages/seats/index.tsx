@@ -83,7 +83,9 @@ export default function SeatsPage() {
           { label: '影院详情', to: `/cinemas/${encodeURIComponent(cinemaId)}` },
           {
             label: '选择场次',
-            to: `/shows?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`,
+            to:
+              `/shows?movieId=${encodeURIComponent(movieId)}` +
+              `&cinemaId=${encodeURIComponent(cinemaId)}`,
           },
           { label: '选择座位' },
         ]}

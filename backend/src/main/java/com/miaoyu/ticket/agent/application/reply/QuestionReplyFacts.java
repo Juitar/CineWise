@@ -35,6 +35,7 @@ public record QuestionReplyFacts(QuestionKind kind, String inputLabel) implement
     public enum QuestionKind {
         CITY,
         DATE,
-        TICKET_COUNT
+        TICKET_COUNT,
+        PROFILE_PREFERENCE
     }
 }

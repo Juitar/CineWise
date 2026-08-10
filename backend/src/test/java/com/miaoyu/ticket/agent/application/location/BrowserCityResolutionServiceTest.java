@@ -46,7 +46,8 @@ class BrowserCityResolutionServiceTest {
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(AgentErrorCode.CITY_RESOLUTION_UNAVAILABLE);
 
-        verify(cityResolver, never()).resolveCity(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(cityResolver, never()).resolveCity(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test

@@ -79,7 +79,9 @@ export function formatOrderDateTime(
   );
   const formatted = `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
   if (localDateTimeMatch) {
-    const expected = `${localDateTimeMatch[1]}-${localDateTimeMatch[2]}-${localDateTimeMatch[3]} ${localDateTimeMatch[4]}:${localDateTimeMatch[5]}`;
+    const expected =
+      `${localDateTimeMatch[1]}-${localDateTimeMatch[2]}-${localDateTimeMatch[3]} ` +
+      `${localDateTimeMatch[4]}:${localDateTimeMatch[5]}`;
     return formatted === expected ? formatted : fallback;
   }
   return formatted;

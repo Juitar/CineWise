@@ -1,4 +1,6 @@
-import type { ElectronicTicketStatus } from '../../features/electronic-ticket-card/ElectronicTicketCard';
+import type {
+  ElectronicTicketStatus,
+} from '../../features/electronic-ticket-card/ElectronicTicketCard';
 
 export interface ElectronicTicketMockData {
   ticketId: string;

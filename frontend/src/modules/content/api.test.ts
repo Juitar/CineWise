@@ -94,6 +94,8 @@ describe('内容详情查询', () => {
       cityCode: '430100',
       area: '岳麓区',
       address: '测试路 1 号',
+      longitude: null,
+      latitude: null,
       source: 'NETSTART_MAOYAN',
       sourceType: 'LIVE',
       dataTime: '2026-08-06T09:00:00+08:00',

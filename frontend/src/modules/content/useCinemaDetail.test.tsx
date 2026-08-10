@@ -14,6 +14,8 @@ const detail = (cinemaId: string, name: string): CinemaDetail => ({
   cityCode: '430100',
   area: '岳麓区',
   address: '梅溪湖路1号',
+  longitude: null,
+  latitude: null,
   source: 'NETSTART_MAOYAN',
   sourceType: 'LIVE',
   dataTime: '2026-08-05T10:00:00+08:00',

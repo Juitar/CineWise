@@ -28,7 +28,13 @@ export function createProfileUuid(): string {
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
     const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    return [
+      hex.slice(0, 8),
+      hex.slice(8, 12),
+      hex.slice(12, 16),
+      hex.slice(16, 20),
+      hex.slice(20),
+    ].join('-');
   }
 
   fallbackUuidSequence = (fallbackUuidSequence + 1) % 0x1000000;
@@ -36,5 +42,11 @@ export function createProfileUuid(): string {
   const sequence = fallbackUuidSequence.toString(16).padStart(6, '0');
   // 此分支只生成非敏感幂等键；随机片段避免不同标签页在相同毫秒从相同序号开始时碰撞。
   const randomHex = fallbackRandomHex(18);
-  return `${randomHex.slice(0, 8)}-${randomHex.slice(8, 12)}-4${randomHex.slice(12, 15)}-8${randomHex.slice(15, 18)}-${timestamp}${sequence}`;
+  return [
+    randomHex.slice(0, 8),
+    randomHex.slice(8, 12),
+    `4${randomHex.slice(12, 15)}`,
+    `8${randomHex.slice(15, 18)}`,
+    `${timestamp}${sequence}`,
+  ].join('-');
 }

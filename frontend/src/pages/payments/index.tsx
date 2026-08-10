@@ -49,14 +49,18 @@ export default function PaymentPage() {
   const submitPayment = async () => {
     const payment = await paymentAction.submit();
     if (payment) {
-      history.push(workspacePath(location.pathname, `/payments/${encodeURIComponent(orderNo)}/result`));
+      history.push(
+        workspacePath(location.pathname, `/payments/${encodeURIComponent(orderNo)}/result`),
+      );
     }
   };
 
   const queryPayment = async () => {
     const payment = await paymentAction.query();
     if (payment) {
-      history.push(workspacePath(location.pathname, `/payments/${encodeURIComponent(orderNo)}/result`));
+      history.push(
+        workspacePath(location.pathname, `/payments/${encodeURIComponent(orderNo)}/result`),
+      );
     }
   };
   return (
@@ -66,7 +70,10 @@ export default function PaymentPage() {
           items={[
             PROFILE_BREADCRUMB_ITEM,
             { label: '我的订单', to: workspacePath(location.pathname, '/orders') },
-            { label: '订单详情', to: workspacePath(location.pathname, `/orders/${encodeURIComponent(orderNo)}`) },
+            {
+              label: '订单详情',
+              to: workspacePath(location.pathname, `/orders/${encodeURIComponent(orderNo)}`),
+            },
             { label: '支付订单' },
           ]}
         />
@@ -84,7 +91,9 @@ export default function PaymentPage() {
           }
           onPay={() => void submitPayment()}
           onQueryOrderResult={() => void queryPayment()}
-          onCancelPayment={() => history.push(workspacePath(location.pathname, `/orders/${encodeURIComponent(orderNo)}`))}
+          onCancelPayment={() =>
+            history.push(workspacePath(location.pathname, `/orders/${encodeURIComponent(orderNo)}`))
+          }
         />
       </div>
     </div>

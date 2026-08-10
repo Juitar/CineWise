@@ -46,6 +46,7 @@ public class EmailCodeApplicationService {
     }
 
     public SendEmailCodeResult send(SendEmailCodeCommand command) {
+        // 限流键只用哈希后的邮箱和 IP；日志与 Redis 不能保存明文地址或验证码。
         String normalizedEmail = normalizeEmail(command.email());
         String emailHash = hasher.hash(normalizedEmail, command.purpose(), "rate-limit");
         String ipHash = sanitizer.hashIp(command.remoteAddress());
@@ -59,6 +60,7 @@ public class EmailCodeApplicationService {
                     properties.ipWindow(),
                     properties.maximumIpRequests());
         } catch (RuntimeException exception) {
+            // 限流系统不可用时拒绝发送，避免失去防护后继续大量投递邮件。
             LOGGER.warn("验证码限流服务不可用, traceId={}", command.traceId(), exception);
             throw new BusinessException(AuthErrorCode.MAIL_SERVICE_UNAVAILABLE);
         }
@@ -66,15 +68,18 @@ public class EmailCodeApplicationService {
             throw new BusinessException(AuthErrorCode.RATE_LIMITED);
         }
         if (!permit.emailAllowed()) {
+            // 邮箱冷却期内仍返回一致的成功格式，不让调用方根据响应推断账号状态。
             return result(permit.remainingSeconds());
         }
 
         Optional<AuthUser> candidate = userRepository.findByEmail(normalizedEmail);
+        // 注册、登录和重置对账号存在/状态的投递规则不同，但外部响应保持一致。
         if (!shouldDeliver(command.purpose(), candidate)) {
             return result(properties.cooldown().toSeconds());
         }
 
         String plainCode = generator.generate();
+        // 仅在调用 Provider 前短暂保留明文验证码，持久化层只接收不可逆哈希。
         String codeHash = hasher.hash(normalizedEmail, command.purpose(), plainCode);
         EmailVerificationCode stored = issueTransaction.issue(
                 normalizedEmail, command.purpose(), codeHash, properties.ttl());
@@ -84,6 +89,7 @@ public class EmailCodeApplicationService {
             return result(properties.cooldown().toSeconds());
         }
         if (delivery == VerificationEmailSender.DeliveryResult.FAILED) {
+            // 明确发送失败才撤销验证码和冷却；结果未知不能自动重试，防止重复发信。
             issueTransaction.invalidate(stored.id());
             rateLimiter.releaseEmailCooldown(emailHash, command.purpose());
         }
@@ -91,6 +97,7 @@ public class EmailCodeApplicationService {
     }
 
     private boolean shouldDeliver(VerificationPurpose purpose, Optional<AuthUser> candidate) {
+        // 注册只允许未存在邮箱；其他场景要求普通用户、已激活且已验证邮箱。
         if (purpose == VerificationPurpose.REGISTER) {
             return candidate.isEmpty();
         }
@@ -105,6 +112,7 @@ public class EmailCodeApplicationService {
     }
 
     private String normalizeEmail(String email) {
+        // 统一邮箱格式后才构造哈希和查询条件，避免大小写或空格绕开验证码限流。
         try {
             return EmailAddress.normalize(email);
         } catch (IllegalArgumentException exception) {

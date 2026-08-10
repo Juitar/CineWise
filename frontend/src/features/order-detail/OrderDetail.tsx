@@ -14,6 +14,7 @@ export interface OrderDetailProps {
   cinemaName?: string;
   cinemaArea?: string;
   cinemaAddress?: string;
+  seatLabels?: readonly string[];
   posterUrl?: string | null;
   ticketCount: number;
   unitPrice: string;
@@ -46,6 +47,7 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
   cinemaName = '未知影院',
   cinemaArea,
   cinemaAddress,
+  seatLabels = [],
   posterUrl,
   ticketCount,
   unitPrice,
@@ -271,6 +273,7 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
             {cinemaArea && <div>区域：{cinemaArea}</div>}
             {cinemaAddress && <div>地址：{cinemaAddress}</div>}
             <div>开场时间：{showTime}</div>
+            {seatLabels.length > 0 && <div>座位：{seatLabels.join('、')}</div>}
           </div>
         </div>
       </div>

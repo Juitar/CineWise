@@ -60,7 +60,8 @@ export default function ShowsPage() {
     history.push(
       workspacePath(
         location.pathname,
-        `/shows/${encodeURIComponent(showId)}/seats?movieId=${encodeURIComponent(movieId)}&cinemaId=${encodeURIComponent(cinemaId)}`,
+        `/shows/${encodeURIComponent(showId)}/seats?movieId=${encodeURIComponent(movieId)}` +
+          `&cinemaId=${encodeURIComponent(cinemaId)}`,
       ),
     );
   };

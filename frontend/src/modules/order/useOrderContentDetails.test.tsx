@@ -33,6 +33,8 @@ const cinema: CinemaDetail = {
   cityCode: null,
   area: '测试区域',
   address: '测试地址',
+  longitude: null,
+  latitude: null,
   source: 'DEMO_CONTENT',
   sourceType: 'MOCK',
   dataTime: '2026-08-06T09:00:00+08:00',
