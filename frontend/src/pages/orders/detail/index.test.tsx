@@ -86,7 +86,10 @@ describe('订单详情交易时间展示', () => {
     });
 
     render(<OrderDetailPage />);
-    fireEvent.click(await screen.findByRole('button', { name: '查看出行建议' }));
+    const travelButton = await screen.findByRole('button', { name: '查看出行建议' });
+    expect(screen.queryByText('场次编号：11')).not.toBeInTheDocument();
+    expect(screen.queryByText(/座位编号[：:]/)).not.toBeInTheDocument();
+    fireEvent.click(travelButton);
     await waitFor(() => expect(travelMocks.find).toHaveBeenCalledWith('1'));
     expect(routeMocks.historyPush).toHaveBeenCalledWith('/travel/90001');
   });
