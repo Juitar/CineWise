@@ -21,6 +21,11 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-}
       MINIO_BUCKET: ${MINIO_BUCKET:-cinewise}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      # Agent 真实模型只在容器环境显式开启，避免本地 .env 存在变量但 Docker 未透传而回退 Mock。
+      DEEPSEEK_ENABLED: ${DEEPSEEK_ENABLED:-false}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
       AUTH_AUDIT_HASH_SECRET: ${AUTH_AUDIT_HASH_SECRET:-}
       AUTH_ACCESS_TOKEN_TTL: ${AUTH_ACCESS_TOKEN_TTL:-30m}
       AUTH_RENEWAL_THRESHOLD: ${AUTH_RENEWAL_THRESHOLD:-10m}
