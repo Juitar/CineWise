@@ -5,6 +5,8 @@ import com.miaoyu.ticket.common.id.BusinessIdGenerator;
 import com.miaoyu.ticket.common.observability.TraceIdHolder;
 import com.miaoyu.ticket.profile.application.ProfileDataConsentQuery;
 import com.miaoyu.ticket.profile.application.ProfileDataConsentSnapshot;
+import com.miaoyu.ticket.profile.application.ProfileDataConsentWithdrawnEvent;
+import com.miaoyu.ticket.profile.application.ProfileDataConsentWithdrawalGuard;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
@@ -14,12 +16,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** C 管理独立的画像数据保存同意，注册隐私同意和个性化开关均不能替代。 */
 @Service
-public class ProfileDataConsentService implements ProfileDataConsentQuery {
+public class ProfileDataConsentService implements ProfileDataConsentQuery, ProfileDataConsentWithdrawalGuard {
   private static final Logger LOGGER = LoggerFactory.getLogger(ProfileDataConsentService.class);
   private final ProfileDataConsentRepository consentRepository;
   private final ProfileDataConsentOutboxRepository outboxRepository;
@@ -47,6 +50,22 @@ public class ProfileDataConsentService implements ProfileDataConsentQuery {
     }
     return consentRepository.findByUserId(userId).map(this::toSnapshot)
         .orElseGet(ProfileDataConsentSnapshot::notGranted);
+  }
+
+  /** 在 C 的行锁内校验撤回事件版本，并执行 D 提供的清理动作。 */
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public boolean executeIfCurrent(ProfileDataConsentWithdrawnEvent event, Runnable cleanup) {
+    ProfileDataConsentRepository.ConsentRecord current =
+        consentRepository.findByUserIdForUpdate(event.userId()).orElse(null);
+    if (current == null
+        || current.status() != ProfileDataConsentRepository.Status.WITHDRAWN
+        || current.consentVersion() != event.consentVersion()
+        || current.recordVersion() != event.consentRecordVersion()) {
+      return false;
+    }
+    cleanup.run();
+    return true;
   }
 
   /** 首次同意创建记录，重复同意不递增版本；撤回后重新同意才递增 consentVersion。 */

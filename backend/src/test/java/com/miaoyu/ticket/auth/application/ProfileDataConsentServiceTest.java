@@ -7,12 +7,14 @@ import static org.mockito.Mockito.verify;
 
 import com.miaoyu.ticket.common.error.BusinessException;
 import com.miaoyu.ticket.profile.application.ProfileDataConsentSnapshot;
+import com.miaoyu.ticket.profile.application.ProfileDataConsentWithdrawnEvent;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -43,6 +45,46 @@ class ProfileDataConsentServiceTest {
         ProfileDataConsentSnapshot snapshot = service.findByUserId(1001L);
 
         assertThat(snapshot).isEqualTo(ProfileDataConsentSnapshot.notGranted());
+    }
+
+    @Test
+    void shouldSkipCleanupWhenWithdrawalVersionIsNoLongerCurrent() {
+        consentRepository.record = new ProfileDataConsentRepository.ConsentRecord(
+                1001L,
+                ProfileDataConsentRepository.Status.GRANTED,
+                3L,
+                6L,
+                NOW,
+                null);
+        AtomicBoolean cleaned = new AtomicBoolean();
+
+        boolean executed = service.executeIfCurrent(
+                new ProfileDataConsentWithdrawnEvent(
+                        "event-1", 1001L, 2L, 5L, NOW, "trace-1"),
+                () -> cleaned.set(true));
+
+        assertThat(executed).isFalse();
+        assertThat(cleaned).isFalse();
+    }
+
+    @Test
+    void shouldRunCleanupWhenWithdrawalVersionsMatch() {
+        consentRepository.record = new ProfileDataConsentRepository.ConsentRecord(
+                1001L,
+                ProfileDataConsentRepository.Status.WITHDRAWN,
+                2L,
+                5L,
+                NOW.minusSeconds(60),
+                NOW.minusSeconds(30));
+        AtomicBoolean cleaned = new AtomicBoolean();
+
+        boolean executed = service.executeIfCurrent(
+                new ProfileDataConsentWithdrawnEvent(
+                        "event-1", 1001L, 2L, 5L, NOW, "trace-1"),
+                () -> cleaned.set(true));
+
+        assertThat(executed).isTrue();
+        assertThat(cleaned).isTrue();
     }
 
     @Test
@@ -142,6 +184,11 @@ class ProfileDataConsentServiceTest {
 
         @Override
         public Optional<ConsentRecord> findByUserId(long userId) {
+            return Optional.ofNullable(record);
+        }
+
+        @Override
+        public Optional<ConsentRecord> findByUserIdForUpdate(long userId) {
             return Optional.ofNullable(record);
         }
 

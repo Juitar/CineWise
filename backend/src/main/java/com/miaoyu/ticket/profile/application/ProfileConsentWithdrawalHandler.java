@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ProfileConsentWithdrawalHandler {
   private static final String OPERATION = "CONSENT_WITHDRAWN";
-  private final ProfileDataConsentQuery consentQuery;
+  private final ProfileDataConsentWithdrawalGuard withdrawalGuard;
   private final ProfilePreferenceRepository preferenceRepository;
   private final ProfileTagRepository tagRepository;
   private final ProfileWriteRequestRepository writeRequestRepository;
@@ -25,14 +25,14 @@ public class ProfileConsentWithdrawalHandler {
   private final Clock clock;
 
   public ProfileConsentWithdrawalHandler(
-      ProfileDataConsentQuery consentQuery,
+      ProfileDataConsentWithdrawalGuard withdrawalGuard,
       ProfilePreferenceRepository preferenceRepository,
       ProfileTagRepository tagRepository,
       ProfileWriteRequestRepository writeRequestRepository,
       ProfileSummaryCache summaryCache,
       BusinessIdGenerator idGenerator,
       Clock clock) {
-    this.consentQuery = consentQuery;
+    this.withdrawalGuard = withdrawalGuard;
     this.preferenceRepository = preferenceRepository;
     this.tagRepository = tagRepository;
     this.writeRequestRepository = writeRequestRepository;
@@ -76,14 +76,11 @@ public class ProfileConsentWithdrawalHandler {
     // 当前实现不创建新幂等键，也不通过重试绕过并发版本检查。
     // 撤回事件可能因 outbox 重试晚于重新同意到达；已重新同意时不能再清理新状态。
     // 保留处理记录后，重复投递会在上面的去重判断处结束，不会不断查询或清理。
-    if (consentQuery.findByUserId(event.userId()).granted()) {
-      writeRequestRepository.insert(new ProfileWriteRequestRepository.NewRequest(
-          idGenerator.nextId(), event.userId(), OPERATION, event.eventId(), hash, 200, "{}", now, now.plusDays(30)));
-      return;
-    }
-    preferenceRepository.disable(event.userId(), now);
-    tagRepository.softDeleteAll(event.userId(), now);
-    summaryCache.invalidateUser(event.userId());
+    withdrawalGuard.executeIfCurrent(event, () -> {
+      preferenceRepository.disable(event.userId(), now);
+      tagRepository.softDeleteAll(event.userId(), now);
+      summaryCache.invalidateUser(event.userId());
+    });
     writeRequestRepository.insert(new ProfileWriteRequestRepository.NewRequest(
         idGenerator.nextId(), event.userId(), OPERATION, event.eventId(), hash, 200, "{}", now, now.plusDays(30)));
   }

@@ -8,6 +8,8 @@ public interface ProfileDataConsentRepository {
 
   Optional<ConsentRecord> findByUserId(long userId);
 
+  Optional<ConsentRecord> findByUserIdForUpdate(long userId);
+
   void insertGranted(long id, long userId, String privacyPolicyVersion, Instant now);
 
   boolean regrant(long userId, long expectedRecordVersion, String privacyPolicyVersion, Instant now);

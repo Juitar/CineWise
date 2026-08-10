@@ -19,7 +19,7 @@ class ProfileConsentWithdrawalHandlerTest {
     @Test
     void shouldDisableProfileOnceForDuplicateEventId() {
         ProfilePreferenceRepository preferences = mock(ProfilePreferenceRepository.class);
-        ProfileDataConsentQuery consentQuery = mock(ProfileDataConsentQuery.class);
+        ProfileDataConsentWithdrawalGuard withdrawalGuard = mock(ProfileDataConsentWithdrawalGuard.class);
         ProfileTagRepository tags = mock(ProfileTagRepository.class);
         ProfileWriteRequestRepository writes = mock(ProfileWriteRequestRepository.class);
         ProfileSummaryCache cache = mock(ProfileSummaryCache.class);
@@ -34,10 +34,12 @@ class ProfileConsentWithdrawalHandlerTest {
         when(writes.findByUserIdAndOperationAndIdempotencyKey(
                 1001L, "CONSENT_WITHDRAWN", "event-1"))
                 .thenReturn(Optional.empty(), Optional.of(replay));
-        when(consentQuery.findByUserId(1001L)).thenReturn(
-                new ProfileDataConsentSnapshot(false, 2L, 5L, null, Instant.parse("2026-08-07T00:00:00Z")));
+        when(withdrawalGuard.executeIfCurrent(any(), any())).thenAnswer(invocation -> {
+            invocation.<Runnable>getArgument(1).run();
+            return true;
+        });
         ProfileConsentWithdrawalHandler handler = new ProfileConsentWithdrawalHandler(
-                consentQuery,
+                withdrawalGuard,
                 preferences,
                 tags,
                 writes,
@@ -63,18 +65,17 @@ class ProfileConsentWithdrawalHandlerTest {
 
     @Test
     void shouldSkipStaleWithdrawalAfterConsentWasGrantedAgain() {
-        ProfileDataConsentQuery consentQuery = mock(ProfileDataConsentQuery.class);
+        ProfileDataConsentWithdrawalGuard withdrawalGuard = mock(ProfileDataConsentWithdrawalGuard.class);
         ProfilePreferenceRepository preferences = mock(ProfilePreferenceRepository.class);
         ProfileTagRepository tags = mock(ProfileTagRepository.class);
         ProfileWriteRequestRepository writes = mock(ProfileWriteRequestRepository.class);
         ProfileSummaryCache cache = mock(ProfileSummaryCache.class);
         when(writes.findByUserIdAndOperationAndIdempotencyKey(1001L, "CONSENT_WITHDRAWN", "event-1"))
                 .thenReturn(Optional.empty());
-        when(consentQuery.findByUserId(1001L)).thenReturn(
-                new ProfileDataConsentSnapshot(true, 3L, 6L, Instant.parse("2026-08-07T00:00:00Z"), null));
+        when(withdrawalGuard.executeIfCurrent(any(), any())).thenReturn(false);
 
         ProfileConsentWithdrawalHandler handler = new ProfileConsentWithdrawalHandler(
-                consentQuery,
+                withdrawalGuard,
                 preferences,
                 tags,
                 writes,

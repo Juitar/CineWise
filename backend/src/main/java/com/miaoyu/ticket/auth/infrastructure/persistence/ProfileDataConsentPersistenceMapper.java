@@ -18,6 +18,14 @@ public interface ProfileDataConsentPersistenceMapper {
       """)
   Row findByUserId(@Param("userId") long userId);
 
+  @Select("""
+      SELECT user_id, status, consent_version, version, granted_at, withdrawn_at
+        FROM sys_profile_data_consent
+       WHERE user_id = #{userId}
+       FOR UPDATE
+      """)
+  Row findByUserIdForUpdate(@Param("userId") long userId);
+
   @Insert("""
       INSERT INTO sys_profile_data_consent (
           id, user_id, status, consent_version, privacy_policy_version,
