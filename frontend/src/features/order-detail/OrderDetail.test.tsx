@@ -13,7 +13,6 @@ describe('OrderDetail 组件', () => {
     showTitle: '流浪地球3',
     showTime: '2026-08-10T14:30:00+08:00',
     cinemaName: '妙语影城（大悦城店）',
-    seatLabels: ['5排10座', '5排11座'],
     ticketCount: 2,
     unitPrice: '39.00',
     totalAmount: '78.00',
@@ -31,8 +30,8 @@ describe('OrderDetail 组件', () => {
     );
     expect(screen.getByText('订单详情')).toBeInTheDocument();
     expect(screen.getByText('流浪地球3')).toBeInTheDocument();
-    expect(screen.getByText(/座位编号[：:]/)).toBeInTheDocument();
-    expect(screen.getByText('5排10座、5排11座')).toBeInTheDocument();
+    expect(screen.queryByText(/场次编号[：:]/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/座位编号[：:]/)).not.toBeInTheDocument();
     expect(screen.getByText('¥ 78.00')).toBeInTheDocument();
 
     const ticketBtn = screen.getByRole('button', { name: '查看电子票' });

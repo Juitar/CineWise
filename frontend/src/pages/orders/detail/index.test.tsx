@@ -86,6 +86,9 @@ describe('订单详情交易时间展示', () => {
     });
 
     render(<OrderDetailPage />);
+    const travelButton = await screen.findByRole('button', { name: '查看出行建议' });
+    expect(screen.queryByText('场次编号：11')).not.toBeInTheDocument();
+    expect(screen.queryByText(/座位编号[：:]/)).not.toBeInTheDocument();
     const breadcrumb = screen.getByRole('navigation', { name: '面包屑' });
     expect(within(breadcrumb).getByRole('link', { name: '个人中心' })).toHaveAttribute(
       'href',
@@ -95,7 +98,7 @@ describe('订单详情交易时间展示', () => {
       'href',
       '/orders',
     );
-    fireEvent.click(await screen.findByRole('button', { name: '查看出行建议' }));
+    fireEvent.click(travelButton);
     await waitFor(() => expect(travelMocks.find).toHaveBeenCalledWith('1'));
     expect(routeMocks.historyPush).toHaveBeenCalledWith('/travel/90001');
   });

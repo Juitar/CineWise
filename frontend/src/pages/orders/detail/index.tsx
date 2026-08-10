@@ -108,9 +108,7 @@ export default function OrderDetailPage() {
           orderNo={order?.orderNo ?? orderNo}
           status={order?.status ?? 'PENDING_PAYMENT'}
           showTitle={order ? (movie?.title ?? '影片信息暂不可用') : undefined}
-          showId={order?.showId}
           showTime={formatOrderDateTime(order?.showStartTime)}
-          seatLabels={order?.seatIds}
           posterUrl={movie?.posterUrl}
           cinemaName={cinema?.name ?? '影院信息暂不可用'}
           cinemaArea={cinema?.area ?? undefined}

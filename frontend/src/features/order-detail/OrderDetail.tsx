@@ -10,13 +10,11 @@ export interface OrderDetailProps {
   orderNo: string;
   status: OrderStatus;
   showTitle?: string;
-  showId?: string;
   showTime?: string;
   cinemaName?: string;
   cinemaArea?: string;
   cinemaAddress?: string;
   posterUrl?: string | null;
-  seatLabels?: string[];
   ticketCount: number;
   unitPrice: string;
   totalAmount: string;
@@ -44,13 +42,11 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
   orderNo,
   status,
   showTitle = '未知影片',
-  showId,
   showTime = '待定',
   cinemaName = '未知影院',
   cinemaArea,
   cinemaAddress,
   posterUrl,
-  seatLabels = [],
   ticketCount,
   unitPrice,
   totalAmount,
@@ -271,17 +267,10 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
           {posterUrl && <img className="order-movie-poster" src={posterUrl} alt="" />}
           <div className="order-movie-name">{showTitle}</div>
           <div className="order-movie-meta">
-            {showId && <div>场次编号：{showId}</div>}
             <div>影院：{cinemaName}</div>
             {cinemaArea && <div>区域：{cinemaArea}</div>}
             {cinemaAddress && <div>地址：{cinemaAddress}</div>}
             <div>开场时间：{showTime}</div>
-            <div>
-              座位编号：
-              <span className="order-seat-list">
-                {seatLabels.length > 0 ? seatLabels.join('、') : '见凭证座位'}
-              </span>
-            </div>
           </div>
         </div>
       </div>
