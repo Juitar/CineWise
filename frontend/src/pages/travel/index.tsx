@@ -10,6 +10,7 @@ import {
 import { useTravelTask } from '../../modules/travel/useTravelTask';
 import { useTravelRoute } from '../../modules/travel/useTravelRoute';
 import { isTravelAdviceAvailable } from '../../modules/travel/advice-availability';
+import { formatTravelSource } from '../../modules/travel/source-labels';
 import {
   ORDERS_BREADCRUMB_ITEM,
   PROFILE_BREADCRUMB_ITEM,
@@ -237,7 +238,9 @@ export default function TravelPage() {
             <Descriptions.Item label="地址">
               {task.cinema.address ?? '地址信息暂不可用'}
             </Descriptions.Item>
-            <Descriptions.Item label="内容来源">{task.cinema.source}</Descriptions.Item>
+            <Descriptions.Item label="内容来源">
+              {formatTravelSource(task.cinema.source, 'CONTENT')}
+            </Descriptions.Item>
           </Descriptions>
         </Card>
 
@@ -354,7 +357,9 @@ export default function TravelPage() {
               <Descriptions.Item label="预计出发时间">
                 {formatOrderDateTime(travelRoute.route.suggestedDepartureAt)}
               </Descriptions.Item>
-              <Descriptions.Item label="路线来源">{travelRoute.route.source}</Descriptions.Item>
+              <Descriptions.Item label="路线来源">
+                {formatTravelSource(travelRoute.route.source, 'ROUTE')}
+              </Descriptions.Item>
               <Descriptions.Item label="数据时间">
                 {formatOrderDateTime(travelRoute.route.dataTime)}
               </Descriptions.Item>
@@ -414,7 +419,7 @@ export default function TravelPage() {
           </div>
         )}
         <p className="travel-freshness">
-          来源：{advice.source ?? '暂不可用'} · 数据时间：
+          来源：{formatTravelSource(advice.source, 'WEATHER')} · 数据时间：
           {formatOrderDateTime(advice.dataAt, '暂不可用')} · 有效期：
           {formatOrderDateTime(advice.expiresAt, '暂不可用')}
         </p>
