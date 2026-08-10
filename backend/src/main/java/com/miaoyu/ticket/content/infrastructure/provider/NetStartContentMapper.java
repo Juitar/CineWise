@@ -33,6 +33,12 @@ import java.util.List;
  */
 final class NetStartContentMapper {
 
+    /**
+     * 地址中的行政区域由受控清单解析，避免“住宅区”等地点名称被错误写入影院资料。
+     * 解析规则属于 Provider 字段标准化，不能散落到前端或天气模块重复处理。
+     */
+    private final CinemaAdministrativeAreaResolver areaResolver = new CinemaAdministrativeAreaResolver();
+
     Optional<ContentItem> map(ContentResourceType type, JsonNode raw, String cityCode) {
         return type == ContentResourceType.MOVIE ? mapMovie(raw) : mapCinema(raw, cityCode);
     }
@@ -69,7 +75,7 @@ final class NetStartContentMapper {
         JsonNode info = raw.path("info").isObject() ? raw.path("info") : raw;
         return text(raw, "id").flatMap(id -> text(info, "name").flatMap(name -> text(info, "address")
                 .flatMap(address -> text(cityCode).map(city -> new CinemaContent(id, name, city,
-                        areaFromAddress(address), address, coordinate(raw, "lng", "longitude", 180),
+                        areaFromAddress(city, address), address, coordinate(raw, "lng", "longitude", 180),
                         coordinate(raw, "lat", "latitude", 90))))));
     }
 
@@ -77,7 +83,7 @@ final class NetStartContentMapper {
         JsonNode data = raw.path("data").isObject() ? raw.path("data") : raw;
         return text(data, "cinemaId").flatMap(id -> text(data, "nm").flatMap(name -> text(data, "addr")
                 .flatMap(address -> text(cityCode).map(city -> new CinemaContent(id, name, city,
-                        areaFromAddress(address), address, coordinate(data, "lng", "longitude", 180),
+                        areaFromAddress(city, address), address, coordinate(data, "lng", "longitude", 180),
                         coordinate(data, "lat", "latitude", 90))))));
     }
 
@@ -130,9 +136,12 @@ final class NetStartContentMapper {
         Optional<BigDecimal> value = decimal(node, shortField).or(() -> decimal(node, longField));
         return value.filter(item -> item.abs().compareTo(BigDecimal.valueOf(maximumAbsoluteValue)) <= 0).orElse(null);
     }
-    private String areaFromAddress(String address) {
-        int index = address.indexOf('区');
-        return index > 0 ? address.substring(0, index + 1) : "未知区域";
+    /**
+     * Provider 未提供独立区域字段时，只从当前同步城市已登记的行政区名称中匹配。
+     * 未命中不做后缀猜测，既保证“浏阳市”等县级市可用，也避免把商圈名称写成行政区。
+     */
+    private String areaFromAddress(String cityCode, String address) {
+        return areaResolver.resolve(cityCode, address);
     }
     /**
      * 上游逗号分隔分类在写入 JSON 列前转为数组，公开接口才能稳定返回 genres 数组。

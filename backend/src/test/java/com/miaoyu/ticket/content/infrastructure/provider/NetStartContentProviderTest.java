@@ -150,6 +150,20 @@ class NetStartContentProviderTest {
     }
 
     @Test
+    void givenCountyLevelCityAddress_whenQuery_thenItKeepsTheRecognizedAdministrativeArea() {
+        NetStartContentProvider provider = provider(query -> json("""
+                [{"id":41479,"info":{"name":"浏阳测试影城",
+                "address":"浏阳市镇头镇华嘉时代广场B1栋412号"}}]
+                """));
+
+        CinemaContent cinema = (CinemaContent) provider.query(
+                new ContentQuery(ContentResourceType.CINEMA, null, "430100", "影城"))
+                .orElseThrow().data().getFirst();
+
+        assertThat(cinema.area()).isEqualTo("浏阳市");
+    }
+
+    @Test
     void givenCinemaSearchWithoutCoordinates_whenDetailProvidesCoordinates_thenItEnrichesTheCinema() {
         AtomicInteger detailCalls = new AtomicInteger();
         NetStartRawClient client = new NetStartRawClient() {
